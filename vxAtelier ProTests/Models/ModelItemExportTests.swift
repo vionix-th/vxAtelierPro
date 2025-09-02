@@ -1,0 +1,18 @@
+import XCTest
+import SwiftData
+@testable import vxAtelier_Pro_debug
+
+final class ModelItemExportTests: XCTestCase {
+    func testExportImportRoundtrip() throws {
+        let original = ModelItem(name: "gpt-4", contextSize: 8192, provider: "OpenAI")
+        original.capabilities = [.text, .vision]
+        let exportData = ModelExportData(original)
+        let encoded = try JSONEncoder().encode(exportData)
+        let decoded = try JSONDecoder().decode(ModelExportData.self, from: encoded)
+        let restored = decoded.toDataItem()
+        XCTAssertEqual(restored.name, original.name)
+        XCTAssertEqual(restored.contextSize, original.contextSize)
+        XCTAssertEqual(restored.provider, original.provider)
+        XCTAssertEqual(Set(restored.capabilities), Set(original.capabilities))
+    }
+}

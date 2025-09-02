@@ -1,0 +1,11 @@
+.build
+.cursor
+.windsurf
+.vscode
+.DS_Store
+.cursorignore
+Build/
+DerivedData/
+TestResults
+TestResults.xcresult/
+
