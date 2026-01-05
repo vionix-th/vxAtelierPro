@@ -56,34 +56,43 @@ struct APISettingsView: View {
             )
             .padding(.vertical, AppDefaults.paddingSmall)
             .padding(.horizontal, AppDefaults.paddingSmall)
-
-            List {
-                ForEach(queryManager.apiConfigurations.sorted { $0.name < $1.name }) { config in
-                    SettingsListRow(
-                        title: config.name,
-                        subtitle: config.baseURL,
-                        icons: isDefaultConfiguration(config) ? [Image(systemName: "star.fill")] : [],
-                        onEdit: {
-                            editingConfig = EditingConfig(config: config, isNew: false)
-                        },
-                        onDelete: {
-                            deleteAPIConfiguration(config)
+            
+            if queryManager.apiConfigurations.isEmpty {
+                ContentUnavailableView(
+                    "No API Configurations",
+                    systemImage: "key",
+                    description: Text("Add an API configuration to enable chatting and model fetching.")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List {
+                    ForEach(queryManager.apiConfigurations.sorted { $0.name < $1.name }) { config in
+                        SettingsListRow(
+                            title: config.name,
+                            subtitle: config.baseURL,
+                            icons: isDefaultConfiguration(config) ? [Image(systemName: "star.fill")] : [],
+                            onEdit: {
+                                editingConfig = EditingConfig(config: config, isNew: false)
+                            },
+                            onDelete: {
+                                deleteAPIConfiguration(config)
+                            }
+                        ) {
+                            if !config.apiKey.isEmpty {
+                                Text("API Key: \(config.apiKey.prefix(4))...\(config.apiKey.suffix(4))")
+                                    .font(.caption2)
+                                    .foregroundColor(.gray)
+                            }
                         }
-                    ) {
-                        if !config.apiKey.isEmpty {
-                            Text("API Key: \(config.apiKey.prefix(4))...\(config.apiKey.suffix(4))")
-                                .font(.caption2)
-                                .foregroundColor(.gray)
-                        }
+                        .settingsRowActions(
+                            onEdit: {
+                                editingConfig = EditingConfig(config: config, isNew: false)
+                            },
+                            onDelete: {
+                                deleteAPIConfiguration(config)
+                            }
+                        )
                     }
-                    .settingsRowActions(
-                        onEdit: {
-                            editingConfig = EditingConfig(config: config, isNew: false)
-                        },
-                        onDelete: {
-                            deleteAPIConfiguration(config)
-                        }
-                    )
                 }
             }
         }

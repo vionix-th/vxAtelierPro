@@ -48,38 +48,47 @@ struct WebSearchSettingsView: View {
             .padding(.vertical, AppDefaults.paddingSmall)
             .padding(.horizontal, AppDefaults.paddingSmall)
 
-            List {
-                ForEach(queryManager.webSearchConfigurations.sorted { $0.name < $1.name }) { config in
-                    SettingsListRow(
-                        title: config.name,
-                        subtitle: "Provider: \(config.provider)",
-                        icons: config.isDefault ? [Image(systemName: "star.fill")] : [],
-                        onEdit: {
-                            editingConfig = EditingConfig(config: config, isNew: false)
-                        },
-                        onDelete: {
-                            deleteWebSearchConfiguration(config)
+            if queryManager.webSearchConfigurations.isEmpty {
+                ContentUnavailableView(
+                    "No Web Search Configurations",
+                    systemImage: "magnifyingglass",
+                    description: Text("Add a web search configuration to enable the search tool.")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List {
+                    ForEach(queryManager.webSearchConfigurations.sorted { $0.name < $1.name }) { config in
+                        SettingsListRow(
+                            title: config.name,
+                            subtitle: "Provider: \(config.provider)",
+                            icons: config.isDefault ? [Image(systemName: "star.fill")] : [],
+                            onEdit: {
+                                editingConfig = EditingConfig(config: config, isNew: false)
+                            },
+                            onDelete: {
+                                deleteWebSearchConfiguration(config)
+                            }
+                        ) {
+                            if let key = config.apiKey, !key.isEmpty {
+                                Text("API Key: \(key.prefix(4))...\(key.suffix(4))")
+                                    .font(.caption2)
+                                    .foregroundColor(.gray)
+                            }
+                            if let cx = config.searchEngineId, !cx.isEmpty {
+                                Text("Engine ID: \(cx)")
+                                    .font(.caption2)
+                                    .foregroundColor(.gray)
+                            }
                         }
-                    ) {
-                        if let key = config.apiKey, !key.isEmpty {
-                            Text("API Key: \(key.prefix(4))...\(key.suffix(4))")
-                                .font(.caption2)
-                                .foregroundColor(.gray)
-                        }
-                        if let cx = config.searchEngineId, !cx.isEmpty {
-                            Text("Engine ID: \(cx)")
-                                .font(.caption2)
-                                .foregroundColor(.gray)
-                        }
+                        .settingsRowActions(
+                            onEdit: {
+                                editingConfig = EditingConfig(config: config, isNew: false)
+                            },
+                            onDelete: {
+                                deleteWebSearchConfiguration(config)
+                            }
+                        )
                     }
-                    .settingsRowActions(
-                        onEdit: {
-                            editingConfig = EditingConfig(config: config, isNew: false)
-                        },
-                        onDelete: {
-                            deleteWebSearchConfiguration(config)
-                        }
-                    )
                 }
             }
         }

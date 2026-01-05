@@ -120,7 +120,6 @@ struct vxAtelierPro: App {
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         
-
         do {
             return try ModelContainer(for: schema, migrationPlan: ProjectMigrationPlan.self, configurations: modelConfiguration)
         } catch {
