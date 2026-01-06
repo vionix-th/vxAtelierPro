@@ -32,46 +32,46 @@ class XAIService: OpenAIService {
         await vxAtelierPro.log.info("Fetching available models")
         
         // Start with default models as the base
-        var modelMap = Dictionary(uniqueKeysWithValues: XAIDefaults.defaultModels.map { ($0.id, $0) })
+        var modelMap = Dictionary(uniqueKeysWithValues: getDefaultModels().map { ($0.id, $0) })
         
-        do {
-            // Fetch models from the API
-            let url = try createURL(for: self.configuration.modelsEndpoint)
-            let response = try await NetworkManager.shared.getRequest(
-                url: url.absoluteString,
-                apiKey: self.configuration.apiKey,
-                responseType: XAICodableTypes.ModelsResponse.self
-            )
-            await vxAtelierPro.log.debug("XAIService: Successfully fetched \(response.data.count) models from API")
+        // Fetch models from the API
+        let url = try createURL(for: self.configuration.modelsEndpoint)
+        let response = try await NetworkManager.shared.getRequest(
+            url: url.absoluteString,
+            apiKey: self.configuration.apiKey,
+            responseType: XAICodableTypes.ModelsResponse.self
+        )
+        await vxAtelierPro.log.debug("XAIService: Successfully fetched \(response.data.count) models from API")
+        
+        // Process API models and merge with defaults
+        for modelData in response.data {
+            let modelId = modelData.id
             
-            // Process API models and merge with defaults
-            for modelData in response.data {
-                let modelId = modelData.id
-                
-                // If we already have this model in defaults, keep it
-                if modelMap[modelId] != nil {
-                    continue
-                }
-                
-                // Otherwise create a new model entry
-                let capabilities = ModelProviderUtils.inferCapabilities(from: modelId)
-                // Use default fallback size for unknown models
-                let contextSize = AppDefaults.ModelContextSizes.defaultSize
-                
-                let model = XAIModel(
-                    id: modelId,
-                    provider: ModelProviderUtils.Provider.xAI.rawValue,
-                    capabilities: capabilities,
-                    contextSize: contextSize
-                )
-                
-                modelMap[modelId] = model
+            // If we already have this model in defaults, keep it
+            if modelMap[modelId] != nil {
+                continue
             }
-        } catch {
-            await vxAtelierPro.log.warning("Failed to fetch models from API: \(error.localizedDescription). Using default models.")
+            
+            // Otherwise create a new model entry
+            let capabilities = ModelProviderUtils.inferCapabilities(from: modelId)
+            // Use default fallback size for unknown models
+            let contextSize = AppDefaults.ModelContextSizes.defaultSize
+            
+            let model = XAIModel(
+                id: modelId,
+                provider: ModelProviderUtils.Provider.xAI.rawValue,
+                capabilities: capabilities,
+                contextSize: contextSize
+            )
+            
+            modelMap[modelId] = model
         }
         
         return Array(modelMap.values)
+    }
+
+    override func getDefaultModels() -> [AIModel] {
+        XAIDefaults.defaultModels
     }
 
     // Override to provide XAI-specific defaults

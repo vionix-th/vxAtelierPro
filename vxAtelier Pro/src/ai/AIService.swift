@@ -21,6 +21,11 @@ public protocol AIService {
     /// - Returns: Array of AI models supported by the provider
     /// - Throws: AIServiceError for network, authentication, or parsing failures
     func fetchAvailableModels() async throws -> [AIModel]
+
+    /// Returns the provider's default model catalog with baked-in metadata
+    /// (context window, capabilities, identifiers). Used as a baseline for
+    /// merging with live provider listings and for offline/default UX.
+    func getDefaultModels() -> [AIModel]
     
     /// Returns default request parameters supported by this provider.
     /// These parameters are used to configure model behavior (temperature, tokens, etc).
@@ -231,4 +236,3 @@ extension AIChatMessage {
         return estimatedTokens
     }
 }
-

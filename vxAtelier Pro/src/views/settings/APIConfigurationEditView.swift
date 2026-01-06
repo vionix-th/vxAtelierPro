@@ -37,6 +37,8 @@ struct APIConfigurationEditView: View {
     @State private var showValidationError = false
     @State private var validationErrorMessage = ""
     @State private var isModelPickerPresented = false
+    @State private var hasUserEditedDefaultModel = false
+    @State private var isValidating = false
 
     // MARK: - Initialization
 
@@ -49,7 +51,9 @@ struct APIConfigurationEditView: View {
         _chatEndpoint = State(initialValue: configuration.chatCompletionsEndpoint)
         _modelsEndpoint = State(initialValue: configuration.modelsEndpoint)
         _isDefault = State(initialValue: configuration.isDefault)
-        _defaultModel = State(initialValue: configuration.defaultModel ?? "")
+        let initialDefaultModel = (configuration.defaultModel?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { !$0.isEmpty ? $0 : nil }
+            ?? APIConfigurationEditView.suggestedDefaultModel(for: configuration.baseURL)
+        _defaultModel = State(initialValue: initialDefaultModel)
     }
 
     // MARK: - View Body
@@ -77,8 +81,12 @@ struct APIConfigurationEditView: View {
                         }
                         // Default Configuration Toggle
                         VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
-                            
-                            let isOnlyConfig = queryManager.apiConfigurations.count < 2
+                            let configsCount = queryManager.apiConfigurations.count
+                            let toggleDisabled: Bool = {
+                                if configsCount == 0 { return true } // first config must stay default
+                                if configsCount == 1 && !isNewConfiguration { return true } // only config cannot be unset
+                                return false
+                            }()
 
                             Toggle(isOn: $isDefault) {
                                 HStack(spacing: 6) {
@@ -90,11 +98,10 @@ struct APIConfigurationEditView: View {
                             }
                             .toggleStyle(.switch)
                             .padding(.horizontal, AppDefaults.paddingSmall)
-                            .disabled(isOnlyConfig)
-                            .help(
-                                isOnlyConfig ? "The only configuration is always the default." : "")
-                            if isOnlyConfig {
-                                Text("The only configuration is always the default.")
+                            .disabled(toggleDisabled)
+                            .help(toggleDisabled ? "The only configuration must remain default." : "")
+                            if toggleDisabled {
+                                Text("The only configuration must remain default.")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -107,6 +114,9 @@ struct APIConfigurationEditView: View {
                             HStack {
                                 TextField("Default Model", text: $defaultModel)
                                     .textFieldStyle(.roundedBorder)
+                                    .onChange(of: defaultModel) { _, _ in
+                                        hasUserEditedDefaultModel = true
+                                    }
                                 Button {
                                     isModelPickerPresented = true
                                 } label: {
@@ -123,6 +133,7 @@ struct APIConfigurationEditView: View {
                                     selectedModel: defaultModel,
                                     onModelSelected: { model in
                                         defaultModel = model
+                                        hasUserEditedDefaultModel = true
                                     },
                                     currentProvider: AIServiceProvider.detectProvider(
                                         from: configuration)
@@ -298,11 +309,16 @@ struct APIConfigurationEditView: View {
         }
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Save") {
-                    if validateInputs() {
-                        saveConfiguration()
+                Button {
+                    Task { await saveConfigurationAsync() }
+                } label: {
+                    if isValidating {
+                        ProgressView()
+                    } else {
+                        Text("Save")
                     }
                 }
+                .disabled(isValidating)
             }
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") {
@@ -310,6 +326,11 @@ struct APIConfigurationEditView: View {
                         "🔑 APIConfigurationListView: Configuration edit cancelled")
                     dismiss()
                 }
+            }
+        }
+        .onChange(of: baseURL) { _, newValue in
+            if !hasUserEditedDefaultModel || defaultModel.isEmpty {
+                defaultModel = APIConfigurationEditView.suggestedDefaultModel(for: newValue)
             }
         }
     }
@@ -339,18 +360,14 @@ struct APIConfigurationEditView: View {
         #endif
     }
 
-    // Computed property for displaying default model immediately in the UI
-    private var computedDefaultModel: String {
+    /// Suggests a default model for a given baseURL/provider
+    static func suggestedDefaultModel(for baseURL: String) -> String {
         let provider = AIServiceProvider.detectProvider(from: baseURL)
         switch provider {
-        case .openAI:
-            return AppDefaults.OpenAi.model
-        case .anthropic:
-            return AppDefaults.Anthropic.model
-        case .xAI:
-            return AppDefaults.XAI.model
-        case .deepSeek:
-            return AppDefaults.DeepSeek.model
+        case .openAI: return AppDefaults.OpenAi.model
+        case .anthropic: return AppDefaults.Anthropic.model
+        case .xAI: return AppDefaults.XAI.model
+        case .deepSeek: return AppDefaults.DeepSeek.model
         }
     }
 
@@ -367,6 +384,12 @@ struct APIConfigurationEditView: View {
         vxAtelierPro.log.debug("🔑 Copied API key to clipboard")
     }
 
+    /// Performs a lightweight validation against the provider (fetch models)
+    private func validateConfiguration(_ config: APIConfigurationItem) async throws {
+        let service = AIServiceManager.shared.getService(with: config)
+        _ = try await service.fetchAvailableModels()
+    }
+
     /// Validates all input fields before saving
     /// - Returns: True if all inputs are valid
     private func validateInputs() -> Bool {
@@ -376,8 +399,6 @@ struct APIConfigurationEditView: View {
             showValidationError = true
             return false
         }
-
-        // API key is now optional, so no check here
 
         // Check for valid base URL
         if !baseURL.hasPrefix("http://") && !baseURL.hasPrefix("https://") {
@@ -389,12 +410,15 @@ struct APIConfigurationEditView: View {
         return true
     }
 
-    /// Saves the configuration changes
-    private func saveConfiguration() {
+    /// Saves the configuration changes with validation against the provider
+    private func saveConfigurationAsync() async {
         guard validateInputs() else {
             showValidationError = true
             return
         }
+
+        isValidating = true
+        defer { isValidating = false }
 
         let configToSave = configuration
         let shouldInsert = isNewConfiguration
@@ -404,24 +428,41 @@ struct APIConfigurationEditView: View {
         configToSave.baseURL = baseURL
         configToSave.chatCompletionsEndpoint = chatEndpoint
         configToSave.modelsEndpoint = modelsEndpoint
-        // Always enforce isDefault = true if only one config exists
-        if queryManager.apiConfigurations.count > 1 {
-            configToSave.isDefault = isDefault
-            if isDefault {
-                for other in queryManager.apiConfigurations
-                where other.id != configToSave.id && other.isDefault {
-                    other.isDefault = false
-                    vxAtelierPro.log.debug("🔑 Unset previous default: \(other.name)")
-                }
+
+        let configsCount = queryManager.apiConfigurations.count
+        if configsCount == 0 {
+            isDefault = true
+        } else if configsCount == 1 && !isNewConfiguration {
+            isDefault = true
+        }
+
+        configToSave.isDefault = isDefault
+        if configToSave.isDefault {
+            for other in queryManager.apiConfigurations
+            where other.id != configToSave.id && other.isDefault {
+                other.isDefault = false
+                vxAtelierPro.log.debug("🔑 Unset previous default: \(other.name)")
             }
         }
 
-        // Set defaultModel to user input, or fallback to computedDefaultModel
-        if defaultModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            configToSave.defaultModel = computedDefaultModel
-            vxAtelierPro.log.info("🔑 Set default model to computed default: \(computedDefaultModel)")
+        let trimmedDefaultModel = defaultModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedDefaultModel.isEmpty {
+            let suggested = APIConfigurationEditView.suggestedDefaultModel(for: baseURL)
+            configToSave.defaultModel = suggested
+            vxAtelierPro.log.info("🔑 Set default model to computed default: \(suggested)")
         } else {
-            configToSave.defaultModel = defaultModel
+            configToSave.defaultModel = trimmedDefaultModel
+        }
+
+        do {
+            try await validateConfiguration(configToSave)
+        } catch {
+            validationErrorMessage = "Failed to validate configuration: \(error.localizedDescription)"
+            showValidationError = true
+            vxAtelierPro.log.error(
+                "🔑 Validation failed for configuration \(configToSave.name): \(error.localizedDescription)"
+            )
+            return
         }
 
         do {
@@ -430,9 +471,9 @@ struct APIConfigurationEditView: View {
                 vxAtelierPro.log.info(
                     "🔑 Inserted configuration: \(configToSave.name), isDefault: \(configToSave.isDefault)"
                 )
+            } else {
+                try queryManager.saveContext()
             }
-            
-            try queryManager.saveContext()
             dismiss()
         } catch {
             validationErrorMessage = "Failed to save configuration: \(error.localizedDescription)"
@@ -459,7 +500,8 @@ struct APIConfigurationEditView: View {
         modelsEndpoint = preset.modelsEndpoint
 
         // Always set the default model to the computed default for the selected provider
-        defaultModel = computedDefaultModel
+        defaultModel = APIConfigurationEditView.suggestedDefaultModel(for: preset.baseURL)
+        hasUserEditedDefaultModel = false
 
         vxAtelierPro.log.info("🔑 Applied \(preset.displayName) preset")
         selectedPreset = nil
@@ -523,4 +565,10 @@ enum APIPreset: String, CaseIterable {
         case .deepSeek: return AppDefaults.DeepSeek.modelsEndpoint
         }
     }
+}
+
+// MARK: - Validation Error
+private struct ValidationError: LocalizedError {
+    let message: String
+    var errorDescription: String? { message }
 }

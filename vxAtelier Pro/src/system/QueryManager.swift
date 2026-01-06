@@ -1,7 +1,7 @@
+import Combine
+import Observation
 import SwiftData
 import SwiftUI
-import Observation
-import Combine
 
 /// Centralized manager for all SwiftData queries in the application
 /// This class acts as a single source of truth for data access throughout the app
@@ -10,12 +10,12 @@ import Combine
 final class QueryManager: @unchecked Sendable {
     // MARK: - Model Context
     private let modelContext: ModelContext
-    
+
     // MARK: - Published Properties
     // These are all conversations and projects, regardless of filtering
     var allConversations: [ConversationItem] = []
     var allProjects: [ProjectItem] = []
-    
+
     // These remain private as they're only used internally for filtering
     private var allBookmarks: [BookmarkItem] = []
     private var allApiConfigurations: [APIConfigurationItem] = []
@@ -23,7 +23,7 @@ final class QueryManager: @unchecked Sendable {
     private var allVoiceConfigurations: [VoiceConfigurationItem] = []
     private var allModels: [ModelItem] = []
     private var allWebSearchConfigurations: [WebSearchConfigurationItem] = []
-    
+
     // MARK: - Fetch Descriptors
     private let conversationDescriptor: FetchDescriptor<ConversationItem>
     private let projectsDescriptor: FetchDescriptor<ProjectItem>
@@ -33,62 +33,76 @@ final class QueryManager: @unchecked Sendable {
     private let voiceConfigurationsDescriptor: FetchDescriptor<VoiceConfigurationItem>
     private let modelsDescriptor: FetchDescriptor<ModelItem>
     private let webSearchConfigurationsDescriptor: FetchDescriptor<WebSearchConfigurationItem>
-    
+
     // MARK: - User Preferences (for filtering)
     // Use @ObservationIgnored to prevent conflict with AppStorage's own property wrappers
-    @ObservationIgnored @AppStorage("ShowUserDialogsOnly") 
+    @ObservationIgnored @AppStorage("ShowUserDialogsOnly")
     private var appStorageShowUserDialogsOnly: Bool = true {
-        didSet { 
-            refreshFilteredData() 
+        didSet {
+            refreshFilteredData()
         }
     }
-    
-    @ObservationIgnored @AppStorage("ShowArchived") 
+
+    @ObservationIgnored @AppStorage("ShowArchived")
     private var appStorageShowArchived: Bool = false {
-        didSet { 
+        didSet {
             if appStorageShowArchived {
                 appStorageShowTrashed = false
             }
-            refreshFilteredData() 
+            refreshFilteredData()
         }
     }
-    
-    @ObservationIgnored @AppStorage("ShowTrashed") 
+
+    @ObservationIgnored @AppStorage("ShowTrashed")
     private var appStorageShowTrashed: Bool = false {
-        didSet { 
+        didSet {
             if appStorageShowTrashed {
                 appStorageShowArchived = false
             }
-            refreshFilteredData() 
+            refreshFilteredData()
         }
     }
-    
+
     // Public read-only computed properties to access the AppStorage values
     var showUserDialogsOnly: Bool { appStorageShowUserDialogsOnly }
     var showArchived: Bool { appStorageShowArchived }
     var showTrashed: Bool { appStorageShowTrashed }
-    
+
     // For updating after context changes
     private var cancellables = Set<AnyCancellable>()
-    
+
     // MARK: - Initialization
-    
+
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
-        
+
         // Initialize descriptors with sorting
-        self.conversationDescriptor = FetchDescriptor<ConversationItem>(sortBy: [SortDescriptor(\ConversationItem.timestamp, order: .reverse)])
-        self.projectsDescriptor = FetchDescriptor<ProjectItem>(sortBy: [SortDescriptor(\ProjectItem.name)])
-        self.bookmarksDescriptor = FetchDescriptor<BookmarkItem>(sortBy: [SortDescriptor(\BookmarkItem.label)])
-        self.apiConfigurationsDescriptor = FetchDescriptor<APIConfigurationItem>(sortBy: [SortDescriptor(\APIConfigurationItem.name)])
-        self.promptTemplatesDescriptor = FetchDescriptor<PromptTemplate>(sortBy: [SortDescriptor(\PromptTemplate.name)])
-        self.voiceConfigurationsDescriptor = FetchDescriptor<VoiceConfigurationItem>(sortBy: [SortDescriptor(\VoiceConfigurationItem.language)])
-        self.modelsDescriptor = FetchDescriptor<ModelItem>(sortBy: [SortDescriptor(\ModelItem.name)])
-        self.webSearchConfigurationsDescriptor = FetchDescriptor<WebSearchConfigurationItem>(sortBy: [SortDescriptor(\WebSearchConfigurationItem.name)])
-        
+        self.conversationDescriptor = FetchDescriptor<ConversationItem>(sortBy: [
+            SortDescriptor(\ConversationItem.timestamp, order: .reverse)
+        ])
+        self.projectsDescriptor = FetchDescriptor<ProjectItem>(sortBy: [
+            SortDescriptor(\ProjectItem.name)
+        ])
+        self.bookmarksDescriptor = FetchDescriptor<BookmarkItem>(sortBy: [
+            SortDescriptor(\BookmarkItem.label)
+        ])
+        self.apiConfigurationsDescriptor = FetchDescriptor<APIConfigurationItem>(sortBy: [
+            SortDescriptor(\APIConfigurationItem.name)
+        ])
+        self.promptTemplatesDescriptor = FetchDescriptor<PromptTemplate>(sortBy: [
+            SortDescriptor(\PromptTemplate.name)
+        ])
+        self.voiceConfigurationsDescriptor = FetchDescriptor<VoiceConfigurationItem>(sortBy: [
+            SortDescriptor(\VoiceConfigurationItem.language)
+        ])
+        self.modelsDescriptor = FetchDescriptor<ModelItem>(sortBy: [SortDescriptor(\ModelItem.name)]
+        )
+        self.webSearchConfigurationsDescriptor = FetchDescriptor<WebSearchConfigurationItem>(
+            sortBy: [SortDescriptor(\WebSearchConfigurationItem.name)])
+
         // Initial fetch of all data
         fetchAllData()
-        
+
         // Listen for model context changes
         NotificationCenter.default
             .publisher(for: NSNotification.Name("NSPersistentStoreRemoteChangeNotification"))
@@ -99,9 +113,9 @@ final class QueryManager: @unchecked Sendable {
             }
             .store(in: &cancellables)
     }
-    
+
     // MARK: - Data Fetching
-    
+
     /// Force a refresh to ensure data is up to date
     func refresh() {
         fetchAllData()
@@ -120,7 +134,7 @@ final class QueryManager: @unchecked Sendable {
             allVoiceConfigurations = try modelContext.fetch(voiceConfigurationsDescriptor)
             allModels = try modelContext.fetch(modelsDescriptor)
             allWebSearchConfigurations = try modelContext.fetch(webSearchConfigurationsDescriptor)
-            
+
             // Prime transient caches for bookmarks safely (ID-based, no stale deref)
             primeBookmarkCaches()
 
@@ -130,14 +144,14 @@ final class QueryManager: @unchecked Sendable {
             vxAtelierPro.log.error("Failed to fetch data: \(error.localizedDescription)")
         }
     }
-    
+
     /// Refresh filtered data without fetching
     private func refreshFilteredData() {
         // The @Observable property wrapper will automatically notify observers when these properties change
     }
-    
+
     // MARK: - Computed Properties: Filtered Collections
-    
+
     /// Standalone conversations that don't belong to a project, filtered by status
     var standaloneConversations: [ConversationItem] {
         allConversations.filter { conversation in
@@ -145,7 +159,7 @@ final class QueryManager: @unchecked Sendable {
             guard conversation.project == nil else {
                 return false
             }
-            
+
             // Filter by conversation purpose
             if showUserDialogsOnly {
                 guard conversation.purpose == .user else {
@@ -157,7 +171,7 @@ final class QueryManager: @unchecked Sendable {
                     return false
                 }
             }
-            
+
             // Then apply status filter
             if showArchived {
                 return conversation.status == ItemStatus.archived
@@ -168,19 +182,19 @@ final class QueryManager: @unchecked Sendable {
             return conversation.status == ItemStatus.active
         }
     }
-    
+
     /// System conversations, filtered by status
     var systemConversations: [ConversationItem] {
         // If showUserDialogsOnly is true, don't show system conversations at all
         guard !showUserDialogsOnly else {
             return []
         }
-        
+
         return allConversations.filter { conversation in
             guard conversation.purpose == .system else {
                 return false
             }
-            
+
             if showArchived {
                 return conversation.status == ItemStatus.archived
             }
@@ -190,7 +204,7 @@ final class QueryManager: @unchecked Sendable {
             return conversation.status == ItemStatus.active
         }
     }
-    
+
     /// Explicit project status accessors
 
     var activeProjects: [ProjectItem] {
@@ -202,7 +216,7 @@ final class QueryManager: @unchecked Sendable {
     var trashedProjects: [ProjectItem] {
         allProjects.filter { $0.status == .trashed }
     }
-    
+
     /// Explicit dialog status accessors
     var activeDialogs: [ConversationItem] {
         allConversations.filter { $0.status == .active }
@@ -213,7 +227,7 @@ final class QueryManager: @unchecked Sendable {
     var trashedDialogs: [ConversationItem] {
         allConversations.filter { $0.status == .trashed }
     }
-    
+
     // Privatize ambiguous filter
     private var filteredProjects: [ProjectItem] {
         allProjects.filter { project in
@@ -226,42 +240,41 @@ final class QueryManager: @unchecked Sendable {
             return project.status == ItemStatus.active
         }
     }
-    
+
     /// Active projects only (for selection in conversations)
 
-    
     /// All available API configurations
     var apiConfigurations: [APIConfigurationItem] {
         allApiConfigurations
     }
-    
+
     /// All available voice configurations
     var voiceConfigurations: [VoiceConfigurationItem] {
         allVoiceConfigurations
     }
-    
+
     /// All available prompt templates
     var promptTemplates: [PromptTemplate] {
         allPromptTemplates
     }
-    
+
     /// All available bookmarks
     var bookmarks: [BookmarkItem] {
         allBookmarks
     }
-    
+
     /// All available models
     var models: [ModelItem] {
         allModels
     }
-    
+
     /// All available Web Search configurations
     var webSearchConfigurations: [WebSearchConfigurationItem] {
         allWebSearchConfigurations
     }
-    
+
     // MARK: - Bookmark Helpers (ID-based resolution)
-    
+
     /// Resolve a bookmark's target message ID without touching optional relationships.
     /// Only uses the transient cache set at creation time; otherwise returns nil.
     private func resolvedTargetMessageID(for bookmark: BookmarkItem) -> PersistentIdentifier? {
@@ -274,7 +287,9 @@ final class QueryManager: @unchecked Sendable {
     }
 
     /// Whether a specific assistant message within a turn is bookmarked (by messageID).
-    func isAssistantBookmarked(turnID: PersistentIdentifier, messageID: PersistentIdentifier) -> Bool {
+    func isAssistantBookmarked(turnID: PersistentIdentifier, messageID: PersistentIdentifier)
+        -> Bool
+    {
         for b in bookmarks where b.turn?.id == turnID && b.target != nil {
             if let mid = resolvedTargetMessageID(for: b), mid == messageID { return true }
         }
@@ -292,18 +307,18 @@ final class QueryManager: @unchecked Sendable {
 
     /// Prime transient caches for bookmarks from the freshly fetched graph.
     /// Intentionally a no-op to avoid dereferencing stale relationships.
-    private func primeBookmarkCaches() { }
-    
+    private func primeBookmarkCaches() {}
+
     /// Dialog linked to the utility panel
     var utilityPanelConversation: ConversationItem? {
         return allConversations.first(where: { $0.isLinkedToUtilityPanel })
     }
-    
+
     /// Default system conversation
     var systemConversation: ConversationItem? {
         return allConversations.first(where: { $0.purpose == .system })
     }
-    
+
     /// The default API configuration, determined by the `isDefault` flag or falling back to the first available.
     var defaultApiConfiguration: APIConfigurationItem? {
         if let explicitDefault = allApiConfigurations.first(where: { $0.isDefault }) {
@@ -311,7 +326,7 @@ final class QueryManager: @unchecked Sendable {
         }
         return allApiConfigurations.first
     }
-    
+
     /// The default Web Search configuration, determined by the `isDefault` flag or falling back to the first available.
     var defaultWebSearchConfiguration: WebSearchConfigurationItem? {
         if let explicitDefault = allWebSearchConfigurations.first(where: { $0.isDefault }) {
@@ -319,7 +334,7 @@ final class QueryManager: @unchecked Sendable {
         }
         return allWebSearchConfigurations.first
     }
-    
+
     /// Ensures the system conversation exists, creating it if necessary.
     /// This should be called after initial data fetch.
     @discardableResult
@@ -327,7 +342,7 @@ final class QueryManager: @unchecked Sendable {
         if let existing = allConversations.first(where: { $0.purpose == .system }) {
             return existing
         }
-        
+
         // Not found, create it
         vxAtelierPro.log.info("System conversation not found, creating a new one.")
         let conversation: ConversationItem
@@ -339,67 +354,70 @@ final class QueryManager: @unchecked Sendable {
         }
         conversation.purpose = .system
         modelContext.insert(conversation)
-        
+
         // Save and refresh
         do {
             try saveContext()
             // Re-fetch the conversation from the refreshed list to ensure we return the managed instance
-            if let newSystemConversation = allConversations.first(where: { $0.purpose == .system }) {
+            if let newSystemConversation = allConversations.first(where: { $0.purpose == .system })
+            {
                 return newSystemConversation
             } else {
                 // This should theoretically not happen after a successful save and fetch
-                vxAtelierPro.log.critical("Failed to retrieve newly created system conversation after save!")
+                vxAtelierPro.log.critical(
+                    "Failed to retrieve newly created system conversation after save!")
                 // Return the unmanaged instance as a fallback, though it might cause issues
-                return conversation 
+                return conversation
             }
         } catch {
-            vxAtelierPro.log.error("Failed to save newly created system conversation: \(error.localizedDescription)")
+            vxAtelierPro.log.error(
+                "Failed to save newly created system conversation: \(error.localizedDescription)")
             // Return the unmanaged instance as a fallback
             return conversation
         }
     }
-    
+
     // MARK: - Data Mutation Methods
-    
+
     /// Empties the trash by deleting all trashed items.
     func emptyTrash() throws {
         let trashedItems = allConversations.filter { $0.status == .trashed }
         try deleteItems(trashedItems)
-        
+
         let trashedProjects = allProjects.filter { $0.status == .trashed }
         try deleteItems(trashedProjects)
     }
-    
+
     /// Saves the model context with error handling.
     func saveContext() throws {
         do {
             try modelContext.save()
-            fetchAllData() // Refresh data after saving
+            fetchAllData()  // Refresh data after saving
         } catch {
             vxAtelierPro.log.error("Failed to save ModelContext: \(error.localizedDescription)")
             throw AppError.dataSaveFailed(error.localizedDescription)
         }
     }
-    
+
     /// Inserts a new persistent model into the context and saves.
     func insert<T: PersistentModel>(_ item: T) throws {
         modelContext.insert(item)
-        try saveContext() // Also refreshes data via fetchAllData
+        try saveContext()  // Also refreshes data via fetchAllData
         vxAtelierPro.log.debug("Inserted \(String(describing: T.self)): \(item.persistentModelID)")
-        fetchAllData() // Refresh after insert
+        fetchAllData()  // Refresh after insert
     }
-    
+
     // MARK: - Property Clearing Helper
     private func clearStoredProperty(for type: Any.Type) {
         switch type {
         case is ProjectItem.Type:
             allProjects = []
-            allConversations = [] // Also clear conversations, since projects own conversations
-            allBookmarks = []     // Bookmarks depend on conversations/projects; clear to avoid stale references during mutations
+            allConversations = []  // Also clear conversations, since projects own conversations
+            allBookmarks = []  // Bookmarks depend on conversations/projects; clear to avoid stale references during mutations
         case is ConversationItem.Type:
             allProjects = []
             allConversations = []
-            allBookmarks = []     // Clear dependent bookmarks to prevent UI from touching deleted targets
+            allBookmarks = []  // Clear dependent bookmarks to prevent UI from touching deleted targets
         case is BookmarkItem.Type:
             allBookmarks = []
         case is APIConfigurationItem.Type:
@@ -416,16 +434,16 @@ final class QueryManager: @unchecked Sendable {
             break
         }
     }
-    
+
     /// Deletes a single persistent model from the context and saves.
     func delete<T: PersistentModel>(_ item: T) throws {
         clearStoredProperty(for: T.self)
-        let itemID = item.persistentModelID // Capture ID before deletion
+        let itemID = item.persistentModelID  // Capture ID before deletion
         modelContext.delete(item)
-        try saveContext() // Also refreshes data via fetchAllData
+        try saveContext()  // Also refreshes data via fetchAllData
         vxAtelierPro.log.debug("Deleted \(String(describing: T.self)): \(itemID)")
     }
-    
+
     /// Deletes an array of persistent models from the context in a single transaction and saves.
     func deleteItems(_ items: [any PersistentModel]) throws {
         guard !items.isEmpty else {
@@ -447,10 +465,10 @@ final class QueryManager: @unchecked Sendable {
             modelContext.delete(item)
         }
         // Save context once after all deletions are staged
-        try saveContext() // Also refreshes data via fetchAllData
+        try saveContext()  // Also refreshes data via fetchAllData
         vxAtelierPro.log.debug("Bulk delete operation saved successfully.")
     }
-    
+
     /// Inserts an array of persistent models into the context in a single transaction and saves.
     func insertItems(_ items: [any PersistentModel]) throws {
         guard !items.isEmpty else {
@@ -459,28 +477,29 @@ final class QueryManager: @unchecked Sendable {
         }
 
         vxAtelierPro.log.debug("Staging insertion for \(items.count) items.")
-        
+
         for item in items {
             modelContext.insert(item)
         }
-        
+
         // Save context once after all insertions are staged
-        try saveContext() // Also refreshes data via fetchAllData
+        try saveContext()  // Also refreshes data via fetchAllData
         vxAtelierPro.log.debug("Bulk insert operation saved successfully.")
     }
-    
+
     /// Updates references when a configuration is deleted **during backup restoration**.
     func cleanupReferences(for config: APIConfigurationItem) throws {
         // Iterate through existing fetched conversations
-        for conversation in allConversations where conversation.options.apiConfiguration?.id == config.id {
+        for conversation in allConversations
+        where conversation.options.apiConfiguration?.id == config.id {
             conversation.options.apiConfiguration = nil
         }
-        
+
         // Iterate through existing fetched projects
         for project in allProjects where project.defaultOptions.apiConfiguration?.id == config.id {
             project.defaultOptions.apiConfiguration = nil
         }
-        
+
         // Save changes using the centralized method
         try saveContext()
         // No separate fetch needed, saveContext already refreshes.
@@ -489,34 +508,35 @@ final class QueryManager: @unchecked Sendable {
     /// Create a new conversation with default settings
     func createConversation() -> ConversationItem {
         let conversation: ConversationItem
-        
+
         if let apiConfig = defaultApiConfiguration {
             let options = ConversationOptions(apiConfiguration: apiConfig)
             conversation = ConversationItem(AppDefaults.newDialogName, options: options)
         } else {
             conversation = ConversationItem(AppDefaults.newDialogName)
         }
-        
+
         do {
             try self.insert(conversation)
         } catch {
             // Error already logged by saveContext/insert
-            vxAtelierPro.log.error("Failed to insert new conversation: \(error.localizedDescription)")
+            vxAtelierPro.log.error(
+                "Failed to insert new conversation: \(error.localizedDescription)")
         }
         return conversation
     }
-    
+
     /// Create a new project with default settings
     func createProject() -> ProjectItem {
         let project: ProjectItem
-        
+
         if let apiConfig = defaultApiConfiguration {
             let options = ConversationOptions(apiConfiguration: apiConfig)
             project = ProjectItem(AppDefaults.newProjectName, defaultOptions: options)
         } else {
             project = ProjectItem(AppDefaults.newProjectName)
         }
-        
+
         do {
             try self.insert(project)
         } catch {
@@ -525,62 +545,72 @@ final class QueryManager: @unchecked Sendable {
         }
         return project
     }
-    
+
     // MARK: - Item Status Actions
-    
+
     /// Moves an item to the trash.
     func moveItemToTrash(_ item: any PersistentModel) throws {
         guard let modifiableItem = item as? (any StatusModifiable) else {
-            vxAtelierPro.log.warning("Attempted to move non-StatusModifiable item to trash: \(type(of: item))")
+            vxAtelierPro.log.warning(
+                "Attempted to move non-StatusModifiable item to trash: \(type(of: item))")
             // Bookmarks are deleted immediately, handle this case specifically
             if item is BookmarkItem {
-                 try delete(item)
-                 vxAtelierPro.log.debug("Deleted BookmarkItem directly as 'move to trash' is not applicable.")
+                try delete(item)
+                vxAtelierPro.log.debug(
+                    "Deleted BookmarkItem directly as 'move to trash' is not applicable.")
             } else {
                 throw AppError.invalidOperation("Item cannot be moved to trash.")
             }
             return
         }
-        
+
         modifiableItem.status = .trashed
         vxAtelierPro.log.debug("Moved item (ID: \(item.persistentModelID)) to trash.")
         try saveContext()
     }
-    
+
     /// Archives an item.
     func archiveItem(_ item: any PersistentModel) throws {
-         guard let modifiableItem = item as? (any StatusModifiable) else {
-            vxAtelierPro.log.warning("Attempted to archive non-StatusModifiable item: \(type(of: item))")
-             throw AppError.invalidOperation("Item cannot be archived.")
+        guard let modifiableItem = item as? (any StatusModifiable) else {
+            vxAtelierPro.log.warning(
+                "Attempted to archive non-StatusModifiable item: \(type(of: item))")
+            throw AppError.invalidOperation("Item cannot be archived.")
         }
-        
+
         modifiableItem.status = .archived
         vxAtelierPro.log.debug("Archived item (ID: \(item.persistentModelID)).")
         try saveContext()
     }
-    
+
     /// Restores an item to active status.
     func restoreItem(_ item: any PersistentModel) throws {
-         guard let modifiableItem = item as? (any StatusModifiable) else {
-            vxAtelierPro.log.warning("Attempted to restore non-StatusModifiable item: \(type(of: item))")
-             throw AppError.invalidOperation("Item cannot be restored.")
+        guard let modifiableItem = item as? (any StatusModifiable) else {
+            vxAtelierPro.log.warning(
+                "Attempted to restore non-StatusModifiable item: \(type(of: item))")
+            throw AppError.invalidOperation("Item cannot be restored.")
         }
-        
+
         modifiableItem.status = .active
         vxAtelierPro.log.debug("Restored item (ID: \(item.persistentModelID)) to active.")
         try saveContext()
     }
-    
+
     /// Permanently deletes an item, handling project cascades.
     func deleteItemPermanently(_ item: any PersistentModel) throws {
-        vxAtelierPro.log.debug("Initiating permanent deletion for item (ID: \(item.persistentModelID), Type: \(type(of: item))).")
-        try delete(item) // Handles save and refresh internally
-        vxAtelierPro.log.debug("Permanent deletion process complete for item (ID: \(item.persistentModelID)).")
+        vxAtelierPro.log.debug(
+            "Initiating permanent deletion for item (ID: \(item.persistentModelID), Type: \(type(of: item)))."
+        )
+        try delete(item)  // Handles save and refresh internally
+        vxAtelierPro.log.debug(
+            "Permanent deletion process complete for item (ID: \(item.persistentModelID)).")
     }
-    
+
     /// Returns the last turn or event timestamp for a given conversation, or nil if no turns exist
     func lastTurnTimestamp(for conversation: ConversationItem) -> Date? {
-        guard let lastTurn = conversation.turns.sorted(by: { $0.sequenceNumber < $1.sequenceNumber }).last else { return nil }
+        guard
+            let lastTurn = conversation.turns.sorted(by: { $0.sequenceNumber < $1.sequenceNumber })
+                .last
+        else { return nil }
         return lastTurn.events.last?.message.timestamp ?? lastTurn.userMessage.timestamp
     }
 
@@ -590,14 +620,16 @@ final class QueryManager: @unchecked Sendable {
     }
 
     /// Returns conversations sorted by last turn/event timestamp
-    func sortedConversationByLastTurn(_ conversations: [ConversationItem], descending: Bool) -> [ConversationItem] {
+    func sortedConversationByLastTurn(_ conversations: [ConversationItem], descending: Bool)
+        -> [ConversationItem]
+    {
         return conversations.sorted {
             let lhsDate = lastTurnTimestamp(for: $0) ?? $0.timestamp
             let rhsDate = lastTurnTimestamp(for: $1) ?? $1.timestamp
             return descending ? lhsDate > rhsDate : lhsDate < rhsDate
         }
     }
-    
+
     // MARK: - Bulk Deletion and Data Reset
     /// Deletes all items of a given PersistentModel type. Returns the number of deleted items.
     func deleteAll<T: PersistentModel>(of type: T.Type) throws -> Int {
@@ -662,11 +694,15 @@ final class QueryManager: @unchecked Sendable {
     }
 
     /// Returns projects sorted for the sidebar according to the given order and type
-    func sortedProjectsForSidebar(_ projects: [ProjectItem], descending: Bool, sortType: SidebarSortType) -> [ProjectItem] {
+    func sortedProjectsForSidebar(
+        _ projects: [ProjectItem], descending: Bool, sortType: SidebarSortType
+    ) -> [ProjectItem] {
         switch sortType {
         case .alphabetically:
             return projects.sorted {
-                descending ? $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedDescending : $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+                descending
+                    ? $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedDescending
+                    : $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
             }
         // Add more sort types for projects if needed
         default:
@@ -675,16 +711,22 @@ final class QueryManager: @unchecked Sendable {
     }
 
     /// Returns conversations sorted for the sidebar according to the given order and type
-    func sortedConversationsForSidebar(_ conversations: [ConversationItem], descending: Bool, sortType: SidebarSortType) -> [ConversationItem] {
+    func sortedConversationsForSidebar(
+        _ conversations: [ConversationItem], descending: Bool, sortType: SidebarSortType
+    ) -> [ConversationItem] {
         switch sortType {
         case .conversationDate:
-            return conversations.sorted { descending ? $0.timestamp > $1.timestamp : $0.timestamp < $1.timestamp }
+            return conversations.sorted {
+                descending ? $0.timestamp > $1.timestamp : $0.timestamp < $1.timestamp
+            }
         case .lastMessageDate:
             // Use last turn/event timestamp
             return sortedConversationByLastTurn(conversations, descending: descending)
         case .alphabetically:
             return conversations.sorted {
-                descending ? $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedDescending : $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
+                descending
+                    ? $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedDescending
+                    : $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
             }
         }
     }
@@ -692,37 +734,52 @@ final class QueryManager: @unchecked Sendable {
     /// Fetches models from all configured API providers and updates the local store.
     @MainActor
     func fetchModelsFromProviders() async {
-        do {
-            let apiConfigurations = self.apiConfigurations // Fetch all API configurations
-            var updated = 0
-            var added = 0
-            for config in apiConfigurations {
-                let service = AIServiceManager.shared.getService(with: config)
-                let fetchedModels = try await service.fetchAvailableModels()
-                for fetchedModel in fetchedModels {
-                    if let existing = allModels.first(where: { $0.name == fetchedModel.id }) {
-                        // Update existing model in place
-                        existing.contextSize = fetchedModel.contextSize
-                        existing.provider = fetchedModel.provider
-                        existing.capabilities = fetchedModel.capabilities
-                        updated += 1
-                        vxAtelierPro.log.debug("Overwrote model: \(fetchedModel.id)")
-                    } else {
-                        // Insert new model
-                        let modelItem = ModelItem(
-                            name: fetchedModel.id,
-                            contextSize: fetchedModel.contextSize,
-                            provider: fetchedModel.provider
-                        )
-                        modelItem.capabilities = fetchedModel.capabilities
-                        modelContext.insert(modelItem)
-                        added += 1
-                        vxAtelierPro.log.debug("Added new model: \(fetchedModel.id)")
-                    }
+
+        let apiConfigurations = self.apiConfigurations  // Fetch all API configurations
+        var updated = 0
+        var added = 0
+
+        for config in apiConfigurations {
+            let service = AIServiceManager.shared.getService(with: config)
+            var fetchedModels: [AIModel] = []
+
+            do {
+                fetchedModels = try await service.fetchAvailableModels()
+            } catch {
+                vxAtelierPro.log.error(
+                    "Failed to fetch models from provider \(config.name): \(error.localizedDescription)"
+                )
+                // fallback to the default model cataloge 
+                fetchedModels = service.getDefaultModels()
+            }
+
+            for fetchedModel in fetchedModels {
+                if let existing = allModels.first(where: { $0.name == fetchedModel.id }) {
+                    // Update existing model in place
+                    existing.contextSize = fetchedModel.contextSize
+                    existing.provider = fetchedModel.provider
+                    existing.capabilities = fetchedModel.capabilities
+                    updated += 1
+                    vxAtelierPro.log.debug("Overwrote model: \(fetchedModel.id)")
+                } else {
+                    // Insert new model
+                    let modelItem = ModelItem(
+                        name: fetchedModel.id,
+                        contextSize: fetchedModel.contextSize,
+                        provider: fetchedModel.provider
+                    )
+                    modelItem.capabilities = fetchedModel.capabilities
+                    modelContext.insert(modelItem)
+                    added += 1
+                    vxAtelierPro.log.debug("Added new model: \(fetchedModel.id)")
                 }
             }
+        }
+
+        do {
             try self.saveContext()
-            vxAtelierPro.log.info("fetchModelsFromProviders: Updated \(updated), added \(added) models.")
+            vxAtelierPro.log.info(
+                "fetchModelsFromProviders: Updated \(updated), added \(added) models.")
         } catch {
             vxAtelierPro.log.error("fetchModelsFromProviders failed: \(error.localizedDescription)")
         }
@@ -736,4 +793,4 @@ protocol StatusModifiable: PersistentModel {
 
 // Conform existing models to the protocol
 extension ConversationItem: StatusModifiable {}
-extension ProjectItem: StatusModifiable {} 
+extension ProjectItem: StatusModifiable {}
