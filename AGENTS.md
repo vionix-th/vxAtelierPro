@@ -7,6 +7,13 @@
 - Do not make assumptions about existing types/properties/functions; verify in the codebase first.
 - Do not implement backward compatibility or data migrations unless explicitly requested.
 
+## SwiftUI View Lifecycle & State Management
+
+1.  **Never rely on `init` for updates.** Treat `init` only as the *initial* allocation blueprint.
+2.  **Use `let` properties + Computed Vars** for data that drives display directly (stateless views).
+3.  **Use `.task(id:)` or `.onChange(of:)`** to sync external parameters with internal `@State` (e.g., `.task(id: userId) { self.user = await fetch(userId) }`).
+4.  **Reserve `.id()`** only for "nuclear" resets where discarding all local state (scroll position, navigation, user input) is explicitly desired.
+
 ## Project Structure
 - Read `Package.swift` to understand the application structure.
 - Update `Package.swift` whenever adding or deleting files.

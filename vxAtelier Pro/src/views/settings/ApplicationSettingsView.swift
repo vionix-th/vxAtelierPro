@@ -62,11 +62,9 @@ struct ApplicationSettingsView: View {
 
     @State private var selectedTab: SettingsTab?
     private let initialTab: SettingsTab?
-    private let openAPIConfigurationEditor: Bool
 
-    init(initialTab: SettingsTab? = nil, openAPIConfigurationEditor: Bool = false) {
+    init(initialTab: SettingsTab? = nil) {
         self.initialTab = initialTab
-        self.openAPIConfigurationEditor = openAPIConfigurationEditor
         _selectedTab = State(initialValue: initialTab ?? .general)
     }
 
@@ -86,7 +84,7 @@ struct ApplicationSettingsView: View {
                     GeneralSettingsView()
                         .padding(AppDefaults.paddingLarge)
                 case .api:
-                    APISettingsView(openNewConfiguration: openAPIConfigurationEditor)
+                    APISettingsView()
                         .padding(AppDefaults.paddingLarge)
                 case .webSearch:
                     WebSearchSettingsView()
@@ -127,9 +125,11 @@ struct ApplicationSettingsView: View {
             } else if selectedTab == nil {
                 selectedTab = .general
             }
-            if openAPIConfigurationEditor {
-                selectedTab = .api
-            }
+        }
+        .onChange(of: initialTab) { _, newValue in
+            if let newValue {
+                selectedTab = newValue
+            } 
         }
     }
 }

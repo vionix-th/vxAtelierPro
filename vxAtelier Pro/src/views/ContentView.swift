@@ -21,7 +21,6 @@ struct ContentView: View {
     @State private var ttsViewIsPresented: Bool = false
     @State private var isPromptTemplatesPresented: Bool = false
     @State private var settingsInitialTab: ApplicationSettingsView.SettingsTab? = nil
-    @State private var settingsOpenNewAPIConfiguration: Bool = false
 
     // Options sheet hosting (hoisted from ConversationView)
     private struct OptionsSheetKey: Identifiable { let id: PersistentIdentifier }
@@ -325,7 +324,6 @@ struct ContentView: View {
                 onNewProject: addProject,
                 onConfigureAPI: {
                     settingsInitialTab = .api
-                    settingsOpenNewAPIConfiguration = true
                     applicationSettingsViewIsPresented = true
                 }
             )
@@ -445,7 +443,6 @@ struct ContentView: View {
     private var settingsMenu: some View {
         Button {
             settingsInitialTab = nil
-            settingsOpenNewAPIConfiguration = false
             applicationSettingsViewIsPresented = true
         } label: {
             MenuItemStyle.label("Application Settings", systemImage: "gear")
@@ -464,7 +461,6 @@ struct ContentView: View {
                     onNewProject: addProject,
                     onConfigureAPI: {
                         settingsInitialTab = .api
-                        settingsOpenNewAPIConfiguration = true
                         applicationSettingsViewIsPresented = true
                     }
                 )
@@ -526,16 +522,10 @@ struct ContentView: View {
         // Present Settings from the toolbar menu entry
         .sheet(isPresented: $applicationSettingsViewIsPresented, onDismiss: {
             settingsInitialTab = nil
-            settingsOpenNewAPIConfiguration = false
         }) {
-            ApplicationSettingsView(
-                initialTab: settingsInitialTab,
-                openAPIConfigurationEditor: settingsOpenNewAPIConfiguration
-            )
-            .environment(queryManager)
-            .environment(\.modelContext, modelContext)
-            // Force view recreation when the requested tab/editor changes to avoid stale selection.
-            .id("settings-\((settingsInitialTab.map { "\($0)" }) ?? "none")-\(settingsOpenNewAPIConfiguration ? "open-new-api" : "default")")
+            ApplicationSettingsView(initialTab: settingsInitialTab)
+                .environment(queryManager)
+                .environment(\.modelContext, modelContext)
             #if os(macOS)
                 .frame(idealWidth: 900, idealHeight: 640)
             #else

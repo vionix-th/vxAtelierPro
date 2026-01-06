@@ -5,7 +5,6 @@ struct APISettingsView: View {
     @State private var editingConfig: EditingConfig?
     @State private var showApiConfigError = false
     @State private var apiConfigErrorMessage = ""
-    @State private var shouldOpenNewConfiguration: Bool
     @State private var didPresentInitialEditor = false
 
     struct EditingConfig: Identifiable {
@@ -16,10 +15,6 @@ struct APISettingsView: View {
 
     private func isDefaultConfiguration(_ config: APIConfigurationItem) -> Bool {
         return config.isDefault
-    }
-
-    init(openNewConfiguration: Bool = false) {
-        _shouldOpenNewConfiguration = State(initialValue: openNewConfiguration)
     }
 
     private func deleteAPIConfiguration(_ config: APIConfigurationItem) {
@@ -108,7 +103,7 @@ struct APISettingsView: View {
         }
         .navigationTitle("API")
         .onAppear {
-            if shouldOpenNewConfiguration && !didPresentInitialEditor {
+            if queryManager.apiConfigurations.isEmpty && !didPresentInitialEditor {
                 didPresentInitialEditor = true
                 startNewConfiguration()
             }
