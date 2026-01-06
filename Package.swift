@@ -133,6 +133,7 @@ let package = Package(
                 "views/components/SidebarSortButton.swift",
                 "views/components/NavigationItem.swift",
                 "views/components/PermissionRowView.swift",
+                "views/components/DetailPlaceholderView.swift",
                 "views/components/markdown/MarkdownUIRenderer.swift",
                 // Splash removed: no highlighter helpers
                 "views/components/HybridNumericInputView.swift",        

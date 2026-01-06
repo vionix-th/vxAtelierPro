@@ -78,12 +78,14 @@ struct ContentView: View {
 
     /// Returns true if there are any visible items in the sidebar (only non-trashed projects and standalone dialogs)
     private var hasVisibleItems: Bool {
-        let hasProjects = !(
-            showArchived ? queryManager.archivedProjects.isEmpty :
-            showTrashed ? queryManager.trashedProjects.isEmpty :
-            queryManager.activeProjects.isEmpty
-        )
-        let hasStandaloneDialogs = queryManager.standaloneConversations.contains { $0.status != .trashed }
+        let hasProjects =
+            !(showArchived
+            ? queryManager.archivedProjects.isEmpty
+            : showTrashed
+                ? queryManager.trashedProjects.isEmpty : queryManager.activeProjects.isEmpty)
+        let hasStandaloneDialogs = queryManager.standaloneConversations.contains {
+            $0.status != .trashed
+        }
         return hasProjects || hasStandaloneDialogs
     }
 
@@ -106,7 +108,9 @@ struct ContentView: View {
         }
     }
 
-    private func assignConversationToProject(_ conversation: ConversationItem, _ project: ProjectItem?) {
+    private func assignConversationToProject(
+        _ conversation: ConversationItem, _ project: ProjectItem?
+    ) {
         conversation.project = project
     }
 
@@ -126,13 +130,18 @@ struct ContentView: View {
         } label: {
             NavigationItem(
                 title: Binding(get: { project.name }, set: { project.name = $0 }),
-                subtitle: project.timestamp.formatted(.dateTime.year().month().day().hour().minute()),
+                subtitle: project.timestamp.formatted(
+                    .dateTime.year().month().day().hour().minute()),
                 onDelete: {
                     do {
                         try queryManager.moveItemToTrash(project)
-                        vxAtelierPro.log.debug("ContentView: Moved project '\(project.name)' to trash via context menu.")
+                        vxAtelierPro.log.debug(
+                            "ContentView: Moved project '\(project.name)' to trash via context menu."
+                        )
                     } catch {
-                        vxAtelierPro.log.error("ContentView: Failed to move project '\(project.name)' to trash via context menu: \(error.localizedDescription)")
+                        vxAtelierPro.log.error(
+                            "ContentView: Failed to move project '\(project.name)' to trash via context menu: \(error.localizedDescription)"
+                        )
                     }
                 },
                 onRename: { project.name = $0 },
@@ -143,7 +152,8 @@ struct ContentView: View {
                         do {
                             try await DataManager.shared.exportProject(project)
                         } catch {
-                            vxAtelierPro.log.error("Failed to export project - \(error.localizedDescription)")
+                            vxAtelierPro.log.error(
+                                "Failed to export project - \(error.localizedDescription)")
                         }
                     }
                 },
@@ -154,7 +164,9 @@ struct ContentView: View {
 
     func conversationNavigationLink(for conversation: ConversationItem) -> some View {
         NavigationLink {
-            Group { ConversationView(conversationID: conversation.id, onRequestOptions: requestOptions) }
+            Group {
+                ConversationView(conversationID: conversation.id, onRequestOptions: requestOptions)
+            }
             .id(conversation.id)
         } label: {
             NavigationItem(
@@ -249,7 +261,9 @@ struct ContentView: View {
 
             projectSection(
                 title: projectTitle,
-                projects: showArchived ? queryManager.archivedProjects : showTrashed ? queryManager.trashedProjects : queryManager.activeProjects
+                projects: showArchived
+                    ? queryManager.archivedProjects
+                    : showTrashed ? queryManager.trashedProjects : queryManager.activeProjects
             )
 
             if showTrashed {
@@ -258,7 +272,8 @@ struct ContentView: View {
                     .sorted(by: { $0.timestamp > $1.timestamp })
                 dialogSection(title: standaloneDialogTitle, dialogs: allTrashedDialogs)
             } else {
-                dialogSection(title: standaloneDialogTitle, dialogs: queryManager.standaloneConversations)
+                dialogSection(
+                    title: standaloneDialogTitle, dialogs: queryManager.standaloneConversations)
             }
 
             if !showArchived && !showTrashed {
@@ -271,8 +286,12 @@ struct ContentView: View {
     @ViewBuilder
     private func detailView(for selectedId: PersistentIdentifier?) -> some View {
         if let selectedId = selectedId {
-            if let conversation = queryManager.allConversations.first(where: { $0.id == selectedId }) {
-                Group { ConversationView(conversationID: conversation.id, onRequestOptions: requestOptions) }
+            if let conversation = queryManager.allConversations.first(where: { $0.id == selectedId }
+            ) {
+                Group {
+                    ConversationView(
+                        conversationID: conversation.id, onRequestOptions: requestOptions)
+                }
                 .id(conversation.id)
             } else if let project = queryManager.allProjects.first(where: { $0.id == selectedId }) {
                 ProjectView(
@@ -298,96 +317,12 @@ struct ContentView: View {
                 Text("Item not found.")
             }
         } else {
-            detailPlaceholderView
-        }
-    }
-
-    /// Placeholder view shown in the detail pane when no item is selected.
-    private var detailPlaceholderView: some View {
-        VStack(spacing: AppDefaults.paddingLarge) {
-            Spacer()
-            Image(systemName: "sparkles.rectangle.stack")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 72, height: 72)
-                .foregroundColor(.accentColor)
-                .shadow(radius: 8)
-                .padding(.bottom, AppDefaults.paddingMedium)
-            Text("Welcome to vxAtelier Pro")
-                .font(.largeTitle.bold())
-                .multilineTextAlignment(.center)
-                .padding(.bottom, AppDefaults.paddingSmall)
-            Text(
-                "Start by creating a new dialog or project. Organize your conversations and ideas with ease."
+            DetailPlaceholderView(
+                canCreate: queryManager.defaultApiConfiguration != nil,
+                onNewDialog: addConversation,
+                onNewProject: addProject
             )
-            .font(.title3)
-            .foregroundColor(.secondary)
-            .multilineTextAlignment(.center)
-            .padding(.horizontal, AppDefaults.paddingLarge)
-            .padding(.bottom, AppDefaults.paddingLarge)
-            VStack(spacing: AppDefaults.paddingLarge) {
-                Button(action: {
-                    if queryManager.defaultApiConfiguration == nil {
-                        vxAtelierPro.log.info("Attempted to create dialog without API configuration")
-                        return
-                    }
-                    addConversation()
-                }) {
-                    Label("New Dialog", systemImage: "plus.bubble")
-                        .font(.title3.bold())
-                        .padding(.vertical, AppDefaults.paddingSmall)
-                        .padding(.horizontal, AppDefaults.paddingLarge)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.accentColor)
-                .accessibilityIdentifier("welcome-new-dialog")
-                .disabled(queryManager.defaultApiConfiguration == nil)
-                .help(
-                    queryManager.defaultApiConfiguration == nil
-                        ? "API configuration required to create a new dialog" : "")
-
-                Button(action: {
-                    if queryManager.defaultApiConfiguration == nil {
-                        vxAtelierPro.log.info(
-                            "Attempted to create project without API configuration")
-                        return
-                    }
-                    addProject()
-                }) {
-                    Label("New Project", systemImage: "folder.badge.plus")
-                        .font(.title3.bold())
-                        .padding(.vertical, AppDefaults.paddingSmall)
-                        .padding(.horizontal, AppDefaults.paddingLarge)
-                }
-                .buttonStyle(.bordered)
-                .tint(.accentColor)
-                .accessibilityIdentifier("welcome-new-project")
-                .disabled(queryManager.defaultApiConfiguration == nil)
-                .help(
-                    queryManager.defaultApiConfiguration == nil
-                        ? "API configuration required to create a new project" : "")
-            }
-            .padding(.bottom, AppDefaults.paddingLarge)
-            Spacer()
         }
-        .padding(AppDefaults.paddingLarge)
-        .background(
-            RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous)
-                .fill(
-                    {
-                        #if os(iOS)
-                            Color(uiColor: .secondarySystemBackground)
-                        #elseif os(macOS)
-                            Color(nsColor: .windowBackgroundColor)
-                        #else
-                            Color(.systemBackground)
-                        #endif
-                    }()
-                )
-                .shadow(color: .black.opacity(0.04), radius: 16, x: 0, y: 4)
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
     }
 
     // MARK: - Toolbar Menus
@@ -514,7 +449,11 @@ struct ContentView: View {
     var body: some View {
         #if os(iOS)
             if horizontalSizeClass == .compact && !hasVisibleItems {
-                detailPlaceholderView
+                DetailPlaceholderView(
+                    canCreate: queryManager.defaultApiConfiguration != nil,
+                    onNewDialog: addConversation,
+                    onNewProject: addProject
+                )
             } else {
                 mainContentView
             }
@@ -522,154 +461,171 @@ struct ContentView: View {
             mainContentView
         #endif
     }
-    
+
     // duplicate mainContentView removed; see consolidated implementation below
-/// Shared main content view for all platforms (except iOS compact/empty placeholder)
-private var mainContentView: some View {
-    VStack(spacing: 0) {
-        NavigationSplitView {
-            sidebarList
-                .toolbar { sidebarToolbar }
-        } detail: {
-            detailView(for: selectedItem)
+    /// Shared main content view for all platforms (except iOS compact/empty placeholder)
+    private var mainContentView: some View {
+        VStack(spacing: 0) {
+            NavigationSplitView {
+                sidebarList
+                    .toolbar { sidebarToolbar }
+            } detail: {
+                detailView(for: selectedItem)
+            }
+            .animation(.default, value: selectedItem)
+
+            if statusBarVisible {
+                StatusBar(
+                    activeItemId: $selectedItem
+                )
+            }
         }
-        .animation(.default, value: selectedItem)
-        
-        if statusBarVisible {
-            StatusBar(
-                activeItemId: $selectedItem
-            )
+        .onAppear {
+            vxAtelierPro.log.debug("ContentView appearing")
+            // Ensure we always start in Show Chats view
+            showArchived = false
+            showTrashed = false
+            selectedItem = nil
+
+            registerGlobalHotkeys()
+            queryManager.ensureSystemConversation()
+            vxAtelierPro.log.info("Application started - Reset to Show Chats view")
         }
-    }
-    .onAppear {
-        vxAtelierPro.log.debug("ContentView appearing")
-        // Ensure we always start in Show Chats view
-        showArchived = false
-        showTrashed = false
-        selectedItem = nil
-        
-        registerGlobalHotkeys()
-        queryManager.ensureSystemConversation()
-        vxAtelierPro.log.info("Application started - Reset to Show Chats view")
-    }
-    #if os(iOS)
-    .onChange(of: ttsQueue.isPlaying) {
-        if ttsQueue.isPlaying {
-            vxAtelierPro.log.info("TTS playback started")
-            ttsViewIsPresented = true
-        }
-    }
-    #else
-    .onChange(of: ttsQueue.isPlaying) { _, _ in
-        if ttsQueue.isPlaying {
-            vxAtelierPro.log.info("TTS playback started")
-            ttsViewIsPresented = true
-        }
-    }
-    #endif
-    .task(id: exportProjectRequested?.1) { await exportTask(for: exportProjectRequested?.0) }
-    .task(id: exportDialogRequested?.1) { await exportTask(for: exportDialogRequested?.0) }
-    .task(id: importRequested) { await importTask() }
-    // Present Settings from the toolbar menu entry
-    .sheet(isPresented: $applicationSettingsViewIsPresented) {
-        AppearanceWrapperForSettingsView(
-            queryManager: queryManager,
-            modelContext: modelContext
-        )
-        #if os(macOS)
-            .frame(idealWidth: 900, idealHeight: 640)
+        #if os(iOS)
+            .onChange(of: ttsQueue.isPlaying) {
+                if ttsQueue.isPlaying {
+                    vxAtelierPro.log.info("TTS playback started")
+                    ttsViewIsPresented = true
+                }
+            }
         #else
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
+            .onChange(of: ttsQueue.isPlaying) { _, _ in
+                if ttsQueue.isPlaying {
+                    vxAtelierPro.log.info("TTS playback started")
+                    ttsViewIsPresented = true
+                }
+            }
         #endif
-    }
-    // Hoisted dialog options sheet (stable parent anchor)
-    .sheet(item: $optionsSheetKey, onDismiss: {
-        vxAtelierPro.log.debug("ContentView: options sheet dismissed (onDismiss)")
-    }) { key in
-        if let dialog = queryManager.allConversations.first(where: { $0.id == key.id }) {
-            ConversationOptionsView(options: Binding(get: { dialog.options }, set: { dialog.options = $0 }))
+        .task(id: exportProjectRequested?.1) { await exportTask(for: exportProjectRequested?.0) }
+        .task(id: exportDialogRequested?.1) { await exportTask(for: exportDialogRequested?.0) }
+        .task(id: importRequested) { await importTask() }
+        // Present Settings from the toolbar menu entry
+        .sheet(isPresented: $applicationSettingsViewIsPresented) {
+            AppearanceWrapperForSettingsView(
+                queryManager: queryManager,
+                modelContext: modelContext
+            )
+            #if os(macOS)
+                .frame(idealWidth: 900, idealHeight: 640)
+            #else
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+            #endif
+        }
+        // Hoisted dialog options sheet (stable parent anchor)
+        .sheet(
+            item: $optionsSheetKey,
+            onDismiss: {
+                vxAtelierPro.log.debug("ContentView: options sheet dismissed (onDismiss)")
+            }
+        ) { key in
+            if let dialog = queryManager.allConversations.first(where: { $0.id == key.id }) {
+                ConversationOptionsView(
+                    options: Binding(get: { dialog.options }, set: { dialog.options = $0 })
+                )
                 .onAppear {
-                    vxAtelierPro.log.debug("ContentView: options sheet presented for dialog '\(dialog.title)' (id: \(dialog.id))")
+                    vxAtelierPro.log.debug(
+                        "ContentView: options sheet presented for dialog '\(dialog.title)' (id: \(dialog.id))"
+                    )
                 }
                 .onDisappear {
                     do {
                         try queryManager.saveContext()
-                        vxAtelierPro.log.debug("ContentView: Saved context after options dismissed for dialog '\(dialog.title)'.")
+                        vxAtelierPro.log.debug(
+                            "ContentView: Saved context after options dismissed for dialog '\(dialog.title)'."
+                        )
                     } catch {
-                        vxAtelierPro.log.error("ContentView: Failed to save context after options dismissed: \(error.localizedDescription)")
+                        vxAtelierPro.log.error(
+                            "ContentView: Failed to save context after options dismissed: \(error.localizedDescription)"
+                        )
                     }
                 }
-        } else {
-            VStack(spacing: AppDefaults.paddingMedium) {
-                ProgressView()
-                Text("Preparing options…")
-                    .foregroundColor(.secondary)
-            }
-            .frame(minWidth: 300, minHeight: 200)
-            .onAppear {
-                vxAtelierPro.log.debug("ContentView: options sheet waiting for conversation to resolve (requested id: \(key.id))")
+            } else {
+                VStack(spacing: AppDefaults.paddingMedium) {
+                    ProgressView()
+                    Text("Preparing options…")
+                        .foregroundColor(.secondary)
+                }
+                .frame(minWidth: 300, minHeight: 200)
+                .onAppear {
+                    vxAtelierPro.log.debug(
+                        "ContentView: options sheet waiting for conversation to resolve (requested id: \(key.id))"
+                    )
+                }
             }
         }
+        // TTS playlist sheet
+        .sheet(isPresented: $ttsViewIsPresented) {
+            TTSControlView()
+                .onAppear { vxAtelierPro.log.debug("ContentView: TTSControlView presented") }
+        }
     }
-    // TTS playlist sheet
-    .sheet(isPresented: $ttsViewIsPresented) {
-        TTSControlView()
-            .onAppear { vxAtelierPro.log.debug("ContentView: TTSControlView presented") }
-    }
-}
 
-// MARK: - Toolbar Content
-private var sidebarToolbar: some ToolbarContent {
-    ToolbarItemGroup(placement: .primaryAction) {
-        if showTrashed {
-            Button(
-                role: .destructive,
-                action: {
-                    DispatchQueue.main.async {
-                        do {
-                            // Store current state before emptying trash
-                            let hadTrashedItems = !queryManager.trashedDialogs.isEmpty || !queryManager.trashedProjects.isEmpty
-                            
-                            // Empty trash
-                            try queryManager.emptyTrash()
-                            
-                            // Reset navigation if we had items to empty
-                            if hadTrashedItems {
-                                self.showTrashed = false
-                                self.selectedItem = nil
-                                vxAtelierPro.log.info("Trash emptied, returning to Show Chats")
-                            } else {
-                                vxAtelierPro.log.debug("Empty trash requested, but trash was already empty")
+    // MARK: - Toolbar Content
+    private var sidebarToolbar: some ToolbarContent {
+        ToolbarItemGroup(placement: .primaryAction) {
+            if showTrashed {
+                Button(
+                    role: .destructive,
+                    action: {
+                        DispatchQueue.main.async {
+                            do {
+                                // Store current state before emptying trash
+                                let hadTrashedItems =
+                                    !queryManager.trashedDialogs.isEmpty
+                                    || !queryManager.trashedProjects.isEmpty
+
+                                // Empty trash
+                                try queryManager.emptyTrash()
+
+                                // Reset navigation if we had items to empty
+                                if hadTrashedItems {
+                                    self.showTrashed = false
+                                    self.selectedItem = nil
+                                    vxAtelierPro.log.info("Trash emptied, returning to Show Chats")
+                                } else {
+                                    vxAtelierPro.log.debug(
+                                        "Empty trash requested, but trash was already empty")
+                                }
+                            } catch {
+                                vxAtelierPro.log.error(
+                                    "Failed to empty trash: \(error.localizedDescription)")
                             }
-                        } catch {
-                            vxAtelierPro.log.error("Failed to empty trash: \(error.localizedDescription)")
                         }
                     }
+                ) {
+                    Label("Empty Trash", systemImage: "trash.fill")
                 }
-            ) {
-                Label("Empty Trash", systemImage: "trash.fill")
+                .help("Permanently delete all trashed items")
             }
-            .help("Permanently delete all trashed items")
-        }
 
-        Menu {
-            newItemMenu
-            Divider()
-            importExportMenu
-            Divider()
-            viewOptionsMenu
-            Divider()
-            utilityActionsMenu
-            Divider()
-            settingsMenu
-        } label: {
-            Image(systemName: "ellipsis.circle")
-                .foregroundColor(.gray)
-                .font(.title2)
+            Menu {
+                newItemMenu
+                Divider()
+                importExportMenu
+                Divider()
+                viewOptionsMenu
+                Divider()
+                utilityActionsMenu
+                Divider()
+                settingsMenu
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .foregroundColor(.gray)
+                    .font(.title2)
+            }
         }
     }
-}
 
     // MARK: - Async Tasks
 
@@ -786,15 +742,17 @@ extension ContentView {
                     vxAtelierPro.log.debug(
                         "Successfully initiated permanent deletion for item (ID: \(itemId), Type: \(itemType)) via swipe/delete from trash."
                     )
-                    
+
                     // Only reset navigation if there are NO trashed items remaining (both dialogs and projects)
-                    let remainingTrashedItems = queryManager.trashedDialogs.count + queryManager.trashedProjects.count
+                    let remainingTrashedItems =
+                        queryManager.trashedDialogs.count + queryManager.trashedProjects.count
                     if remainingTrashedItems == 0 {
                         self.showTrashed = false
                         self.selectedItem = nil
                         vxAtelierPro.log.info("Last trashed item removed, returning to Show Chats")
                     } else {
-                        vxAtelierPro.log.debug("\(remainingTrashedItems) trashed items still remain")
+                        vxAtelierPro.log.debug(
+                            "\(remainingTrashedItems) trashed items still remain")
                     }
                 } else {
                     try queryManager.moveItemToTrash(item)
@@ -814,19 +772,19 @@ extension ContentView {
         let itemId = item.persistentModelID
         let itemType = type(of: item)
         let wasInArchive = showArchived
-        
+
         do {
             try queryManager.archiveItem(item)
             vxAtelierPro.log.debug("Successfully archived item (ID: \(itemId), Type: \(itemType)).")
-            
-            if selectedItem == itemId { 
-                selectedItem = nil 
-                
+
+            if selectedItem == itemId {
+                selectedItem = nil
+
                 // If we're in archive view and this was the last item, return to Show Chats
                 if wasInArchive {
                     let remainingArchivedItems = queryManager.archivedProjects.count
                     let remainingArchivedDialogs = queryManager.archivedDialogs.count
-                    
+
                     if remainingArchivedItems == 0 && remainingArchivedDialogs == 0 {
                         self.showArchived = false
                         vxAtelierPro.log.info("Last archived item removed, returning to Show Chats")
