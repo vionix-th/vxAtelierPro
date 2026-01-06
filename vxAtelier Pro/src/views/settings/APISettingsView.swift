@@ -5,6 +5,8 @@ struct APISettingsView: View {
     @State private var editingConfig: EditingConfig?
     @State private var showApiConfigError = false
     @State private var apiConfigErrorMessage = ""
+    @State private var shouldOpenNewConfiguration: Bool
+    @State private var didPresentInitialEditor = false
 
     struct EditingConfig: Identifiable {
         let id = UUID()
@@ -14,6 +16,10 @@ struct APISettingsView: View {
 
     private func isDefaultConfiguration(_ config: APIConfigurationItem) -> Bool {
         return config.isDefault
+    }
+
+    init(openNewConfiguration: Bool = false) {
+        _shouldOpenNewConfiguration = State(initialValue: openNewConfiguration)
     }
 
     private func deleteAPIConfiguration(_ config: APIConfigurationItem) {
@@ -33,6 +39,17 @@ struct APISettingsView: View {
         }
     }
 
+    private func startNewConfiguration() {
+        editingConfig = EditingConfig(config: APIConfigurationItem(
+            name: "New Configuration",
+            apiKey: "",
+            baseURL: AppDefaults.OpenAi.baseURL,
+            chatCompletionsEndpoint: AppDefaults.OpenAi.chatCompletionsEndpoint,
+            modelsEndpoint: AppDefaults.OpenAi.modelsEndpoint,
+            isDefault: queryManager.apiConfigurations.count < 2
+        ), isNew: true)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             SettingsActionBar(
@@ -41,14 +58,7 @@ struct APISettingsView: View {
                         .font(.headline)
                 },
                 primaryAction: {
-                    editingConfig = EditingConfig(config: APIConfigurationItem(
-                        name: "New Configuration",
-                        apiKey: "",
-                        baseURL: AppDefaults.OpenAi.baseURL,
-                        chatCompletionsEndpoint: AppDefaults.OpenAi.chatCompletionsEndpoint,
-                        modelsEndpoint: AppDefaults.OpenAi.modelsEndpoint,
-                        isDefault: queryManager.apiConfigurations.count < 2
-                    ), isNew: true)
+                    startNewConfiguration()
                 },
                 secondaryActions: [],
                 showAddButton: false,
@@ -97,6 +107,12 @@ struct APISettingsView: View {
             }
         }
         .navigationTitle("API")
+        .onAppear {
+            if shouldOpenNewConfiguration && !didPresentInitialEditor {
+                didPresentInitialEditor = true
+                startNewConfiguration()
+            }
+        }
         .alert("Configuration Error", isPresented: $showApiConfigError) {
             Button("OK") {
                 showApiConfigError = false

@@ -60,7 +60,15 @@ struct ApplicationSettingsView: View {
         }
     }
 
-    @State private var selectedTab: SettingsTab? = .general
+    @State private var selectedTab: SettingsTab?
+    private let initialTab: SettingsTab?
+    private let openAPIConfigurationEditor: Bool
+
+    init(initialTab: SettingsTab? = nil, openAPIConfigurationEditor: Bool = false) {
+        self.initialTab = initialTab
+        self.openAPIConfigurationEditor = openAPIConfigurationEditor
+        _selectedTab = State(initialValue: initialTab ?? .general)
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -78,7 +86,7 @@ struct ApplicationSettingsView: View {
                     GeneralSettingsView()
                         .padding(AppDefaults.paddingLarge)
                 case .api:
-                    APISettingsView()
+                    APISettingsView(openNewConfiguration: openAPIConfigurationEditor)
                         .padding(AppDefaults.paddingLarge)
                 case .webSearch:
                     WebSearchSettingsView()
@@ -114,16 +122,14 @@ struct ApplicationSettingsView: View {
         }
         .onAppear {
             vxAtelierPro.log.debug("ApplicationSettingsView appeared")
-            if horizontalSizeClass == .compact {
-                if selectedTab != nil {
-                    selectedTab = nil
-                }
-            } else {
-                if selectedTab == nil {
-                    selectedTab = .general
-                }
+            if let initialTab = initialTab {
+                selectedTab = initialTab
+            } else if selectedTab == nil {
+                selectedTab = .general
+            }
+            if openAPIConfigurationEditor {
+                selectedTab = .api
             }
         }
     }
 }
-

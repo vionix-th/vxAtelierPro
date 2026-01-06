@@ -20,6 +20,8 @@ struct ContentView: View {
     @State private var applicationSettingsViewIsPresented: Bool = false
     @State private var ttsViewIsPresented: Bool = false
     @State private var isPromptTemplatesPresented: Bool = false
+    @State private var settingsInitialTab: ApplicationSettingsView.SettingsTab? = nil
+    @State private var settingsOpenNewAPIConfiguration: Bool = false
 
     // Options sheet hosting (hoisted from ConversationView)
     private struct OptionsSheetKey: Identifiable { let id: PersistentIdentifier }
@@ -318,9 +320,14 @@ struct ContentView: View {
             }
         } else {
             DetailPlaceholderView(
-                canCreate: queryManager.defaultApiConfiguration != nil,
+                hasAPIConfiguration: queryManager.defaultApiConfiguration != nil,
                 onNewDialog: addConversation,
-                onNewProject: addProject
+                onNewProject: addProject,
+                onConfigureAPI: {
+                    settingsInitialTab = .api
+                    settingsOpenNewAPIConfiguration = true
+                    applicationSettingsViewIsPresented = true
+                }
             )
         }
     }
@@ -437,6 +444,8 @@ struct ContentView: View {
     @ViewBuilder
     private var settingsMenu: some View {
         Button {
+            settingsInitialTab = nil
+            settingsOpenNewAPIConfiguration = false
             applicationSettingsViewIsPresented = true
         } label: {
             MenuItemStyle.label("Application Settings", systemImage: "gear")
@@ -450,9 +459,14 @@ struct ContentView: View {
         #if os(iOS)
             if horizontalSizeClass == .compact && !hasVisibleItems {
                 DetailPlaceholderView(
-                    canCreate: queryManager.defaultApiConfiguration != nil,
+                    hasAPIConfiguration: queryManager.defaultApiConfiguration != nil,
                     onNewDialog: addConversation,
-                    onNewProject: addProject
+                    onNewProject: addProject,
+                    onConfigureAPI: {
+                        settingsInitialTab = .api
+                        settingsOpenNewAPIConfiguration = true
+                        applicationSettingsViewIsPresented = true
+                    }
                 )
             } else {
                 mainContentView
@@ -510,11 +524,18 @@ struct ContentView: View {
         .task(id: exportDialogRequested?.1) { await exportTask(for: exportDialogRequested?.0) }
         .task(id: importRequested) { await importTask() }
         // Present Settings from the toolbar menu entry
-        .sheet(isPresented: $applicationSettingsViewIsPresented) {
-            AppearanceWrapperForSettingsView(
-                queryManager: queryManager,
-                modelContext: modelContext
+        .sheet(isPresented: $applicationSettingsViewIsPresented, onDismiss: {
+            settingsInitialTab = nil
+            settingsOpenNewAPIConfiguration = false
+        }) {
+            ApplicationSettingsView(
+                initialTab: settingsInitialTab,
+                openAPIConfigurationEditor: settingsOpenNewAPIConfiguration
             )
+            .environment(queryManager)
+            .environment(\.modelContext, modelContext)
+            // Force view recreation when the requested tab/editor changes to avoid stale selection.
+            .id("settings-\((settingsInitialTab.map { "\($0)" }) ?? "none")-\(settingsOpenNewAPIConfiguration ? "open-new-api" : "default")")
             #if os(macOS)
                 .frame(idealWidth: 900, idealHeight: 640)
             #else

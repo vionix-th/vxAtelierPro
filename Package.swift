@@ -124,7 +124,6 @@ let package = Package(
                 "utilities/ShortcutsManager.swift",
                 "utilities/TypeConversionUtils.swift",
                 "utilities/URLExtensions.swift",
-                "views/AppearanceWrapperView.swift",
                 "views/ContentView.swift",
                 "views/StatusBar.swift",
                 // Views - Components

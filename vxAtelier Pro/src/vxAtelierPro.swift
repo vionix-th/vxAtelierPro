@@ -133,12 +133,20 @@ struct vxAtelierPro: App {
     
     // Read the stored appearance preference
     @AppStorage("appearanceStyle") private var appearanceStyle: AppearanceStyle = .system
-    
+    private var effectiveColorScheme: ColorScheme? {
+        switch appearanceStyle {
+        case .system:
+            return nil // Follow system, do not override
+        case .light:
+            return .light
+        case .dark:
+            return .dark
+        }
+    }
+
     @State private var isDialogShown: Bool = false
     @State private var isLogHistoryShown: Bool = false
     @State private var logHistoryFilters: Set<LoggingService.LogType> = []
-    
-    @Environment(\.colorScheme) private var systemColorScheme
     
     init() {
         vxAtelierPro.log.debug("Initializing vxAtelierPro")
@@ -200,7 +208,8 @@ struct vxAtelierPro: App {
     
     var body: some Scene {
         WindowGroup("Main Window", id: "mainWindow") {
-            AppearanceWrapperView()
+            ContentView()
+                .preferredColorScheme(effectiveColorScheme)
                 .environment(\.showLogHistory) {
                     isLogHistoryShown = true
                 }
@@ -218,9 +227,12 @@ struct vxAtelierPro: App {
         }
                 
 #if os(macOS)
-        // Use AppearanceWrapperForSettingsView for Settings as well, wrapping ApplicationSettingsView
+        // Settings scene keeps the user-selected appearance override
         Settings {
-            AppearanceWrapperForSettingsView(queryManager: queryManager, modelContext: sharedModelContainer.mainContext)
+            ApplicationSettingsView()
+                .preferredColorScheme(effectiveColorScheme)
+                .environment(queryManager)
+                .environment(\.modelContext, sharedModelContainer.mainContext)
         }
         
         MenuBarExtra("vxAtelier Pro", systemImage: "message.circle") {

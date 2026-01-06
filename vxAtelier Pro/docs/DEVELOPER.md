@@ -852,7 +852,7 @@ This module provides a collection of shared services, helpers, and extensions us
 Location: `src/views/`
 *   **`ContentView.swift`**: The core of the user interface. It implements the main `NavigationSplitView`, which contains the sidebar for navigation and the detail pane for content. It manages the selection state, orchestrates the presentation of sheets and popovers, and defines the primary toolbar actions. It serves as the central hub for all other views.
 *   **`StatusBar.swift`**: A persistent view displayed at the bottom of the main window. It provides real-time feedback to the user, including the latest log messages from `LoggingService` and contextual information about the currently active dialog (e.g., token counts, AI model capabilities).
-*   **`AppearanceWrapperView.swift`**: This file provides wrapper views that apply the user-selected appearance (light/dark mode) to the main content and settings windows. It reads the user's preference from `@AppStorage` and uses the `.preferredColorScheme()` modifier to override the system theme, decoupling appearance logic from the core views.
+*   **Appearance handling**: The app-level scene builders apply the user-selected appearance using `.preferredColorScheme` with the `@AppStorage("appearanceStyle")` value, so the main window and Settings scene respect runtime theme changes without extra wrapper views.
 
 The rest of the UI is organized into the following subdirectories:
 
@@ -1045,7 +1045,7 @@ Delete rules:
 
 ## Lifecycle & Entry Points
 1. `vxAtelierPro.App` registers platform specific `AppDelegate`, initialises `ModelContainer`, `QueryManager`, `AIServiceManager`, and default tools.
-2. The `WindowGroup` hosts `AppearanceWrapperView`; `Settings` scene hosts `AppearanceWrapperForSettingsView`.
+2. The `WindowGroup` hosts `ContentView` with `.preferredColorScheme` driven by `@AppStorage("appearanceStyle")`; the `Settings` scene hosts `ApplicationSettingsView` with the same override and injected environments.
 3. On macOS, a `MenuBarExtra` supplies quick actions.
 
 ---

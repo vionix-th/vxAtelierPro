@@ -1,9 +1,10 @@
 import SwiftUI
 
 struct DetailPlaceholderView: View {
-    let canCreate: Bool
+    let hasAPIConfiguration: Bool
     let onNewDialog: () -> Void
     let onNewProject: () -> Void
+    let onConfigureAPI: () -> Void
 
     var body: some View {
         VStack(spacing: AppDefaults.paddingLarge) {
@@ -19,40 +20,54 @@ struct DetailPlaceholderView: View {
                 .font(.largeTitle.bold())
                 .multilineTextAlignment(.center)
                 .padding(.bottom, AppDefaults.paddingSmall)
-            Text("Start by creating a new dialog or project. Organize your conversations and ideas with ease.")
+            Text(
+                hasAPIConfiguration
+                    ? "Start by creating a new dialog or project. Organize your conversations and ideas with ease."
+                    : "Configure an API provider to create dialogs and projects."
+            )
                 .font(.title3)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, AppDefaults.paddingLarge)
                 .padding(.bottom, AppDefaults.paddingLarge)
             VStack(spacing: AppDefaults.paddingLarge) {
-                Button(action: {
-                    if canCreate { onNewDialog() }
-                }) {
-                    Label("New Dialog", systemImage: "plus.bubble")
-                        .font(.title3.bold())
-                        .padding(.vertical, AppDefaults.paddingSmall)
-                        .padding(.horizontal, AppDefaults.paddingLarge)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.accentColor)
-                .accessibilityIdentifier("welcome-new-dialog")
-                .disabled(!canCreate)
-                .help(canCreate ? "" : "API configuration required to create a new dialog")
+                if hasAPIConfiguration {
+                    Button(action: {
+                        onNewDialog()
+                    }) {
+                        Label("New Dialog", systemImage: "plus.bubble")
+                            .font(.title3.bold())
+                            .padding(.vertical, AppDefaults.paddingSmall)
+                            .padding(.horizontal, AppDefaults.paddingLarge)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.accentColor)
+                    .accessibilityIdentifier("welcome-new-dialog")
 
-                Button(action: {
-                    if canCreate { onNewProject() }
-                }) {
-                    Label("New Project", systemImage: "folder.badge.plus")
-                        .font(.title3.bold())
-                        .padding(.vertical, AppDefaults.paddingSmall)
-                        .padding(.horizontal, AppDefaults.paddingLarge)
+                    Button(action: {
+                        onNewProject()
+                    }) {
+                        Label("New Project", systemImage: "folder.badge.plus")
+                            .font(.title3.bold())
+                            .padding(.vertical, AppDefaults.paddingSmall)
+                            .padding(.horizontal, AppDefaults.paddingLarge)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.accentColor)
+                    .accessibilityIdentifier("welcome-new-project")
+                } else {
+                    Button(action: {
+                        onConfigureAPI()
+                    }) {
+                        Label("Configure API", systemImage: "key.fill")
+                            .font(.title3.bold())
+                            .padding(.vertical, AppDefaults.paddingSmall)
+                            .padding(.horizontal, AppDefaults.paddingLarge)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.accentColor)
+                    .accessibilityIdentifier("welcome-configure-api")
                 }
-                .buttonStyle(.bordered)
-                .tint(.accentColor)
-                .accessibilityIdentifier("welcome-new-project")
-                .disabled(!canCreate)
-                .help(canCreate ? "" : "API configuration required to create a new project")
             }
             .padding(.bottom, AppDefaults.paddingLarge)
             Spacer()
