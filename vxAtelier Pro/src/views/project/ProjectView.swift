@@ -6,8 +6,10 @@ import Observation
 // MARK: - Project View
 struct ProjectView: View {
     // MARK: - Environment & Properties
-    @Environment(\.modelContext) private var modelContext
-    @Environment(QueryManager.self) private var queryManager
+    @Environment(\.modelContext) private var modelContext: ModelContext   
+    @Environment(QueryManager.self) private var queryManager: QueryManager
+    @Environment(TTSQueue.self) private var ttsQueue: TTSQueue    
+    @Environment(ConversationViewModelStore.self) private var conversationStore: ConversationViewModelStore
     
     // Store the project ID directly in the view
     private let projectID: PersistentIdentifier
@@ -186,8 +188,12 @@ struct ProjectView: View {
             VStack {
                 ForEach(filteredConversations) { conversation in
                     NavigationLink {
-                        Group { ConversationView(conversation: conversation, onRequestOptions: onRequestOptions) }
-                        .id(conversation.id)
+                        Group {
+                            ConversationView(
+                                viewModel: conversationStore.viewModel(for: conversation.id),
+                                onRequestOptions: onRequestOptions
+                            )
+                        }
                             .onAppear() {
                                 onConversationViewAppear(conversation)
                             }
@@ -353,4 +359,3 @@ struct ProjectView: View {
         }
     }
 }
-

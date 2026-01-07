@@ -9,6 +9,7 @@ struct ContentView: View {
     @Environment(QueryManager.self) private var queryManager
     @Environment(\.showLogHistory) private var showLogHistory
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(ConversationViewModelStore.self) private var conversationStore
 
     #if os(macOS)
         private let globalHotkeys = HotkeyManager()
@@ -166,9 +167,11 @@ struct ContentView: View {
     func conversationNavigationLink(for conversation: ConversationItem) -> some View {
         NavigationLink {
             Group {
-                ConversationView(conversationID: conversation.id, onRequestOptions: requestOptions)
+                ConversationView(
+                    viewModel: conversationStore.viewModel(for: conversation.id),
+                    onRequestOptions: requestOptions
+                )
             }
-            .id(conversation.id)
         } label: {
             NavigationItem(
                 title: Binding(get: { conversation.title }, set: { conversation.title = $0 }),
@@ -209,12 +212,11 @@ struct ContentView: View {
             if let conversation = conversation {
                 Group {
                     ConversationView(
-                        conversationID: conversation.id,
+                        viewModel: conversationStore.viewModel(for: conversation.id),
                         scrollHint: queryManager.scrollHint(for: bookmark),
                         onRequestOptions: requestOptions
                     )
                 }
-                .id(conversation.id)
             } else {
                 Text("Invalid bookmark: missing conversation.")
             }
@@ -291,9 +293,9 @@ struct ContentView: View {
             ) {
                 Group {
                     ConversationView(
-                        conversationID: conversation.id, onRequestOptions: requestOptions)
+                        viewModel: conversationStore.viewModel(for: conversation.id),
+                        onRequestOptions: requestOptions)
                 }
-                .id(conversation.id)
             } else if let project = queryManager.allProjects.first(where: { $0.id == selectedId }) {
                 ProjectView(
                     projectID: project.id,
@@ -305,12 +307,11 @@ struct ContentView: View {
                 if let conversation = conversation {
                     Group {
                         ConversationView(
-                            conversationID: conversation.id,
+                            viewModel: conversationStore.viewModel(for: conversation.id),
                             scrollHint: queryManager.scrollHint(for: bookmark),
                             onRequestOptions: requestOptions
                         )
                     }
-                    .id(conversation.id)
                 } else {
                     Text("Invalid bookmark: missing conversation.")
                 }

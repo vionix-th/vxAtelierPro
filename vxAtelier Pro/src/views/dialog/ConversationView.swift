@@ -1,60 +1,35 @@
 import SwiftUI
 import SwiftData
-import Observation
 import Foundation
 
 // MARK: - ConversationView
 struct ConversationView: View {
-    @Environment(QueryManager.self) private var queryManager
-    @Environment(TTSQueue.self) private var ttsQueue
-    @StateObject private var viewModel: ConversationViewModel
-
-    // Pinned-to-end state and unread indicators
-    @State private var isPinnedToEnd: Bool = true
-    @State private var unreadCount: Int = 0
-    @State private var sendScrollTick: Int = 0
-
+    @ObservedObject var viewModel: ConversationViewModel
     private var autoScrollDebugEnabled: Bool { UserDefaults.standard.bool(forKey: "AutoScrollDebugEnabled") }
-
-    private var endAnchorID: String {
-        if let dialog = viewModel.conversation { return "END-\(dialog.id)" }
-        return "END-none"
-    }
+    private var bottomAnchorID: String { "BOTTOM-\(viewModel.id)" }
     
     let scrollHint: PersistentIdentifier?
     let onRequestOptions: (PersistentIdentifier) -> Void
 
-    init(conversationID: PersistentIdentifier, scrollHint: PersistentIdentifier? = nil, onRequestOptions: @escaping (PersistentIdentifier) -> Void = { _ in }) {
+    init(
+        viewModel: ConversationViewModel,
+        scrollHint: PersistentIdentifier? = nil,
+        onRequestOptions: @escaping (PersistentIdentifier) -> Void = { _ in }
+    ) {
+        self.viewModel = viewModel
         self.scrollHint = scrollHint
         self.onRequestOptions = onRequestOptions
-        _viewModel = StateObject(wrappedValue: ConversationViewModel(conversationID: conversationID, queryManager: nil, ttsQueue: nil))
-    }
-
-    // Backward compatibility initializer
-    init(conversation: ConversationItem, scrollHint: PersistentIdentifier? = nil, onRequestOptions: @escaping (PersistentIdentifier) -> Void = { _ in }) {
-        self.init(conversationID: conversation.id, scrollHint: scrollHint, onRequestOptions: onRequestOptions)
     }
 
     var body: some View {
-        // Stable content version for change detection
-        let contentVersion: Int = viewModel.conversation?.turns.reduce(0) { $0 + 1 + $1.events.count } ?? 0
-
-        return VStack(spacing: 0) {
+        VStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ZStack(alignment: .bottomTrailing) {
-                    // Reversed scroll technique keeps the visual end anchored without bottom sentinel jitter
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 10) {
-                            // Visual bottom anchor (placed on top due to rotation)
-                            Color.clear
-                                .frame(height: 1)
-                                .id(endAnchorID)
-                                .onAppear { endVisibilityChanged(true) }
-                                .onDisappear { endVisibilityChanged(false) }
-
                             if let dialog = viewModel.conversation {
                                 let turns = viewModel.sortedTurns
-                                ForEach(turns.reversed(), id: \.id) { turn in
+                                ForEach(turns, id: \.id) { turn in
                                     TurnRowV2(
                                         conversationID: dialog.id,
                                         turn: turn,
@@ -76,47 +51,62 @@ struct ConversationView: View {
                                         onAction: { action, message, t in
                                             viewModel.handleMessageAction(action, message: message, turn: t)
                                         },
-                                        isBookmarkedUser: queryManager.isUserBookmarked(turnID: turn.id),
+                                        isBookmarkedUser: viewModel.queryManager.isUserBookmarked(turnID: turn.id),
                                         isBookmarkedAssistant: {
                                             if let mid = latestAssistantMessageID(for: turn) {
-                                                return queryManager.isAssistantBookmarked(turnID: turn.id, messageID: mid)
+                                                return viewModel.queryManager.isAssistantBookmarked(turnID: turn.id, messageID: mid)
                                             }
                                             return false
                                         }()
                                     )
-                                    .rotationEffect(.degrees(180)) // invert back per-row
+                                    .onAppear {
+                                        if !viewModel.isPinnedToEnd {
+                                            viewModel.lastVisibleMessageID = turn.userMessage.id
+                                        }
+                                    }
                                 }
                             }
+
+                            if viewModel.streamingState.isActive,
+                               !viewModel.streamingState.text.isEmpty,
+                               let dialog = viewModel.conversation,
+                               let lastTurn = viewModel.sortedTurns.last {
+                                MessageView(
+                                    messageID: nil,
+                                    turnID: lastTurn.id,
+                                    conversationID: dialog.id,
+                                    isSelected: false,
+                                    isSelecting: false,
+                                    onSelect: {},
+                                    onTap: {},
+                                    onAction: { _ in },
+                                    isBookmarked: false,
+                                    streamingContent: viewModel.streamingState.text
+                                )
+                            }
+
+                            Color.clear
+                                .frame(height: 1)
+                                .id(bottomAnchorID)
+                                .onAppear { viewModel.markBottomVisibility(true) }
+                                .onDisappear { viewModel.markBottomVisibility(false) }
                         }
-                    }
-                    .rotationEffect(.degrees(180)) // reverse the scroll direction for bottom anchoring
-                    .onAppear {
-                        var tx = Transaction(); tx.disablesAnimations = true
-                        if let hint = scrollHint {
-                            withTransaction(tx) { proxy.scrollTo(hint, anchor: .center) }
-                            isPinnedToEnd = false
-                            if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: initial onAppear -> scrolled to hint \(hint)") }
-                        } else {
-                            // Land at visual bottom (top in reversed space)
-                            withTransaction(tx) { proxy.scrollTo(endAnchorID, anchor: .top) }
-                            if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: initial onAppear -> scrolled to end") }
-                        }
+                        .padding(.vertical, AppDefaults.paddingSmall)
                     }
 
-                    // Floating scroll-to-end button with unread badge
-                    if !isPinnedToEnd {
+                    if !viewModel.isPinnedToEnd {
                         Button {
-                            withAnimation { proxy.scrollTo(endAnchorID, anchor: .top) }
-                            unreadCount = 0
-                            isPinnedToEnd = true
+                            withAnimation { scrollToBottom(proxy: proxy, animated: true) }
+                            viewModel.resetUnread()
+                            viewModel.isPinnedToEnd = true
                             if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: FAB tapped -> scroll to end") }
                         } label: {
                             ZStack(alignment: .topTrailing) {
                                 Image(systemName: "arrow.down.circle.fill")
                                     .font(.system(size: 28))
                                     .foregroundColor(.accentColor)
-                                if unreadCount > 0 {
-                                    Text("\(unreadCount)")
+                                if viewModel.unreadCount > 0 {
+                                    Text("\(viewModel.unreadCount)")
                                         .font(.caption2)
                                         .foregroundColor(.white)
                                         .padding(4)
@@ -131,47 +121,41 @@ struct ConversationView: View {
                         .padding(.bottom, AppDefaults.paddingMedium)
                     }
                 }
-                // Scroll triggers
-                .onChange(of: contentVersion) {
-                    if isPinnedToEnd {
-                        var tx = Transaction(); tx.disablesAnimations = true
-                        withTransaction(tx) { proxy.scrollTo(endAnchorID, anchor: .top) }
+                .onAppear {
+                    performInitialScroll(proxy: proxy)
+                    viewModel.onAppear()
+                }
+                .onChange(of: viewModel.contentVersion) { _, _ in
+                    if viewModel.isPinnedToEnd {
+                        scrollToBottom(proxy: proxy, animated: false)
                         if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: contentVersion -> pinned, scrolled to end") }
                     } else {
-                        unreadCount = min(unreadCount + 1, 99)
-                        if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: contentVersion -> not pinned, unread=\(unreadCount)") }
+                        viewModel.incrementUnreadIfNeeded()
+                        if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: contentVersion -> not pinned, unread=\(viewModel.unreadCount)") }
                     }
                 }
-                .onChange(of: viewModel.streamingState.text) {
-                    if isPinnedToEnd && viewModel.streamingState.isActive {
-                        var tx = Transaction(); tx.disablesAnimations = true
-                        withTransaction(tx) { proxy.scrollTo(endAnchorID, anchor: .top) }
+                .onChange(of: viewModel.streamingState.text) { _, _ in
+                    if viewModel.isPinnedToEnd && viewModel.streamingState.isActive {
+                        scrollToBottom(proxy: proxy, animated: false)
                         if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: stream flush -> pinned, scrolled to end") }
-                    } else if !isPinnedToEnd && viewModel.streamingState.isActive {
-                        if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: stream flush -> not pinned") }
                     }
                 }
-                .onChange(of: sendScrollTick) {
-                    withAnimation { proxy.scrollTo(endAnchorID, anchor: .top) }
-                    isPinnedToEnd = true
-                    unreadCount = 0
-                    if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: sendScrollTick -> force scroll to end") }
-                }
-            }
 
-            if !viewModel.isSelectingMessages, let conversation = viewModel.conversation {
-                Divider()
-                MessageInputView(
-                    dialog: conversation,
-                    streamingState: viewModel.streamingState,
-                    didSend: { _ in
-                        sendScrollTick &+= 1
-                        unreadCount = 0
-                        if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: didSend -> reset unread and scrolled") }
-                    }
-                )
-                .padding(AppDefaults.paddingSmall)
-                .disabled(viewModel.streamingState.isActive)
+                if !viewModel.isSelectingMessages, let conversation = viewModel.conversation {
+                    Divider()
+                    MessageInputView(
+                        dialog: conversation,
+                        streamingState: viewModel.streamingState,
+                        didSend: { _ in
+                            viewModel.resetUnread()
+                            viewModel.isPinnedToEnd = true
+                            scrollToBottom(proxy: proxy, animated: true)
+                            if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: didSend -> reset unread and scrolled") }
+                        }
+                    )
+                    .padding(AppDefaults.paddingSmall)
+                    .disabled(viewModel.streamingState.isActive)
+                }
             }
         }
         .padding(AppDefaults.paddingSmall)
@@ -192,15 +176,7 @@ struct ConversationView: View {
                 }
             }
         }
-        .onAppear {
-            if viewModel.queryManager == nil { viewModel.queryManager = queryManager }
-            if viewModel.ttsQueue == nil { viewModel.ttsQueue = ttsQueue }
-            viewModel.onAppear()
-        }
         .onTapGesture { hideKeyboard() }
-        .onChange(of: viewModel.conversation?.id) { oldValue, newValue in
-            vxAtelierPro.log.debug("ConversationView: conversation id changed old=\(String(describing: oldValue)) new=\(String(describing: newValue))")
-        }
         .onKeyPress(.escape, action: {
             if viewModel.isSelectingMessages {
                 viewModel.isSelectingMessages = false
@@ -225,186 +201,32 @@ struct ConversationView: View {
         }
     }
 
-    private func endVisibilityChanged(_ visible: Bool) {
-        isPinnedToEnd = visible
-        if visible { unreadCount = 0 }
-        if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: end visible=\(visible)") }
+    private func performInitialScroll(proxy: ScrollViewProxy) {
+        var tx = Transaction(); tx.disablesAnimations = true
+        if let hint = scrollHint {
+            withTransaction(tx) { proxy.scrollTo(hint, anchor: .center) }
+            viewModel.isPinnedToEnd = false
+            if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: initial -> scrolled to hint \(hint)") }
+        } else if viewModel.isPinnedToEnd {
+            withTransaction(tx) { scrollToBottom(proxy: proxy, animated: false) }
+            if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: initial -> scrolled to bottom") }
+        } else if let anchor = viewModel.lastVisibleMessageID {
+            withTransaction(tx) { proxy.scrollTo(anchor, anchor: .top) }
+            if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: initial -> restored anchor \(anchor)") }
+        }
+    }
+
+    private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool) {
+        if animated {
+            withAnimation { proxy.scrollTo(bottomAnchorID, anchor: .bottom) }
+        } else {
+            proxy.scrollTo(bottomAnchorID, anchor: .bottom)
+        }
     }
 
     private func latestAssistantMessageID(for turn: ConversationTurn) -> PersistentIdentifier? {
         let assistantEvents = turn.events.filter { $0.type == .assistant }
         return assistantEvents.sorted { $0.timestamp < $1.timestamp }.last?.message.id
-    }
-}
-
-// Preference keys for auto-scroll stickiness removed
-
-struct ConversationMessagesList: View {
-    @Environment(QueryManager.self) private var queryManager
-    let sortedTurnIDs: [PersistentIdentifier]
-    let contentVersion: Int
-    let conversationID: PersistentIdentifier
-    let selectedMessages: Set<PersistentIdentifier>
-    let isSelectingMessages: Bool
-    let streamingState: StreamingState
-    let onSelect: (PersistentIdentifier) -> Void
-    let onTap: (MessageItem, ConversationTurn) -> Void
-    let onAction: (MessageAction, MessageItem, ConversationTurn) -> Void
-    let onBottomVisibilityChange: (Bool) -> Void
-    private var streamingDebugEnabled: Bool { UserDefaults.standard.bool(forKey: "StreamingDebugEnabled") }
-
-    private func logRenderSequence() {
-        guard streamingDebugEnabled else { return }
-        guard let dialog = queryManager.allConversations.first(where: { $0.id == conversationID }) else { return }
-        var parts: [String] = []
-        for turnID in sortedTurnIDs {
-            guard let turn = dialog.turns.first(where: { $0.id == turnID }) else { continue }
-            parts.append("user(\(turn.userMessage.id))@\(turn.userMessage.timestamp.ISO8601Format())")
-            for ev in turn.events.sorted(by: compareEvents) {
-                parts.append("\(String(describing: ev.type))(\(ev.message.id))@\(ev.timestamp.ISO8601Format())")
-            }
-        }
-        if streamingState.isActive && !streamingState.text.isEmpty,
-           let lastTurnID = sortedTurnIDs.last,
-           let lastTurn = dialog.turns.first(where: { $0.id == lastTurnID }) {
-            parts.append("stream(\(lastTurn.id))@now len=\(streamingState.text.count)")
-        }
-        vxAtelierPro.log.debug("ConversationMessagesList.render v=\(contentVersion) items=\(parts.count) seq=[\(parts.joined(separator: ", "))]")
-    }
-
-    private func eventRank(_ type: TurnEvent.EventType) -> Int {
-        switch type {
-        case .assistant: return 0
-        case .toolCall: return 1
-        case .toolResult: return 2
-        }
-    }
-
-    private func compareEvents(_ a: TurnEvent, _ b: TurnEvent) -> Bool {
-        // Primary: event timestamp
-        if a.timestamp != b.timestamp { return a.timestamp < b.timestamp }
-        // Secondary: type rank (assistant < toolCall < toolResult)
-        let ra = eventRank(a.type)
-        let rb = eventRank(b.type)
-        if ra != rb { return ra < rb }
-        // Tertiary: message timestamp
-        if a.message.timestamp != b.message.timestamp { return a.message.timestamp < b.message.timestamp }
-        // Quaternary: toolCallId (if present)
-        let aid = a.message.toolCallId ?? ""
-        let bid = b.message.toolCallId ?? ""
-        if aid != bid { return aid < bid }
-        // Final: stable fallback on object identity hash
-        return ObjectIdentifier(a.message).hashValue < ObjectIdentifier(b.message).hashValue
-    }
-
-    // Compute tool-result message IDs that are collapsed into assistant messages for a turn
-    private func hiddenToolResultIds(for turn: ConversationTurn) -> Set<PersistentIdentifier> {
-        let assistantEvents = turn.events.filter { $0.type == .assistant }
-        let toolResultsById = Dictionary(grouping: turn.events.filter { $0.type == .toolResult && $0.message.toolCallId != nil }, by: { $0.message.toolCallId! })
-        var hidden = Set<PersistentIdentifier>()
-        for ae in assistantEvents {
-            if let calls = ae.message.getToolCalls() {
-                for c in calls {
-                    let id = c.id
-                    if let results = toolResultsById[id] {
-                        for r in results { hidden.insert(r.message.id) }
-                    }
-                }
-            }
-        }
-        return hidden
-    }
-
-    var body: some View {
-        LazyVStack(alignment: .leading, spacing: 10) {
-            ForEach(sortedTurnIDs, id: \.self) { turnID in
-                if let dialog = queryManager.allConversations.first(where: { $0.id == conversationID }),
-                   let turn = dialog.turns.first(where: { $0.id == turnID }) {
-                     MessageView(
-                         messageID: turn.userMessage.id,
-                         turnID: turn.id,
-                         conversationID: dialog.id,
-                         isSelected: selectedMessages.contains(turn.userMessage.id),
-                         isSelecting: isSelectingMessages,
-                         onSelect: { onSelect(turn.userMessage.id) },
-                         onTap: { 
-                             onTap(turn.userMessage, turn) 
-                         },
-                         onAction: { action in 
-                             onAction(action, turn.userMessage, turn) 
-                         },
-                         isBookmarked: queryManager.isUserBookmarked(turnID: turnID)
-                     )
-                     .id(turn.userMessage.id)
-                     
-                     // Build hidden set for tool results that will be shown inside the assistant bubble
-                     let hiddenIds = hiddenToolResultIds(for: turn)
-                     ForEach(turn.events.sorted(by: compareEvents).filter { $0.type != .toolResult || !hiddenIds.contains($0.message.id) }) { event in
-                         MessageView(
-                             messageID: event.message.id,
-                             turnID: turnID,
-                             conversationID: dialog.id,
-                             isSelected: selectedMessages.contains(event.message.id),
-                             isSelecting: isSelectingMessages,
-                             onSelect: { onSelect(event.message.id) },
-                             onTap: { 
-                                 onTap(event.message, turn) 
-                             },
-                             onAction: { action in 
-                                 onAction(action, event.message, turn) 
-                             },
-                             isBookmarked: queryManager.isAssistantBookmarked(turnID: turnID, messageID: event.message.id)
-                         )
-                         .id(event.message.id)
-                     }
-                 }
-             }
-            
-            if streamingState.isActive,
-               !streamingState.text.isEmpty,
-               let dialog = queryManager.allConversations.first(where: { $0.id == conversationID }),
-               let lastTurnID = sortedTurnIDs.last,
-               let lastTurn = dialog.turns.first(where: { $0.id == lastTurnID }) {
-                
-                MessageView(
-                    messageID: nil, // Streaming content doesn't have a persistent ID
-                    turnID: lastTurn.id,
-                    conversationID: dialog.id,
-                    isSelected: false,
-                    isSelecting: false,
-                    onSelect: {},
-                    onTap: {},
-                    onAction: { _ in },
-                    isBookmarked: false,
-                    streamingContent: streamingState.text
-                )
-                .id("streaming-content")
-            }
-
-            // Bottom visibility sentinel inside the lazy stack for reliable viewport tracking
-            Color.clear
-                .frame(height: 1)
-                .id("BOTTOM-\(conversationID)")
-                .onAppear { onBottomVisibilityChange(true) }
-                .onDisappear { onBottomVisibilityChange(false) }
-        }
-        .id(contentVersion)
-        .onAppear {
-            logRenderSequence()
-        }
-        .onChange(of: contentVersion) {
-            logRenderSequence()
-        }
-        .onChange(of: streamingState.text) {
-            if streamingDebugEnabled && streamingState.isActive {
-                vxAtelierPro.log.debug("ConversationMessagesList.stream len=\(streamingState.text.count)")
-            }
-        }
-        .onChange(of: streamingState.isActive) {
-            if streamingDebugEnabled {
-                vxAtelierPro.log.debug("ConversationMessagesList.streamActive=\(streamingState.isActive)")
-            }
-        }
     }
 }
 

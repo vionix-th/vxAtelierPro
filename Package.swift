@@ -145,6 +145,7 @@ let package = Package(
                 "views/dialog/ConversationOptionsView.swift",                
                 "views/dialog/MessageAction.swift",
                 "views/dialog/ConversationViewModel.swift",
+                "views/dialog/ConversationViewModelStore.swift",
                 // Views - Project
                 "views/project/ProjectView.swift",
                 // Views - Status Bar

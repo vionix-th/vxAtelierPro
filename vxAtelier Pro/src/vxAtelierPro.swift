@@ -130,6 +130,8 @@ struct vxAtelierPro: App {
     
     // Create the QueryManager for centralized data access
     private let queryManager: QueryManager
+    private let ttsQueue: TTSQueue
+    private let conversationStore: ConversationViewModelStore
     
     // Read the stored appearance preference
     @AppStorage("appearanceStyle") private var appearanceStyle: AppearanceStyle = .system
@@ -154,6 +156,14 @@ struct vxAtelierPro: App {
         vxAtelierPro.log.debug("Initializing Query Manager")
         self.queryManager = QueryManager(modelContext: sharedModelContainer.mainContext)
         vxAtelierPro.log.debug("Query Manager initialized")
+
+        vxAtelierPro.log.debug("Initializing TTS Queue")
+        self.ttsQueue = TTSQueue(modelContext: sharedModelContainer.mainContext)
+        vxAtelierPro.log.debug("TTS Queue initialized")
+
+        vxAtelierPro.log.debug("Initializing Conversation ViewModel Store")
+        self.conversationStore = ConversationViewModelStore(queryManager: queryManager, ttsQueue: ttsQueue)
+        vxAtelierPro.log.debug("Conversation ViewModel Store initialized")
 
         vxAtelierPro.log.debug("Initializing AIServiceManager")
         _ = AIServiceManager.shared
@@ -210,9 +220,10 @@ struct vxAtelierPro: App {
         WindowGroup("Main Window", id: "mainWindow") {
             ContentView()
                 .preferredColorScheme(effectiveColorScheme)
+                .environment(conversationStore)
                 .environment(\.showLogHistory) {
                     isLogHistoryShown = true
-                }
+                }                
                 .sheet(isPresented: $isLogHistoryShown) {
                     LogHistorySheet(
                         filters: $logHistoryFilters
@@ -221,7 +232,7 @@ struct vxAtelierPro: App {
         }        
         .modelContainer(sharedModelContainer)
         .environment(queryManager)
-        .environment(TTSQueue(modelContext: sharedModelContainer.mainContext))
+        .environment(ttsQueue)
         .commands {
             AppCommands()
         }

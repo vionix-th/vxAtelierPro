@@ -9,6 +9,7 @@ import SwiftData
 final class ConversationViewModel: ObservableObject {
     // Store the conversation ID instead of the direct reference
     private let conversationID: PersistentIdentifier
+    var id: PersistentIdentifier { conversationID }
     
     @Published var selectedMessages = Set<PersistentIdentifier>()
     @Published var isSelectingMessages: Bool = false
@@ -16,18 +17,19 @@ final class ConversationViewModel: ObservableObject {
     @Published var errorAlert: ErrorAlert?
     @Published var bookmarkMessage: MessageItem? = nil
     @Published var bookmarkMessageLabel: String = ""
+    @Published var isPinnedToEnd: Bool = true
+    @Published var unreadCount: Int = 0
+    @Published var lastVisibleMessageID: PersistentIdentifier? = nil
 
-    @Published public var queryManager: QueryManager?
-    var ttsQueue: TTSQueue?
+    let queryManager: QueryManager
+    let ttsQueue: TTSQueue
 
     // Debug flags removed for auto-scroll; keys retained in settings only
 
     // Resolve the conversation on-demand from the QueryManager
     var conversation: ConversationItem? {
-        queryManager?.allConversations.first { $0.id == conversationID }
+        queryManager.allConversations.first { $0.id == conversationID }
     }
-    
-
     
     var sortedTurns: [ConversationTurn] {
         guard let conversation = conversation else { return [] }
@@ -48,15 +50,19 @@ final class ConversationViewModel: ObservableObject {
         }
     }
 
+    var contentVersion: Int {
+        conversation?.turns.reduce(0) { $0 + 1 + $1.events.count } ?? 0
+    }
+
     // Initialize with conversation ID instead of direct reference
-    init(conversationID: PersistentIdentifier, queryManager: QueryManager?, ttsQueue: TTSQueue? = nil) {
+    init(conversationID: PersistentIdentifier, queryManager: QueryManager, ttsQueue: TTSQueue) {
         self.conversationID = conversationID
         self.queryManager = queryManager
         self.ttsQueue = ttsQueue
     }
     
     // Backward compatibility initializer
-    convenience init(conversation: ConversationItem, queryManager: QueryManager? = nil, ttsQueue: TTSQueue? = nil) {
+    convenience init(conversation: ConversationItem, queryManager: QueryManager, ttsQueue: TTSQueue) {
         self.init(conversationID: conversation.id, queryManager: queryManager, ttsQueue: ttsQueue)
     }
 
@@ -88,7 +94,6 @@ final class ConversationViewModel: ObservableObject {
     // MARK: - Message Actions
     func handleMessageAction(_ action: MessageAction, message: MessageItem, turn: ConversationTurn) {
         vxAtelierPro.log.info("Handling message action: \(action) for message ID: \(message.id)")
-        guard let queryManager = queryManager else { return }
         guard let conversation = conversation else { 
             vxAtelierPro.log.error("Cannot handle message action: conversation not found")
             errorAlert = ErrorAlert(error: AppError.invalidOperation("Conversation not found"))
@@ -109,12 +114,8 @@ final class ConversationViewModel: ObservableObject {
                 vxAtelierPro.log.error("Failed to insert forked conversation: \(error.localizedDescription)")
             }
         case .addToPlaylist:
-            if let ttsQueue = ttsQueue {
-                vxAtelierPro.log.info("Adding single message to playlist. ID: \(message.id)")
-                ttsQueue.add(message, dialogTitle: conversation.title, messageIndex: 0, projectName: conversation.project?.name)
-            } else {
-                vxAtelierPro.log.error("TTSQueue is nil. Cannot add message to playlist.")
-            }
+            vxAtelierPro.log.info("Adding single message to playlist. ID: \(message.id)")
+            ttsQueue.add(message, dialogTitle: conversation.title, messageIndex: 0, projectName: conversation.project?.name)
         case .select:
             isSelectingMessages = true
             selectedMessages.insert(message.id)
@@ -129,7 +130,6 @@ final class ConversationViewModel: ObservableObject {
     }
 
     func deleteMessages(_ ids: [PersistentIdentifier]) {
-        guard let queryManager = queryManager else { return }
         guard let conversation = conversation else {
             vxAtelierPro.log.error("Cannot delete messages: conversation not found")
             errorAlert = ErrorAlert(error: AppError.invalidOperation("Conversation not found"))
@@ -198,9 +198,6 @@ final class ConversationViewModel: ObservableObject {
     }
 
     func saveContext() throws {
-        guard let queryManager = queryManager else {
-            throw AppError.modelContextMissing
-        }
         try queryManager.saveContext()
     }
 
@@ -212,10 +209,6 @@ final class ConversationViewModel: ObservableObject {
 
     func addSelectedToPlaylist() {
         vxAtelierPro.log.info("Adding selected messages to playlist.")
-        guard let ttsQueue = ttsQueue else {
-            vxAtelierPro.log.error("TTSQueue is nil. Cannot add selected messages to playlist.")
-            return
-        }
         guard let conversation = conversation else {
             vxAtelierPro.log.error("Cannot add to playlist: conversation not found")
             errorAlert = ErrorAlert(error: AppError.invalidOperation("Conversation not found"))
@@ -259,7 +252,7 @@ final class ConversationViewModel: ObservableObject {
         }
 
         for (index, message) in messagesToAdd.enumerated() {
-            ttsQueue?.add(
+            ttsQueue.add(
                 message,
                 dialogTitle: conversation.title,
                 messageIndex: index,
@@ -273,10 +266,6 @@ final class ConversationViewModel: ObservableObject {
 
     func addAllToPlaylist() {
         vxAtelierPro.log.info("Adding all messages to playlist.")
-        guard let ttsQueue = ttsQueue else {
-            vxAtelierPro.log.error("TTSQueue is nil. Cannot add all messages to playlist.")
-            return
-        }
         guard let conversation = conversation else {
             vxAtelierPro.log.error("Cannot add to playlist: conversation not found")
             errorAlert = ErrorAlert(error: AppError.invalidOperation("Conversation not found"))
@@ -376,7 +365,7 @@ final class ConversationViewModel: ObservableObject {
         isSelectingMessages = false
         
         // Save context
-        try? queryManager?.saveContext()
+        try? queryManager.saveContext()
         isSelectingMessages = false
         selectedMessages.removeAll()
     }
@@ -400,7 +389,6 @@ final class ConversationViewModel: ObservableObject {
     
     /// Remove a bookmark for the given message
     func removeBookmarkForMessage(_ message: MessageItem) {
-        guard let queryManager = queryManager else { return }
         guard let (turn, event) = turnAndEvent(for: message) else { return }
         
         if let bookmark = queryManager.bookmarks.first(where: { $0.turn == turn && $0.target === event }) {
@@ -413,7 +401,6 @@ final class ConversationViewModel: ObservableObject {
     }
     
     func insertBookmark(label: String, message: MessageItem) {
-        guard let queryManager = queryManager else { return }
         // We need to check if the conversation exists, but we don't need the actual value
         guard conversation != nil else { return }
         guard let (turn, event) = turnAndEvent(for: message) else { return }
@@ -421,5 +408,19 @@ final class ConversationViewModel: ObservableObject {
         // Create and insert bookmark through QueryManager
         let bookmark = BookmarkItem(label, turn: turn, event: event)
         try? queryManager.insert(bookmark)
+    }
+
+    func markBottomVisibility(_ visible: Bool) {
+        isPinnedToEnd = visible
+        if visible { unreadCount = 0 }
+    }
+
+    func incrementUnreadIfNeeded() {
+        guard !isPinnedToEnd else { return }
+        unreadCount = min(unreadCount + 1, 99)
+    }
+
+    func resetUnread() {
+        unreadCount = 0
     }
 } 
