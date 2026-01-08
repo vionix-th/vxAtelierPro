@@ -17,16 +17,9 @@ final class ConversationViewModel: ObservableObject {
     @Published var errorAlert: ErrorAlert?
     @Published var bookmarkMessage: MessageItem? = nil
     @Published var bookmarkMessageLabel: String = ""
-    @Published var isPinnedToEnd: Bool = true
-    @Published var unreadCount: Int = 0
-    @Published var lastVisibleMessageID: PersistentIdentifier? = nil
-
     let queryManager: QueryManager
     let ttsQueue: TTSQueue
 
-    // Debug flags removed for auto-scroll; keys retained in settings only
-
-    // Resolve the conversation on-demand from the QueryManager
     var conversation: ConversationItem? {
         queryManager.allConversations.first { $0.id == conversationID }
     }
@@ -175,8 +168,6 @@ final class ConversationViewModel: ObservableObject {
         isSelectingMessages = false
         selectedMessages.removeAll()
     }
-
-    // MARK: - Scroll Logic (removed)
 
     // MARK: - Lifecycle
     @MainActor
@@ -410,17 +401,4 @@ final class ConversationViewModel: ObservableObject {
         try? queryManager.insert(bookmark)
     }
 
-    func markBottomVisibility(_ visible: Bool) {
-        isPinnedToEnd = visible
-        if visible { unreadCount = 0 }
-    }
-
-    func incrementUnreadIfNeeded() {
-        guard !isPinnedToEnd else { return }
-        unreadCount = min(unreadCount + 1, 99)
-    }
-
-    func resetUnread() {
-        unreadCount = 0
-    }
-} 
+}

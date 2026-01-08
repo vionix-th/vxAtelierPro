@@ -5,8 +5,6 @@ import Foundation
 // MARK: - ConversationView
 struct ConversationView: View {
     @ObservedObject var viewModel: ConversationViewModel
-    private var autoScrollDebugEnabled: Bool { UserDefaults.standard.bool(forKey: "AutoScrollDebugEnabled") }
-    private var bottomAnchorID: String { "BOTTOM-\(viewModel.id)" }
     
     let scrollHint: PersistentIdentifier?
     let onRequestOptions: (PersistentIdentifier) -> Void
@@ -59,11 +57,6 @@ struct ConversationView: View {
                                             return false
                                         }()
                                     )
-                                    .onAppear {
-                                        if !viewModel.isPinnedToEnd {
-                                            viewModel.lastVisibleMessageID = turn.userMessage.id
-                                        }
-                                    }
                                 }
                             }
 
@@ -87,58 +80,12 @@ struct ConversationView: View {
 
                             Color.clear
                                 .frame(height: 1)
-                                .id(bottomAnchorID)
-                                .onAppear { viewModel.markBottomVisibility(true) }
-                                .onDisappear { viewModel.markBottomVisibility(false) }
                         }
                         .padding(.vertical, AppDefaults.paddingSmall)
                     }
-
-                    if !viewModel.isPinnedToEnd {
-                        Button {
-                            withAnimation { scrollToBottom(proxy: proxy, animated: true) }
-                            viewModel.resetUnread()
-                            viewModel.isPinnedToEnd = true
-                            if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: FAB tapped -> scroll to end") }
-                        } label: {
-                            ZStack(alignment: .topTrailing) {
-                                Image(systemName: "arrow.down.circle.fill")
-                                    .font(.system(size: 28))
-                                    .foregroundColor(.accentColor)
-                                if viewModel.unreadCount > 0 {
-                                    Text("\(viewModel.unreadCount)")
-                                        .font(.caption2)
-                                        .foregroundColor(.white)
-                                        .padding(4)
-                                        .background(Circle().fill(Color.red))
-                                        .offset(x: 10, y: -10)
-                                }
-                            }
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .help("Scroll to bottom")
-                        .padding(.trailing, AppDefaults.paddingMedium)
-                        .padding(.bottom, AppDefaults.paddingMedium)
-                    }
                 }
                 .onAppear {
-                    performInitialScroll(proxy: proxy)
                     viewModel.onAppear()
-                }
-                .onChange(of: viewModel.contentVersion) { _, _ in
-                    if viewModel.isPinnedToEnd {
-                        scrollToBottom(proxy: proxy, animated: false)
-                        if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: contentVersion -> pinned, scrolled to end") }
-                    } else {
-                        viewModel.incrementUnreadIfNeeded()
-                        if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: contentVersion -> not pinned, unread=\(viewModel.unreadCount)") }
-                    }
-                }
-                .onChange(of: viewModel.streamingState.text) { _, _ in
-                    if viewModel.isPinnedToEnd && viewModel.streamingState.isActive {
-                        scrollToBottom(proxy: proxy, animated: false)
-                        if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: stream flush -> pinned, scrolled to end") }
-                    }
                 }
 
                 if !viewModel.isSelectingMessages, let conversation = viewModel.conversation {
@@ -147,10 +94,6 @@ struct ConversationView: View {
                         dialog: conversation,
                         streamingState: viewModel.streamingState,
                         didSend: { _ in
-                            viewModel.resetUnread()
-                            viewModel.isPinnedToEnd = true
-                            scrollToBottom(proxy: proxy, animated: true)
-                            if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: didSend -> reset unread and scrolled") }
                         }
                     )
                     .padding(AppDefaults.paddingSmall)
@@ -198,29 +141,6 @@ struct ConversationView: View {
                         .font(.title2)
                 }
             }
-        }
-    }
-
-    private func performInitialScroll(proxy: ScrollViewProxy) {
-        var tx = Transaction(); tx.disablesAnimations = true
-        if let hint = scrollHint {
-            withTransaction(tx) { proxy.scrollTo(hint, anchor: .center) }
-            viewModel.isPinnedToEnd = false
-            if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: initial -> scrolled to hint \(hint)") }
-        } else if viewModel.isPinnedToEnd {
-            withTransaction(tx) { scrollToBottom(proxy: proxy, animated: false) }
-            if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: initial -> scrolled to bottom") }
-        } else if let anchor = viewModel.lastVisibleMessageID {
-            withTransaction(tx) { proxy.scrollTo(anchor, anchor: .top) }
-            if autoScrollDebugEnabled { vxAtelierPro.log.debug("ConversationView: initial -> restored anchor \(anchor)") }
-        }
-    }
-
-    private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool) {
-        if animated {
-            withAnimation { proxy.scrollTo(bottomAnchorID, anchor: .bottom) }
-        } else {
-            proxy.scrollTo(bottomAnchorID, anchor: .bottom)
         }
     }
 
