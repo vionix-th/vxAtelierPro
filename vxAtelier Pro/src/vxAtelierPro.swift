@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Observation
 #if os(macOS)
 import AppKit
 #endif
@@ -8,39 +9,31 @@ import AppKit
 
 /// Custom commands for the application's main menu
 struct AppCommands: Commands {
-    @AppStorage("ShowEmptySections") private var showEmptySections: Bool = false
-    @AppStorage("ShowArchived") private var showArchived: Bool = false
-    @AppStorage("ShowTrashed") private var showTrashed: Bool = false
+    var viewOptions: ViewOptionsStore
     
     var body: some Commands {
         CommandGroup(after: .sidebar) {
             Divider()
-            Toggle("Show Empty Sections", isOn: $showEmptySections)
+            Toggle("Show Empty Sections", isOn: Binding(
+                get: { viewOptions.showEmptySections },
+                set: { viewOptions.showEmptySections = $0 }
+            ))
                 .keyboardShortcut("e", modifiers: [.command, .shift])
             
             Divider()
             
             Button("Show Chats") {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    showArchived = false
-                    showTrashed = false
-                }
+                viewOptions.setNavigationMode(.chats)
             }
             .keyboardShortcut("1", modifiers: [.command])
             
             Button("Show Archive") {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    showArchived = true
-                    showTrashed = false
-                }
+                viewOptions.setNavigationMode(.archive)
             }
             .keyboardShortcut("2", modifiers: [.command])
             
             Button("Show Trash") {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    showArchived = false
-                    showTrashed = true
-                }
+                viewOptions.setNavigationMode(.trash)
             }
             .keyboardShortcut("3", modifiers: [.command])
 
@@ -128,13 +121,13 @@ struct vxAtelierPro: App {
         }
     }()
     
-    // Create the QueryManager for centralized data access
     private let queryManager: QueryManager
     private let ttsQueue: TTSQueue
     private let conversationStore: ConversationViewModelStore
+    private let viewOptionsStore: ViewOptionsStore
     
-    // Read the stored appearance preference
     @AppStorage("appearanceStyle") private var appearanceStyle: AppearanceStyle = .system
+    
     private var effectiveColorScheme: ColorScheme? {
         switch appearanceStyle {
         case .system:
@@ -164,6 +157,10 @@ struct vxAtelierPro: App {
         vxAtelierPro.log.debug("Initializing Conversation ViewModel Store")
         self.conversationStore = ConversationViewModelStore(queryManager: queryManager, ttsQueue: ttsQueue)
         vxAtelierPro.log.debug("Conversation ViewModel Store initialized")
+        
+        vxAtelierPro.log.debug("Initializing View Options Store")
+        self.viewOptionsStore = ViewOptionsStore()
+        vxAtelierPro.log.debug("View Options Store initialized")
 
         vxAtelierPro.log.debug("Initializing AIServiceManager")
         _ = AIServiceManager.shared
@@ -221,6 +218,7 @@ struct vxAtelierPro: App {
             ContentView()
                 .preferredColorScheme(effectiveColorScheme)
                 .environment(conversationStore)
+                .environment(viewOptionsStore)
                 .environment(\.showLogHistory) {
                     isLogHistoryShown = true
                 }                
@@ -234,7 +232,7 @@ struct vxAtelierPro: App {
         .environment(queryManager)
         .environment(ttsQueue)
         .commands {
-            AppCommands()
+            AppCommands(viewOptions: viewOptionsStore)
         }
                 
 #if os(macOS)
@@ -244,6 +242,7 @@ struct vxAtelierPro: App {
                 .preferredColorScheme(effectiveColorScheme)
                 .environment(queryManager)
                 .environment(\.modelContext, sharedModelContainer.mainContext)
+                .environment(viewOptionsStore)
         }
         
         MenuBarExtra("vxAtelier Pro", systemImage: "message.circle") {

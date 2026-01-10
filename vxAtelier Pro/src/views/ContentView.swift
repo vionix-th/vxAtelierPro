@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import Observation
 
 // MARK: - ContentView
 struct ContentView: View {
@@ -10,6 +11,7 @@ struct ContentView: View {
     @Environment(\.showLogHistory) private var showLogHistory
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(ConversationViewModelStore.self) private var conversationStore
+    @Environment(ViewOptionsStore.self) private var viewOptions
 
     #if os(macOS)
         private let globalHotkeys = HotkeyManager()
@@ -32,58 +34,25 @@ struct ContentView: View {
     @State private var exportDialogRequested: (ConversationItem, UUID)?
     @State private var importRequested = false
 
-    // MARK: - User Preferences
-    @AppStorage("ShowEmptySections") private var showEmptySectionsUserPref: Bool = false
-    private var showEmptySections: Bool {
-        showTrashed || showArchived
-            || UserDefaults.standard.object(forKey: "ShowEmptySections") as? Bool
-                ?? AppDefaults.showEmptySections
-    }
+    // MARK: - User Preferences (via shared store)
     @AppStorage("ShowUserDialogsOnly") private var showUserDialogsOnly: Bool = true
-    @AppStorage("ShowArchived") private var showArchived: Bool = false {
-        didSet {
-            if showArchived {
-                showTrashed = false
-            }
-        }
-    }
-    @AppStorage("ShowTrashed") private var showTrashed: Bool = false {
-        didSet {
-            if showTrashed {
-                showArchived = false
-            }
-        }
-    }
-    @AppStorage("statusBarVisible") private var statusBarVisible: Bool = AppDefaults
-        .statusBarVisible
-
-    // Sidebar dialog sort state
-    @AppStorage("SidebarDialogsSortOrderDescending") private var sidebarDialogsSortDescending:
-        Bool = true
-    @AppStorage("SidebarDialogsSortType") private var sidebarDialogsSortTypeRaw: String =
-        SidebarSortType.conversationDate.rawValue
-
-    // Sidebar project sort state
-    @AppStorage("SidebarProjectsSortOrderDescending") private var sidebarProjectsSortDescending:
-        Bool = false
-    @AppStorage("SidebarProjectsSortType") private var sidebarProjectsSortTypeRaw: String =
-        SidebarSortType.alphabetically.rawValue
 
     // MARK: - Computed Properties (Using QueryManager)
     private var sortedConversations: [ConversationItem] {
         queryManager.sortedConversationsForSidebar(
             queryManager.standaloneConversations,
-            descending: sidebarDialogsSortDescending,
-            sortType: SidebarSortType(rawValue: sidebarDialogsSortTypeRaw) ?? .conversationDate
+            descending: viewOptions.sidebarDialogsSortDescending,
+            sortType: SidebarSortType(rawValue: viewOptions.sidebarDialogsSortTypeRaw)
+                ?? .conversationDate
         )
     }
 
     /// Returns true if there are any visible items in the sidebar (only non-trashed projects and standalone dialogs)
     private var hasVisibleItems: Bool {
         let hasProjects =
-            !(showArchived
+            !(viewOptions.showArchived
             ? queryManager.archivedProjects.isEmpty
-            : showTrashed
+            : viewOptions.showTrashed
                 ? queryManager.trashedProjects.isEmpty : queryManager.activeProjects.isEmpty)
         let hasStandaloneDialogs = queryManager.standaloneConversations.contains {
             $0.status != .trashed
@@ -115,6 +84,7 @@ struct ContentView: View {
     ) {
         conversation.project = project
     }
+
 
     private func requestOptions(for id: PersistentIdentifier) {
         vxAtelierPro.log.debug("ContentView: options requested for dialog id \(id)")
@@ -251,25 +221,25 @@ struct ContentView: View {
         let _ = showUserDialogsOnly
         return List(selection: $selectedItem) {
             let projectTitle =
-                showArchived ? "Archived Projects" : showTrashed ? "Trashed Projects" : "Projects"
+                viewOptions.showArchived ? "Archived Projects" : viewOptions.showTrashed ? "Trashed Projects" : "Projects"
             let standaloneDialogTitle =
-                showArchived
-                ? "Archived Dialogs" : showTrashed ? "Trashed Items" : "Standalone Dialogs"
+                viewOptions.showArchived
+                ? "Archived Dialogs" : viewOptions.showTrashed ? "Trashed Items" : "Standalone Dialogs"
             let systemDialogTitle = "System"
             let bookmarkTitle = "Bookmarks"
 
-            if !showArchived && !showTrashed {
+            if !viewOptions.showArchived && !viewOptions.showTrashed {
                 dialogSection(title: systemDialogTitle, dialogs: queryManager.systemConversations)
             }
 
             projectSection(
                 title: projectTitle,
-                projects: showArchived
+                projects: viewOptions.showArchived
                     ? queryManager.archivedProjects
-                    : showTrashed ? queryManager.trashedProjects : queryManager.activeProjects
+                    : viewOptions.showTrashed ? queryManager.trashedProjects : queryManager.activeProjects
             )
 
-            if showTrashed {
+            if viewOptions.showTrashed {
                 // Use QueryManager's explicit trashedDialogs property
                 let allTrashedDialogs = queryManager.trashedDialogs
                     .sorted(by: { $0.timestamp > $1.timestamp })
@@ -279,7 +249,7 @@ struct ContentView: View {
                     title: standaloneDialogTitle, dialogs: queryManager.standaloneConversations)
             }
 
-            if !showArchived && !showTrashed {
+            if !viewOptions.showArchived && !viewOptions.showTrashed {
                 bookmarkSection(title: bookmarkTitle, bookmarks: queryManager.bookmarks)
             }
         }
@@ -378,7 +348,9 @@ struct ContentView: View {
     /// Menu items for controlling view options.
     @ViewBuilder
     private var viewOptionsMenu: some View {
-        Toggle(isOn: $showEmptySectionsUserPref) {
+        @Bindable var viewOptions = viewOptions
+        
+        Toggle(isOn: $viewOptions.showEmptySections) {
             MenuItemStyle.label("Show Empty Sections", systemImage: "eye")
         }
         .keyboardShortcut("e", modifiers: [.command, .shift])
@@ -387,21 +359,15 @@ struct ContentView: View {
         Divider()
 
         Button {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                showArchived = false
-                showTrashed = false
-            }
+            viewOptions.setNavigationMode(.chats)
         } label: {
             MenuItemStyle.label("Show Chats", systemImage: "tray.full")
         }
-        .keyboardShortcut("1", modifiers: [.command])
-        .help("Show active chats")
+            .keyboardShortcut("1", modifiers: [.command])
+            .help("Show active chats")
 
         Button {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                showArchived = true
-                showTrashed = false
-            }
+            viewOptions.setNavigationMode(.archive)
         } label: {
             MenuItemStyle.label("Show Archive", systemImage: "archivebox")
         }
@@ -409,10 +375,7 @@ struct ContentView: View {
         .help("Show archived items")
 
         Button {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                showArchived = false
-                showTrashed = true
-            }
+            viewOptions.setNavigationMode(.trash)
         } label: {
             MenuItemStyle.label("Show Trash", systemImage: "trash")
         }
@@ -473,19 +436,18 @@ struct ContentView: View {
         #endif
     }
 
-    // duplicate mainContentView removed; see consolidated implementation below
     /// Shared main content view for all platforms (except iOS compact/empty placeholder)
     private var mainContentView: some View {
         VStack(spacing: 0) {
+            @Bindable var viewOptions = viewOptions
             NavigationSplitView {
                 sidebarList
                     .toolbar { sidebarToolbar }
             } detail: {
                 detailView(for: selectedItem)
             }
-            .animation(.default, value: selectedItem)
 
-            if statusBarVisible {
+            if viewOptions.statusBarVisible {
                 StatusBar(
                     activeItemId: $selectedItem
                 )
@@ -494,8 +456,7 @@ struct ContentView: View {
         .onAppear {
             vxAtelierPro.log.debug("ContentView appearing")
             // Ensure we always start in Show Chats view
-            showArchived = false
-            showTrashed = false
+            viewOptions.setNavigationMode(.chats, animated: false)
             selectedItem = nil
 
             registerGlobalHotkeys()
@@ -586,7 +547,7 @@ struct ContentView: View {
     // MARK: - Toolbar Content
     private var sidebarToolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
-            if showTrashed {
+            if viewOptions.showTrashed {
                 Button(
                     role: .destructive,
                     action: {
@@ -597,17 +558,17 @@ struct ContentView: View {
                                     !queryManager.trashedDialogs.isEmpty
                                     || !queryManager.trashedProjects.isEmpty
 
-                                // Empty trash
-                                try queryManager.emptyTrash()
+                        // Empty trash
+                        try queryManager.emptyTrash()
 
-                                // Reset navigation if we had items to empty
-                                if hadTrashedItems {
-                                    self.showTrashed = false
-                                    self.selectedItem = nil
-                                    vxAtelierPro.log.info("Trash emptied, returning to Show Chats")
-                                } else {
-                                    vxAtelierPro.log.debug(
-                                        "Empty trash requested, but trash was already empty")
+                        // Reset navigation if we had items to empty
+                        if hadTrashedItems {
+                            self.viewOptions.setNavigationMode(.chats, animated: true)
+                            self.selectedItem = nil
+                            vxAtelierPro.log.info("Trash emptied, returning to Show Chats")
+                        } else {
+                            vxAtelierPro.log.debug(
+                                "Empty trash requested, but trash was already empty")
                                 }
                             } catch {
                                 vxAtelierPro.log.error(
@@ -731,10 +692,6 @@ struct ContentView: View {
         }
         return "vxAtelier Pro * Unbundled"
     }
-}
-
-// MARK: - Refactored Helper Functions/Views
-extension ContentView {
 
     private func deleteItem(for item: any PersistentModel) {
         let itemId = item.persistentModelID
@@ -749,7 +706,7 @@ extension ContentView {
 
         DispatchQueue.main.async {
             do {
-                if showTrashed {
+                if viewOptions.showTrashed {
                     try queryManager.deleteItemPermanently(item)
                     vxAtelierPro.log.debug(
                         "Successfully initiated permanent deletion for item (ID: \(itemId), Type: \(itemType)) via swipe/delete from trash."
@@ -759,7 +716,7 @@ extension ContentView {
                     let remainingTrashedItems =
                         queryManager.trashedDialogs.count + queryManager.trashedProjects.count
                     if remainingTrashedItems == 0 {
-                        self.showTrashed = false
+                        self.viewOptions.setNavigationMode(.chats, animated: true)
                         self.selectedItem = nil
                         vxAtelierPro.log.info("Last trashed item removed, returning to Show Chats")
                     } else {
@@ -783,7 +740,7 @@ extension ContentView {
     private func archiveItem(_ item: any PersistentModel) {
         let itemId = item.persistentModelID
         let itemType = type(of: item)
-        let wasInArchive = showArchived
+        let wasInArchive = viewOptions.showArchived
 
         do {
             try queryManager.archiveItem(item)
@@ -798,7 +755,7 @@ extension ContentView {
                     let remainingArchivedDialogs = queryManager.archivedDialogs.count
 
                     if remainingArchivedItems == 0 && remainingArchivedDialogs == 0 {
-                        self.showArchived = false
+                        self.viewOptions.setNavigationMode(.chats, animated: true)
                         vxAtelierPro.log.info("Last archived item removed, returning to Show Chats")
                     }
                 }
@@ -825,20 +782,21 @@ extension ContentView {
 
     @ViewBuilder
     private func projectSection(title: String, projects: [ProjectItem]) -> some View {
-        if !projects.isEmpty || showEmptySections {
+        if !projects.isEmpty || viewOptions.showEmptySections {
+            @Bindable var viewOptions = viewOptions
             Section {
                 ForEach(
                     queryManager.sortedProjectsForSidebar(
-                        projects, descending: sidebarProjectsSortDescending,
-                        sortType: SidebarSortType(rawValue: sidebarProjectsSortTypeRaw)
+                        projects, descending: viewOptions.sidebarProjectsSortDescending,
+                        sortType: SidebarSortType(rawValue: viewOptions.sidebarProjectsSortTypeRaw)
                             ?? .alphabetically)
                 ) { project in
                     projectNavigationLink(for: project)
                 }
                 .onDelete { indexSet in
                     let sorted = queryManager.sortedProjectsForSidebar(
-                        projects, descending: sidebarProjectsSortDescending,
-                        sortType: SidebarSortType(rawValue: sidebarProjectsSortTypeRaw)
+                        projects, descending: viewOptions.sidebarProjectsSortDescending,
+                        sortType: SidebarSortType(rawValue: viewOptions.sidebarProjectsSortTypeRaw)
                             ?? .alphabetically)
                     indexSet.forEach { index in
                         if index < sorted.count {
@@ -854,8 +812,9 @@ extension ContentView {
             } header: {
                 HStack {
                     SidebarSortButton(
-                        sortDescending: $sidebarProjectsSortDescending,
-                        sortTypeRaw: $sidebarProjectsSortTypeRaw, allowedTypes: [.alphabetically])
+                        sortDescending: $viewOptions.sidebarProjectsSortDescending,
+                        sortTypeRaw: $viewOptions.sidebarProjectsSortTypeRaw,
+                        allowedTypes: [.alphabetically])
                     Text(title)
                 }
             }
@@ -864,20 +823,21 @@ extension ContentView {
 
     @ViewBuilder
     private func dialogSection(title: String, dialogs: [ConversationItem]) -> some View {
-        if !dialogs.isEmpty || showEmptySections {
+        if !dialogs.isEmpty || viewOptions.showEmptySections {
+            @Bindable var viewOptions = viewOptions
             Section {
                 ForEach(
                     queryManager.sortedConversationsForSidebar(
-                        dialogs, descending: sidebarDialogsSortDescending,
-                        sortType: SidebarSortType(rawValue: sidebarDialogsSortTypeRaw)
+                        dialogs, descending: viewOptions.sidebarDialogsSortDescending,
+                        sortType: SidebarSortType(rawValue: viewOptions.sidebarDialogsSortTypeRaw)
                             ?? .conversationDate)
                 ) { dialog in
                     conversationNavigationLink(for: dialog)
                 }
                 .onDelete { indexSet in
                     let sorted = queryManager.sortedConversationsForSidebar(
-                        dialogs, descending: sidebarDialogsSortDescending,
-                        sortType: SidebarSortType(rawValue: sidebarDialogsSortTypeRaw)
+                        dialogs, descending: viewOptions.sidebarDialogsSortDescending,
+                        sortType: SidebarSortType(rawValue: viewOptions.sidebarDialogsSortTypeRaw)
                             ?? .conversationDate)
                     indexSet.forEach { index in
                         if index < sorted.count {
@@ -893,8 +853,8 @@ extension ContentView {
             } header: {
                 HStack {
                     SidebarSortButton(
-                        sortDescending: $sidebarDialogsSortDescending,
-                        sortTypeRaw: $sidebarDialogsSortTypeRaw,
+                        sortDescending: $viewOptions.sidebarDialogsSortDescending,
+                        sortTypeRaw: $viewOptions.sidebarDialogsSortTypeRaw,
                         allowedTypes: SidebarSortType.allCases)
                     Text(title)
                 }
@@ -904,7 +864,7 @@ extension ContentView {
 
     @ViewBuilder
     private func bookmarkSection(title: String, bookmarks: [BookmarkItem]) -> some View {
-        if !bookmarks.isEmpty || showEmptySections {
+        if !bookmarks.isEmpty || viewOptions.showEmptySections {
             Section(title) {
                 ForEach(bookmarks) { bookmark in
                     bookmarkNavigationLink(for: bookmark)
@@ -915,18 +875,15 @@ extension ContentView {
                             let bookmark = bookmarks[index]
                             do {
                                 try queryManager.delete(bookmark)
-                                vxAtelierPro.log.debug(
-                                    "Deleted bookmark '\(bookmark.label)' via swipe.")
+                                vxAtelierPro.log.debug("Deleted bookmark '\(bookmark.label)' via swipe.")
                                 if selectedItem == bookmark.id { selectedItem = nil }
                             } catch {
                                 vxAtelierPro.log.error(
-                                    "ContentView: Failed during swipe delete for bookmark '\(bookmark.label)': \(error.localizedDescription)"
-                                )
+                                    "ContentView: Failed during swipe delete for bookmark '\(bookmark.label)': \(error.localizedDescription)")
                             }
                         } else {
                             vxAtelierPro.log.warning(
-                                "ContentView: Invalid index \(index) encountered in bookmarkSection.onDelete for bookmarks array count \(bookmarks.count)."
-                            )
+                                "ContentView: Invalid index \(index) encountered in bookmarkSection.onDelete for bookmarks array count \(bookmarks.count).")
                         }
                     }
                 }

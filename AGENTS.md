@@ -2,6 +2,8 @@
 
 ## Swift / SwiftUI / SwiftData
 - Generate code targeting Swift 5.9+ 
+- Prefer @Observable over ObservableObject
+- Prefer @Environment over @EnvironmentObject
 - Apply SwiftUI and SwiftData best practices.
 - Fully implement requested functionality: no new TODOs, placeholders, or missing pieces.
 - Do **not** add `#Preview` blocks or any other SwiftUI preview-related code.

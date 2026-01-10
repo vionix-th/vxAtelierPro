@@ -10,6 +10,7 @@ struct StatusBar: View {
     @State private var statusBarLogTypeFilters: Set<LoggingService.LogType> = []
     @Environment(\.showLogHistory) private var showLogHistory
     @State private var displayedMessage: String = ""
+    private let messageAnimation: Animation = .easeInOut(duration: 0.18)
     
     // Environment access
     @Environment(QueryManager.self) private var queryManager
@@ -49,6 +50,18 @@ struct StatusBar: View {
             return loggingService.lastLogType
         }
         return filteredMessages(with: statusBarLogTypeFilters).last?.type ?? .info
+    }
+
+    private func updateDisplayedMessage(animated: Bool = true) {
+        let next = latestFilteredMessage
+        guard next != displayedMessage else { return }
+        if animated {
+            withAnimation(messageAnimation) {
+                displayedMessage = next
+            }
+        } else {
+            displayedMessage = next
+        }
     }
 
     // MARK: - Initialization
@@ -118,9 +131,7 @@ struct StatusBar: View {
                         showNote: true,
                         onClear: {                        
                             statusBarLogTypeFilters.removeAll()
-                            withAnimation {
-                                displayedMessage = latestFilteredMessage
-                            }
+                            updateDisplayedMessage()
                             saveFiltersToUserDefaults()
                         }
                     )
@@ -161,22 +172,18 @@ struct StatusBar: View {
             }
         }
         .onChange(of: loggingService.latestMessage) { _, _ in
-            withAnimation {
-                displayedMessage = latestFilteredMessage
-            }
+            updateDisplayedMessage()
         }
         .onChange(of: statusBarLogTypeFilters) { _, _ in
             saveFiltersToUserDefaults()
-            withAnimation {
-                displayedMessage = latestFilteredMessage
-            }
+            updateDisplayedMessage()
         }
         .onChange(of: popupLogTypeFilters) { _, _ in
             saveFiltersToUserDefaults()
         }
         .onAppear {
             loadFiltersFromUserDefaults()
-            displayedMessage = latestFilteredMessage
+            updateDisplayedMessage(animated: false)
         }
     }
     
@@ -534,4 +541,3 @@ struct DialogInfoHeader: View {
         }
     }
 }
-

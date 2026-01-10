@@ -125,6 +125,7 @@ let package = Package(
                 "utilities/TypeConversionUtils.swift",
                 "utilities/URLExtensions.swift",
                 "views/ContentView.swift",
+                "views/ViewOptionsStore.swift",
                 "views/StatusBar.swift",
                 // Views - Components
                 "views/components/AvatarView.swift",
