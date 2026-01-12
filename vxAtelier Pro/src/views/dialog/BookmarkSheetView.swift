@@ -5,9 +5,8 @@ struct BookmarkSheetView: View {
     @Binding var label: String
     let turn: ConversationTurn
     let event: TurnEvent?
-    let onBookmark: () -> Void
-
-    @Environment(QueryManager.self) private var queryManager
+    let onBookmark: (ConversationTurn, TurnEvent?, String) -> Void
+    let onCancel: () -> Void
 
     private var backgroundColor: Color {
         #if os(macOS)
@@ -33,17 +32,12 @@ struct BookmarkSheetView: View {
                     .submitLabel(.done)
                 HStack {
                     Button("Cancel") {
-                        onBookmark() // parent will dismiss
+                        onCancel()
                     }
                     .buttonStyle(.bordered)
                     Spacer()
                     Button("Bookmark") {
-                        if let event = event {
-                            queryManager.insertBookmark(label: label, turn: turn, event: event)
-                        } else {
-                            queryManager.insertBookmark(label: label, turn: turn)
-                        }
-                        onBookmark()
+                        onBookmark(turn, event, label)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.accentColor)

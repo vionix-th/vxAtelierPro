@@ -84,7 +84,11 @@ struct ConversationView: View {
                         label: $viewModel.bookmarkMessageLabel,
                         turn: turn,
                         event: event,
-                        onBookmark: {
+                        onBookmark: { _, _, label in
+                            viewModel.insertBookmark(label: label, message: message)
+                            viewModel.bookmarkMessage = nil
+                        },
+                        onCancel: {
                             viewModel.bookmarkMessage = nil
                         }
                     )
