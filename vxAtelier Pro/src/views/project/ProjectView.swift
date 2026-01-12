@@ -188,12 +188,10 @@ struct ProjectView: View {
             VStack {
                 ForEach(filteredConversations) { conversation in
                     NavigationLink {
-                        Group {
-                            ConversationView(
-                                viewModel: conversationStore.viewModel(for: conversation.id),
-                                onRequestOptions: onRequestOptions
-                            )
-                        }
+                        ConversationView(
+                            viewModel: conversationStore.viewModel(for: conversation.id),
+                            onRequestOptions: onRequestOptions
+                        )
                             .onAppear() {
                                 onConversationViewAppear(conversation)
                             }
