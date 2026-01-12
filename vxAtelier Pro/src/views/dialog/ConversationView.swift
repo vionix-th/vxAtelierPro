@@ -34,14 +34,8 @@ struct ConversationView: View {
                                         isLastTurn: turn.id == turns.last?.id,
                                         streamingState: viewModel.streamingState,
                                         isSelecting: viewModel.isSelectingMessages,
-                                        isSelectedUser: viewModel.selectedMessages.contains(turn.userMessage.id),
-                                        isSelectedAssistant: latestAssistantMessageID(for: turn).map { viewModel.selectedMessages.contains($0) } ?? false,
-                                        onSelectUser: { viewModel.toggleSelection(for: turn.userMessage.id) },
-                                        onSelectAssistant: {
-                                            if let mid = latestAssistantMessageID(for: turn) {
-                                                viewModel.toggleSelection(for: mid)
-                                            }
-                                        },
+                                        isSelected: { viewModel.selectedMessages.contains($0) },
+                                        onSelect: { viewModel.toggleSelection(for: $0) },
                                         onTap: { message, t in
                                             hideKeyboard()
                                             if viewModel.isSelectingMessages { viewModel.toggleSelection(for: message.id) }
@@ -50,32 +44,11 @@ struct ConversationView: View {
                                             viewModel.handleMessageAction(action, message: message, turn: t)
                                         },
                                         isBookmarkedUser: viewModel.queryManager.isUserBookmarked(turnID: turn.id),
-                                        isBookmarkedAssistant: {
-                                            if let mid = latestAssistantMessageID(for: turn) {
-                                                return viewModel.queryManager.isAssistantBookmarked(turnID: turn.id, messageID: mid)
-                                            }
-                                            return false
-                                        }()
+                                        isBookmarkedAssistant: { messageID in
+                                            viewModel.queryManager.isAssistantBookmarked(turnID: turn.id, messageID: messageID)
+                                        }
                                     )
                                 }
-                            }
-
-                            if viewModel.streamingState.isActive,
-                               !viewModel.streamingState.text.isEmpty,
-                               let dialog = viewModel.conversation,
-                               let lastTurn = viewModel.sortedTurns.last {
-                                MessageView(
-                                    messageID: nil,
-                                    turnID: lastTurn.id,
-                                    conversationID: dialog.id,
-                                    isSelected: false,
-                                    isSelecting: false,
-                                    onSelect: {},
-                                    onTap: {},
-                                    onAction: { _ in },
-                                    isBookmarked: false,
-                                    streamingContent: viewModel.streamingState.text
-                                )
                             }
 
                             Color.clear
@@ -112,7 +85,6 @@ struct ConversationView: View {
                         turn: turn,
                         event: event,
                         onBookmark: {
-                            viewModel.insertBookmark(label: viewModel.bookmarkMessageLabel, message: message)
                             viewModel.bookmarkMessage = nil
                         }
                     )
@@ -143,11 +115,6 @@ struct ConversationView: View {
             }
         }
     }
-
-    private func latestAssistantMessageID(for turn: ConversationTurn) -> PersistentIdentifier? {
-        let assistantEvents = turn.events.filter { $0.type == .assistant }
-        return assistantEvents.sorted { $0.timestamp < $1.timestamp }.last?.message.id
-    }
 }
 
 fileprivate struct TurnRowV2: View {
@@ -157,16 +124,14 @@ fileprivate struct TurnRowV2: View {
     let streamingState: StreamingState
 
     let isSelecting: Bool
-    let isSelectedUser: Bool
-    let isSelectedAssistant: Bool
+    let isSelected: (PersistentIdentifier) -> Bool
 
-    let onSelectUser: () -> Void
-    let onSelectAssistant: () -> Void
+    let onSelect: (PersistentIdentifier) -> Void
     let onTap: (MessageItem, ConversationTurn) -> Void
     let onAction: (MessageAction, MessageItem, ConversationTurn) -> Void
 
     let isBookmarkedUser: Bool
-    let isBookmarkedAssistant: Bool
+    let isBookmarkedAssistant: (PersistentIdentifier) -> Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -175,30 +140,36 @@ fileprivate struct TurnRowV2: View {
                 messageID: turn.userMessage.id,
                 turnID: turn.id,
                 conversationID: conversationID,
-                isSelected: isSelectedUser,
+                isSelected: isSelected(turn.userMessage.id),
                 isSelecting: isSelecting,
-                onSelect: onSelectUser,
+                onSelect: { onSelect(turn.userMessage.id) },
                 onTap: { onTap(turn.userMessage, turn) },
                 onAction: { action in onAction(action, turn.userMessage, turn) },
                 isBookmarked: isBookmarkedUser
             )
             .id(turn.userMessage.id)
 
-            // Assistant bubble: prefer finalized assistant; otherwise streaming placeholder for last turn
-            if let assistant = latestAssistantEvent(in: turn) {
+            // Assistant bubbles: render all assistant events in chronological order
+            let assistantEvents = turn.events
+                .filter { $0.type == .assistant }
+                .sorted { $0.timestamp < $1.timestamp }
+            ForEach(assistantEvents, id: \.id) { assistant in
                 MessageView(
                     messageID: assistant.message.id,
                     turnID: turn.id,
                     conversationID: conversationID,
-                    isSelected: isSelectedAssistant,
+                    isSelected: isSelected(assistant.message.id),
                     isSelecting: isSelecting,
-                    onSelect: onSelectAssistant,
+                    onSelect: { onSelect(assistant.message.id) },
                     onTap: { onTap(assistant.message, turn) },
                     onAction: { action in onAction(action, assistant.message, turn) },
-                    isBookmarked: isBookmarkedAssistant
+                    isBookmarked: isBookmarkedAssistant(assistant.message.id)
                 )
                 .id(assistant.message.id)
-            } else if streamingState.isActive && isLastTurn {
+            }
+
+            // Streaming placeholder for last turn when no assistant events exist yet
+            if assistantEvents.isEmpty && streamingState.isActive && isLastTurn {
                 MessageView(
                     messageID: nil,
                     turnID: turn.id,
@@ -215,11 +186,6 @@ fileprivate struct TurnRowV2: View {
             }
         }
         .padding(.horizontal, AppDefaults.paddingSmall)
-    }
-
-    private func latestAssistantEvent(in turn: ConversationTurn) -> TurnEvent? {
-        let assistantEvents = turn.events.filter { $0.type == .assistant }
-        return assistantEvents.sorted { $0.timestamp < $1.timestamp }.last
     }
 }
 

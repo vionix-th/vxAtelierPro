@@ -118,51 +118,40 @@ final class ConversationViewModel: ObservableObject {
             let messageData = MessageExportData(message)
             ExportUtils.copyToClipboard(messageData)
         case .delete:
-            deleteMessages([message.id])
+            deleteTurns([message.id])
         }
     }
 
-    func deleteMessages(_ ids: [PersistentIdentifier]) {
+    func deleteTurns(_ messageIds: [PersistentIdentifier]) {
         guard let conversation = conversation else {
             vxAtelierPro.log.error("Cannot delete messages: conversation not found")
             errorAlert = ErrorAlert(error: AppError.invalidOperation("Conversation not found"))
             return
         }
-        
-        let messagesToRemove = Set(ids)
-        var turnsToRemove = Set<PersistentIdentifier>()
-        var removedCount = 0
-        
-        for turn in conversation.turns {
-            if messagesToRemove.contains(turn.userMessage.id) {
-                turnsToRemove.insert(turn.id)
-            }
+
+        let messagesToRemove = Set(messageIds)
+        let turnsToRemove = turnIDsContainingMessages(in: conversation, messageIDs: messagesToRemove)
+        if turnsToRemove.isEmpty {
+            vxAtelierPro.log.info("DialogViewModel: No turns removed during delete action.")
+            isSelectingMessages = false
+            selectedMessages.removeAll()
+            return
         }
-        
+
         let initialCount = conversation.turns.count
         conversation.turns.removeAll { turn in
             turnsToRemove.contains(turn.id)
         }
-        removedCount += initialCount - conversation.turns.count
-        
-        for turn in conversation.turns {
-            let initialEventCount = turn.events.count
-            turn.events.removeAll { event in
-                messagesToRemove.contains(event.message.id)
-            }
-            removedCount += initialEventCount - turn.events.count
-        }
-        
+        let removedCount = initialCount - conversation.turns.count
+
         if removedCount > 0 {
             conversation.forceUpdateTokenCount(updateContextCount: true, updateTotalCount: false)
             do {
                 try queryManager.saveContext()
-                vxAtelierPro.log.notice("DialogViewModel: Deleted \(removedCount) selected messages.")
+                vxAtelierPro.log.notice("DialogViewModel: Deleted \(removedCount) turn(s) for selected messages.")
             } catch {
                 vxAtelierPro.log.error("DialogViewModel: Failed to save context after deleting messages: \(error.localizedDescription)")
             }
-        } else {
-            vxAtelierPro.log.info("DialogViewModel: No messages removed during delete action.")
         }
         
         isSelectingMessages = false
@@ -205,12 +194,8 @@ final class ConversationViewModel: ObservableObject {
             errorAlert = ErrorAlert(error: AppError.invalidOperation("Conversation not found"))
             return
         }
-        
-        let messagesToAdd = conversation.turns.flatMap { turn -> [MessageItem] in
-            let turnMessages = [turn.userMessage] + turn.events.map { $0.message }
-            let isTurnSelected = turnMessages.contains { selectedMessages.contains($0.id) }
-            return isTurnSelected ? turnMessages : []
-        }
+
+        let messagesToAdd = selectedMessagesOrdered(in: conversation, messageIDs: selectedMessages)
 
         for (index, message) in messagesToAdd.enumerated() {
             ttsQueue.add(
@@ -235,12 +220,8 @@ final class ConversationViewModel: ObservableObject {
             errorAlert = ErrorAlert(error: AppError.invalidOperation("Conversation not found"))
             return
         }
-        
-        let messagesToAdd = conversation.turns.flatMap { turn -> [MessageItem] in
-            let turnMessages = [turn.userMessage] + turn.events.map { $0.message }
-            let isTurnSelected = turnMessages.contains { messageIDs.contains($0.id) }
-            return isTurnSelected ? turnMessages : []
-        }
+
+        let messagesToAdd = selectedMessagesOrdered(in: conversation, messageIDs: messageIDs)
 
         for (index, message) in messagesToAdd.enumerated() {
             ttsQueue.add(
@@ -275,40 +256,26 @@ final class ConversationViewModel: ObservableObject {
     }
 
     func copySelectedAsText() {
-        guard let conversations = conversation else { return }
-        
-        let selectedText = conversations.turns
-            .filter { selectedMessages.contains($0.userMessage.id) }
-            .map { $0.userMessage.content.text }
-            .joined(separator: "\n\n")
+        guard let conversation = conversation else { return }
+
+        let selectedMessagesList = selectedMessagesOrdered(in: conversation, messageIDs: selectedMessages)
+        let selectedText = selectedMessagesList.map { $0.content.text }.joined(separator: "\n\n")
         ExportUtils.copyToClipboard(selectedText)
     }
 
     func copySelectedAsJSON() {
         guard let conversation = conversation else { return }
-        
-        let selectedMessagesList = conversation.turns
-            .filter { selectedMessages.contains($0.userMessage.id) }
-            .map { MessageExportData($0.userMessage) }
+
+        let selectedMessagesList = selectedMessagesOrdered(in: conversation, messageIDs: selectedMessages)
+            .map { MessageExportData($0) }
         ExportUtils.copyToClipboard(selectedMessagesList)
         isSelectingMessages = false
     }
 
     func exportSelectedMessages() async {
         guard let conversation = conversation else { return }
-        
-        let selectedMessageItems: [MessageItem] = conversation.turns.flatMap { turn in
-            var items: [MessageItem] = []
-            if selectedMessages.contains(turn.userMessage.id) {
-                items.append(turn.userMessage)
-            }
-            for event in turn.events {
-                if selectedMessages.contains(event.message.id) {
-                    items.append(event.message)
-                }
-            }
-            return items
-        }
+
+        let selectedMessageItems = selectedMessagesOrdered(in: conversation, messageIDs: selectedMessages)
         do {
             try await DataManager.shared.exportSelectedMessages(
                 selectedMessageItems,
@@ -322,33 +289,16 @@ final class ConversationViewModel: ObservableObject {
     func deleteSelectedMessages() {
         guard !selectedMessages.isEmpty else { return }
         guard let conversation = conversation else { return }
-        
-        // Need to find all turns containing these messages
-        var turnsToCheck = Set<PersistentIdentifier>()
-        
-        for turn in conversation.turns {
-            if selectedMessages.contains(turn.userMessage.id) {
-                turnsToCheck.insert(turn.id)
-            } else {
-                for event in turn.events where selectedMessages.contains(event.message.id) {
-                    turnsToCheck.insert(turn.id)
-                    break
-                }
-            }
+
+        let turnsToRemove = turnIDsContainingMessages(in: conversation, messageIDs: selectedMessages)
+        if turnsToRemove.isEmpty {
+            isSelectingMessages = false
+            selectedMessages.removeAll()
+            return
         }
-        
-        var removedCount = 0
-        for turn in turnsToCheck {
-            if let index = conversation.turns.firstIndex(where: { $0.id == turn }) {
-                conversation.turns.remove(at: index)
-                removedCount += 1
-            }
-        }
-        
-        for turn in conversation.turns {
-            turn.events.removeAll { event in
-                selectedMessages.contains(event.message.id)
-            }
+
+        conversation.turns.removeAll { turn in
+            turnsToRemove.contains(turn.id)
         }
         
         // Update token count and exit selection mode
@@ -364,10 +314,13 @@ final class ConversationViewModel: ObservableObject {
     // MARK: - Bookmark Management
     
     /// Returns the turn and event for the given message
-    func turnAndEvent(for message: MessageItem) -> (ConversationTurn, TurnEvent)? {
+    func turnAndEvent(for message: MessageItem) -> (ConversationTurn, TurnEvent?)? {
         guard let conversation = conversation else { return nil }
         
         for turn in conversation.turns {
+            if turn.userMessage.id == message.id {
+                return (turn, nil)
+            }
             for event in turn.events {
                 if event.message.id == message.id {
                     return (turn, event)
@@ -381,8 +334,16 @@ final class ConversationViewModel: ObservableObject {
     /// Remove a bookmark for the given message
     func removeBookmarkForMessage(_ message: MessageItem) {
         guard let (turn, event) = turnAndEvent(for: message) else { return }
-        
-        if let bookmark = queryManager.bookmarks.first(where: { $0.turn == turn && $0.target === event }) {
+
+        let bookmark = queryManager.bookmarks.first { bookmark in
+            if bookmark.turn != turn { return false }
+            if let event = event {
+                return bookmark.target === event
+            }
+            return bookmark.target == nil
+        }
+
+        if let bookmark = bookmark {
             do {
                 try queryManager.delete(bookmark)
             } catch {
@@ -397,8 +358,50 @@ final class ConversationViewModel: ObservableObject {
         guard let (turn, event) = turnAndEvent(for: message) else { return }
         
         // Create and insert bookmark through QueryManager
-        let bookmark = BookmarkItem(label, turn: turn, event: event)
-        try? queryManager.insert(bookmark)
+        if let event = event {
+            let bookmark = BookmarkItem(label, turn: turn, event: event)
+            try? queryManager.insert(bookmark)
+        } else {
+            let bookmark = BookmarkItem(label, turn: turn)
+            try? queryManager.insert(bookmark)
+        }
     }
 
+    private func selectedMessagesOrdered(
+        in conversation: ConversationItem,
+        messageIDs: Set<PersistentIdentifier>
+    ) -> [MessageItem] {
+        guard !messageIDs.isEmpty else { return [] }
+
+        let turns = conversation.turns.sorted(by: { $0.sequenceNumber < $1.sequenceNumber })
+        var messages: [MessageItem] = []
+        for turn in turns {
+            if messageIDs.contains(turn.userMessage.id) {
+                messages.append(turn.userMessage)
+            }
+            let selectedEvents = turn.events
+                .filter { messageIDs.contains($0.message.id) }
+                .sorted { $0.timestamp < $1.timestamp }
+            messages.append(contentsOf: selectedEvents.map { $0.message })
+        }
+        return messages
+    }
+
+    private func turnIDsContainingMessages(
+        in conversation: ConversationItem,
+        messageIDs: Set<PersistentIdentifier>
+    ) -> Set<PersistentIdentifier> {
+        guard !messageIDs.isEmpty else { return [] }
+        var turnIDs = Set<PersistentIdentifier>()
+        for turn in conversation.turns {
+            if messageIDs.contains(turn.userMessage.id) {
+                turnIDs.insert(turn.id)
+                continue
+            }
+            if turn.events.contains(where: { messageIDs.contains($0.message.id) }) {
+                turnIDs.insert(turn.id)
+            }
+        }
+        return turnIDs
+    }
 }
