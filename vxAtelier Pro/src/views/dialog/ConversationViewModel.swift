@@ -118,18 +118,18 @@ final class ConversationViewModel: ObservableObject {
             let messageData = MessageExportData(message)
             ExportUtils.copyToClipboard(messageData)
         case .delete:
-            deleteTurns([message.id])
+            deleteTurnsContainingMessages([message.id])
         }
     }
 
-    func deleteTurns(_ messageIds: [PersistentIdentifier]) {
+    func deleteTurnsContainingMessages(_ ids: [PersistentIdentifier]) {
         guard let conversation = conversation else {
             vxAtelierPro.log.error("Cannot delete messages: conversation not found")
             errorAlert = ErrorAlert(error: AppError.invalidOperation("Conversation not found"))
             return
         }
 
-        let messagesToRemove = Set(messageIds)
+        let messagesToRemove = Set(ids)
         let turnsToRemove = turnIDsContainingMessages(in: conversation, messageIDs: messagesToRemove)
         if turnsToRemove.isEmpty {
             vxAtelierPro.log.info("DialogViewModel: No turns removed during delete action.")
@@ -367,6 +367,8 @@ final class ConversationViewModel: ObservableObject {
         }
     }
 
+    /// Orders selected messages by turn.sequenceNumber, then event.timestamp (stable by event array order).
+    /// User messages come before events within the same turn.
     private func selectedMessagesOrdered(
         in conversation: ConversationItem,
         messageIDs: Set<PersistentIdentifier>
@@ -379,10 +381,16 @@ final class ConversationViewModel: ObservableObject {
             if messageIDs.contains(turn.userMessage.id) {
                 messages.append(turn.userMessage)
             }
-            let selectedEvents = turn.events
-                .filter { messageIDs.contains($0.message.id) }
-                .sorted { $0.timestamp < $1.timestamp }
-            messages.append(contentsOf: selectedEvents.map { $0.message })
+            let indexedEvents = Array(turn.events.enumerated())
+            let selectedEvents = indexedEvents
+                .filter { messageIDs.contains($0.element.message.id) }
+                .sorted {
+                    if $0.element.timestamp != $1.element.timestamp {
+                        return $0.element.timestamp < $1.element.timestamp
+                    }
+                    return $0.offset < $1.offset
+                }
+            messages.append(contentsOf: selectedEvents.map { $0.element.message })
         }
         return messages
     }
