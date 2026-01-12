@@ -29,11 +29,6 @@ final class ConversationViewModel: ObservableObject {
         return conversation.turns.sorted(by: { $0.sequenceNumber < $1.sequenceNumber })
     }
 
-    var allSelectableMessageIDs: [PersistentIdentifier] {
-        guard let conversation = conversation else { return [] }
-        return conversation.turns.flatMap { [$0.userMessage.id] + $0.events.map { $0.message.id } }
-    }
-
     var navigationTitle: String {
         guard let conversation = conversation else { return "Conversation Not Found" }
         if let project = conversation.project {
@@ -76,11 +71,16 @@ final class ConversationViewModel: ObservableObject {
     }
 
     func selectAllMessages() {
-        selectedMessages = Set(allSelectableMessageIDs)
+        guard let conversation = conversation else {
+            selectedMessages.removeAll()
+            return
+        }
+        selectedMessages = allMessageIDs(in: conversation)
     }
 
     func invertSelection() {
-        let all = Set(allSelectableMessageIDs)
+        guard let conversation = conversation else { return }
+        let all = allMessageIDs(in: conversation)
         selectedMessages = all.subtracting(selectedMessages)
     }
 
@@ -133,8 +133,7 @@ final class ConversationViewModel: ObservableObject {
         let turnsToRemove = turnIDsContainingMessages(in: conversation, messageIDs: messagesToRemove)
         if turnsToRemove.isEmpty {
             vxAtelierPro.log.info("DialogViewModel: No turns removed during delete action.")
-            isSelectingMessages = false
-            selectedMessages.removeAll()
+            exitSelectionMode()
             return
         }
 
@@ -152,12 +151,15 @@ final class ConversationViewModel: ObservableObject {
             } catch {
                 vxAtelierPro.log.error("DialogViewModel: Failed to save context after deleting messages: \(error.localizedDescription)")
             }
-        }
-        
-        isSelectingMessages = false
-        selectedMessages.removeAll()
+        }        
     }
 
+    func deleteSelectedMessages() {
+        guard !selectedMessages.isEmpty else { return }
+        deleteTurnsContainingMessages(selectedMessages.map { $0 })                
+        exitSelectionMode()           
+    }
+    
     // MARK: - Lifecycle
     @MainActor
     func onAppear() {
@@ -183,29 +185,7 @@ final class ConversationViewModel: ObservableObject {
 
     // MARK: - Menu Actions
     func exitSelectionMode() {
-        isSelectingMessages = false
-        selectedMessages.removeAll()
-    }
-
-    func addSelectedToPlaylist() {
-        vxAtelierPro.log.info("Adding selected messages to playlist.")
-        guard let conversation = conversation else {
-            vxAtelierPro.log.error("Cannot add to playlist: conversation not found")
-            errorAlert = ErrorAlert(error: AppError.invalidOperation("Conversation not found"))
-            return
-        }
-
-        let messagesToAdd = selectedMessagesOrdered(in: conversation, messageIDs: selectedMessages)
-
-        for (index, message) in messagesToAdd.enumerated() {
-            ttsQueue.add(
-                message,
-                dialogTitle: conversation.title,
-                messageIndex: index,
-                projectName: conversation.project?.name
-            )
-        }
-
+        vxAtelierPro.log.debug("Exiting selection mode.")
         isSelectingMessages = false
         selectedMessages.removeAll()
     }
@@ -231,9 +211,16 @@ final class ConversationViewModel: ObservableObject {
                 projectName: conversation.project?.name
             )
         }
+    }
 
-        isSelectingMessages = false
-        selectedMessages.removeAll()
+    func addSelectedToPlaylist() {
+        guard !selectedMessages.isEmpty else {
+            vxAtelierPro.log.debug("No messages selected to add to playlist")
+            return
+        }
+
+        addToPlaylist(selectedMessages)
+        exitSelectionMode()
     }
 
     func addAllToPlaylist() {
@@ -243,16 +230,7 @@ final class ConversationViewModel: ObservableObject {
             errorAlert = ErrorAlert(error: AppError.invalidOperation("Conversation not found"))
             return
         }
-        
-        let allMessages = conversation.turns.flatMap { [$0.userMessage] + $0.events.map { $0.message } }
-        for (index, message) in allMessages.enumerated() {
-            ttsQueue.add(
-                message,
-                dialogTitle: conversation.title,
-                messageIndex: index,
-                projectName: conversation.project?.name
-            )
-        }
+        addToPlaylist(allMessageIDs(in: conversation))
     }
 
     func copySelectedAsText() {
@@ -269,7 +247,8 @@ final class ConversationViewModel: ObservableObject {
         let selectedMessagesList = selectedMessagesOrdered(in: conversation, messageIDs: selectedMessages)
             .map { MessageExportData($0) }
         ExportUtils.copyToClipboard(selectedMessagesList)
-        isSelectingMessages = false
+        
+        exitSelectionMode()
     }
 
     func exportSelectedMessages() async {
@@ -286,31 +265,6 @@ final class ConversationViewModel: ObservableObject {
         }
     }
 
-    func deleteSelectedMessages() {
-        guard !selectedMessages.isEmpty else { return }
-        guard let conversation = conversation else { return }
-
-        let turnsToRemove = turnIDsContainingMessages(in: conversation, messageIDs: selectedMessages)
-        if turnsToRemove.isEmpty {
-            isSelectingMessages = false
-            selectedMessages.removeAll()
-            return
-        }
-
-        conversation.turns.removeAll { turn in
-            turnsToRemove.contains(turn.id)
-        }
-        
-        // Update token count and exit selection mode
-        conversation.forceUpdateTokenCount(updateContextCount: true, updateTotalCount: false)
-        isSelectingMessages = false
-        
-        // Save context
-        try? queryManager.saveContext()
-        isSelectingMessages = false
-        selectedMessages.removeAll()
-    }
-    
     // MARK: - Bookmark Management
     
     /// Returns the turn and event for the given message
@@ -393,6 +347,17 @@ final class ConversationViewModel: ObservableObject {
             messages.append(contentsOf: selectedEvents.map { $0.element.message })
         }
         return messages
+    }
+
+    private func allMessageIDs(in conversation: ConversationItem) -> Set<PersistentIdentifier> {
+        var ids = Set<PersistentIdentifier>()
+        for turn in conversation.turns {
+            ids.insert(turn.userMessage.id)
+            for event in turn.events {
+                ids.insert(event.message.id)
+            }
+        }
+        return ids
     }
 
     private func turnIDsContainingMessages(

@@ -28,7 +28,7 @@ struct ConversationView: View {
                             if let dialog = viewModel.conversation {
                                 let turns = viewModel.sortedTurns
                                 ForEach(turns, id: \.id) { turn in
-                                    TurnRowV2(
+                                    ConversationTurnView(
                                         conversationID: dialog.id,
                                         turn: turn,
                                         isLastTurn: turn.id == turns.last?.id,
@@ -121,7 +121,7 @@ struct ConversationView: View {
     }
 }
 
-fileprivate struct TurnRowV2: View {
+fileprivate struct ConversationTurnView: View {
     let conversationID: PersistentIdentifier
     let turn: ConversationTurn
     let isLastTurn: Bool
@@ -260,8 +260,9 @@ struct SelectionModeMenu: View {
         Divider()
 
         if viewModel.conversation?.status == .active {
-            Button(role: .destructive) {
-                viewModel.deleteSelectedMessages()
+            Button(role: .destructive) {            
+                viewModel.deleteTurnsContainingMessages(viewModel.selectedMessages.map { $0 })                
+                viewModel.exitSelectionMode()                
             } label: {
                 MenuItemStyle.label("Delete Selected", systemImage: "trash")
             }
