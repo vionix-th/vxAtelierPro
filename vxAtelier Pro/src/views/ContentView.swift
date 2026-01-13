@@ -213,10 +213,13 @@ struct ContentView: View {
             )
 
             if viewOptions.showTrashed {
-                // Use QueryManager's explicit trashedDialogs property
-                let allTrashedDialogs = queryManager.trashedDialogs
-                    .sorted(by: { $0.timestamp > $1.timestamp })
-                dialogSection(title: standaloneDialogTitle, dialogs: allTrashedDialogs)
+                let trashedDialogs = queryManager.sortedConversationsForSidebar(
+                    queryManager.trashedDialogs,
+                    descending: viewOptions.sidebarDialogsSortDescending,
+                    sortType: SidebarSortType(rawValue: viewOptions.sidebarDialogsSortTypeRaw)
+                        ?? .conversationDate
+                )
+                dialogSection(title: standaloneDialogTitle, dialogs: trashedDialogs)
             } else {
                 dialogSection(
                     title: standaloneDialogTitle, dialogs: queryManager.standaloneConversations)
@@ -425,15 +428,6 @@ struct ContentView: View {
                 )
             }
         }
-        .onAppear {
-            vxAtelierPro.log.debug("ContentView appearing")
-            // Ensure we always start in Show Chats view
-            viewOptions.setNavigationMode(.chats, animated: false)
-            selectedItem = nil
-
-            queryManager.ensureSystemConversation()
-            vxAtelierPro.log.info("Application started - Reset to Show Chats view")
-        }
         #if os(iOS)
             .onChange(of: ttsQueue.isPlaying) {
                 if ttsQueue.isPlaying {
@@ -581,6 +575,7 @@ struct ContentView: View {
     // MARK: - Async Tasks
 
     /// Generic export task for Projects or Dialogs.
+    @MainActor
     private func exportTask(for item: (any PersistentModel)?) async {
         guard let item = item else { return }
 
@@ -601,6 +596,7 @@ struct ContentView: View {
     }
 
     /// Task to handle importing data.
+    @MainActor
     private func importTask() async {
         if importRequested {
             defer { importRequested = false }
@@ -712,20 +708,19 @@ struct ContentView: View {
     private func projectSection(title: String, projects: [ProjectItem]) -> some View {
         if !projects.isEmpty || viewOptions.showEmptySections {
             @Bindable var viewOptions = viewOptions
+            let sorted = queryManager.sortedProjectsForSidebar(
+                projects,
+                descending: viewOptions.sidebarProjectsSortDescending,
+                sortType: SidebarSortType(rawValue: viewOptions.sidebarProjectsSortTypeRaw)
+                    ?? .alphabetically
+            )
             Section {
                 ForEach(
-                    queryManager.sortedProjectsForSidebar(
-                        projects, descending: viewOptions.sidebarProjectsSortDescending,
-                        sortType: SidebarSortType(rawValue: viewOptions.sidebarProjectsSortTypeRaw)
-                            ?? .alphabetically)
+                    sorted
                 ) { project in
                     projectNavigationLink(for: project)
                 }
                 .onDelete { indexSet in
-                    let sorted = queryManager.sortedProjectsForSidebar(
-                        projects, descending: viewOptions.sidebarProjectsSortDescending,
-                        sortType: SidebarSortType(rawValue: viewOptions.sidebarProjectsSortTypeRaw)
-                            ?? .alphabetically)
                     indexSet.forEach { index in
                         if index < sorted.count {
                             let project = sorted[index]
@@ -753,20 +748,19 @@ struct ContentView: View {
     private func dialogSection(title: String, dialogs: [ConversationItem]) -> some View {
         if !dialogs.isEmpty || viewOptions.showEmptySections {
             @Bindable var viewOptions = viewOptions
+            let sorted = queryManager.sortedConversationsForSidebar(
+                dialogs,
+                descending: viewOptions.sidebarDialogsSortDescending,
+                sortType: SidebarSortType(rawValue: viewOptions.sidebarDialogsSortTypeRaw)
+                    ?? .conversationDate
+            )
             Section {
                 ForEach(
-                    queryManager.sortedConversationsForSidebar(
-                        dialogs, descending: viewOptions.sidebarDialogsSortDescending,
-                        sortType: SidebarSortType(rawValue: viewOptions.sidebarDialogsSortTypeRaw)
-                            ?? .conversationDate)
+                    sorted
                 ) { dialog in
                     conversationNavigationLink(for: dialog)
                 }
                 .onDelete { indexSet in
-                    let sorted = queryManager.sortedConversationsForSidebar(
-                        dialogs, descending: viewOptions.sidebarDialogsSortDescending,
-                        sortType: SidebarSortType(rawValue: viewOptions.sidebarDialogsSortTypeRaw)
-                            ?? .conversationDate)
                     indexSet.forEach { index in
                         if index < sorted.count {
                             let dialog = sorted[index]

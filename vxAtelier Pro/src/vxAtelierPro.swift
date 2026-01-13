@@ -166,12 +166,18 @@ struct vxAtelierPro: App {
         vxAtelierPro.log.debug("View Options Store initialized")
 
 #if os(macOS)
-        self.hotkeyController = GlobalHotkeyController()
+        vxAtelierPro.log.debug("Initializing Global Hotkey Controller")
+        self.hotkeyController = GlobalHotkeyController()        
         hotkeyController.register(
             modelContext: sharedModelContainer.mainContext,
             queryManager: queryManager
-        )
+        )    
+        vxAtelierPro.log.debug("Global Hotkey Controller initialized")
 #endif
+
+        vxAtelierPro.log.debug("Ensuring system conversation")           
+        queryManager.ensureSystemConversation()
+        vxAtelierPro.log.debug("System conversation ensured")
 
         vxAtelierPro.log.debug("Initializing AIServiceManager")
         _ = AIServiceManager.shared
