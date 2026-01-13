@@ -13,11 +13,6 @@ struct ContentView: View {
     @Environment(ConversationViewModelStore.self) private var conversationStore
     @Environment(ViewOptionsStore.self) private var viewOptions
 
-    #if os(macOS)
-        private let globalHotkeys = HotkeyManager()
-        private let globalUtilityPanel = GlobalUtilityPanel()
-    #endif
-
     // MARK: - State & Bindings
     @State private var selectedItem: PersistentIdentifier?
     @State private var applicationSettingsViewIsPresented: Bool = false
@@ -432,7 +427,6 @@ struct ContentView: View {
             viewOptions.setNavigationMode(.chats, animated: false)
             selectedItem = nil
 
-            registerGlobalHotkeys()
             queryManager.ensureSystemConversation()
             vxAtelierPro.log.info("Application started - Reset to Show Chats view")
         }
@@ -451,6 +445,11 @@ struct ContentView: View {
                 }
             }
         #endif
+        .onReceive(NotificationCenter.default.publisher(for: .utilityPanelDidSendConversation)) { notification in
+            if let conversationID = notification.object as? PersistentIdentifier {
+                selectedItem = conversationID
+            }
+        }
         .task(id: exportProjectRequested?.1) { await exportTask(for: exportProjectRequested?.0) }
         .task(id: exportDialogRequested?.1) { await exportTask(for: exportDialogRequested?.0) }
         .task(id: importRequested) { await importTask() }
@@ -614,46 +613,6 @@ struct ContentView: View {
                 vxAtelierPro.log.error("Import failed: \(error.localizedDescription)")
             }
         }
-    }
-
-    // MARK: - Global Hotkeys (macOS)
-
-    private func registerGlobalHotkeys() {
-        #if os(macOS)
-            vxAtelierPro.log.debug("Registering global hotkeys")
-            globalHotkeys.register(
-                key: "k", modifierFlags: [.command],
-                action: { _ in
-                    vxAtelierPro.log.debug("Global utility panel hotkey triggered")
-                    globalHotkeyUtilityPanelAction()
-                    return true
-                })
-        #endif
-    }
-
-    private func globalHotkeyUtilityPanelAction() {
-        #if os(macOS)
-            if let item = queryManager.utilityPanelConversation {
-                vxAtelierPro.log.notice("Showing utility panel for existing dialog '\(item.title)'")
-                globalUtilityPanel.show(
-                    modelContext: modelContext, conversationID: item.id, queryManager: queryManager,
-                    didSend: { conversationID in
-                        selectedItem = conversationID
-                    })
-            } else {
-                vxAtelierPro.log.notice("Creating new dialog for utility panel")
-                let item = queryManager.createConversation()
-                item.title = AppDefaults.newDialogName
-                if let config = item.options.apiConfiguration {
-                    item.options.setupAiRequestArguments(for: config, modelContext: modelContext)
-                }
-                globalUtilityPanel.show(
-                    modelContext: modelContext, conversationID: item.id, queryManager: queryManager,
-                    didSend: { conversationID in
-                        selectedItem = conversationID
-                    })
-            }
-        #endif
     }
 
     private func deleteItem(for item: any PersistentModel) {

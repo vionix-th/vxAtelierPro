@@ -125,6 +125,9 @@ struct vxAtelierPro: App {
     private let ttsQueue: TTSQueue
     private let conversationStore: ConversationViewModelStore
     private let viewOptionsStore: ViewOptionsStore
+#if os(macOS)
+    private let hotkeyController: GlobalHotkeyController
+#endif
     
     @AppStorage("appearanceStyle") private var appearanceStyle: AppearanceStyle = .system
     
@@ -161,6 +164,14 @@ struct vxAtelierPro: App {
         vxAtelierPro.log.debug("Initializing View Options Store")
         self.viewOptionsStore = ViewOptionsStore()
         vxAtelierPro.log.debug("View Options Store initialized")
+
+#if os(macOS)
+        self.hotkeyController = GlobalHotkeyController()
+        hotkeyController.register(
+            modelContext: sharedModelContainer.mainContext,
+            queryManager: queryManager
+        )
+#endif
 
         vxAtelierPro.log.debug("Initializing AIServiceManager")
         _ = AIServiceManager.shared
@@ -242,7 +253,7 @@ struct vxAtelierPro: App {
                 .preferredColorScheme(effectiveColorScheme)
                 .environment(queryManager)
                 .environment(\.modelContext, sharedModelContainer.mainContext)
-                .environment(viewOptionsStore)
+                .environment(viewOptionsStore)                
         }
         
         MenuBarExtra("vxAtelier Pro", systemImage: "message.circle") {
@@ -262,6 +273,10 @@ extension EnvironmentValues {
         get { self[ShowLogHistoryKey.self] }
         set { self[ShowLogHistoryKey.self] = newValue }
     }
+}
+
+extension Notification.Name {
+    static let utilityPanelDidSendConversation = Notification.Name("utilityPanelDidSendConversation")
 }
 
 // MARK: - Platform-Specific Components
@@ -284,6 +299,66 @@ struct MenuBarContent: View {
             NSApplication.shared.terminate(nil)
         }
         .keyboardShortcut("q")
+    }
+}
+
+@MainActor
+final class GlobalHotkeyController {
+    private let hotkeys = HotkeyManager()
+    private let utilityPanel = GlobalUtilityPanel()
+    private var didRegister = false
+
+    func register(modelContext: ModelContext, queryManager: QueryManager) {
+        guard !didRegister else { return }
+        didRegister = true
+        vxAtelierPro.log.debug("Registering global hotkeys")
+        hotkeys.register(
+            key: "k",
+            modifierFlags: [.command],
+            action: { [weak self] _ in
+                guard let self else { return false }
+                vxAtelierPro.log.debug("Global utility panel hotkey triggered")
+                Task { @MainActor in
+                    self.showUtilityPanel(modelContext: modelContext, queryManager: queryManager)
+                }
+                return true
+            }
+        )
+    }
+
+    private func showUtilityPanel(modelContext: ModelContext, queryManager: QueryManager) {
+        if let item = queryManager.utilityPanelConversation {
+            vxAtelierPro.log.notice("Showing utility panel for existing dialog '\(item.title)'")
+            utilityPanel.show(
+                modelContext: modelContext,
+                conversationID: item.id,
+                queryManager: queryManager,
+                didSend: { conversationID in
+                    NotificationCenter.default.post(
+                        name: .utilityPanelDidSendConversation,
+                        object: conversationID
+                    )
+                }
+            )
+        } else {
+            vxAtelierPro.log.notice("Creating new dialog for utility panel")
+            let item = queryManager.createConversation()
+            item.title = AppDefaults.newDialogName
+            if let config = item.options.apiConfiguration {
+                item.options.setupAiRequestArguments(for: config, modelContext: modelContext)
+            }
+            utilityPanel.show(
+                modelContext: modelContext,
+                conversationID: item.id,
+                queryManager: queryManager,
+                didSend: { conversationID in
+                    NotificationCenter.default.post(
+                        name: .utilityPanelDidSendConversation,
+                        object: conversationID
+                    )
+                }
+            )
+        }
     }
 }
 
