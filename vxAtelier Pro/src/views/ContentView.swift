@@ -40,9 +40,11 @@ struct ContentView: View {
             ? queryManager.archivedProjects.isEmpty
             : viewOptions.showTrashed
                 ? queryManager.trashedProjects.isEmpty : queryManager.activeProjects.isEmpty)
-        let hasStandaloneDialogs = queryManager.standaloneConversations.contains {
-            $0.status != .trashed
-        }
+        let hasStandaloneDialogs = viewOptions.showArchived
+            ? !queryManager.archivedDialogs.isEmpty
+            : viewOptions.showTrashed
+                ? !queryManager.trashedDialogs.isEmpty
+                : !queryManager.standaloneConversations.isEmpty
         return hasProjects || hasStandaloneDialogs
     }
 
