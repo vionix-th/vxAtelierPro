@@ -82,27 +82,30 @@ struct ContentView: View {
                 onRequestOptions: requestOptions
             )
         } label: {
-            NavigationItem(
-                title: Binding(get: { project.name }, set: { project.name = $0 }),
-                subtitle: project.timestamp.formatted(
-                    .dateTime.year().month().day().hour().minute()),
-                onDelete: {
-                    do {
-                        try queryManager.moveItemToTrash(project)
-                        vxAtelierPro.log.debug(
-                            "ContentView: Moved project '\(project.name)' to trash via context menu."
-                        )
-                    } catch {
-                        vxAtelierPro.log.error(
-                            "ContentView: Failed to move project '\(project.name)' to trash via context menu: \(error.localizedDescription)"
-                        )
-                    }
-                },
-                onRename: { project.name = $0 },
-                imageName: "folder",
-                onProjectAssign: { _ in },
-                onExport: {
-                    exportProjectRequested = (project, UUID())
+                NavigationItem(
+                    title: Binding(get: { project.name }, set: { project.name = $0 }),
+                    subtitle: project.timestamp.formatted(
+                        .dateTime.year().month().day().hour().minute()),
+                    onDelete: {
+                        deleteItem(for: project)
+                    },
+                    onRename: { project.name = $0 },
+                    onRestore: project.status != .active
+                        ? {
+                            restoreItem(project)
+                        } : nil,
+                    onPermanentDelete: project.status == .trashed
+                        ? {
+                            deleteItem(for: project)
+                        } : nil,
+                    onArchive: project.status == .active
+                        ? {
+                            archiveItem(project)
+                        } : nil,
+                    imageName: "folder",
+                    onProjectAssign: { _ in },
+                    onExport: {
+                        exportProjectRequested = (project, UUID())
                 },
                 project: project
             )
