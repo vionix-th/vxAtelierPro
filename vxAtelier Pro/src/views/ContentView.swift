@@ -100,14 +100,7 @@ struct ContentView: View {
                 imageName: "folder",
                 onProjectAssign: { _ in },
                 onExport: {
-                    Task {
-                        do {
-                            try await DataManager.shared.exportProject(project)
-                        } catch {
-                            vxAtelierPro.log.error(
-                                "Failed to export project - \(error.localizedDescription)")
-                        }
-                    }
+                    exportProjectRequested = (project, UUID())
                 },
                 project: project
             )
