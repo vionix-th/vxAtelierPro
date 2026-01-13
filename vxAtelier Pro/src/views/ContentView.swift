@@ -1,6 +1,6 @@
+import Observation
 import SwiftData
 import SwiftUI
-import Observation
 
 // MARK: - ContentView
 struct ContentView: View {
@@ -35,7 +35,8 @@ struct ContentView: View {
             ? queryManager.archivedProjects.isEmpty
             : viewOptions.showTrashed
                 ? queryManager.trashedProjects.isEmpty : queryManager.activeProjects.isEmpty)
-        let hasStandaloneDialogs = viewOptions.showArchived
+        let hasStandaloneDialogs =
+            viewOptions.showArchived
             ? !queryManager.archivedDialogs.isEmpty
             : viewOptions.showTrashed
                 ? !queryManager.trashedDialogs.isEmpty
@@ -62,7 +63,6 @@ struct ContentView: View {
         conversation.project = project
     }
 
-
     private func requestOptions(for id: PersistentIdentifier) {
         vxAtelierPro.log.debug("ContentView: options requested for dialog id \(id)")
         optionsSheetKey = OptionsSheetKey(id: id)
@@ -77,30 +77,30 @@ struct ContentView: View {
                 onRequestOptions: requestOptions
             )
         } label: {
-                NavigationItem(
-                    title: Binding(get: { project.name }, set: { project.name = $0 }),
-                    subtitle: project.timestamp.formatted(
-                        .dateTime.year().month().day().hour().minute()),
-                    onDelete: {
+            NavigationItem(
+                title: Binding(get: { project.name }, set: { project.name = $0 }),
+                subtitle: project.timestamp.formatted(
+                    .dateTime.year().month().day().hour().minute()),
+                onDelete: {
+                    deleteItem(for: project)
+                },
+                onRename: { project.name = $0 },
+                onRestore: project.status != .active
+                    ? {
+                        restoreItem(project)
+                    } : nil,
+                onPermanentDelete: project.status == .trashed
+                    ? {
                         deleteItem(for: project)
-                    },
-                    onRename: { project.name = $0 },
-                    onRestore: project.status != .active
-                        ? {
-                            restoreItem(project)
-                        } : nil,
-                    onPermanentDelete: project.status == .trashed
-                        ? {
-                            deleteItem(for: project)
-                        } : nil,
-                    onArchive: project.status == .active
-                        ? {
-                            archiveItem(project)
-                        } : nil,
-                    imageName: "folder",
-                    onProjectAssign: { _ in },
-                    onExport: {
-                        exportProjectRequested = (project, UUID())
+                    } : nil,
+                onArchive: project.status == .active
+                    ? {
+                        archiveItem(project)
+                    } : nil,
+                imageName: "folder",
+                onProjectAssign: { _ in },
+                onExport: {
+                    exportProjectRequested = (project, UUID())
                 },
                 project: project
             )
@@ -188,13 +188,15 @@ struct ContentView: View {
     }
 
     // MARK: - View Components
-    var sidebarList: some View {        
+    var sidebarList: some View {
         return List(selection: $selectedItem) {
             let projectTitle =
-                viewOptions.showArchived ? "Archived Projects" : viewOptions.showTrashed ? "Trashed Projects" : "Projects"
+                viewOptions.showArchived
+                ? "Archived Projects" : viewOptions.showTrashed ? "Trashed Projects" : "Projects"
             let standaloneDialogTitle =
                 viewOptions.showArchived
-                ? "Archived Dialogs" : viewOptions.showTrashed ? "Trashed Items" : "Standalone Dialogs"
+                ? "Archived Dialogs"
+                : viewOptions.showTrashed ? "Trashed Items" : "Standalone Dialogs"
             let systemDialogTitle = "System"
             let bookmarkTitle = "Bookmarks"
 
@@ -206,7 +208,8 @@ struct ContentView: View {
                 title: projectTitle,
                 projects: viewOptions.showArchived
                     ? queryManager.archivedProjects
-                    : viewOptions.showTrashed ? queryManager.trashedProjects : queryManager.activeProjects
+                    : viewOptions.showTrashed
+                        ? queryManager.trashedProjects : queryManager.activeProjects
             )
 
             if viewOptions.showTrashed {
@@ -233,7 +236,8 @@ struct ContentView: View {
             ) {
                 ConversationView(
                     viewModel: conversationStore.viewModel(for: conversation.id),
-                    onRequestOptions: requestOptions)
+                    onRequestOptions: requestOptions
+                )
                 .id(conversation.id)
             } else if let project = queryManager.allProjects.first(where: { $0.id == selectedId }) {
                 ProjectView(
@@ -317,7 +321,7 @@ struct ContentView: View {
     @ViewBuilder
     private var viewOptionsMenu: some View {
         @Bindable var viewOptions = viewOptions
-        
+
         Toggle(isOn: $viewOptions.showEmptySections) {
             MenuItemStyle.label("Show Empty Sections", systemImage: "eye")
         }
@@ -331,8 +335,8 @@ struct ContentView: View {
         } label: {
             MenuItemStyle.label("Show Chats", systemImage: "tray.full")
         }
-            .keyboardShortcut("1", modifiers: [.command])
-            .help("Show active chats")
+        .keyboardShortcut("1", modifiers: [.command])
+        .help("Show active chats")
 
         Button {
             viewOptions.setNavigationMode(.archive)
@@ -445,7 +449,8 @@ struct ContentView: View {
                 }
             }
         #endif
-        .onReceive(NotificationCenter.default.publisher(for: .utilityPanelDidSendConversation)) { notification in
+        .onReceive(NotificationCenter.default.publisher(for: .utilityPanelDidSendConversation)) {
+            notification in
             if let conversationID = notification.object as? PersistentIdentifier {
                 selectedItem = conversationID
             }
@@ -454,18 +459,21 @@ struct ContentView: View {
         .task(id: exportDialogRequested?.1) { await exportTask(for: exportDialogRequested?.0) }
         .task(id: importRequested) { await importTask() }
         // Present Settings from the toolbar menu entry
-        .sheet(isPresented: $applicationSettingsViewIsPresented, onDismiss: {
-            settingsInitialTab = nil
-        }) {
+        .sheet(
+            isPresented: $applicationSettingsViewIsPresented,
+            onDismiss: {
+                settingsInitialTab = nil
+            }
+        ) {
             ApplicationSettingsView(initialTab: settingsInitialTab)
                 .environment(queryManager)
                 .environment(\.modelContext, modelContext)
-            #if os(macOS)
-                .frame(idealWidth: 900, idealHeight: 640)
-            #else
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-            #endif
+                #if os(macOS)
+                    .frame(idealWidth: 900, idealHeight: 640)
+                #else
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                #endif
         }
         // Hoisted dialog options sheet (stable parent anchor)
         .sheet(
@@ -523,29 +531,27 @@ struct ContentView: View {
                 Button(
                     role: .destructive,
                     action: {
-                        DispatchQueue.main.async {
-                            do {
-                                // Store current state before emptying trash
-                                let hadTrashedItems =
-                                    !queryManager.trashedDialogs.isEmpty
-                                    || !queryManager.trashedProjects.isEmpty
+                        do {
+                            // Store current state before emptying trash
+                            let hadTrashedItems =
+                                !queryManager.trashedDialogs.isEmpty
+                                || !queryManager.trashedProjects.isEmpty
 
-                        // Empty trash
-                        try queryManager.emptyTrash()
+                            // Empty trash
+                            try queryManager.emptyTrash()
 
-                        // Reset navigation if we had items to empty
-                        if hadTrashedItems {
-                            self.viewOptions.setNavigationMode(.chats, animated: true)
-                            self.selectedItem = nil
-                            vxAtelierPro.log.info("Trash emptied, returning to Show Chats")
-                        } else {
-                            vxAtelierPro.log.debug(
-                                "Empty trash requested, but trash was already empty")
-                                }
-                            } catch {
-                                vxAtelierPro.log.error(
-                                    "Failed to empty trash: \(error.localizedDescription)")
+                            // Reset navigation if we had items to empty
+                            if hadTrashedItems {
+                                self.viewOptions.setNavigationMode(.chats, animated: true)
+                                self.selectedItem = nil
+                                vxAtelierPro.log.info("Trash emptied, returning to Show Chats")
+                            } else {
+                                vxAtelierPro.log.debug(
+                                    "Empty trash requested, but trash was already empty")
                             }
+                        } catch {
+                            vxAtelierPro.log.error(
+                                "Failed to empty trash: \(error.localizedDescription)")
                         }
                     }
                 ) {
@@ -797,15 +803,18 @@ struct ContentView: View {
                             let bookmark = bookmarks[index]
                             do {
                                 try queryManager.delete(bookmark)
-                                vxAtelierPro.log.debug("Deleted bookmark '\(bookmark.label)' via swipe.")
+                                vxAtelierPro.log.debug(
+                                    "Deleted bookmark '\(bookmark.label)' via swipe.")
                                 if selectedItem == bookmark.id { selectedItem = nil }
                             } catch {
                                 vxAtelierPro.log.error(
-                                    "ContentView: Failed during swipe delete for bookmark '\(bookmark.label)': \(error.localizedDescription)")
+                                    "ContentView: Failed during swipe delete for bookmark '\(bookmark.label)': \(error.localizedDescription)"
+                                )
                             }
                         } else {
                             vxAtelierPro.log.warning(
-                                "ContentView: Invalid index \(index) encountered in bookmarkSection.onDelete for bookmarks array count \(bookmarks.count).")
+                                "ContentView: Invalid index \(index) encountered in bookmarkSection.onDelete for bookmarks array count \(bookmarks.count)."
+                            )
                         }
                     }
                 }
