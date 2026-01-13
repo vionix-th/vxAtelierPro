@@ -22,7 +22,6 @@ struct ContentView: View {
     @State private var selectedItem: PersistentIdentifier?
     @State private var applicationSettingsViewIsPresented: Bool = false
     @State private var ttsViewIsPresented: Bool = false
-    @State private var isPromptTemplatesPresented: Bool = false
     @State private var settingsInitialTab: ApplicationSettingsView.SettingsTab? = nil
 
     // Options sheet hosting (hoisted from ConversationView)
@@ -33,19 +32,6 @@ struct ContentView: View {
     @State private var exportProjectRequested: (ProjectItem, UUID)?
     @State private var exportDialogRequested: (ConversationItem, UUID)?
     @State private var importRequested = false
-
-    // MARK: - User Preferences (via shared store)
-    @AppStorage("ShowUserDialogsOnly") private var showUserDialogsOnly: Bool = true
-
-    // MARK: - Computed Properties (Using QueryManager)
-    private var sortedConversations: [ConversationItem] {
-        queryManager.sortedConversationsForSidebar(
-            queryManager.standaloneConversations,
-            descending: viewOptions.sidebarDialogsSortDescending,
-            sortType: SidebarSortType(rawValue: viewOptions.sidebarDialogsSortTypeRaw)
-                ?? .conversationDate
-        )
-    }
 
     /// Returns true if there are any visible items in the sidebar (only non-trashed projects and standalone dialogs)
     private var hasVisibleItems: Bool {
@@ -71,12 +57,6 @@ struct ContentView: View {
     private func addProject() {
         let project = queryManager.createProject()
         selectedItem = project.id
-    }
-
-    private func scrollToLatestItem(using scrollViewProxy: ScrollViewProxy) {
-        if let latestDialog = sortedConversations.first {
-            scrollViewProxy.scrollTo(latestDialog.id, anchor: .top)
-        }
     }
 
     private func assignConversationToProject(
@@ -215,8 +195,7 @@ struct ContentView: View {
     }
 
     // MARK: - View Components
-    var sidebarList: some View {
-        let _ = showUserDialogsOnly
+    var sidebarList: some View {        
         return List(selection: $selectedItem) {
             let projectTitle =
                 viewOptions.showArchived ? "Archived Projects" : viewOptions.showTrashed ? "Trashed Projects" : "Projects"
@@ -677,16 +656,6 @@ struct ContentView: View {
                     })
             }
         #endif
-    }
-
-    private var appName: String {
-        if var appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String {
-            #if DEBUG
-                appName = "\(appName) (Debug)"
-            #endif
-            return appName
-        }
-        return "vxAtelier Pro * Unbundled"
     }
 
     private func deleteItem(for item: any PersistentModel) {
