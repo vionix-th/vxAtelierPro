@@ -147,7 +147,10 @@ struct ContentView: View {
             ProjectView(
                 projectID: project.id,
                 onConversationViewAppear: { self.selectedItem = $0.id },
-                onRequestOptions: requestOptions
+                onRequestOptions: requestOptions,
+                onDeleteConversation: { conversation in
+                    deleteItem(for: conversation)
+                }
             )
         } label: {
             NavigationItem(
@@ -301,7 +304,10 @@ struct ContentView: View {
                 ProjectView(
                     projectID: project.id,
                     onConversationViewAppear: { self.selectedItem = $0.id },
-                    onRequestOptions: requestOptions
+                    onRequestOptions: requestOptions,
+                    onDeleteConversation: { conversation in
+                        deleteItem(for: conversation)
+                    }
                 )
             } else if let bookmark = queryManager.bookmarks.first(where: { $0.id == selectedId }) {
                 let conversation = bookmark.turn?.conversation

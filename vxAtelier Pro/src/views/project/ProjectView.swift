@@ -16,6 +16,7 @@ struct ProjectView: View {
     
     var onConversationViewAppear: (ConversationItem) -> Void = { _ in }
     var onRequestOptions: (PersistentIdentifier) -> Void = { _ in }
+    var onDeleteConversation: (ConversationItem) -> Void
     
     // Computed property to resolve project by ID
     private var project: ProjectItem? {
@@ -39,15 +40,31 @@ struct ProjectView: View {
         set { conversationsSortTypeRaw = newValue.rawValue }
     }
     
-    init(projectID: PersistentIdentifier, onConversationViewAppear: @escaping (ConversationItem) -> Void = { _ in }, onRequestOptions: @escaping (PersistentIdentifier) -> Void = { _ in }) {
+    init(
+        projectID: PersistentIdentifier,
+        onConversationViewAppear: @escaping (ConversationItem) -> Void = { _ in },
+        onRequestOptions: @escaping (PersistentIdentifier) -> Void = { _ in },
+        onDeleteConversation: @escaping (ConversationItem) -> Void
+    ) {
         self.projectID = projectID
         self.onConversationViewAppear = onConversationViewAppear
         self.onRequestOptions = onRequestOptions
+        self.onDeleteConversation = onDeleteConversation
     }
     
     // Backward compatibility initializer
-    init(project: ProjectItem, onConversationViewAppear: @escaping (ConversationItem) -> Void = { _ in }, onRequestOptions: @escaping (PersistentIdentifier) -> Void = { _ in }) {
-        self.init(projectID: project.id, onConversationViewAppear: onConversationViewAppear, onRequestOptions: onRequestOptions)
+    init(
+        project: ProjectItem,
+        onConversationViewAppear: @escaping (ConversationItem) -> Void = { _ in },
+        onRequestOptions: @escaping (PersistentIdentifier) -> Void = { _ in },
+        onDeleteConversation: @escaping (ConversationItem) -> Void
+    ) {
+        self.init(
+            projectID: project.id,
+            onConversationViewAppear: onConversationViewAppear,
+            onRequestOptions: onRequestOptions,
+            onDeleteConversation: onDeleteConversation
+        )
     }
     
     // MARK: - Computed Properties
@@ -183,14 +200,7 @@ struct ProjectView: View {
                             title: Binding(get: { conversation.title} , set: { conversation.title = $0 }),
                             subtitle: conversation.timestamp.formatted(.dateTime.year().month().day().hour().minute()),
                             onDelete: {
-                                // Use QueryManager to move to trash (or delete if bookmark)
-                                do {
-                                    try queryManager.moveItemToTrash(conversation)
-                                    vxAtelierPro.log.debug("ProjectView: Moved conversation '\(conversation.title)' to trash via context menu.")
-                                } catch {
-                                    vxAtelierPro.log.error("ProjectView: Failed to move conversation '\(conversation.title)' to trash via context menu: \(error.localizedDescription)")
-                                    // Consider showing an error alert
-                                }
+                                onDeleteConversation(conversation)
                             },
                             onRename: { conversation.title = $0 },
                             imageName: "document",
@@ -218,18 +228,10 @@ struct ProjectView: View {
                     }
                 }                
                 .onDelete { indexSet in
-                    // Use QueryManager to move to trash (or delete if bookmark)
                     for index in indexSet {
-                        // Ensure index is valid before accessing
                         if index < filteredConversations.count {
                             let conversation = filteredConversations[index]
-                            do {
-                                try queryManager.moveItemToTrash(conversation)
-                                vxAtelierPro.log.debug("ProjectView: Moved conversation '\(conversation.title)' to trash via swipe delete.")
-                            } catch {
-                                vxAtelierPro.log.error("ProjectView: Failed to move conversation '\(conversation.title)' to trash via swipe delete: \(error.localizedDescription)")
-                                // Consider showing an error alert
-                            }
+                            onDeleteConversation(conversation)
                         } else {
                             vxAtelierPro.log.warning("ProjectView: Invalid index \(index) encountered in sectionDialogs.onDelete for filteredConversations count \(filteredConversations.count).")
                         }
