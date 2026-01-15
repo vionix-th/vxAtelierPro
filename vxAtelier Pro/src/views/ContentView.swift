@@ -40,7 +40,11 @@ struct ContentView: View {
             ? !queryManager.archivedDialogs.isEmpty
             : viewOptions.showTrashed
                 ? !queryManager.trashedDialogs.isEmpty
-                : !queryManager.standaloneConversations.isEmpty
+                : !queryManager.standaloneConversations(
+                    showUserDialogsOnly: viewOptions.showUserDialogsOnly,
+                    showArchived: viewOptions.showArchived,
+                    showTrashed: viewOptions.showTrashed
+                ).isEmpty
         return hasProjects || hasStandaloneDialogs
     }
 
@@ -208,7 +212,14 @@ struct ContentView: View {
             let bookmarkTitle = "Bookmarks"
 
             if !viewOptions.showArchived && !viewOptions.showTrashed {
-                dialogSection(title: systemDialogTitle, dialogs: queryManager.systemConversations)
+                dialogSection(
+                    title: systemDialogTitle,
+                    dialogs: queryManager.systemConversations(
+                        showUserDialogsOnly: viewOptions.showUserDialogsOnly,
+                        showArchived: viewOptions.showArchived,
+                        showTrashed: viewOptions.showTrashed
+                    )
+                )
             }
 
             projectSection(
@@ -229,7 +240,13 @@ struct ContentView: View {
                 dialogSection(title: standaloneDialogTitle, dialogs: trashedDialogs)
             } else {
                 dialogSection(
-                    title: standaloneDialogTitle, dialogs: queryManager.standaloneConversations)
+                    title: standaloneDialogTitle,
+                    dialogs: queryManager.standaloneConversations(
+                        showUserDialogsOnly: viewOptions.showUserDialogsOnly,
+                        showArchived: viewOptions.showArchived,
+                        showTrashed: viewOptions.showTrashed
+                    )
+                )
             }
 
             if !viewOptions.showArchived && !viewOptions.showTrashed {

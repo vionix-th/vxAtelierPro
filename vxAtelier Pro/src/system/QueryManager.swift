@@ -1,7 +1,7 @@
 import Combine
+import Foundation
 import Observation
 import SwiftData
-import SwiftUI
 
 /// Centralized manager for all SwiftData queries in the application
 /// This class acts as a single source of truth for data access throughout the app
@@ -33,40 +33,6 @@ final class QueryManager: @unchecked Sendable {
     private let voiceConfigurationsDescriptor: FetchDescriptor<VoiceConfigurationItem>
     private let modelsDescriptor: FetchDescriptor<ModelItem>
     private let webSearchConfigurationsDescriptor: FetchDescriptor<WebSearchConfigurationItem>
-
-    // MARK: - User Preferences (for filtering)
-    // Use @ObservationIgnored to prevent conflict with AppStorage's own property wrappers
-    @ObservationIgnored @AppStorage("ShowUserDialogsOnly")
-    private var appStorageShowUserDialogsOnly: Bool = true {
-        didSet {
-            refreshFilteredData()
-        }
-    }
-
-    @ObservationIgnored @AppStorage("ShowArchived")
-    private var appStorageShowArchived: Bool = false {
-        didSet {
-            if appStorageShowArchived {
-                appStorageShowTrashed = false
-            }
-            refreshFilteredData()
-        }
-    }
-
-    @ObservationIgnored @AppStorage("ShowTrashed")
-    private var appStorageShowTrashed: Bool = false {
-        didSet {
-            if appStorageShowTrashed {
-                appStorageShowArchived = false
-            }
-            refreshFilteredData()
-        }
-    }
-
-    // Public read-only computed properties to access the AppStorage values
-    var showUserDialogsOnly: Bool { appStorageShowUserDialogsOnly }
-    var showArchived: Bool { appStorageShowArchived }
-    var showTrashed: Bool { appStorageShowTrashed }
 
     // For updating after context changes
     private var cancellables = Set<AnyCancellable>()
@@ -138,22 +104,19 @@ final class QueryManager: @unchecked Sendable {
             // Prime transient caches for bookmarks safely (ID-based, no stale deref)
             primeBookmarkCaches()
 
-            // Update computed properties
-            refreshFilteredData()
         } catch {
             vxAtelierPro.log.error("Failed to fetch data: \(error.localizedDescription)")
         }
     }
 
-    /// Refresh filtered data without fetching
-    private func refreshFilteredData() {
-        // The @Observable property wrapper will automatically notify observers when these properties change
-    }
-
     // MARK: - Computed Properties: Filtered Collections
 
     /// Standalone conversations that don't belong to a project, filtered by status
-    var standaloneConversations: [ConversationItem] {
+    func standaloneConversations(
+        showUserDialogsOnly: Bool,
+        showArchived: Bool,
+        showTrashed: Bool
+    ) -> [ConversationItem] {
         allConversations.filter { conversation in
             // First check if conversation belongs to a project
             guard conversation.project == nil else {
@@ -184,7 +147,11 @@ final class QueryManager: @unchecked Sendable {
     }
 
     /// System conversations, filtered by status
-    var systemConversations: [ConversationItem] {
+    func systemConversations(
+        showUserDialogsOnly: Bool,
+        showArchived: Bool,
+        showTrashed: Bool
+    ) -> [ConversationItem] {
         // If showUserDialogsOnly is true, don't show system conversations at all
         guard !showUserDialogsOnly else {
             return []
@@ -226,19 +193,6 @@ final class QueryManager: @unchecked Sendable {
     }
     var trashedDialogs: [ConversationItem] {
         allConversations.filter { $0.status == .trashed }
-    }
-
-    // Privatize ambiguous filter
-    private var filteredProjects: [ProjectItem] {
-        allProjects.filter { project in
-            if showArchived {
-                return project.status == ItemStatus.archived
-            }
-            if showTrashed {
-                return project.status == ItemStatus.trashed
-            }
-            return project.status == ItemStatus.active
-        }
     }
 
     /// Active projects only (for selection in conversations)

@@ -19,6 +19,10 @@ final class ViewOptionsStore {
     var showEmptySections: Bool {
         didSet { defaults.set(showEmptySections, forKey: Keys.showEmptySections) }
     }
+
+    var showUserDialogsOnly: Bool {
+        didSet { defaults.set(showUserDialogsOnly, forKey: Keys.showUserDialogsOnly) }
+    }
     
     var statusBarVisible: Bool {
         didSet { defaults.set(statusBarVisible, forKey: Keys.statusBarVisible) }
@@ -65,6 +69,8 @@ final class ViewOptionsStore {
         
         showEmptySections = defaults.object(forKey: Keys.showEmptySections) as? Bool
             ?? AppDefaults.showEmptySections
+        showUserDialogsOnly = defaults.object(forKey: Keys.showUserDialogsOnly) as? Bool
+            ?? AppDefaults.showUserDialogsOnly
         statusBarVisible = defaults.object(forKey: Keys.statusBarVisible) as? Bool
             ?? AppDefaults.statusBarVisible
         sidebarDialogsSortDescending =
@@ -119,6 +125,12 @@ final class ViewOptionsStore {
         if emptySections != showEmptySections {
             showEmptySections = emptySections
         }
+
+        let userDialogsOnly = defaults.object(forKey: Keys.showUserDialogsOnly) as? Bool
+            ?? showUserDialogsOnly
+        if userDialogsOnly != showUserDialogsOnly {
+            showUserDialogsOnly = userDialogsOnly
+        }
         
         let statusVisible = defaults.object(forKey: Keys.statusBarVisible) as? Bool
             ?? statusBarVisible
@@ -155,6 +167,7 @@ final class ViewOptionsStore {
     private enum Keys {
         static let navigationMode = "NavigationMode"
         static let showEmptySections = "ShowEmptySections"
+        static let showUserDialogsOnly = "ShowUserDialogsOnly"
         static let showArchived = "ShowArchived"
         static let showTrashed = "ShowTrashed"
         static let statusBarVisible = "statusBarVisible"
