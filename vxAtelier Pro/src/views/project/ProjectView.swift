@@ -29,8 +29,7 @@ struct ProjectView: View {
     
     @AppStorage("DialogTextEdit.buttonSize") var buttonSize: Double = AppDefaults.dialogTextEditButtonSize
     
-    @AppStorage("ShowArchived") private var showArchived: Bool = false
-    @AppStorage("ShowTrashed") private var showTrashed: Bool = false
+    @AppStorage("NavigationMode") private var navigationMode: NavigationMode = .chats
     @AppStorage("SidebarDialogsSortOrderDescending") private var conversationsSortDescending: Bool = true
     @AppStorage("SidebarDialogsSortType") private var conversationsSortTypeRaw: String =
         SidebarSortType.conversationDate.rawValue
@@ -52,6 +51,9 @@ struct ProjectView: View {
     }
     
     // MARK: - Computed Properties
+    private var showArchived: Bool { navigationMode == .archive }
+    private var showTrashed: Bool { navigationMode == .trash }
+
     var filteredConversations: [ConversationItem] {
         guard let project = self.project else { return [] }
         

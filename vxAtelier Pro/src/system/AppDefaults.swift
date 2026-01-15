@@ -163,10 +163,8 @@ extension AppDefaults {
         defaults.set("alphabetically", forKey: "SidebarProjectsSortType")
         // Dialog/project filters
         defaults.set(false, forKey: "ShowEmptySections")
-        defaults.set(true, forKey: "ShowArchived")
-        defaults.set(false, forKey: "ShowTrashed")
+        defaults.set(NavigationMode.chats.rawValue, forKey: "NavigationMode")
         // Add any additional settings as needed
         defaults.synchronize()
     }
 }
-

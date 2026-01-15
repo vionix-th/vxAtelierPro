@@ -1,21 +1,21 @@
 import SwiftUI
 
-enum NavigationMode {
-    case chats
-    case archive
-    case trash
+enum NavigationMode: String, CaseIterable, Identifiable {
+    case chats = "chats"
+    case archive = "archive"
+    case trash = "trash"
+
+    var id: String { rawValue }
 }
 
 @MainActor
 func setNavigationMode(
     _ mode: NavigationMode,
-    showArchived: Binding<Bool>,
-    showTrashed: Binding<Bool>,
+    navigationMode: Binding<NavigationMode>,
     animated: Bool = true
 ) {
     let update = {
-        showArchived.wrappedValue = (mode == .archive)
-        showTrashed.wrappedValue = (mode == .trash)
+        navigationMode.wrappedValue = mode
     }
     if animated {
         withAnimation(.easeInOut(duration: 0.3)) {

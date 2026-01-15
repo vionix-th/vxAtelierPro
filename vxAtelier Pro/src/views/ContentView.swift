@@ -14,8 +14,7 @@ struct ContentView: View {
     // MARK: - View Options (UserDefaults-backed)
     @AppStorage("ShowEmptySections") private var showEmptySections: Bool = AppDefaults.showEmptySections
     @AppStorage("ShowUserDialogsOnly") private var showUserDialogsOnly: Bool = AppDefaults.showUserDialogsOnly
-    @AppStorage("ShowArchived") private var showArchived: Bool = false
-    @AppStorage("ShowTrashed") private var showTrashed: Bool = false
+    @AppStorage("NavigationMode") private var navigationMode: NavigationMode = .chats
     @AppStorage("statusBarVisible") private var statusBarVisible: Bool = AppDefaults.statusBarVisible
     @AppStorage("SidebarDialogsSortOrderDescending") private var sidebarDialogsSortDescending: Bool = true
     @AppStorage("SidebarDialogsSortType") private var sidebarDialogsSortTypeRaw: String =
@@ -39,28 +38,85 @@ struct ContentView: View {
     @State private var exportDialogRequested: (ConversationItem, UUID)?
     @State private var importRequested = false
 
-    /// Returns true if there are any visible items in the sidebar (only non-trashed projects and standalone dialogs)
+    private var showTrashed: Bool { navigationMode == .trash }
+
+    private var sidebarProjects: [ProjectItem] {
+        switch navigationMode {
+        case .chats:
+            return queryManager.activeProjects
+        case .archive:
+            return queryManager.archivedProjects
+        case .trash:
+            return queryManager.trashedProjects
+        }
+    }
+
+    private var sidebarDialogs: [ConversationItem] {
+        switch navigationMode {
+        case .chats:
+            return queryManager.standaloneConversations(
+                showUserDialogsOnly: showUserDialogsOnly,
+                showArchived: false,
+                showTrashed: false
+            )
+        case .archive:
+            return filterDialogs(queryManager.archivedDialogs)
+        case .trash:
+            return filterDialogs(queryManager.trashedDialogs)
+        }
+    }
+
+    private var sidebarSystemDialogs: [ConversationItem] {
+        guard navigationMode == .chats else { return [] }
+        return queryManager.systemConversations(
+            showUserDialogsOnly: showUserDialogsOnly,
+            showArchived: false,
+            showTrashed: false
+        )
+    }
+
+    private var sidebarBookmarks: [BookmarkItem] {
+        guard navigationMode == .chats else { return [] }
+        return queryManager.bookmarks
+    }
+
+    private var projectTitle: String {
+        switch navigationMode {
+        case .chats:
+            return "Projects"
+        case .archive:
+            return "Archived Projects"
+        case .trash:
+            return "Trashed Projects"
+        }
+    }
+
+    private var dialogTitle: String {
+        switch navigationMode {
+        case .chats:
+            return "Standalone Dialogs"
+        case .archive:
+            return "Archived Dialogs"
+        case .trash:
+            return "Trashed Items"
+        }
+    }
+
+    /// Returns true if there are any visible items in the sidebar.
     private var hasVisibleItems: Bool {
-        let hasProjects =
-            !(showArchived
-            ? queryManager.archivedProjects.isEmpty
-            : showTrashed
-                ? queryManager.trashedProjects.isEmpty : queryManager.activeProjects.isEmpty)
-        let hasStandaloneDialogs =
-            showArchived
-            ? !queryManager.archivedDialogs.isEmpty
-            : showTrashed
-                ? !queryManager.trashedDialogs.isEmpty
-                : !queryManager.standaloneConversations(
-                    showUserDialogsOnly: showUserDialogsOnly,
-                    showArchived: showArchived,
-                    showTrashed: showTrashed
-                ).isEmpty
-        return hasProjects || hasStandaloneDialogs
+        !sidebarProjects.isEmpty
+            || !sidebarDialogs.isEmpty
+            || !sidebarSystemDialogs.isEmpty
+            || !sidebarBookmarks.isEmpty
     }
 
     // MARK: - Helper Methods
     // MARK: - Actions
+    private func filterDialogs(_ dialogs: [ConversationItem]) -> [ConversationItem] {
+        guard showUserDialogsOnly else { return dialogs }
+        return dialogs.filter { $0.purpose == .user }
+    }
+
     private func addConversation() {
         let conversation = queryManager.createConversation()
         selectedItem = conversation.id
@@ -211,56 +267,25 @@ struct ContentView: View {
     // MARK: - View Components
     var sidebarList: some View {
         return List(selection: $selectedItem) {
-            let projectTitle =
-                showArchived
-                ? "Archived Projects" : showTrashed ? "Trashed Projects" : "Projects"
-            let standaloneDialogTitle =
-                showArchived
-                ? "Archived Dialogs"
-                : showTrashed ? "Trashed Items" : "Standalone Dialogs"
-            let systemDialogTitle = "System"
-            let bookmarkTitle = "Bookmarks"
-
-            if !showArchived && !showTrashed {
+            if navigationMode == .chats {
                 dialogSection(
-                    title: systemDialogTitle,
-                    dialogs: queryManager.systemConversations(
-                        showUserDialogsOnly: showUserDialogsOnly,
-                        showArchived: showArchived,
-                        showTrashed: showTrashed
-                    )
+                    title: "System",
+                    dialogs: sidebarSystemDialogs
                 )
             }
 
             projectSection(
                 title: projectTitle,
-                projects: showArchived
-                    ? queryManager.archivedProjects
-                    : showTrashed
-                        ? queryManager.trashedProjects : queryManager.activeProjects
+                projects: sidebarProjects
             )
 
-            if showTrashed {
-                let trashedDialogs = ConversationSorter.sort(
-                    queryManager.trashedDialogs,
-                    descending: sidebarDialogsSortDescending,
-                    sortType: SidebarSortType(rawValue: sidebarDialogsSortTypeRaw)
-                        ?? .conversationDate
-                )
-                dialogSection(title: standaloneDialogTitle, dialogs: trashedDialogs)
-            } else {
-                dialogSection(
-                    title: standaloneDialogTitle,
-                    dialogs: queryManager.standaloneConversations(
-                        showUserDialogsOnly: showUserDialogsOnly,
-                        showArchived: showArchived,
-                        showTrashed: showTrashed
-                    )
-                )
-            }
+            dialogSection(
+                title: dialogTitle,
+                dialogs: sidebarDialogs
+            )
 
-            if !showArchived && !showTrashed {
-                bookmarkSection(title: bookmarkTitle, bookmarks: queryManager.bookmarks)
+            if navigationMode == .chats {
+                bookmarkSection(title: "Bookmarks", bookmarks: sidebarBookmarks)
             }
         }
     }
@@ -366,7 +391,7 @@ struct ContentView: View {
         Divider()
 
         Button {
-            setNavigationMode(.chats, showArchived: $showArchived, showTrashed: $showTrashed)
+            setNavigationMode(.chats, navigationMode: $navigationMode)
         } label: {
             MenuItemStyle.label("Show Chats", systemImage: "tray.full")
         }
@@ -374,7 +399,7 @@ struct ContentView: View {
         .help("Show active chats")
 
         Button {
-            setNavigationMode(.archive, showArchived: $showArchived, showTrashed: $showTrashed)
+            setNavigationMode(.archive, navigationMode: $navigationMode)
         } label: {
             MenuItemStyle.label("Show Archive", systemImage: "archivebox")
         }
@@ -382,7 +407,7 @@ struct ContentView: View {
         .help("Show archived items")
 
         Button {
-            setNavigationMode(.trash, showArchived: $showArchived, showTrashed: $showTrashed)
+            setNavigationMode(.trash, navigationMode: $navigationMode)
         } label: {
             MenuItemStyle.label("Show Trash", systemImage: "trash")
         }
@@ -569,8 +594,7 @@ struct ContentView: View {
                             if hadTrashedItems {
                                 setNavigationMode(
                                     .chats,
-                                    showArchived: $showArchived,
-                                    showTrashed: $showTrashed,
+                                    navigationMode: $navigationMode,
                                     animated: true
                                 )
                                 self.selectedItem = nil
@@ -678,8 +702,7 @@ struct ContentView: View {
                     if remainingTrashedItems == 0 {
                         setNavigationMode(
                             .chats,
-                            showArchived: $showArchived,
-                            showTrashed: $showTrashed,
+                            navigationMode: $navigationMode,
                             animated: true
                         )
                         self.selectedItem = nil
@@ -705,7 +728,7 @@ struct ContentView: View {
     private func archiveItem(_ item: any PersistentModel) {
         let itemId = item.persistentModelID
         let itemType = type(of: item)
-        let wasInArchive = showArchived
+        let wasInArchive = navigationMode == .archive
 
         do {
             try queryManager.archiveItem(item)
@@ -722,8 +745,7 @@ struct ContentView: View {
                     if remainingArchivedItems == 0 && remainingArchivedDialogs == 0 {
                         setNavigationMode(
                             .chats,
-                            showArchived: $showArchived,
-                            showTrashed: $showTrashed,
+                            navigationMode: $navigationMode,
                             animated: true
                         )
                         vxAtelierPro.log.info("Last archived item removed, returning to Show Chats")
