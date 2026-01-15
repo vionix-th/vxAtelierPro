@@ -688,40 +688,38 @@ struct ContentView: View {
             vxAtelierPro.log.debug("Selected item (ID: \(itemId), Type: \(itemType)) not cleared.")
         }
 
-        DispatchQueue.main.async {
-            do {
-                if showTrashed {
-                    try queryManager.deleteItemPermanently(item)
-                    vxAtelierPro.log.debug(
-                        "Successfully initiated permanent deletion for item (ID: \(itemId), Type: \(itemType)) via swipe/delete from trash."
-                    )
+        do {
+            if showTrashed {
+                try queryManager.deleteItemPermanently(item)
+                vxAtelierPro.log.debug(
+                    "Successfully initiated permanent deletion for item (ID: \(itemId), Type: \(itemType)) via swipe/delete from trash."
+                )
 
-                    // Only reset navigation if there are NO trashed items remaining (both dialogs and projects)
-                    let remainingTrashedItems =
-                        queryManager.trashedDialogs.count + queryManager.trashedProjects.count
-                    if remainingTrashedItems == 0 {
-                        setNavigationMode(
-                            .chats,
-                            navigationMode: $navigationMode,
-                            animated: true
-                        )
-                        self.selectedItem = nil
-                        vxAtelierPro.log.info("Last trashed item removed, returning to Show Chats")
-                    } else {
-                        vxAtelierPro.log.debug(
-                            "\(remainingTrashedItems) trashed items still remain")
-                    }
-                } else {
-                    try queryManager.moveItemToTrash(item)
-                    vxAtelierPro.log.debug(
-                        "Successfully moved/deleted item (ID: \(itemId), Type: \(itemType)) via swipe/delete."
+                // Only reset navigation if there are NO trashed items remaining (both dialogs and projects)
+                let remainingTrashedItems =
+                    queryManager.trashedDialogs.count + queryManager.trashedProjects.count
+                if remainingTrashedItems == 0 {
+                    setNavigationMode(
+                        .chats,
+                        navigationMode: $navigationMode,
+                        animated: true
                     )
+                    self.selectedItem = nil
+                    vxAtelierPro.log.info("Last trashed item removed, returning to Show Chats")
+                } else {
+                    vxAtelierPro.log.debug(
+                        "\(remainingTrashedItems) trashed items still remain")
                 }
-            } catch {
-                vxAtelierPro.log.error(
-                    "ContentView: Failed during deleteItem for item (ID: \(itemId), Type: \(itemType)): \(error.localizedDescription)"
+            } else {
+                try queryManager.moveItemToTrash(item)
+                vxAtelierPro.log.debug(
+                    "Successfully moved/deleted item (ID: \(itemId), Type: \(itemType)) via swipe/delete."
                 )
             }
+        } catch {
+            vxAtelierPro.log.error(
+                "ContentView: Failed during deleteItem for item (ID: \(itemId), Type: \(itemType)): \(error.localizedDescription)"
+            )
         }
     }
 
