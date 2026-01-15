@@ -595,6 +595,16 @@ final class QueryManager: @unchecked Sendable {
         try saveContext()
     }
 
+    /// Assigns a conversation to a project (or removes it) and persists the change.
+    func assignConversation(_ conversation: ConversationItem, to project: ProjectItem?) throws {
+        conversation.project = project
+        try saveContext()
+        let projectName = project?.name ?? "none"
+        vxAtelierPro.log.debug(
+            "Assigned conversation '\(conversation.title)' (ID: \(conversation.id)) to project '\(projectName)'."
+        )
+    }
+
     /// Permanently deletes an item, handling project cascades.
     func deleteItemPermanently(_ item: any PersistentModel) throws {
         vxAtelierPro.log.debug(

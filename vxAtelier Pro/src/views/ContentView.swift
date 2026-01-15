@@ -60,7 +60,14 @@ struct ContentView: View {
     private func assignConversationToProject(
         _ conversation: ConversationItem, _ project: ProjectItem?
     ) {
-        conversation.project = project
+        do {
+            try queryManager.assignConversation(conversation, to: project)
+        } catch {
+            let projectName = project?.name ?? "none"
+            vxAtelierPro.log.error(
+                "Failed to assign conversation '\(conversation.title)' to project '\(projectName)': \(error.localizedDescription)"
+            )
+        }
     }
 
     private func requestOptions(for id: PersistentIdentifier) {
