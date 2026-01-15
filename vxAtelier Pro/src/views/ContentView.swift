@@ -38,8 +38,6 @@ struct ContentView: View {
     @State private var exportDialogRequested: (ConversationItem, UUID)?
     @State private var importRequested = false
 
-    private var showTrashed: Bool { navigationMode == .trash }
-
     private var sidebarProjects: [ProjectItem] {
         switch navigationMode {
         case .chats:
@@ -56,8 +54,7 @@ struct ContentView: View {
         case .chats:
             return queryManager.standaloneConversations(
                 showUserDialogsOnly: showUserDialogsOnly,
-                showArchived: false,
-                showTrashed: false
+                navigationMode: .chats
             )
         case .archive:
             return filterDialogs(queryManager.archivedDialogs)
@@ -70,8 +67,7 @@ struct ContentView: View {
         guard navigationMode == .chats else { return [] }
         return queryManager.systemConversations(
             showUserDialogsOnly: showUserDialogsOnly,
-            showArchived: false,
-            showTrashed: false
+            navigationMode: .chats
         )
     }
 
@@ -577,7 +573,7 @@ struct ContentView: View {
     // MARK: - Toolbar Content
     private var sidebarToolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
-            if showTrashed {
+            if navigationMode == .trash {
                 Button(
                     role: .destructive,
                     action: {
@@ -689,7 +685,7 @@ struct ContentView: View {
         }
 
         do {
-            if showTrashed {
+                if navigationMode == .trash {
                 try queryManager.deleteItemPermanently(item)
                 vxAtelierPro.log.debug(
                     "Successfully initiated permanent deletion for item (ID: \(itemId), Type: \(itemType)) via swipe/delete from trash."

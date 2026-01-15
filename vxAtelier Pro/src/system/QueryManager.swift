@@ -114,8 +114,7 @@ final class QueryManager: @unchecked Sendable {
     /// Standalone conversations that don't belong to a project, filtered by status
     func standaloneConversations(
         showUserDialogsOnly: Bool,
-        showArchived: Bool,
-        showTrashed: Bool
+        navigationMode: NavigationMode
     ) -> [ConversationItem] {
         allConversations.filter { conversation in
             // First check if conversation belongs to a project
@@ -136,21 +135,21 @@ final class QueryManager: @unchecked Sendable {
             }
 
             // Then apply status filter
-            if showArchived {
+            switch navigationMode {
+            case .chats:
+                return conversation.status == ItemStatus.active
+            case .archive:
                 return conversation.status == ItemStatus.archived
-            }
-            if showTrashed {
+            case .trash:
                 return conversation.status == ItemStatus.trashed
             }
-            return conversation.status == ItemStatus.active
         }
     }
 
     /// System conversations, filtered by status
     func systemConversations(
         showUserDialogsOnly: Bool,
-        showArchived: Bool,
-        showTrashed: Bool
+        navigationMode: NavigationMode
     ) -> [ConversationItem] {
         // If showUserDialogsOnly is true, don't show system conversations at all
         guard !showUserDialogsOnly else {
@@ -162,13 +161,14 @@ final class QueryManager: @unchecked Sendable {
                 return false
             }
 
-            if showArchived {
+            switch navigationMode {
+            case .chats:
+                return conversation.status == ItemStatus.active
+            case .archive:
                 return conversation.status == ItemStatus.archived
-            }
-            if showTrashed {
+            case .trash:
                 return conversation.status == ItemStatus.trashed
             }
-            return conversation.status == ItemStatus.active
         }
     }
 

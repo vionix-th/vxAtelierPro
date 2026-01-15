@@ -63,17 +63,49 @@ final class QueryManagerTests: XCTestCase {
         try? queryManager.deleteItems([activeDialog])
     }
     
-    func testStatusPropertyAccess() {
-        // Test that we can access the status properties
-        // This doesn't test setting them since they're read-only
-        // Note: We're only testing that we can access these properties without crashing
-        // The actual values depend on UserDefaults which may vary in the test environment
-        _ = queryManager.showArchived
-        _ = queryManager.showTrashed
-        _ = queryManager.showUserDialogsOnly
-        
-        // Ensure the test passes
-        XCTAssertTrue(true)
+    func testStandaloneAndSystemConversationFilteringByNavigationMode() {
+        // Given
+        let project = testEnv.createProject(name: "Project 1")
+        _ = testEnv.createConversation(title: "Active", status: .active, purpose: .user)
+        _ = testEnv.createConversation(title: "Archived", status: .archived, purpose: .user)
+        _ = testEnv.createConversation(title: "Trashed", status: .trashed, purpose: .user)
+        _ = testEnv.createConversation(title: "System Archived", status: .archived, purpose: .system)
+        _ = testEnv.createConversation(
+            title: "Project Dialog",
+            status: .active,
+            purpose: .user,
+            project: project
+        )
+        try? testEnv.save()
+
+        // When
+        queryManager.fetchAllData()
+
+        // Then - standalone conversations are filtered by status and exclude system/project items
+        let activeStandalone = queryManager.standaloneConversations(
+            showUserDialogsOnly: false,
+            navigationMode: .chats
+        )
+        XCTAssertEqual(activeStandalone.map(\.title), ["Active"])
+
+        let archivedStandalone = queryManager.standaloneConversations(
+            showUserDialogsOnly: false,
+            navigationMode: .archive
+        )
+        XCTAssertEqual(archivedStandalone.map(\.title), ["Archived"])
+
+        let trashedStandalone = queryManager.standaloneConversations(
+            showUserDialogsOnly: false,
+            navigationMode: .trash
+        )
+        XCTAssertEqual(trashedStandalone.map(\.title), ["Trashed"])
+
+        // System conversations honor navigation mode when user dialogs are shown
+        let systemArchived = queryManager.systemConversations(
+            showUserDialogsOnly: false,
+            navigationMode: .archive
+        )
+        XCTAssertEqual(systemArchived.map(\.title), ["System Archived"])
     }
     
     // MARK: - Item Management Tests

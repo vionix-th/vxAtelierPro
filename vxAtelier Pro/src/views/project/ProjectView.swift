@@ -51,9 +51,6 @@ struct ProjectView: View {
     }
     
     // MARK: - Computed Properties
-    private var showArchived: Bool { navigationMode == .archive }
-    private var showTrashed: Bool { navigationMode == .trash }
-
     var filteredConversations: [ConversationItem] {
         guard let project = self.project else { return [] }
         
@@ -62,9 +59,9 @@ struct ProjectView: View {
             case .active:
                 return true
             case .archived:
-                return showArchived
+                return navigationMode == .archive
             case .trashed:
-                return showTrashed
+                return navigationMode == .trash
             }
         }
         // Sort by selected type and order

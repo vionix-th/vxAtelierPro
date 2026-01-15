@@ -157,7 +157,7 @@ The `system/` module contains core application services, data management logic, 
 `QueryManager.swift` implements the **Repository pattern** for the application. It is an `@Observable` class that acts as a centralized, reactive data access layer, abstracting all direct SwiftData interactions from the rest of the app.
 
 *   **Single Source of Truth**: It is initialized with the main `ModelContext` and maintains a local, in-memory cache of all major data models (e.g., `allConversations`, `allProjects`). It automatically refreshes this cache in response to underlying database changes, ensuring the UI is always synchronized.
-*   **Filtered Views for UI**: It exposes a rich set of computed properties (e.g., `standaloneConversations`, `filteredProjects`) that provide filtered and sorted views of the data based on user preferences (e.g., `showArchived`). These reactive properties are the primary data source for the application's SwiftUI views.
+*   **Filtered Views for UI**: It exposes a rich set of computed properties (e.g., `standaloneConversations`, `filteredProjects`) that provide filtered and sorted views of the data based on user preferences (e.g., `NavigationMode`). These reactive properties are the primary data source for the application's SwiftUI views.
 *   **High-Level CRUD API**: It provides a clean, high-level API for all Create, Read, Update, and Delete (CRUD) operations (e.g., `insert()`, `delete()`, `archiveItem()`). This encapsulates all `ModelContext` interactions and ensures the local cache is refreshed after every mutation.
 *   **Data Integrity**: It contains logic to enforce application invariants, such as the `ensureSystemConversation()` method, which guarantees that a system-level conversation always exists.
 
@@ -705,14 +705,13 @@ This is the modal view for creating and editing individual `PromptTemplate` enti
 
 This submodule contains the primary interface for viewing and managing the contents of a single project.
 
-#### `ProjectView.swift` & `ProjectViewModel.swift`
+#### `ProjectView.swift`
 
-This pair of files implements the main dashboard for a `ProjectItem` using the Model-View-ViewModel (MVVM) pattern. The view has been migrated to use ID-based selection patterns to prevent crashes when SwiftData objects are deleted while views are active.
+This view implements the main dashboard for a `ProjectItem`. It uses ID-based selection to avoid dereferencing deleted SwiftData objects while views are active.
 
-*   **`ProjectView.swift` (The View)**: A declarative SwiftUI view responsible for rendering the UI. It displays the project's default settings and provides a filterable, sortable list of all its associated conversations. It observes the ViewModel for all state and forwards all user actions to it. The view has been migrated to use ID-based selection patterns, initializing with a `projectID` instead of a direct `ProjectItem` reference to prevent crashes when SwiftData objects are deleted while views are active.
-*   **`ProjectViewModel.swift` (The ViewModel)**: An `@MainActor ObservableObject` that holds the state and business logic. It is initialized with a `projectID` and the `QueryManager`. It publishes all UI state (e.g., `showArchived`, `showTrashed`) and contains the methods to handle every user action. The ViewModel resolves the actual `ProjectItem` from the `QueryManager` by `projectID` at render time, ensuring data consistency.
+*   **`ProjectView.swift` (The View)**: A declarative SwiftUI view responsible for rendering the UI. It displays the project's default settings and provides a filterable, sortable list of all its associated conversations. It initializes with a `projectID` instead of a direct `ProjectItem` reference to prevent crashes when SwiftData objects are deleted while views are active.
 *   **Conversation Management**: It displays a list of the project's `ConversationItem`s with advanced filtering and sorting capabilities.
-    *   **Filtering**: Users can toggle the visibility of archived and trashed conversations. These preferences are persisted globally via `@AppStorage`.
+    *   **Filtering**: Conversation visibility is controlled by the global `NavigationMode` preference, persisted via `@AppStorage`.
     *   **Sorting**: The conversation list can be sorted by creation date, last message date, or alphabetically, in either ascending or descending order. These settings are also persisted via `@AppStorage`.
 *   **System Prompt Editor**: It includes a dedicated section for viewing and editing the project's default system prompt. Users can edit the prompt directly in a `TextEditor` or apply a predefined template from a popover list.
 *   **Component-Based Structure**: The view is organized into logical, reusable sub-views (`sectionSystemPrompt`, `sectionDialogs`) for clarity and maintainability.
