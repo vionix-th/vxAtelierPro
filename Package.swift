@@ -125,7 +125,6 @@ let package = Package(
                 "utilities/TypeConversionUtils.swift",
                 "utilities/URLExtensions.swift",
                 "views/ContentView.swift",
-                "views/ViewOptionsStore.swift",
                 "views/StatusBar.swift",
                 // Views - Components
                 "views/components/AvatarView.swift",
@@ -182,7 +181,8 @@ let package = Package(
                 "views/settings/components/SettingsRowActions.swift",
                 // Views - Utility
                 "views/utility/GlobalUtilityPanel.swift",
-                "views/utility/LogHistorySheet.swift"
+                "views/utility/LogHistorySheet.swift",
+                "views/utility/NavigationMode.swift"
             ],
             swiftSettings: [
                 .define("DEBUG", .when(configuration: .debug)),

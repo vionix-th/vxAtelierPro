@@ -10,34 +10,33 @@ import SwiftUI
 
 /// Custom commands for the application's main menu
 struct AppCommands: Commands {
-    var viewOptions: ViewOptionsStore
+    @AppStorage("ShowEmptySections") private var showEmptySections: Bool = AppDefaults.showEmptySections
+    @AppStorage("ShowArchived") private var showArchived: Bool = false
+    @AppStorage("ShowTrashed") private var showTrashed: Bool = false
 
     var body: some Commands {
         CommandGroup(after: .sidebar) {
             Divider()
             Toggle(
                 "Show Empty Sections",
-                isOn: Binding(
-                    get: { viewOptions.showEmptySections },
-                    set: { viewOptions.showEmptySections = $0 }
-                )
+                isOn: $showEmptySections
             )
             .keyboardShortcut("e", modifiers: [.command, .shift])
 
             Divider()
 
             Button("Show Chats") {
-                viewOptions.setNavigationMode(.chats)
+                setNavigationMode(.chats, showArchived: $showArchived, showTrashed: $showTrashed)
             }
             .keyboardShortcut("1", modifiers: [.command])
 
             Button("Show Archive") {
-                viewOptions.setNavigationMode(.archive)
+                setNavigationMode(.archive, showArchived: $showArchived, showTrashed: $showTrashed)
             }
             .keyboardShortcut("2", modifiers: [.command])
 
             Button("Show Trash") {
-                viewOptions.setNavigationMode(.trash)
+                setNavigationMode(.trash, showArchived: $showArchived, showTrashed: $showTrashed)
             }
             .keyboardShortcut("3", modifiers: [.command])
 
@@ -129,7 +128,6 @@ struct vxAtelierPro: App {
     private let queryManager: QueryManager
     private let ttsQueue: TTSQueue
     private let conversationStore: ConversationViewModelStore
-    private let viewOptionsStore: ViewOptionsStore
     #if os(macOS)
         private let hotkeyController: GlobalHotkeyController
     #endif
@@ -166,10 +164,6 @@ struct vxAtelierPro: App {
         self.conversationStore = ConversationViewModelStore(
             queryManager: queryManager, ttsQueue: ttsQueue)
         vxAtelierPro.log.debug("Conversation ViewModel Store initialized")
-
-        vxAtelierPro.log.debug("Initializing View Options Store")
-        self.viewOptionsStore = ViewOptionsStore()
-        vxAtelierPro.log.debug("View Options Store initialized")
 
         #if os(macOS)
             vxAtelierPro.log.debug("Initializing Global Hotkey Controller")
@@ -247,7 +241,6 @@ struct vxAtelierPro: App {
             ContentView()
                 .preferredColorScheme(effectiveColorScheme)
                 .environment(conversationStore)
-                .environment(viewOptionsStore)
                 .environment(\.showLogHistory) {
                     isLogHistoryShown = true
                 }
@@ -261,7 +254,7 @@ struct vxAtelierPro: App {
         .environment(queryManager)
         .environment(ttsQueue)
         .commands {
-            AppCommands(viewOptions: viewOptionsStore)
+            AppCommands()
         }
 
         #if os(macOS)
@@ -271,7 +264,6 @@ struct vxAtelierPro: App {
                     .preferredColorScheme(effectiveColorScheme)
                     .environment(queryManager)
                     .environment(\.modelContext, sharedModelContainer.mainContext)
-                    .environment(viewOptionsStore)
             }
 
             MenuBarExtra("vxAtelier Pro", systemImage: "message.circle") {
