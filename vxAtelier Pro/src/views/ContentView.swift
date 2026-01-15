@@ -241,7 +241,7 @@ struct ContentView: View {
             )
 
             if showTrashed {
-                let trashedDialogs = queryManager.sortedConversationsForSidebar(
+                let trashedDialogs = ConversationSorter.sort(
                     queryManager.trashedDialogs,
                     descending: sidebarDialogsSortDescending,
                     sortType: SidebarSortType(rawValue: sidebarDialogsSortTypeRaw)
@@ -753,7 +753,7 @@ struct ContentView: View {
     @ViewBuilder
     private func projectSection(title: String, projects: [ProjectItem]) -> some View {
         if !projects.isEmpty || showEmptySections {
-            let sorted = queryManager.sortedProjectsForSidebar(
+            let sorted = ProjectSorter.sort(
                 projects,
                 descending: sidebarProjectsSortDescending,
                 sortType: SidebarSortType(rawValue: sidebarProjectsSortTypeRaw)
@@ -792,7 +792,7 @@ struct ContentView: View {
     @ViewBuilder
     private func dialogSection(title: String, dialogs: [ConversationItem]) -> some View {
         if !dialogs.isEmpty || showEmptySections {
-            let sorted = queryManager.sortedConversationsForSidebar(
+            let sorted = ConversationSorter.sort(
                 dialogs,
                 descending: sidebarDialogsSortDescending,
                 sortType: SidebarSortType(rawValue: sidebarDialogsSortTypeRaw)

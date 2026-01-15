@@ -182,7 +182,8 @@ let package = Package(
                 // Views - Utility
                 "views/utility/GlobalUtilityPanel.swift",
                 "views/utility/LogHistorySheet.swift",
-                "views/utility/NavigationMode.swift"
+                "views/utility/NavigationMode.swift",
+                "views/utility/Sorters.swift"
             ],
             swiftSettings: [
                 .define("DEBUG", .when(configuration: .debug)),

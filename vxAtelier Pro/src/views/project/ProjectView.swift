@@ -31,8 +31,9 @@ struct ProjectView: View {
     
     @AppStorage("ShowArchived") private var showArchived: Bool = false
     @AppStorage("ShowTrashed") private var showTrashed: Bool = false
-    @AppStorage("DialogsSortOrderDescending") private var conversationsSortDescending: Bool = true
-    @AppStorage("DialogsSortType") private var conversationsSortTypeRaw: String = SidebarSortType.conversationDate.rawValue
+    @AppStorage("SidebarDialogsSortOrderDescending") private var conversationsSortDescending: Bool = true
+    @AppStorage("SidebarDialogsSortType") private var conversationsSortTypeRaw: String =
+        SidebarSortType.conversationDate.rawValue
     
     private var conversationsSortType: SidebarSortType {
         get { SidebarSortType(rawValue: conversationsSortTypeRaw) ?? .conversationDate }
@@ -65,28 +66,11 @@ struct ProjectView: View {
             }
         }
         // Sort by selected type and order
-        let sorted: [ConversationItem]
-        switch conversationsSortType {
-        case .conversationDate:
-            if conversationsSortDescending {
-                sorted = filtered.sorted { $0.timestamp > $1.timestamp }
-            } else {
-                sorted = filtered.sorted { $0.timestamp < $1.timestamp }
-            }
-        case .lastMessageDate:
-            sorted = filtered.sorted {
-                let lhsDate = queryManager.lastTurnTimestamp(for: $0) ?? $0.timestamp
-                let rhsDate = queryManager.lastTurnTimestamp(for: $1) ?? $1.timestamp
-                return conversationsSortDescending ? lhsDate > rhsDate : lhsDate < rhsDate
-            }
-        case .alphabetically:
-            if conversationsSortDescending {
-                sorted = filtered.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedDescending }
-            } else {
-                sorted = filtered.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-            }
-        }
-        return sorted
+        return ConversationSorter.sort(
+            filtered,
+            descending: conversationsSortDescending,
+            sortType: conversationsSortType
+        )
     }
     
     // MARK: - View Components

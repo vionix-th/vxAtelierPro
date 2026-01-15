@@ -569,31 +569,6 @@ final class QueryManager: @unchecked Sendable {
             "Permanent deletion process complete for item (ID: \(item.persistentModelID)).")
     }
 
-    /// Returns the last turn or event timestamp for a given conversation, or nil if no turns exist
-    func lastTurnTimestamp(for conversation: ConversationItem) -> Date? {
-        guard
-            let lastTurn = conversation.turns.sorted(by: { $0.sequenceNumber < $1.sequenceNumber })
-                .last
-        else { return nil }
-        return lastTurn.events.last?.message.timestamp ?? lastTurn.userMessage.timestamp
-    }
-
-    /// Returns the last turn or event timestamp for a given project, or nil if no turns exist
-    func lastTurnTimestamp(for project: ProjectItem) -> Date? {
-        return project.conversations.compactMap { lastTurnTimestamp(for: $0) }.max()
-    }
-
-    /// Returns conversations sorted by last turn/event timestamp
-    func sortedConversationByLastTurn(_ conversations: [ConversationItem], descending: Bool)
-        -> [ConversationItem]
-    {
-        return conversations.sorted {
-            let lhsDate = lastTurnTimestamp(for: $0) ?? $0.timestamp
-            let rhsDate = lastTurnTimestamp(for: $1) ?? $1.timestamp
-            return descending ? lhsDate > rhsDate : lhsDate < rhsDate
-        }
-    }
-
     // MARK: - Bulk Deletion and Data Reset
     /// Deletes all items of a given PersistentModel type. Returns the number of deleted items.
     func deleteAll<T: PersistentModel>(of type: T.Type) throws -> Int {
@@ -654,44 +629,6 @@ final class QueryManager: @unchecked Sendable {
             try insert(bookmark)
         } catch {
             vxAtelierPro.log.error("Failed to insert bookmark: \(error.localizedDescription)")
-        }
-    }
-
-    /// Returns projects sorted for the sidebar according to the given order and type
-    func sortedProjectsForSidebar(
-        _ projects: [ProjectItem], descending: Bool, sortType: SidebarSortType
-    ) -> [ProjectItem] {
-        switch sortType {
-        case .alphabetically:
-            return projects.sorted {
-                descending
-                    ? $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedDescending
-                    : $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
-            }
-        // Add more sort types for projects if needed
-        default:
-            return projects
-        }
-    }
-
-    /// Returns conversations sorted for the sidebar according to the given order and type
-    func sortedConversationsForSidebar(
-        _ conversations: [ConversationItem], descending: Bool, sortType: SidebarSortType
-    ) -> [ConversationItem] {
-        switch sortType {
-        case .conversationDate:
-            return conversations.sorted {
-                descending ? $0.timestamp > $1.timestamp : $0.timestamp < $1.timestamp
-            }
-        case .lastMessageDate:
-            // Use last turn/event timestamp
-            return sortedConversationByLastTurn(conversations, descending: descending)
-        case .alphabetically:
-            return conversations.sorted {
-                descending
-                    ? $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedDescending
-                    : $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
-            }
         }
     }
 

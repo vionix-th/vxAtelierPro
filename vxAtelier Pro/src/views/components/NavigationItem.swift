@@ -166,7 +166,7 @@ struct NavigationItem: View {
                     }
                 } else if let project = project {
                     if showConversationLastMessageLabel {
-                        if let lastMsg = queryManager.lastTurnTimestamp(for: project) {
+                        if let lastMsg = ProjectSorter.lastTurnTimestamp(for: project) {
                             Text(lastMsg.formatted(.dateTime.year().month().day().hour().minute()))
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
