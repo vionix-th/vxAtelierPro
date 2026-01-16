@@ -28,9 +28,10 @@ struct ProjectView: View {
     @State private var systemPromptValue: String = ""
     
     @AppStorage("NavigationMode") private var navigationMode: NavigationMode = .chats
-    @AppStorage("SidebarDialogsSortOrderDescending") private var conversationsSortDescending: Bool = true
-    @AppStorage("SidebarDialogsSortType") private var conversationsSortTypeRaw: String =
-        SidebarSortType.conversationDate.rawValue
+    @AppStorage("ProjectDialogsSortOrderDescending") private var conversationsSortDescending: Bool =
+        AppDefaults.projectDialogsSortDescending
+    @AppStorage("ProjectDialogsSortType") private var conversationsSortTypeRaw: String =
+        AppDefaults.projectDialogsSortType
     
     private var conversationsSortType: SidebarSortType {
         get { SidebarSortType(rawValue: conversationsSortTypeRaw) ?? .conversationDate }

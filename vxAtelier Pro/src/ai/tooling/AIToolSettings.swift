@@ -33,6 +33,8 @@ private let knownSettings: [String: SettingInfo] = [
     "IsMarkdownEnabled": .init(type: Bool.self),
     "IsMarkdownTextSelectable": .init(type: Bool.self),
     "ShowSystemDialogs": .init(type: Bool.self),
+    "ProjectDialogsSortOrderDescending": .init(type: Bool.self),
+    "ProjectDialogsSortType": .init(type: String.self, allowedValues: ["conversationDate", "lastMessageDate", "alphabetically"]),
     "AutoSendDialogTemplates": .init(type: Bool.self),
     "autoSendDialogTemplates": .init(type: Bool.self), // Used in GeneralSettingsView
     "TTSAutoplay": .init(type: Bool.self),

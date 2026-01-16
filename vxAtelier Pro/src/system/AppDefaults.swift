@@ -44,6 +44,8 @@ struct AppDefaults {
     static let autoSendDialogTemplates = true
     static let showRowToolButtons = true
     static let showEmptySections = false 
+    static let projectDialogsSortDescending = true
+    static let projectDialogsSortType = "conversationDate"
     // Conversation label toggles
     static let showConversationLastMessageLabel = true
     static let showConversationCreatedLabel = true
@@ -161,6 +163,9 @@ extension AppDefaults {
         defaults.set("conversationDate", forKey: "SidebarDialogsSortType")
         defaults.set(false, forKey: "SidebarProjectsSortOrderDescending")
         defaults.set("alphabetically", forKey: "SidebarProjectsSortType")
+        // Project view sort
+        defaults.set(AppDefaults.projectDialogsSortDescending, forKey: "ProjectDialogsSortOrderDescending")
+        defaults.set(AppDefaults.projectDialogsSortType, forKey: "ProjectDialogsSortType")
         // Dialog/project filters
         defaults.set(false, forKey: "ShowEmptySections")
         defaults.set(NavigationMode.chats.rawValue, forKey: "NavigationMode")
