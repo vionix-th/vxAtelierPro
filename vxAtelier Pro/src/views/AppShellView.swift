@@ -14,7 +14,6 @@ struct AppShellView: View {
     @State private var optionsSheetKey: OptionsSheetKey?
     @State private var exportRequest: ExportRequest?
     @State private var importRequested = false
-    @State private var logHistoryFilters: Set<LoggingService.LogType> = []
     @State private var isLogHistoryShown: Bool = false
 
     private struct OptionsSheetKey: Identifiable { let id: PersistentIdentifier }
@@ -102,9 +101,7 @@ struct AppShellView: View {
         .task(id: exportRequest?.id) { await exportTask(for: exportRequest) }
         .task(id: importRequested) { await importTask() }
         .sheet(isPresented: $isLogHistoryShown) {
-            LogHistorySheet(
-                filters: $logHistoryFilters
-            )
+            LogHistorySheet()
         }
         // Present Settings from the toolbar menu entry
         .sheet(
