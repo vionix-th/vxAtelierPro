@@ -327,7 +327,6 @@ final class QueryManager: @unchecked Sendable {
         modelContext.insert(item)
         try saveContext()  // Also refreshes data via fetchAllData
         vxAtelierPro.log.debug("Inserted \(String(describing: T.self)): \(item.persistentModelID)")
-        fetchAllData()  // Refresh after insert
     }
 
     // MARK: - Property Clearing Helper
