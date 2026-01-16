@@ -34,8 +34,21 @@ struct ContentView: View {
     @State private var optionsSheetKey: OptionsSheetKey?
 
     // Task-related state
-    @State private var exportProjectRequested: (ProjectItem, UUID)?
-    @State private var exportDialogRequested: (ConversationItem, UUID)?
+    private enum ExportRequest: Identifiable {
+        case project(ProjectItem, UUID)
+        case conversation(ConversationItem, UUID)
+
+        var id: UUID {
+            switch self {
+            case .project(_, let id):
+                return id
+            case .conversation(_, let id):
+                return id
+            }
+        }
+    }
+
+    @State private var exportRequest: ExportRequest?
     @State private var importRequested = false
 
     private var sidebarProjects: [ProjectItem] {
@@ -141,6 +154,14 @@ struct ContentView: View {
         optionsSheetKey = OptionsSheetKey(id: id)
     }
 
+    private func requestExport(project: ProjectItem) {
+        exportRequest = .project(project, UUID())
+    }
+
+    private func requestExport(conversation: ConversationItem) {
+        exportRequest = .conversation(conversation, UUID())
+    }
+
     // MARK: - Navigation Links
     func projectNavigationLink(for project: ProjectItem) -> some View {
         NavigationLink {
@@ -150,6 +171,9 @@ struct ContentView: View {
                 onRequestOptions: requestOptions,
                 onDeleteConversation: { conversation in
                     deleteItem(for: conversation)
+                },
+                onExportProject: { project in
+                    requestExport(project: project)
                 }
             )
         } label: {
@@ -176,7 +200,7 @@ struct ContentView: View {
                 imageName: "folder",
                 onProjectAssign: { _ in },
                 onExport: {
-                    exportProjectRequested = (project, UUID())
+                    requestExport(project: project)
                 },
                 project: project
             )
@@ -217,7 +241,7 @@ struct ContentView: View {
                         assignConversationToProject(conversation, project)
                     } : nil,
                 onExport: {
-                    exportDialogRequested = (conversation, UUID())
+                    requestExport(conversation: conversation)
                 },
                 conversation: conversation
             )
@@ -307,6 +331,9 @@ struct ContentView: View {
                     onRequestOptions: requestOptions,
                     onDeleteConversation: { conversation in
                         deleteItem(for: conversation)
+                    },
+                    onExportProject: { project in
+                        requestExport(project: project)
                     }
                 )
             } else if let bookmark = queryManager.bookmarks.first(where: { $0.id == selectedId }) {
@@ -507,8 +534,7 @@ struct ContentView: View {
                 selectedItem = conversationID
             }
         }
-        .task(id: exportProjectRequested?.1) { await exportTask(for: exportProjectRequested?.0) }
-        .task(id: exportDialogRequested?.1) { await exportTask(for: exportDialogRequested?.0) }
+        .task(id: exportRequest?.id) { await exportTask(for: exportRequest) }
         .task(id: importRequested) { await importTask() }
         // Present Settings from the toolbar menu entry
         .sheet(
@@ -638,23 +664,29 @@ struct ContentView: View {
 
     /// Generic export task for Projects or Dialogs.
     @MainActor
-    private func exportTask(for item: (any PersistentModel)?) async {
-        guard let item = item else { return }
+    private func exportTask(for request: ExportRequest?) async {
+        guard let request = request else { return }
 
         do {
-            if let project = item as? ProjectItem {
+            switch request {
+            case .project(let project, _):
                 try await DataManager.shared.exportProject(project)
                 vxAtelierPro.log.info("Successfully exported project '\(project.name)'.")
-            } else if let conversation = item as? ConversationItem {
+            case .conversation(let conversation, _):
                 try await DataManager.shared.exportDialog(conversation)
                 vxAtelierPro.log.info("Successfully exported conversation '\(conversation.title)'.")
             }
         } catch {
-            let itemType = (item is ProjectItem) ? "project" : "dialog"
+            let itemType: String
+            switch request {
+            case .project:
+                itemType = "project"
+            case .conversation:
+                itemType = "dialog"
+            }
             vxAtelierPro.log.error("Export \(itemType) failed: \(error.localizedDescription)")
         }
-        if item is ProjectItem { exportProjectRequested = nil }
-        if item is ConversationItem { exportDialogRequested = nil }
+        exportRequest = nil
     }
 
     /// Task to handle importing data.

@@ -17,6 +17,7 @@ struct ProjectView: View {
     var onConversationViewAppear: (ConversationItem) -> Void = { _ in }
     var onRequestOptions: (PersistentIdentifier) -> Void = { _ in }
     var onDeleteConversation: (ConversationItem) -> Void
+    var onExportProject: (ProjectItem) -> Void
     
     // Computed property to resolve project by ID
     private var project: ProjectItem? {
@@ -44,12 +45,14 @@ struct ProjectView: View {
         projectID: PersistentIdentifier,
         onConversationViewAppear: @escaping (ConversationItem) -> Void = { _ in },
         onRequestOptions: @escaping (PersistentIdentifier) -> Void = { _ in },
-        onDeleteConversation: @escaping (ConversationItem) -> Void
+        onDeleteConversation: @escaping (ConversationItem) -> Void,
+        onExportProject: @escaping (ProjectItem) -> Void
     ) {
         self.projectID = projectID
         self.onConversationViewAppear = onConversationViewAppear
         self.onRequestOptions = onRequestOptions
         self.onDeleteConversation = onDeleteConversation
+        self.onExportProject = onExportProject
     }
     
     // Backward compatibility initializer
@@ -57,13 +60,15 @@ struct ProjectView: View {
         project: ProjectItem,
         onConversationViewAppear: @escaping (ConversationItem) -> Void = { _ in },
         onRequestOptions: @escaping (PersistentIdentifier) -> Void = { _ in },
-        onDeleteConversation: @escaping (ConversationItem) -> Void
+        onDeleteConversation: @escaping (ConversationItem) -> Void,
+        onExportProject: @escaping (ProjectItem) -> Void
     ) {
         self.init(
             projectID: project.id,
             onConversationViewAppear: onConversationViewAppear,
             onRequestOptions: onRequestOptions,
-            onDeleteConversation: onDeleteConversation
+            onDeleteConversation: onDeleteConversation,
+            onExportProject: onExportProject
         )
     }
     
@@ -214,13 +219,12 @@ struct ProjectView: View {
                                 }
                             },
                             onExport: {
-                                Task {
-                                    do {
-                                        vxAtelierPro.log.debug("Exporting project '\(self.project?.name ?? "Unknown")'")
-                                        try await DataManager.shared.exportProject(self.project!)
-                                    } catch {
-                                        vxAtelierPro.log.error("Failed to export project - \(error.localizedDescription)")
-                                    }
+                                if let project = self.project {
+                                    onExportProject(project)
+                                } else {
+                                    vxAtelierPro.log.warning(
+                                        "ProjectView: Export requested but project not resolved for id \(projectID)."
+                                    )
                                 }
                             },
                             conversation: conversation
