@@ -5,7 +5,8 @@ struct ConversationSorter {
         guard let lastTurn = conversation.turns.max(by: { $0.sequenceNumber < $1.sequenceNumber }) else {
             return nil
         }
-        return lastTurn.events.last?.message.timestamp ?? lastTurn.userMessage.timestamp
+        let lastEventTimestamp = lastTurn.events.map(\.message.timestamp).max()
+        return max(lastTurn.userMessage.timestamp, lastEventTimestamp ?? lastTurn.userMessage.timestamp)
     }
 
     static func sort(
