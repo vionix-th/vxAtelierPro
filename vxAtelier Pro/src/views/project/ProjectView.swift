@@ -6,9 +6,7 @@ import Observation
 // MARK: - Project View
 struct ProjectView: View {
     // MARK: - Environment & Properties
-    @Environment(\.modelContext) private var modelContext: ModelContext   
     @Environment(QueryManager.self) private var queryManager: QueryManager
-    @Environment(TTSQueue.self) private var ttsQueue: TTSQueue    
     @Environment(ConversationViewModelStore.self) private var conversationStore: ConversationViewModelStore
     
     // Store the project ID directly in the view
@@ -28,8 +26,6 @@ struct ProjectView: View {
     @State private var projectOptionsIsPresented: Bool = false
     @State private var isPromptTemplatesPresented: Bool = false
     @State private var systemPromptValue: String = ""
-    
-    @AppStorage("DialogTextEdit.buttonSize") var buttonSize: Double = AppDefaults.dialogTextEditButtonSize
     
     @AppStorage("NavigationMode") private var navigationMode: NavigationMode = .chats
     @AppStorage("SidebarDialogsSortOrderDescending") private var conversationsSortDescending: Bool = true
@@ -53,23 +49,6 @@ struct ProjectView: View {
         self.onRequestOptions = onRequestOptions
         self.onDeleteConversation = onDeleteConversation
         self.onExportProject = onExportProject
-    }
-    
-    // Backward compatibility initializer
-    init(
-        project: ProjectItem,
-        onConversationViewAppear: @escaping (ConversationItem) -> Void = { _ in },
-        onRequestOptions: @escaping (PersistentIdentifier) -> Void = { _ in },
-        onDeleteConversation: @escaping (ConversationItem) -> Void,
-        onExportProject: @escaping (ProjectItem) -> Void
-    ) {
-        self.init(
-            projectID: project.id,
-            onConversationViewAppear: onConversationViewAppear,
-            onRequestOptions: onRequestOptions,
-            onDeleteConversation: onDeleteConversation,
-            onExportProject: onExportProject
-        )
     }
     
     // MARK: - Computed Properties
