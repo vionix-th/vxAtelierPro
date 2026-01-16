@@ -32,7 +32,7 @@ private let knownSettings: [String: SettingInfo] = [
     "defaultAvatar": .init(type: Data.self, isWritable: false), // Special case: Read-only for existence check
     "IsMarkdownEnabled": .init(type: Bool.self),
     "IsMarkdownTextSelectable": .init(type: Bool.self),
-    "ShowUserDialogsOnly": .init(type: Bool.self),
+    "ShowSystemDialogs": .init(type: Bool.self),
     "AutoSendDialogTemplates": .init(type: Bool.self),
     "autoSendDialogTemplates": .init(type: Bool.self), // Used in GeneralSettingsView
     "TTSAutoplay": .init(type: Bool.self),

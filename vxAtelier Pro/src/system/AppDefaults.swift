@@ -40,7 +40,7 @@ struct AppDefaults {
     static let isMarkdownEnabled = true
     static let isMarkdownTextSelectable = false
     static let statusBarVisible = true
-    static let showUserDialogsOnly = false
+    static let showSystemDialogs = false
     static let autoSendDialogTemplates = true
     static let showRowToolButtons = true
     static let showEmptySections = false 
@@ -149,7 +149,7 @@ extension AppDefaults {
         // Developer/advanced settings
         defaults.set(AppDefaults.isMarkdownEnabled, forKey: "IsMarkdownEnabled")
         defaults.set(AppDefaults.isMarkdownTextSelectable, forKey: "IsMarkdownTextSelectable")
-        defaults.set(AppDefaults.showUserDialogsOnly, forKey: "ShowUserDialogsOnly")
+        defaults.set(AppDefaults.showSystemDialogs, forKey: "ShowSystemDialogs")
         // Permissions
         defaults.set(false, forKey: "allowSelfSignedCertificates")
         defaults.set("[]", forKey: "selfSignedCertWhitelist")

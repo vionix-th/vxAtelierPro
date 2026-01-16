@@ -113,7 +113,7 @@ final class QueryManager: @unchecked Sendable {
 
     /// Standalone conversations that don't belong to a project, filtered by status
     func standaloneConversations(
-        showUserDialogsOnly: Bool,
+        showSystemDialogs: Bool,
         navigationMode: NavigationMode
     ) -> [ConversationItem] {
         allConversations.filter { conversation in
@@ -122,16 +122,8 @@ final class QueryManager: @unchecked Sendable {
                 return false
             }
 
-            // Filter by conversation purpose
-            if showUserDialogsOnly {
-                guard conversation.purpose == .user else {
-                    return false
-                }
-            } else {
-                // When showing all conversations, system conversations go to their own section
-                guard conversation.purpose != .system else {
-                    return false
-                }
+            if conversation.purpose == .system && !showSystemDialogs {
+                return false
             }
 
             // Then apply status filter
@@ -147,30 +139,7 @@ final class QueryManager: @unchecked Sendable {
     }
 
     /// System conversations, filtered by status
-    func systemConversations(
-        showUserDialogsOnly: Bool,
-        navigationMode: NavigationMode
-    ) -> [ConversationItem] {
-        // If showUserDialogsOnly is true, don't show system conversations at all
-        guard !showUserDialogsOnly else {
-            return []
-        }
-
-        return allConversations.filter { conversation in
-            guard conversation.purpose == .system else {
-                return false
-            }
-
-            switch navigationMode {
-            case .chats:
-                return conversation.status == ItemStatus.active
-            case .archive:
-                return conversation.status == ItemStatus.archived
-            case .trash:
-                return conversation.status == ItemStatus.trashed
-            }
-        }
-    }
+ 
 
     /// Explicit project status accessors
 

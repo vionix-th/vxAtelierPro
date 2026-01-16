@@ -13,7 +13,7 @@ struct ContentView: View {
 
     // MARK: - View Options (UserDefaults-backed)
     @AppStorage("ShowEmptySections") private var showEmptySections: Bool = AppDefaults.showEmptySections
-    @AppStorage("ShowUserDialogsOnly") private var showUserDialogsOnly: Bool = AppDefaults.showUserDialogsOnly
+    @AppStorage("ShowSystemDialogs") private var showSystemDialogs: Bool = AppDefaults.showSystemDialogs
     @AppStorage("NavigationMode") private var navigationMode: NavigationMode = .chats
     @AppStorage("statusBarVisible") private var statusBarVisible: Bool = AppDefaults.statusBarVisible
     @AppStorage("SidebarDialogsSortOrderDescending") private var sidebarDialogsSortDescending: Bool = true
@@ -63,24 +63,9 @@ struct ContentView: View {
     }
 
     private var sidebarDialogs: [ConversationItem] {
-        switch navigationMode {
-        case .chats:
-            return queryManager.standaloneConversations(
-                showUserDialogsOnly: showUserDialogsOnly,
-                navigationMode: .chats
-            )
-        case .archive:
-            return filterDialogs(queryManager.archivedDialogs)
-        case .trash:
-            return filterDialogs(queryManager.trashedDialogs)
-        }
-    }
-
-    private var sidebarSystemDialogs: [ConversationItem] {
-        guard navigationMode == .chats else { return [] }
-        return queryManager.systemConversations(
-            showUserDialogsOnly: showUserDialogsOnly,
-            navigationMode: .chats
+        queryManager.standaloneConversations(
+            showSystemDialogs: showSystemDialogs,
+            navigationMode: navigationMode
         )
     }
 
@@ -115,17 +100,11 @@ struct ContentView: View {
     private var hasVisibleItems: Bool {
         !sidebarProjects.isEmpty
             || !sidebarDialogs.isEmpty
-            || !sidebarSystemDialogs.isEmpty
             || !sidebarBookmarks.isEmpty
     }
 
     // MARK: - Helper Methods
     // MARK: - Actions
-    private func filterDialogs(_ dialogs: [ConversationItem]) -> [ConversationItem] {
-        guard showUserDialogsOnly else { return dialogs }
-        return dialogs.filter { $0.purpose == .user }
-    }
-
     private func addConversation() {
         let conversation = queryManager.createConversation()
         selectedItem = conversation.id
@@ -290,13 +269,6 @@ struct ContentView: View {
     // MARK: - View Components
     var sidebarList: some View {
         return List(selection: $selectedItem) {
-            if navigationMode == .chats {
-                dialogSection(
-                    title: "System",
-                    dialogs: sidebarSystemDialogs
-                )
-            }
-
             projectSection(
                 title: projectTitle,
                 projects: sidebarProjects

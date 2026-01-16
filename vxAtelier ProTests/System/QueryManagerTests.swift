@@ -83,29 +83,32 @@ final class QueryManagerTests: XCTestCase {
 
         // Then - standalone conversations are filtered by status and exclude system/project items
         let activeStandalone = queryManager.standaloneConversations(
-            showUserDialogsOnly: false,
+            showSystemDialogs: false,
             navigationMode: .chats
         )
         XCTAssertEqual(activeStandalone.map(\.title), ["Active"])
 
         let archivedStandalone = queryManager.standaloneConversations(
-            showUserDialogsOnly: false,
+            showSystemDialogs: false,
             navigationMode: .archive
         )
         XCTAssertEqual(archivedStandalone.map(\.title), ["Archived"])
 
         let trashedStandalone = queryManager.standaloneConversations(
-            showUserDialogsOnly: false,
+            showSystemDialogs: false,
             navigationMode: .trash
         )
         XCTAssertEqual(trashedStandalone.map(\.title), ["Trashed"])
 
-        // System conversations honor navigation mode when user dialogs are shown
-        let systemArchived = queryManager.systemConversations(
-            showUserDialogsOnly: false,
+        // System conversations are included in standalone when enabled
+        let archivedStandaloneWithSystem = queryManager.standaloneConversations(
+            showSystemDialogs: true,
             navigationMode: .archive
         )
-        XCTAssertEqual(systemArchived.map(\.title), ["System Archived"])
+        XCTAssertEqual(
+            Set(archivedStandaloneWithSystem.map(\.title)),
+            Set(["Archived", "System Archived"])
+        )
     }
     
     // MARK: - Item Management Tests
