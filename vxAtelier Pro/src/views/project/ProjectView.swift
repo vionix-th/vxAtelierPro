@@ -12,7 +12,7 @@ struct ProjectView: View {
     // Store the project ID directly in the view
     private let projectID: PersistentIdentifier
     
-    @Binding private var selectedConversationID: PersistentIdentifier?
+    private let initialConversationID: PersistentIdentifier?
     var onActiveConversationChange: (PersistentIdentifier?) -> Void = { _ in }
     var onRequestOptions: (PersistentIdentifier) -> Void = { _ in }
     var onDeleteConversation: (ConversationItem) -> Void
@@ -32,6 +32,7 @@ struct ProjectView: View {
     @State private var isPromptTemplatesPresented: Bool = false
     @State private var systemPromptValue: String = ""
     @State private var path: [ProjectRoute] = []
+    @State private var didApplyInitialConversation: Bool = false
     
     @AppStorage("NavigationMode") private var navigationMode: NavigationMode = .chats
     @AppStorage("ProjectDialogsSortOrderDescending") private var conversationsSortDescending: Bool =
@@ -46,14 +47,14 @@ struct ProjectView: View {
     
     init(
         projectID: PersistentIdentifier,
-        selectedConversationID: Binding<PersistentIdentifier?> = .constant(nil),
+        initialConversationID: PersistentIdentifier? = nil,
         onActiveConversationChange: @escaping (PersistentIdentifier?) -> Void = { _ in },
         onRequestOptions: @escaping (PersistentIdentifier) -> Void = { _ in },
         onDeleteConversation: @escaping (ConversationItem) -> Void,
         onExportProject: @escaping (ProjectItem) -> Void
     ) {
         self.projectID = projectID
-        self._selectedConversationID = selectedConversationID
+        self.initialConversationID = initialConversationID
         self.onActiveConversationChange = onActiveConversationChange
         self.onRequestOptions = onRequestOptions
         self.onDeleteConversation = onDeleteConversation
@@ -247,11 +248,7 @@ struct ProjectView: View {
             hideKeyboard()
         }
         .onAppear {
-            if let initialID = selectedConversationID,
-               project?.conversations.contains(where: { $0.id == initialID }) == true {
-                path = [.conversation(initialID)]
-                selectedConversationID = nil
-            }
+            applyInitialConversationIfNeeded()
         }
         .onChange(of: path) { _, newValue in
             if case .conversation(let id) = newValue.last {
@@ -260,13 +257,14 @@ struct ProjectView: View {
                 onActiveConversationChange(nil)
             }
         }
-        .onChange(of: selectedConversationID) { _, newValue in
-            guard let newValue else { return }
-            if project?.conversations.contains(where: { $0.id == newValue }) == true {
-                path = [.conversation(newValue)]
-            }
-            selectedConversationID = nil
-        }
+    }
+
+    private func applyInitialConversationIfNeeded() {
+        guard !didApplyInitialConversation else { return }
+        guard let initialID = initialConversationID else { return }
+        guard project?.conversations.contains(where: { $0.id == initialID }) == true else { return }
+        path = [.conversation(initialID)]
+        didApplyInitialConversation = true
     }
     
     var bodyContent: some View {

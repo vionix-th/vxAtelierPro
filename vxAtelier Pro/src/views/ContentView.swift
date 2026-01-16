@@ -65,26 +65,10 @@ struct ContentView: View {
         }
     }
 
-    private func projectConversationSelectionBinding(
-        for projectID: PersistentIdentifier
-    ) -> Binding<PersistentIdentifier?> {
-        Binding(
-            get: {
-                guard let pending = pendingProjectConversationSelection,
-                      pending.projectID == projectID else { return nil }
-                return pending.conversationID
-            },
-            set: { newValue in
-                if let newValue {
-                    pendingProjectConversationSelection = ProjectConversationSelection(
-                        projectID: projectID,
-                        conversationID: newValue
-                    )
-                } else if pendingProjectConversationSelection?.projectID == projectID {
-                    pendingProjectConversationSelection = nil
-                }
-            }
-        )
+    private func initialConversationID(for projectID: PersistentIdentifier) -> PersistentIdentifier? {
+        guard let pending = pendingProjectConversationSelection,
+              pending.projectID == projectID else { return nil }
+        return pending.conversationID
     }
 
     private func selectConversationFromBookmark(_ bookmark: BookmarkItem) {
@@ -187,7 +171,7 @@ struct ContentView: View {
                 if let project = queryManager.allProjects.first(where: { $0.id == id }) {
                     ProjectView(
                         projectID: project.id,
-                        selectedConversationID: projectConversationSelectionBinding(for: project.id),
+                        initialConversationID: initialConversationID(for: project.id),
                         onActiveConversationChange: { activeConversationID = $0 },
                         onRequestOptions: onRequestOptions,
                         onDeleteConversation: { conversation in
@@ -403,7 +387,7 @@ struct ContentView: View {
                         if let project = queryManager.allProjects.first(where: { $0.id == id }) {
                             ProjectView(
                                 projectID: project.id,
-                                selectedConversationID: projectConversationSelectionBinding(for: project.id),
+                                initialConversationID: initialConversationID(for: project.id),
                                 onActiveConversationChange: { activeConversationID = $0 },
                                 onRequestOptions: onRequestOptions,
                                 onDeleteConversation: { conversation in
