@@ -16,7 +16,7 @@ struct StatusBar: View {
     @Environment(QueryManager.self) private var queryManager
     
     // Track the active item from ContentView
-    @Binding var activeItemId: PersistentIdentifier?
+    let activeItemId: PersistentIdentifier?
     
     // UserDefaults keys
     private let popupFilterKey = "popupLogTypeFilters"
@@ -65,8 +65,8 @@ struct StatusBar: View {
     }
 
     // MARK: - Initialization
-    init(activeItemId: Binding<PersistentIdentifier?>) {
-        self._activeItemId = activeItemId
+    init(activeItemId: PersistentIdentifier?) {
+        self.activeItemId = activeItemId
     }
     
     // MARK: - Filter Persistence Methods

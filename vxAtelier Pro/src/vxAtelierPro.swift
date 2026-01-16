@@ -237,7 +237,7 @@ struct vxAtelierPro: App {
 
     var body: some Scene {
         WindowGroup("Main Window", id: "mainWindow") {
-            ContentView()
+            AppShellView()
                 .preferredColorScheme(effectiveColorScheme)
                 .environment(conversationStore)
                 .environment(\.showLogHistory) {
