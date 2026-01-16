@@ -12,10 +12,15 @@ struct ProjectView: View {
     // Store the project ID directly in the view
     private let projectID: PersistentIdentifier
     
-    var onConversationViewAppear: (ConversationItem) -> Void = { _ in }
+    @Binding private var selectedConversationID: PersistentIdentifier?
+    var onActiveConversationChange: (PersistentIdentifier?) -> Void = { _ in }
     var onRequestOptions: (PersistentIdentifier) -> Void = { _ in }
     var onDeleteConversation: (ConversationItem) -> Void
     var onExportProject: (ProjectItem) -> Void
+
+    private enum ProjectRoute: Hashable {
+        case conversation(PersistentIdentifier)
+    }
     
     // Computed property to resolve project by ID
     private var project: ProjectItem? {
@@ -26,6 +31,7 @@ struct ProjectView: View {
     @State private var projectOptionsIsPresented: Bool = false
     @State private var isPromptTemplatesPresented: Bool = false
     @State private var systemPromptValue: String = ""
+    @State private var path: [ProjectRoute] = []
     
     @AppStorage("NavigationMode") private var navigationMode: NavigationMode = .chats
     @AppStorage("ProjectDialogsSortOrderDescending") private var conversationsSortDescending: Bool =
@@ -40,13 +46,15 @@ struct ProjectView: View {
     
     init(
         projectID: PersistentIdentifier,
-        onConversationViewAppear: @escaping (ConversationItem) -> Void = { _ in },
+        selectedConversationID: Binding<PersistentIdentifier?> = .constant(nil),
+        onActiveConversationChange: @escaping (PersistentIdentifier?) -> Void = { _ in },
         onRequestOptions: @escaping (PersistentIdentifier) -> Void = { _ in },
         onDeleteConversation: @escaping (ConversationItem) -> Void,
         onExportProject: @escaping (ProjectItem) -> Void
     ) {
         self.projectID = projectID
-        self.onConversationViewAppear = onConversationViewAppear
+        self._selectedConversationID = selectedConversationID
+        self.onActiveConversationChange = onActiveConversationChange
         self.onRequestOptions = onRequestOptions
         self.onDeleteConversation = onDeleteConversation
         self.onExportProject = onExportProject
@@ -172,15 +180,7 @@ struct ProjectView: View {
         VStack(spacing: AppDefaults.paddingMedium) {
             VStack {
                 ForEach(filteredConversations) { conversation in
-                    NavigationLink {
-                        ConversationView(
-                            viewModel: conversationStore.viewModel(for: conversation.id),
-                            onRequestOptions: onRequestOptions
-                        )
-                            .onAppear() {
-                                onConversationViewAppear(conversation)
-                            }
-                    } label: {
+                    NavigationLink(value: ProjectRoute.conversation(conversation.id)) {
                         NavigationItem(
                             title: Binding(get: { conversation.title} , set: { conversation.title = $0 }),
                             subtitle: conversation.timestamp.formatted(.dateTime.year().month().day().hour().minute()),
@@ -229,11 +229,43 @@ struct ProjectView: View {
     
     // MARK: - View Body
     var body: some View {
-        // Extract the main content to reduce complexity
-        bodyContent
+        NavigationStack(path: $path) {
+            bodyContent
+                .navigationDestination(for: ProjectRoute.self) { route in
+                    switch route {
+                    case .conversation(let id):
+                        ConversationView(
+                            viewModel: conversationStore.viewModel(for: id),
+                            onRequestOptions: onRequestOptions
+                        )
+                        .id(id)
+                    }
+                }
+        }
         .padding(AppDefaults.paddingSmall)
         .onTapGesture {
             hideKeyboard()
+        }
+        .onAppear {
+            if let initialID = selectedConversationID,
+               project?.conversations.contains(where: { $0.id == initialID }) == true {
+                path = [.conversation(initialID)]
+                selectedConversationID = nil
+            }
+        }
+        .onChange(of: path) { _, newValue in
+            if case .conversation(let id) = newValue.last {
+                onActiveConversationChange(id)
+            } else {
+                onActiveConversationChange(nil)
+            }
+        }
+        .onChange(of: selectedConversationID) { _, newValue in
+            guard let newValue else { return }
+            if project?.conversations.contains(where: { $0.id == newValue }) == true {
+                path = [.conversation(newValue)]
+            }
+            selectedConversationID = nil
         }
     }
     
@@ -269,7 +301,8 @@ struct ProjectView: View {
                     } catch {
                         vxAtelierPro.log.error("ProjectView: Failed to save context after setting project for new conversation: \(error.localizedDescription)")
                     }
-                    onConversationViewAppear(conversation)
+                    path = [.conversation(conversation.id)]
+                    onActiveConversationChange(conversation.id)
                 }).padding(AppDefaults.paddingSmall)
             }
             

@@ -24,10 +24,32 @@ struct ContentView: View {
         SidebarSortType.alphabetically.rawValue
 
     // MARK: - State & Bindings
-    @State private var selectedItem: PersistentIdentifier?
+    @State private var selection: SidebarSelection?
     @State private var applicationSettingsViewIsPresented: Bool = false
     @State private var ttsViewIsPresented: Bool = false
     @State private var settingsInitialTab: ApplicationSettingsView.SettingsTab? = nil
+    @State private var activeConversationID: PersistentIdentifier?
+    @State private var pendingProjectConversationSelection: ProjectConversationSelection?
+
+    private enum SidebarSelection: Hashable {
+        case project(PersistentIdentifier)
+        case conversation(PersistentIdentifier)
+
+        var conversationID: PersistentIdentifier? {
+            if case .conversation(let id) = self { return id }
+            return nil
+        }
+
+        var projectID: PersistentIdentifier? {
+            if case .project(let id) = self { return id }
+            return nil
+        }
+    }
+
+    private struct ProjectConversationSelection: Equatable {
+        let projectID: PersistentIdentifier
+        let conversationID: PersistentIdentifier
+    }
 
     // Options sheet hosting (hoisted from ConversationView)
     private struct OptionsSheetKey: Identifiable { let id: PersistentIdentifier }
@@ -111,12 +133,12 @@ struct ContentView: View {
     // MARK: - Actions
     private func addConversation() {
         let conversation = queryManager.createConversation()
-        selectedItem = conversation.id
+        selection = .conversation(conversation.id)
     }
 
     private func addProject() {
         let project = queryManager.createProject()
-        selectedItem = project.id
+        selection = .project(project.id)
     }
 
     private func assignConversationToProject(
@@ -145,21 +167,66 @@ struct ContentView: View {
         exportRequest = .conversation(conversation, UUID())
     }
 
+    private var activeConversationBinding: Binding<PersistentIdentifier?> {
+        Binding(
+            get: { activeConversationID },
+            set: { _ in }
+        )
+    }
+
+    private func projectConversationSelectionBinding(
+        for projectID: PersistentIdentifier
+    ) -> Binding<PersistentIdentifier?> {
+        Binding(
+            get: {
+                guard let pending = pendingProjectConversationSelection,
+                      pending.projectID == projectID else { return nil }
+                return pending.conversationID
+            },
+            set: { newValue in
+                if let newValue {
+                    pendingProjectConversationSelection = ProjectConversationSelection(
+                        projectID: projectID,
+                        conversationID: newValue
+                    )
+                } else if pendingProjectConversationSelection?.projectID == projectID {
+                    pendingProjectConversationSelection = nil
+                }
+            }
+        )
+    }
+
+    private func selectConversationFromBookmark(_ bookmark: BookmarkItem) {
+        guard let conversation = bookmark.turn?.conversation else {
+            vxAtelierPro.log.error("Bookmark selection failed: missing conversation.")
+            return
+        }
+
+        if let project = conversation.project {
+            selection = .project(project.id)
+            pendingProjectConversationSelection = ProjectConversationSelection(
+                projectID: project.id,
+                conversationID: conversation.id
+            )
+        } else {
+            selection = .conversation(conversation.id)
+            pendingProjectConversationSelection = nil
+        }
+    }
+
+    private func selectionMatches(_ item: any PersistentModel) -> Bool {
+        if let conversation = item as? ConversationItem {
+            return selection == .conversation(conversation.id)
+        }
+        if let project = item as? ProjectItem {
+            return selection == .project(project.id)
+        }
+        return false
+    }
+
     // MARK: - Navigation Links
     func projectNavigationLink(for project: ProjectItem) -> some View {
-        NavigationLink {
-            ProjectView(
-                projectID: project.id,
-                onConversationViewAppear: { self.selectedItem = $0.id },
-                onRequestOptions: requestOptions,
-                onDeleteConversation: { conversation in
-                    deleteItem(for: conversation)
-                },
-                onExportProject: { project in
-                    requestExport(project: project)
-                }
-            )
-        } label: {
+        NavigationLink(value: SidebarSelection.project(project.id)) {
             NavigationItem(
                 title: Binding(get: { project.name }, set: { project.name = $0 }),
                 subtitle: project.timestamp.formatted(
@@ -191,13 +258,7 @@ struct ContentView: View {
     }
 
     func conversationNavigationLink(for conversation: ConversationItem) -> some View {
-        NavigationLink {
-            ConversationView(
-                viewModel: conversationStore.viewModel(for: conversation.id),
-                onRequestOptions: requestOptions
-            )
-            .id(conversation.id)
-        } label: {
+        NavigationLink(value: SidebarSelection.conversation(conversation.id)) {
             NavigationItem(
                 title: Binding(get: { conversation.title }, set: { conversation.title = $0 }),
                 subtitle: conversation.timestamp.formatted(
@@ -231,48 +292,35 @@ struct ContentView: View {
         }
     }
 
-    func bookmarkNavigationLink(for bookmark: BookmarkItem) -> some View {
-        NavigationLink {
-            let conversation = bookmark.turn?.conversation
-            if let conversation = conversation {
-                ConversationView(
-                    viewModel: conversationStore.viewModel(for: conversation.id),
-                    scrollHint: queryManager.scrollHint(for: bookmark),
-                    onRequestOptions: requestOptions
-                )
-                .id(conversation.id)
-            } else {
-                Text("Invalid bookmark: missing conversation.")
-            }
-        } label: {
-            NavigationItem(
-                title: Binding(get: { bookmark.label }, set: { bookmark.label = $0 }),
-                subtitle: bookmark.turn?.conversation?.title ?? "(missing)",
-                onDelete: {
-                    do {
-                        try queryManager.delete(bookmark)
-                        vxAtelierPro.log.debug(
-                            "Deleted bookmark '\(bookmark.label)' via context menu.")
-                        if selectedItem == bookmark.id {
-                            selectedItem = nil
-                        }
-                    } catch {
-                        vxAtelierPro.log.error(
-                            "Failed to delete bookmark \(bookmark.label) from context menu: \(error.localizedDescription)"
-                        )
-                    }
-                },
-                onRename: {
-                    bookmark.label = $0
-                },
-                imageName: "bookmark"
-            )
+    func bookmarkRow(for bookmark: BookmarkItem) -> some View {
+        NavigationItem(
+            title: Binding(get: { bookmark.label }, set: { bookmark.label = $0 }),
+            subtitle: bookmark.turn?.conversation?.title ?? "(missing)",
+            onDelete: {
+                do {
+                    try queryManager.delete(bookmark)
+                    vxAtelierPro.log.debug(
+                        "Deleted bookmark '\(bookmark.label)' via context menu.")
+                } catch {
+                    vxAtelierPro.log.error(
+                        "Failed to delete bookmark \(bookmark.label) from context menu: \(error.localizedDescription)"
+                    )
+                }
+            },
+            onRename: {
+                bookmark.label = $0
+            },
+            imageName: "bookmark"
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            selectConversationFromBookmark(bookmark)
         }
     }
 
     // MARK: - View Components
     var sidebarList: some View {
-        return List(selection: $selectedItem) {
+        return List(selection: $selection) {
             projectSection(
                 title: projectTitle,
                 projects: sidebarProjects
@@ -289,55 +337,53 @@ struct ContentView: View {
         }
     }
 
-    /// Builds the detail view based on the selected item ID.
     @ViewBuilder
-    private func detailView(for selectedId: PersistentIdentifier?) -> some View {
-        if let selectedId = selectedId {
-            if let conversation = queryManager.allConversations.first(where: { $0.id == selectedId }
-            ) {
-                ConversationView(
-                    viewModel: conversationStore.viewModel(for: conversation.id),
-                    onRequestOptions: requestOptions
-                )
-                .id(conversation.id)
-            } else if let project = queryManager.allProjects.first(where: { $0.id == selectedId }) {
-                ProjectView(
-                    projectID: project.id,
-                    onConversationViewAppear: { self.selectedItem = $0.id },
-                    onRequestOptions: requestOptions,
-                    onDeleteConversation: { conversation in
-                        deleteItem(for: conversation)
-                    },
-                    onExportProject: { project in
-                        requestExport(project: project)
-                    }
-                )
-            } else if let bookmark = queryManager.bookmarks.first(where: { $0.id == selectedId }) {
-                let conversation = bookmark.turn?.conversation
-                if let conversation = conversation {
+    private func detailView(for selection: SidebarSelection?) -> some View {
+        if let selection {
+            switch selection {
+            case .conversation(let id):
+                if let conversation = queryManager.allConversations.first(where: { $0.id == id }) {
                     ConversationView(
                         viewModel: conversationStore.viewModel(for: conversation.id),
-                        scrollHint: queryManager.scrollHint(for: bookmark),
                         onRequestOptions: requestOptions
                     )
                     .id(conversation.id)
                 } else {
-                    Text("Invalid bookmark: missing conversation.")
+                    Text("Item not found.")
                 }
-            } else {
-                Text("Item not found.")
+            case .project(let id):
+                if let project = queryManager.allProjects.first(where: { $0.id == id }) {
+                    ProjectView(
+                        projectID: project.id,
+                        selectedConversationID: projectConversationSelectionBinding(for: project.id),
+                        onActiveConversationChange: { activeConversationID = $0 },
+                        onRequestOptions: requestOptions,
+                        onDeleteConversation: { conversation in
+                            deleteItem(for: conversation)
+                        },
+                        onExportProject: { project in
+                            requestExport(project: project)
+                        }
+                    )
+                } else {
+                    Text("Item not found.")
+                }
             }
         } else {
-            DetailPlaceholderView(
-                hasAPIConfiguration: queryManager.defaultApiConfiguration != nil,
-                onNewDialog: addConversation,
-                onNewProject: addProject,
-                onConfigureAPI: {
-                    settingsInitialTab = .api
-                    applicationSettingsViewIsPresented = true
-                }
-            )
+            detailPlaceholderView
         }
+    }
+
+    private var detailPlaceholderView: some View {
+        DetailPlaceholderView(
+            hasAPIConfiguration: queryManager.defaultApiConfiguration != nil,
+            onNewDialog: addConversation,
+            onNewProject: addProject,
+            onConfigureAPI: {
+                settingsInitialTab = .api
+                applicationSettingsViewIsPresented = true
+            }
+        )
     }
 
     // MARK: - Toolbar Menus
@@ -474,12 +520,20 @@ struct ContentView: View {
             #endif
         }
         .onChange(of: navigationMode) { _, _ in
-            var visibleIDs = sidebarProjects.map(\.id) + sidebarDialogs.map(\.id)
-            if navigationMode == .chats {
-                visibleIDs += sidebarBookmarks.map(\.id)
+            let visibleSelections: [SidebarSelection] =
+                sidebarProjects.map { .project($0.id) }
+                + sidebarDialogs.map { .conversation($0.id) }
+            if let selection, !visibleSelections.contains(selection) {
+                self.selection = nil
             }
-            if let selectedItem, !visibleIDs.contains(selectedItem) {
-                self.selectedItem = nil
+        }
+        .onChange(of: selection) { _, newValue in
+            activeConversationID = newValue?.conversationID
+            if case .conversation = newValue {
+                pendingProjectConversationSelection = nil
+            } else if case .project(let projectID) = newValue,
+                      pendingProjectConversationSelection?.projectID != projectID {
+                pendingProjectConversationSelection = nil
             }
         }
     }
@@ -487,16 +541,56 @@ struct ContentView: View {
     /// Shared main content view for all platforms (except iOS compact/empty placeholder)
     private var mainContentView: some View {
         VStack(spacing: 0) {
-            NavigationSplitView {
-                sidebarList
-                    .toolbar { sidebarToolbar }
-            } detail: {
-                detailView(for: selectedItem)
-            }
+            #if os(macOS)
+                NavigationSplitView {
+                    sidebarList
+                        .toolbar { sidebarToolbar }
+                } detail: {
+                    detailView(for: selection)
+                }
+            #else
+                NavigationSplitView {
+                    sidebarList
+                        .toolbar { sidebarToolbar }
+                } detail: {
+                    detailPlaceholderView
+                }
+                .navigationDestination(for: SidebarSelection.self) { selection in
+                    switch selection {
+                    case .conversation(let id):
+                        if let conversation = queryManager.allConversations.first(where: { $0.id == id }) {
+                            ConversationView(
+                                viewModel: conversationStore.viewModel(for: conversation.id),
+                                onRequestOptions: requestOptions
+                            )
+                            .id(conversation.id)
+                        } else {
+                            Text("Item not found.")
+                        }
+                    case .project(let id):
+                        if let project = queryManager.allProjects.first(where: { $0.id == id }) {
+                            ProjectView(
+                                projectID: project.id,
+                                selectedConversationID: projectConversationSelectionBinding(for: project.id),
+                                onActiveConversationChange: { activeConversationID = $0 },
+                                onRequestOptions: requestOptions,
+                                onDeleteConversation: { conversation in
+                                    deleteItem(for: conversation)
+                                },
+                                onExportProject: { project in
+                                    requestExport(project: project)
+                                }
+                            )
+                        } else {
+                            Text("Item not found.")
+                        }
+                    }
+                }
+            #endif
 
             if statusBarVisible {
                 StatusBar(
-                    activeItemId: $selectedItem
+                    activeItemId: activeConversationBinding
                 )
             }
         }
@@ -518,7 +612,8 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .utilityPanelDidSendConversation)) {
             notification in
             if let conversationID = notification.object as? PersistentIdentifier {
-                selectedItem = conversationID
+                selection = .conversation(conversationID)
+                pendingProjectConversationSelection = nil
             }
         }
         .task(id: exportRequest?.id) { await exportTask(for: exportRequest) }
@@ -612,7 +707,7 @@ struct ContentView: View {
                                     navigationMode: $navigationMode,
                                     animated: true
                                 )
-                                self.selectedItem = nil
+                                self.selection = nil
                                 vxAtelierPro.log.info("Trash emptied, returning to Show Chats")
                             } else {
                                 vxAtelierPro.log.debug(
@@ -685,11 +780,11 @@ struct ContentView: View {
                 let importedItem = try await DataManager.shared.importData(into: modelContext)
                 if let project = importedItem as? ProjectItem {
                     try queryManager.insert(project)
-                    selectedItem = project.id
+                    selection = .project(project.id)
                     vxAtelierPro.log.info("Successfully imported project '\(project.name)'.")
                 } else if let dialog = importedItem as? ConversationItem {
                     try queryManager.insert(dialog)
-                    selectedItem = dialog.id
+                    selection = .conversation(dialog.id)
                     vxAtelierPro.log.info("Successfully imported dialog '\(dialog.title)'.")
                 }
             } catch {
@@ -702,8 +797,8 @@ struct ContentView: View {
         let itemId = item.persistentModelID
         let itemType = type(of: item)
 
-        if selectedItem == itemId {
-            selectedItem = nil
+        if selectionMatches(item) {
+            selection = nil
             vxAtelierPro.log.debug("Selected item (ID: \(itemId), Type: \(itemType)) cleared.")
         } else {
             vxAtelierPro.log.debug("Selected item (ID: \(itemId), Type: \(itemType)) not cleared.")
@@ -725,7 +820,7 @@ struct ContentView: View {
                         navigationMode: $navigationMode,
                         animated: true
                     )
-                    self.selectedItem = nil
+                    self.selection = nil
                     vxAtelierPro.log.info("Last trashed item removed, returning to Show Chats")
                 } else {
                     vxAtelierPro.log.debug(
@@ -753,8 +848,8 @@ struct ContentView: View {
             try queryManager.archiveItem(item)
             vxAtelierPro.log.debug("Successfully archived item (ID: \(itemId), Type: \(itemType)).")
 
-            if selectedItem == itemId {
-                selectedItem = nil
+            if selectionMatches(item) {
+                selection = nil
 
                 // If we're in archive view and this was the last item, return to Show Chats
                 if wasInArchive {
@@ -875,7 +970,7 @@ struct ContentView: View {
         if !bookmarks.isEmpty || showEmptySections {
             Section(title) {
                 ForEach(bookmarks) { bookmark in
-                    bookmarkNavigationLink(for: bookmark)
+                    bookmarkRow(for: bookmark)
                 }
                 .onDelete { indexSet in
                     indexSet.forEach { index in
@@ -885,7 +980,6 @@ struct ContentView: View {
                                 try queryManager.delete(bookmark)
                                 vxAtelierPro.log.debug(
                                     "Deleted bookmark '\(bookmark.label)' via swipe.")
-                                if selectedItem == bookmark.id { selectedItem = nil }
                             } catch {
                                 vxAtelierPro.log.error(
                                     "ContentView: Failed during swipe delete for bookmark '\(bookmark.label)': \(error.localizedDescription)"
