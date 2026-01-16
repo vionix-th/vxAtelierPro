@@ -454,23 +454,34 @@ struct ContentView: View {
 
     // MARK: - Body
     var body: some View {
-        #if os(iOS)
-            if horizontalSizeClass == .compact && !hasVisibleItems {
-                DetailPlaceholderView(
-                    hasAPIConfiguration: queryManager.defaultApiConfiguration != nil,
-                    onNewDialog: addConversation,
-                    onNewProject: addProject,
-                    onConfigureAPI: {
-                        settingsInitialTab = .api
-                        applicationSettingsViewIsPresented = true
-                    }
-                )
-            } else {
+        Group {
+            #if os(iOS)
+                if horizontalSizeClass == .compact && !hasVisibleItems {
+                    DetailPlaceholderView(
+                        hasAPIConfiguration: queryManager.defaultApiConfiguration != nil,
+                        onNewDialog: addConversation,
+                        onNewProject: addProject,
+                        onConfigureAPI: {
+                            settingsInitialTab = .api
+                            applicationSettingsViewIsPresented = true
+                        }
+                    )
+                } else {
+                    mainContentView
+                }
+            #else
                 mainContentView
+            #endif
+        }
+        .onChange(of: navigationMode) { _, _ in
+            var visibleIDs = sidebarProjects.map(\.id) + sidebarDialogs.map(\.id)
+            if navigationMode == .chats {
+                visibleIDs += sidebarBookmarks.map(\.id)
             }
-        #else
-            mainContentView
-        #endif
+            if let selectedItem, !visibleIDs.contains(selectedItem) {
+                self.selectedItem = nil
+            }
+        }
     }
 
     /// Shared main content view for all platforms (except iOS compact/empty placeholder)
