@@ -14,6 +14,8 @@ struct AppShellView: View {
     @State private var optionsSheetKey: OptionsSheetKey?
     @State private var exportRequest: ExportRequest?
     @State private var importRequested = false
+    @State private var logHistoryFilters: Set<LoggingService.LogType> = []
+    @State private var isLogHistoryShown: Bool = false
 
     private struct OptionsSheetKey: Identifiable { let id: PersistentIdentifier }
 
@@ -57,6 +59,10 @@ struct AppShellView: View {
         ttsViewIsPresented = true
     }
 
+    private func requestLogHistory() {
+        isLogHistoryShown = true
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             ContentView(
@@ -67,12 +73,14 @@ struct AppShellView: View {
                 onRequestExportConversation: requestExport(conversation:),
                 onRequestImport: requestImport,
                 onRequestSettings: requestSettings(_:),
-                onRequestTTS: requestTTS
+                onRequestTTS: requestTTS,
+                onRequestLogHistory: requestLogHistory
             )
 
             if statusBarVisible {
                 StatusBar(
-                    activeItemId: activeConversationID
+                    activeItemId: activeConversationID,
+                    onRequestLogHistory: requestLogHistory
                 )
             }
         }
@@ -93,6 +101,11 @@ struct AppShellView: View {
         #endif
         .task(id: exportRequest?.id) { await exportTask(for: exportRequest) }
         .task(id: importRequested) { await importTask() }
+        .sheet(isPresented: $isLogHistoryShown) {
+            LogHistorySheet(
+                filters: $logHistoryFilters
+            )
+        }
         // Present Settings from the toolbar menu entry
         .sheet(
             isPresented: $applicationSettingsViewIsPresented,

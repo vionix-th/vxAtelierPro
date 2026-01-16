@@ -5,7 +5,6 @@ import SwiftUI
 struct ContentView: View {
     // MARK: - Environment & Context
     @Environment(QueryManager.self) private var queryManager
-    @Environment(\.showLogHistory) private var showLogHistory
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(ConversationViewModelStore.self) private var conversationStore
 
@@ -31,6 +30,7 @@ struct ContentView: View {
     let onRequestImport: () -> Void
     let onRequestSettings: (ApplicationSettingsView.SettingsTab?) -> Void
     let onRequestTTS: () -> Void
+    let onRequestLogHistory: () -> Void
 
     private var sidebarDataSource: ContentSidebarDataSource {
         ContentSidebarDataSource(
@@ -308,7 +308,7 @@ struct ContentView: View {
         .help("Open text-to-speech queue")
 
         Button {
-            showLogHistory()
+            onRequestLogHistory()
         } label: {
             MenuItemStyle.label("Log History", systemImage: "list.bullet.clipboard")
         }

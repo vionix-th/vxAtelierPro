@@ -145,8 +145,6 @@ struct vxAtelierPro: App {
     }
 
     @State private var isDialogShown: Bool = false
-    @State private var isLogHistoryShown: Bool = false
-    @State private var logHistoryFilters: Set<LoggingService.LogType> = []
 
     init() {
         vxAtelierPro.log.debug("Initializing vxAtelierPro")
@@ -240,14 +238,6 @@ struct vxAtelierPro: App {
             AppShellView()
                 .preferredColorScheme(effectiveColorScheme)
                 .environment(conversationStore)
-                .environment(\.showLogHistory) {
-                    isLogHistoryShown = true
-                }
-                .sheet(isPresented: $isLogHistoryShown) {
-                    LogHistorySheet(
-                        filters: $logHistoryFilters
-                    )
-                }
         }
         .modelContainer(sharedModelContainer)
         .environment(queryManager)
@@ -269,18 +259,6 @@ struct vxAtelierPro: App {
                 MenuBarContent()
             }
         #endif
-    }
-}
-
-// MARK: - Environment Keys
-private struct ShowLogHistoryKey: EnvironmentKey {
-    static let defaultValue: () -> Void = {}
-}
-
-extension EnvironmentValues {
-    var showLogHistory: () -> Void {
-        get { self[ShowLogHistoryKey.self] }
-        set { self[ShowLogHistoryKey.self] = newValue }
     }
 }
 

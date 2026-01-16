@@ -8,8 +8,8 @@ struct StatusBar: View {
     @State private var isStatusBarFilterPopoverOpen: Bool = false
     @State private var popupLogTypeFilters: Set<LoggingService.LogType> = []
     @State private var statusBarLogTypeFilters: Set<LoggingService.LogType> = []
-    @Environment(\.showLogHistory) private var showLogHistory
     @State private var displayedMessage: String = ""
+    let onRequestLogHistory: () -> Void
     private let messageAnimation: Animation = .easeInOut(duration: 0.18)
     
     // Environment access
@@ -65,8 +65,12 @@ struct StatusBar: View {
     }
 
     // MARK: - Initialization
-    init(activeItemId: PersistentIdentifier?) {
+    init(
+        activeItemId: PersistentIdentifier?,
+        onRequestLogHistory: @escaping () -> Void
+    ) {
         self.activeItemId = activeItemId
+        self.onRequestLogHistory = onRequestLogHistory
     }
     
     // MARK: - Filter Persistence Methods
@@ -144,7 +148,7 @@ struct StatusBar: View {
                     .padding(.horizontal, 2)
                     .frame(minWidth: 100, maxWidth: .infinity, alignment: .leading)
                     .onTapGesture {
-                        showLogHistory()
+                        onRequestLogHistory()
                     }
                 
                 // Only show dialog info inline if we have an active dialog and not compact
