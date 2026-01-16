@@ -31,26 +31,6 @@ struct ContentView: View {
     @State private var activeConversationID: PersistentIdentifier?
     @State private var pendingProjectConversationSelection: ProjectConversationSelection?
 
-    private enum SidebarSelection: Hashable {
-        case project(PersistentIdentifier)
-        case conversation(PersistentIdentifier)
-
-        var conversationID: PersistentIdentifier? {
-            if case .conversation(let id) = self { return id }
-            return nil
-        }
-
-        var projectID: PersistentIdentifier? {
-            if case .project(let id) = self { return id }
-            return nil
-        }
-    }
-
-    private struct ProjectConversationSelection: Equatable {
-        let projectID: PersistentIdentifier
-        let conversationID: PersistentIdentifier
-    }
-
     // Options sheet hosting (hoisted from ConversationView)
     private struct OptionsSheetKey: Identifiable { let id: PersistentIdentifier }
     @State private var optionsSheetKey: OptionsSheetKey?
@@ -73,60 +53,12 @@ struct ContentView: View {
     @State private var exportRequest: ExportRequest?
     @State private var importRequested = false
 
-    private var sidebarProjects: [ProjectItem] {
-        switch navigationMode {
-        case .chats:
-            return queryManager.activeProjects
-        case .archive:
-            return queryManager.archivedProjects
-        case .trash:
-            return queryManager.trashedProjects
-        }
-    }
-
-    private var sidebarDialogs: [ConversationItem] {
-        queryManager.standaloneConversations(
-            showSystemDialogs: showSystemDialogs,
-            navigationMode: navigationMode
+    private var sidebarDataSource: ContentSidebarDataSource {
+        ContentSidebarDataSource(
+            queryManager: queryManager,
+            navigationMode: navigationMode,
+            showSystemDialogs: showSystemDialogs
         )
-    }
-
-    private var sidebarBookmarks: [BookmarkItem] {
-        guard navigationMode == .chats else { return [] }
-        return queryManager.bookmarks.sorted {
-            let comparison = $0.label.localizedCaseInsensitiveCompare($1.label)
-            if comparison == .orderedSame { return false }
-            return comparison == .orderedAscending
-        }
-    }
-
-    private var projectTitle: String {
-        switch navigationMode {
-        case .chats:
-            return "Projects"
-        case .archive:
-            return "Archived Projects"
-        case .trash:
-            return "Trashed Projects"
-        }
-    }
-
-    private var dialogTitle: String {
-        switch navigationMode {
-        case .chats:
-            return "Standalone Dialogs"
-        case .archive:
-            return "Archived Dialogs"
-        case .trash:
-            return "Trashed Items"
-        }
-    }
-
-    /// Returns true if there are any visible items in the sidebar.
-    private var hasVisibleItems: Bool {
-        !sidebarProjects.isEmpty
-            || !sidebarDialogs.isEmpty
-            || !sidebarBookmarks.isEmpty
     }
 
     // MARK: - Helper Methods
@@ -214,127 +146,68 @@ struct ContentView: View {
         }
     }
 
-    private func selectionMatches(_ item: any PersistentModel) -> Bool {
-        if let conversation = item as? ConversationItem {
-            return selection == .conversation(conversation.id)
-        }
-        if let project = item as? ProjectItem {
-            return selection == .project(project.id)
-        }
-        return false
-    }
-
-    // MARK: - Navigation Links
-    func projectNavigationLink(for project: ProjectItem) -> some View {
-        NavigationLink(value: SidebarSelection.project(project.id)) {
-            NavigationItem(
-                title: Binding(get: { project.name }, set: { project.name = $0 }),
-                subtitle: project.timestamp.formatted(
-                    .dateTime.year().month().day().hour().minute()),
-                onDelete: {
-                    deleteItem(for: project)
-                },
-                onRename: { project.name = $0 },
-                onRestore: project.status != .active
-                    ? {
-                        restoreItem(project)
-                    } : nil,
-                onPermanentDelete: project.status == .trashed
-                    ? {
-                        deleteItem(for: project)
-                    } : nil,
-                onArchive: project.status == .active
-                    ? {
-                        archiveItem(project)
-                    } : nil,
-                imageName: "folder",
-                onProjectAssign: { _ in },
-                onExport: {
-                    requestExport(project: project)
-                },
-                project: project
+    private func deleteBookmarkFromContext(_ bookmark: BookmarkItem) {
+        do {
+            try queryManager.delete(bookmark)
+            vxAtelierPro.log.debug(
+                "Deleted bookmark '\(bookmark.label)' via context menu.")
+        } catch {
+            vxAtelierPro.log.error(
+                "Failed to delete bookmark \(bookmark.label) from context menu: \(error.localizedDescription)"
             )
         }
     }
 
-    func conversationNavigationLink(for conversation: ConversationItem) -> some View {
-        NavigationLink(value: SidebarSelection.conversation(conversation.id)) {
-            NavigationItem(
-                title: Binding(get: { conversation.title }, set: { conversation.title = $0 }),
-                subtitle: conversation.timestamp.formatted(
-                    .dateTime.year().month().day().hour().minute()),
-                onDelete: {
-                    deleteItem(for: conversation)
-                },
-                onRename: { conversation.title = $0 },
-                onRestore: conversation.status != .active
-                    ? {
-                        restoreItem(conversation)
-                    } : nil,
-                onPermanentDelete: conversation.status == .trashed
-                    ? {
-                        deleteItem(for: conversation)
-                    } : nil,
-                onArchive: conversation.status == .active
-                    ? {
-                        archiveItem(conversation)
-                    } : nil,
-                imageName: AppDefaults.dialogImageSystemName,
-                onProjectAssign: conversation.status == .active
-                    ? { project in
-                        assignConversationToProject(conversation, project)
-                    } : nil,
-                onExport: {
-                    requestExport(conversation: conversation)
-                },
-                conversation: conversation
+    private func deleteBookmarkFromSwipe(_ bookmark: BookmarkItem) {
+        do {
+            try queryManager.delete(bookmark)
+            vxAtelierPro.log.debug(
+                "Deleted bookmark '\(bookmark.label)' via swipe.")
+        } catch {
+            vxAtelierPro.log.error(
+                "ContentView: Failed during swipe delete for bookmark '\(bookmark.label)': \(error.localizedDescription)"
             )
         }
     }
 
-    func bookmarkRow(for bookmark: BookmarkItem) -> some View {
-        NavigationItem(
-            title: Binding(get: { bookmark.label }, set: { bookmark.label = $0 }),
-            subtitle: bookmark.turn?.conversation?.title ?? "(missing)",
-            onDelete: {
-                do {
-                    try queryManager.delete(bookmark)
-                    vxAtelierPro.log.debug(
-                        "Deleted bookmark '\(bookmark.label)' via context menu.")
-                } catch {
-                    vxAtelierPro.log.error(
-                        "Failed to delete bookmark \(bookmark.label) from context menu: \(error.localizedDescription)"
-                    )
-                }
+    private var sidebarActions: ContentSidebarActions {
+        ContentSidebarActions(
+            deleteItem: { deleteItem(for: $0) },
+            restoreItem: { restoreItem($0) },
+            archiveItem: { archiveItem($0) },
+            assignConversationToProject: { conversation, project in
+                assignConversationToProject(conversation, project)
             },
-            onRename: {
-                bookmark.label = $0
+            requestExportProject: { project in
+                requestExport(project: project)
             },
-            imageName: "bookmark"
+            requestExportConversation: { conversation in
+                requestExport(conversation: conversation)
+            },
+            deleteBookmarkFromContext: { bookmark in
+                deleteBookmarkFromContext(bookmark)
+            },
+            deleteBookmarkFromSwipe: { bookmark in
+                deleteBookmarkFromSwipe(bookmark)
+            },
+            selectBookmark: { bookmark in
+                selectConversationFromBookmark(bookmark)
+            }
         )
-        .contentShape(Rectangle())
-        .onTapGesture {
-            selectConversationFromBookmark(bookmark)
-        }
     }
 
     // MARK: - View Components
-    var sidebarList: some View {
-        return List(selection: $selection) {
-            projectSection(
-                title: projectTitle,
-                projects: sidebarProjects
-            )
-
-            dialogSection(
-                title: dialogTitle,
-                dialogs: sidebarDialogs
-            )
-
-            if navigationMode == .chats {
-                bookmarkSection(title: "Bookmarks", bookmarks: sidebarBookmarks)
-            }
-        }
+    private var sidebarView: some View {
+        ContentSidebarView(
+            dataSource: sidebarDataSource,
+            selection: $selection,
+            sidebarProjectsSortDescending: $sidebarProjectsSortDescending,
+            sidebarProjectsSortTypeRaw: $sidebarProjectsSortTypeRaw,
+            sidebarDialogsSortDescending: $sidebarDialogsSortDescending,
+            sidebarDialogsSortTypeRaw: $sidebarDialogsSortTypeRaw,
+            showEmptySections: showEmptySections,
+            actions: sidebarActions
+        )
     }
 
     @ViewBuilder
@@ -502,7 +375,7 @@ struct ContentView: View {
     var body: some View {
         Group {
             #if os(iOS)
-                if horizontalSizeClass == .compact && !hasVisibleItems {
+                if horizontalSizeClass == .compact && !sidebarDataSource.hasVisibleItems {
                     DetailPlaceholderView(
                         hasAPIConfiguration: queryManager.defaultApiConfiguration != nil,
                         onNewDialog: addConversation,
@@ -520,9 +393,7 @@ struct ContentView: View {
             #endif
         }
         .onChange(of: navigationMode) { _, _ in
-            let visibleSelections: [SidebarSelection] =
-                sidebarProjects.map { .project($0.id) }
-                + sidebarDialogs.map { .conversation($0.id) }
+            let visibleSelections = sidebarDataSource.visibleSelections
             if let selection, !visibleSelections.contains(selection) {
                 self.selection = nil
             }
@@ -543,14 +414,14 @@ struct ContentView: View {
         VStack(spacing: 0) {
             #if os(macOS)
                 NavigationSplitView {
-                    sidebarList
+                    sidebarView
                         .toolbar { sidebarToolbar }
                 } detail: {
                     detailView(for: selection)
                 }
             #else
                 NavigationSplitView {
-                    sidebarList
+                    sidebarView
                         .toolbar { sidebarToolbar }
                 } detail: {
                     detailPlaceholderView
@@ -797,7 +668,7 @@ struct ContentView: View {
         let itemId = item.persistentModelID
         let itemType = type(of: item)
 
-        if selectionMatches(item) {
+        if selectionMatches(selection, item: item) {
             selection = nil
             vxAtelierPro.log.debug("Selected item (ID: \(itemId), Type: \(itemType)) cleared.")
         } else {
@@ -805,7 +676,7 @@ struct ContentView: View {
         }
 
         do {
-                if navigationMode == .trash {
+            if navigationMode == .trash {
                 try queryManager.deleteItemPermanently(item)
                 vxAtelierPro.log.debug(
                     "Successfully initiated permanent deletion for item (ID: \(itemId), Type: \(itemType)) via swipe/delete from trash."
@@ -848,7 +719,7 @@ struct ContentView: View {
             try queryManager.archiveItem(item)
             vxAtelierPro.log.debug("Successfully archived item (ID: \(itemId), Type: \(itemType)).")
 
-            if selectionMatches(item) {
+            if selectionMatches(selection, item: item) {
                 selection = nil
 
                 // If we're in archive view and this was the last item, return to Show Chats
@@ -886,113 +757,4 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder
-    private func projectSection(title: String, projects: [ProjectItem]) -> some View {
-        if !projects.isEmpty || showEmptySections {
-            let sorted = ProjectSorter.sort(
-                projects,
-                descending: sidebarProjectsSortDescending,
-                sortType: SidebarSortType(rawValue: sidebarProjectsSortTypeRaw)
-                    ?? .alphabetically,
-                navigationMode: navigationMode
-            )
-            Section {
-                ForEach(
-                    sorted
-                ) { project in
-                    projectNavigationLink(for: project)
-                }
-                .onDelete { indexSet in
-                    indexSet.forEach { index in
-                        if index < sorted.count {
-                            let project = sorted[index]
-                            deleteItem(for: project)
-                        } else {
-                            vxAtelierPro.log.warning(
-                                "ContentView: Invalid index \(index) encountered in projectSection.onDelete for projects array count \(projects.count)."
-                            )
-                        }
-                    }
-                }
-            } header: {
-                HStack {
-                    SidebarSortButton(
-                        sortDescending: $sidebarProjectsSortDescending,
-                        sortTypeRaw: $sidebarProjectsSortTypeRaw,
-                        allowedTypes: [.alphabetically])
-                    Text(title)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func dialogSection(title: String, dialogs: [ConversationItem]) -> some View {
-        if !dialogs.isEmpty || showEmptySections {
-            let sorted = ConversationSorter.sort(
-                dialogs,
-                descending: sidebarDialogsSortDescending,
-                sortType: SidebarSortType(rawValue: sidebarDialogsSortTypeRaw)
-                    ?? .conversationDate
-            )
-            Section {
-                ForEach(
-                    sorted
-                ) { dialog in
-                    conversationNavigationLink(for: dialog)
-                }
-                .onDelete { indexSet in
-                    indexSet.forEach { index in
-                        if index < sorted.count {
-                            let dialog = sorted[index]
-                            deleteItem(for: dialog)
-                        } else {
-                            vxAtelierPro.log.warning(
-                                "ContentView: Invalid index \(index) encountered in dialogSection.onDelete for dialogs array count \(dialogs.count)."
-                            )
-                        }
-                    }
-                }
-            } header: {
-                HStack {
-                    SidebarSortButton(
-                        sortDescending: $sidebarDialogsSortDescending,
-                        sortTypeRaw: $sidebarDialogsSortTypeRaw,
-                        allowedTypes: SidebarSortType.allCases)
-                    Text(title)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func bookmarkSection(title: String, bookmarks: [BookmarkItem]) -> some View {
-        if !bookmarks.isEmpty || showEmptySections {
-            Section(title) {
-                ForEach(bookmarks) { bookmark in
-                    bookmarkRow(for: bookmark)
-                }
-                .onDelete { indexSet in
-                    indexSet.forEach { index in
-                        if index < bookmarks.count {
-                            let bookmark = bookmarks[index]
-                            do {
-                                try queryManager.delete(bookmark)
-                                vxAtelierPro.log.debug(
-                                    "Deleted bookmark '\(bookmark.label)' via swipe.")
-                            } catch {
-                                vxAtelierPro.log.error(
-                                    "ContentView: Failed during swipe delete for bookmark '\(bookmark.label)': \(error.localizedDescription)"
-                                )
-                            }
-                        } else {
-                            vxAtelierPro.log.warning(
-                                "ContentView: Invalid index \(index) encountered in bookmarkSection.onDelete for bookmarks array count \(bookmarks.count)."
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
