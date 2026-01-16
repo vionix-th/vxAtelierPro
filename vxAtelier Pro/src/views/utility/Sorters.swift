@@ -57,17 +57,35 @@ private func sortItems<Item>(
     switch sortType {
     case .conversationDate:
         return items.sorted {
-            descending ? timestamp($0) > timestamp($1) : timestamp($0) < timestamp($1)
+            let lhsDate = timestamp($0)
+            let rhsDate = timestamp($1)
+            if lhsDate != rhsDate {
+                return descending ? lhsDate > rhsDate : lhsDate < rhsDate
+            }
+            let comparison = name($0).localizedCaseInsensitiveCompare(name($1))
+            if comparison == .orderedSame { return false }
+            return descending ? comparison == .orderedDescending : comparison == .orderedAscending
         }
     case .lastMessageDate:
         return items.sorted {
             let lhsDate = lastMessage($0) ?? timestamp($0)
             let rhsDate = lastMessage($1) ?? timestamp($1)
-            return descending ? lhsDate > rhsDate : lhsDate < rhsDate
+            if lhsDate != rhsDate {
+                return descending ? lhsDate > rhsDate : lhsDate < rhsDate
+            }
+            let comparison = name($0).localizedCaseInsensitiveCompare(name($1))
+            if comparison == .orderedSame { return false }
+            return descending ? comparison == .orderedDescending : comparison == .orderedAscending
         }
     case .alphabetically:
         return items.sorted {
             let comparison = name($0).localizedCaseInsensitiveCompare(name($1))
+            if comparison == .orderedSame {
+                let lhsDate = timestamp($0)
+                let rhsDate = timestamp($1)
+                if lhsDate == rhsDate { return false }
+                return descending ? lhsDate > rhsDate : lhsDate < rhsDate
+            }
             return descending ? comparison == .orderedDescending : comparison == .orderedAscending
         }
     }
