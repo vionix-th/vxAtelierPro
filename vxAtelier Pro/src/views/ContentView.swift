@@ -71,7 +71,11 @@ struct ContentView: View {
 
     private var sidebarBookmarks: [BookmarkItem] {
         guard navigationMode == .chats else { return [] }
-        return queryManager.bookmarks
+        return queryManager.bookmarks.sorted {
+            let comparison = $0.label.localizedCaseInsensitiveCompare($1.label)
+            if comparison == .orderedSame { return false }
+            return comparison == .orderedAscending
+        }
     }
 
     private var projectTitle: String {
