@@ -783,7 +783,8 @@ struct ContentView: View {
                 projects,
                 descending: sidebarProjectsSortDescending,
                 sortType: SidebarSortType(rawValue: sidebarProjectsSortTypeRaw)
-                    ?? .alphabetically
+                    ?? .alphabetically,
+                navigationMode: navigationMode
             )
             Section {
                 ForEach(
