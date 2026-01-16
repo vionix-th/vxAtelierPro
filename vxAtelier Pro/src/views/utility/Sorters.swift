@@ -13,24 +13,14 @@ struct ConversationSorter {
         descending: Bool,
         sortType: SidebarSortType
     ) -> [ConversationItem] {
-        switch sortType {
-        case .conversationDate:
-            return conversations.sorted {
-                descending ? $0.timestamp > $1.timestamp : $0.timestamp < $1.timestamp
-            }
-        case .lastMessageDate:
-            return conversations.sorted {
-                let lhsDate = lastTurnTimestamp(for: $0) ?? $0.timestamp
-                let rhsDate = lastTurnTimestamp(for: $1) ?? $1.timestamp
-                return descending ? lhsDate > rhsDate : lhsDate < rhsDate
-            }
-        case .alphabetically:
-            return conversations.sorted {
-                descending
-                    ? $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedDescending
-                    : $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
-            }
-        }
+        sortItems(
+            conversations,
+            descending: descending,
+            sortType: sortType,
+            name: { $0.title },
+            timestamp: { $0.timestamp },
+            lastMessage: { lastTurnTimestamp(for: $0) }
+        )
     }
 }
 
@@ -44,23 +34,40 @@ struct ProjectSorter {
         descending: Bool,
         sortType: SidebarSortType
     ) -> [ProjectItem] {
-        switch sortType {
-        case .alphabetically:
-            return projects.sorted {
-                descending
-                    ? $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedDescending
-                    : $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
-            }
-        case .conversationDate:
-            return projects.sorted {
-                descending ? $0.timestamp > $1.timestamp : $0.timestamp < $1.timestamp
-            }
-        case .lastMessageDate:
-            return projects.sorted {
-                let lhsDate = lastTurnTimestamp(for: $0) ?? $0.timestamp
-                let rhsDate = lastTurnTimestamp(for: $1) ?? $1.timestamp
-                return descending ? lhsDate > rhsDate : lhsDate < rhsDate
-            }
+        sortItems(
+            projects,
+            descending: descending,
+            sortType: sortType,
+            name: { $0.name },
+            timestamp: { $0.timestamp },
+            lastMessage: { lastTurnTimestamp(for: $0) }
+        )
+    }
+}
+
+private func sortItems<Item>(
+    _ items: [Item],
+    descending: Bool,
+    sortType: SidebarSortType,
+    name: (Item) -> String,
+    timestamp: (Item) -> Date,
+    lastMessage: (Item) -> Date?
+) -> [Item] {
+    switch sortType {
+    case .conversationDate:
+        return items.sorted {
+            descending ? timestamp($0) > timestamp($1) : timestamp($0) < timestamp($1)
+        }
+    case .lastMessageDate:
+        return items.sorted {
+            let lhsDate = lastMessage($0) ?? timestamp($0)
+            let rhsDate = lastMessage($1) ?? timestamp($1)
+            return descending ? lhsDate > rhsDate : lhsDate < rhsDate
+        }
+    case .alphabetically:
+        return items.sorted {
+            let comparison = name($0).localizedCaseInsensitiveCompare(name($1))
+            return descending ? comparison == .orderedDescending : comparison == .orderedAscending
         }
     }
 }
