@@ -17,8 +17,8 @@ struct MessageInputView: View {
 
     @AppStorage("DialogTextEdit.buttonSize") var buttonSize: Double = AppDefaults
         .dialogTextEditButtonSize
-    @AppStorage("AutoNameDialogs") private var autoNameDialogs: Bool = AppDefaults.autoNameDialogs
-    @AppStorage("AutoSendDialogTemplates") private var autoSendDialogTemplates: Bool = AppDefaults.autoSendDialogTemplates
+    @AppStorage("autoNameDialogs") private var autoNameDialogs: Bool = AppDefaults.autoNameDialogs
+    @AppStorage("autoSendDialogTemplates") private var autoSendDialogTemplates: Bool = AppDefaults.autoSendDialogTemplates
 
     var didSend: ((ConversationItem) -> Void)?
 

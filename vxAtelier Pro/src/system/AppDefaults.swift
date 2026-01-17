@@ -19,7 +19,7 @@ struct AppDefaults {
     static let sectionBackgroundOpacity = 0.1
     static let sectionHeaderColor = Color.secondary
     
-    static let appearanceStyle = "Auto"
+    static let appearanceStyle = "System"
     
     static let newProjectName = "Unnamed Project"
     static let projectImageSystemName: String = "folder"
@@ -46,9 +46,28 @@ struct AppDefaults {
     static let showEmptySections = false 
     static let projectDialogsSortDescending = true
     static let projectDialogsSortType = "conversationDate"
+    static let sidebarDialogsSortDescending = true
+    static let sidebarDialogsSortType = "conversationDate"
+    static let sidebarProjectsSortDescending = false
+    static let sidebarProjectsSortType = "alphabetically"
+    static let navigationMode = NavigationMode.chats.rawValue
     // Conversation label toggles
     static let showConversationLastMessageLabel = true
     static let showConversationCreatedLabel = true
+    
+    // Developer/advanced settings
+    static let makeKeyAndOrderFront = false
+    static let autoScrollDebugEnabled = false
+    static let autoScrollGateEnabled = false
+    static let streamingThrottleEnabled = false
+    static let streamingThrottleIntervalMs = 50
+    static let streamingDebugEnabled = false
+    static let markdownStreamFinalizeOnly = false
+    static let showToolCallChips = true
+    
+    // Permissions
+    static let allowSelfSignedCertificates = false
+    static let selfSignedCertWhitelist = "[]"
         
     // TTS Settings
     static let ttsAutoplay = true
@@ -148,27 +167,36 @@ extension AppDefaults {
         defaults.set(AppDefaults.disableAvatar, forKey: "DisableAvatar")
         defaults.set(AppDefaults.defaultAvatarSize, forKey: "DefaultAvatarSize")
         defaults.set(AppDefaults.fontSizeMedium, forKey: "BubbleFontSize")
+        defaults.removeObject(forKey: "defaultAvatar")
         // Developer/advanced settings
         defaults.set(AppDefaults.isMarkdownEnabled, forKey: "IsMarkdownEnabled")
         defaults.set(AppDefaults.isMarkdownTextSelectable, forKey: "IsMarkdownTextSelectable")
         defaults.set(AppDefaults.showSystemDialogs, forKey: "ShowSystemDialogs")
+        defaults.set(AppDefaults.makeKeyAndOrderFront, forKey: "MakeKeyAndOrderFront")
+        defaults.set(AppDefaults.autoScrollDebugEnabled, forKey: "AutoScrollDebugEnabled")
+        defaults.set(AppDefaults.autoScrollGateEnabled, forKey: "AutoScrollGateEnabled")
+        defaults.set(AppDefaults.streamingThrottleEnabled, forKey: "StreamingThrottleEnabled")
+        defaults.set(AppDefaults.streamingThrottleIntervalMs, forKey: "StreamingThrottleIntervalMs")
+        defaults.set(AppDefaults.streamingDebugEnabled, forKey: "StreamingDebugEnabled")
+        defaults.set(AppDefaults.markdownStreamFinalizeOnly, forKey: "MarkdownStreamFinalizeOnly")
+        defaults.set(AppDefaults.showToolCallChips, forKey: "ShowToolCallChips")
         // Permissions
-        defaults.set(false, forKey: "allowSelfSignedCertificates")
-        defaults.set("[]", forKey: "selfSignedCertWhitelist")
+        defaults.set(AppDefaults.allowSelfSignedCertificates, forKey: "allowSelfSignedCertificates")
+        defaults.set(AppDefaults.selfSignedCertWhitelist, forKey: "selfSignedCertWhitelist")
         // TTS
         defaults.set(AppDefaults.ttsAutoplay, forKey: "TTSAutoplay")
         defaults.set(AppDefaults.ttsRepeatMode, forKey: "TTSRepeatMode")
         // Sidebar sort
-        defaults.set(true, forKey: "SidebarDialogsSortOrderDescending")
-        defaults.set("conversationDate", forKey: "SidebarDialogsSortType")
-        defaults.set(false, forKey: "SidebarProjectsSortOrderDescending")
-        defaults.set("alphabetically", forKey: "SidebarProjectsSortType")
+        defaults.set(AppDefaults.sidebarDialogsSortDescending, forKey: "SidebarDialogsSortOrderDescending")
+        defaults.set(AppDefaults.sidebarDialogsSortType, forKey: "SidebarDialogsSortType")
+        defaults.set(AppDefaults.sidebarProjectsSortDescending, forKey: "SidebarProjectsSortOrderDescending")
+        defaults.set(AppDefaults.sidebarProjectsSortType, forKey: "SidebarProjectsSortType")
         // Project view sort
         defaults.set(AppDefaults.projectDialogsSortDescending, forKey: "ProjectDialogsSortOrderDescending")
         defaults.set(AppDefaults.projectDialogsSortType, forKey: "ProjectDialogsSortType")
         // Dialog/project filters
-        defaults.set(false, forKey: "ShowEmptySections")
-        defaults.set(NavigationMode.chats.rawValue, forKey: "NavigationMode")
+        defaults.set(AppDefaults.showEmptySections, forKey: "ShowEmptySections")
+        defaults.set(AppDefaults.navigationMode, forKey: "NavigationMode")
         // Add any additional settings as needed
         defaults.synchronize()
     }

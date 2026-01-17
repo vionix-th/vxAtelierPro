@@ -24,7 +24,6 @@ private let knownSettings: [String: SettingInfo] = [
     "DisableAvatar": .init(type: Bool.self),
     "DefaultAvatarSize": .init(type: Int.self), // Range: 16...128, Step: 2
     "BubbleFontSize": .init(type: Double.self), // Range: 8...28
-    "AutoNameDialogs": .init(type: Bool.self), // Legacy, keep for compatibility
     "autoNameDialogs": .init(type: Bool.self), // Used in GeneralSettingsView
     "statusBarVisible": .init(type: Bool.self),
     "showConversationLastMessageLabel": .init(type: Bool.self), // Used in GeneralSettingsView
@@ -35,13 +34,11 @@ private let knownSettings: [String: SettingInfo] = [
     "ShowSystemDialogs": .init(type: Bool.self),
     "ProjectDialogsSortOrderDescending": .init(type: Bool.self),
     "ProjectDialogsSortType": .init(type: String.self, allowedValues: ["conversationDate", "lastMessageDate", "alphabetically"]),
-    "AutoSendDialogTemplates": .init(type: Bool.self),
     "autoSendDialogTemplates": .init(type: Bool.self), // Used in GeneralSettingsView
     "TTSAutoplay": .init(type: Bool.self),
     "TTSRepeatMode": .init(type: String.self, allowedValues: ["none", "one", "all"]),
     "allowSelfSignedCertificates": .init(type: Bool.self), // Used in PermissionsSettingsView
-    "selfSignedCertWhitelist": .init(type: String.self), // JSON-encoded array, used in DeveloperSettingsView
-    "selfSignedCertWhitelistJSON": .init(type: String.self) // JSON-encoded array, used in PermissionsSettingsView
+    "selfSignedCertWhitelist": .init(type: String.self) // JSON-encoded array, used in DeveloperSettingsView and PermissionsSettingsView
 ]
 
 // MARK: - List Settings Tool
