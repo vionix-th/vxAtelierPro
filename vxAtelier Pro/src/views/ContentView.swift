@@ -16,7 +16,7 @@ struct ContentView: View {
     // MARK: - View Options (UserDefaults-backed)
     @AppStorage(AppSettings.Keys.showEmptySections) private var showEmptySections: Bool = AppDefaults.showEmptySections
     @AppStorage(AppSettings.Keys.showSystemDialogs) private var showSystemDialogs: Bool = AppDefaults.showSystemDialogs
-    @AppStorage(AppSettings.Keys.navigationMode) private var navigationMode: NavigationMode = .chats
+    @AppStorage(AppSettings.Keys.contentFilter) private var contentFilter: ContentFilter = .active
     @AppStorage(AppSettings.Keys.sidebarDialogsSortDescending) private var sidebarDialogsSortDescending: Bool = true
     @AppStorage(AppSettings.Keys.sidebarDialogsSortType) private var sidebarDialogsSortTypeRaw: String =
         SidebarSortType.conversationDate.rawValue
@@ -34,12 +34,12 @@ struct ContentView: View {
     let onRequestLogHistory: () -> Void
 
     private var filteredProjects: [ProjectItem] {
-        switch navigationMode {
-        case .chats:
+        switch contentFilter {
+        case .active:
             return projects.filter { $0.status == .active }
-        case .archive:
+        case .archived:
             return projects.filter { $0.status == .archived }
-        case .trash:
+        case .trashed:
             return projects.filter { $0.status == .trashed }
         }
     }
@@ -47,12 +47,12 @@ struct ContentView: View {
     private var standaloneDialogs: [ConversationItem] {
         conversations.filter { conversation in
             guard conversation.project == nil else { return false }
-            switch navigationMode {
-            case .chats:
+            switch contentFilter {
+            case .active:
                 if conversation.status != .active { return false }
-            case .archive:
+            case .archived:
                 if conversation.status != .archived { return false }
-            case .trash:
+            case .trashed:
                 if conversation.status != .trashed { return false }
             }
             if !showSystemDialogs && conversation.purpose == .system {
@@ -63,7 +63,7 @@ struct ContentView: View {
     }
 
     private var visibleBookmarks: [BookmarkItem] {
-        navigationMode == .chats ? bookmarks : []
+        contentFilter == .active ? bookmarks : []
     }
     
     private var hasVisibleSidebarItems: Bool {
@@ -192,7 +192,7 @@ struct ContentView: View {
     // MARK: - View Components
     private var sidebarView: some View {
         ContentSidebarView(
-            navigationMode: navigationMode,
+            contentFilter: contentFilter,
             projects: filteredProjects,
             dialogs: standaloneDialogs,
             bookmarks: visibleBookmarks,
@@ -313,7 +313,7 @@ struct ContentView: View {
         Divider()
 
         Button {
-            setNavigationMode(.chats, navigationMode: $navigationMode)
+            setContentFilter(.active, contentFilter: $contentFilter)
         } label: {
             MenuItemStyle.label("Show Chats", systemImage: "tray.full")
         }
@@ -321,7 +321,7 @@ struct ContentView: View {
         .help("Show active chats")
 
         Button {
-            setNavigationMode(.archive, navigationMode: $navigationMode)
+            setContentFilter(.archived, contentFilter: $contentFilter)
         } label: {
             MenuItemStyle.label("Show Archive", systemImage: "archivebox")
         }
@@ -329,7 +329,7 @@ struct ContentView: View {
         .help("Show archived items")
 
         Button {
-            setNavigationMode(.trash, navigationMode: $navigationMode)
+            setContentFilter(.trashed, contentFilter: $contentFilter)
         } label: {
             MenuItemStyle.label("Show Trash", systemImage: "trash")
         }
@@ -388,7 +388,7 @@ struct ContentView: View {
                 mainContentView
             #endif
         }
-        .onChange(of: navigationMode) { _, _ in
+        .onChange(of: contentFilter) { _, _ in
             let visibleSelections = filteredProjects.map { SidebarSelection.project($0.id) }
                 + standaloneDialogs.map { SidebarSelection.conversation($0.id) }
             if let selection = router.selection, !visibleSelections.contains(selection) {
@@ -435,7 +435,7 @@ struct ContentView: View {
     // MARK: - Toolbar Content
     private var sidebarToolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
-            if navigationMode == .trash {
+            if contentFilter == .trashed {
                 Button(
                     role: .destructive,
                     action: {
@@ -450,9 +450,9 @@ struct ContentView: View {
 
                             // Reset navigation if we had items to empty
                             if hadTrashedItems {
-                                setNavigationMode(
-                                    .chats,
-                                    navigationMode: $navigationMode,
+                                setContentFilter(
+                                    .active,
+                                    contentFilter: $contentFilter,
                                     animated: true
                                 )
                                 router.setSelection(nil)
@@ -505,7 +505,7 @@ struct ContentView: View {
         }
 
         do {
-            if navigationMode == .trash {
+            if contentFilter == .trashed {
                 try queryManager.deleteItemPermanently(item)
                 vxAtelierPro.log.debug(
                     "Successfully initiated permanent deletion for item (ID: \(itemId), Type: \(itemType)) via swipe/delete from trash."
@@ -514,9 +514,9 @@ struct ContentView: View {
                 // Only reset navigation if there are NO trashed items remaining (both dialogs and projects)
                 let remainingTrashedItems = trashedDialogsCount + trashedProjectsCount
                 if remainingTrashedItems == 0 {
-                    setNavigationMode(
-                        .chats,
-                        navigationMode: $navigationMode,
+                    setContentFilter(
+                        .active,
+                        contentFilter: $contentFilter,
                         animated: true
                     )
                     router.setSelection(nil)
@@ -541,7 +541,7 @@ struct ContentView: View {
     private func archiveItem(_ item: any PersistentModel) {
         let itemId = item.persistentModelID
         let itemType = type(of: item)
-        let wasInArchive = navigationMode == .archive
+        let wasInArchive = contentFilter == .archived
 
         do {
             try queryManager.archiveItem(item)
@@ -556,9 +556,9 @@ struct ContentView: View {
                     let remainingArchivedDialogs = archivedDialogsCount
 
                     if remainingArchivedItems == 0 && remainingArchivedDialogs == 0 {
-                        setNavigationMode(
-                            .chats,
-                            navigationMode: $navigationMode,
+                        setContentFilter(
+                            .active,
+                            contentFilter: $contentFilter,
                             animated: true
                         )
                         vxAtelierPro.log.info("Last archived item removed, returning to Show Chats")

@@ -14,7 +14,7 @@ struct ContentSidebarActions {
 }
 
 struct ContentSidebarView: View {
-    let navigationMode: NavigationMode
+    let contentFilter: ContentFilter
     let projects: [ProjectItem]
     let dialogs: [ConversationItem]
     let bookmarks: [BookmarkItem]
@@ -28,18 +28,18 @@ struct ContentSidebarView: View {
     let availableProjects: [ProjectItem]
     
     private var titleForProjects: String {
-        switch navigationMode {
-        case .chats: return "Projects"
-        case .archive: return "Archived Projects"
-        case .trash: return "Trashed Projects"
+        switch contentFilter {
+        case .active: return "Projects"
+        case .archived: return "Archived Projects"
+        case .trashed: return "Trashed Projects"
         }
     }
     
     private var titleForDialogs: String {
-        switch navigationMode {
-        case .chats: return "Standalone Dialogs"
-        case .archive: return "Archived Dialogs"
-        case .trash: return "Trashed Items"
+        switch contentFilter {
+        case .active: return "Standalone Dialogs"
+        case .archived: return "Archived Dialogs"
+        case .trashed: return "Trashed Items"
         }
     }
 
@@ -55,7 +55,7 @@ struct ContentSidebarView: View {
                 dialogs: dialogs
             )
 
-            if navigationMode == .chats {
+            if contentFilter == .active {
                 bookmarkSection(title: "Bookmarks", bookmarks: bookmarks)
             }
         }
@@ -156,7 +156,7 @@ struct ContentSidebarView: View {
                 descending: sidebarProjectsSortDescending,
                 sortType: SidebarSortType(rawValue: sidebarProjectsSortTypeRaw)
                     ?? .alphabetically,
-                navigationMode: navigationMode
+                contentFilter: contentFilter
             )
             Section {
                 ForEach(

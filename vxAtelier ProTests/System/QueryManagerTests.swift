@@ -63,7 +63,7 @@ final class QueryManagerTests: XCTestCase {
         try? queryManager.deleteItems([activeDialog])
     }
     
-    func testStandaloneAndSystemConversationFilteringByNavigationMode() {
+    func testStandaloneAndSystemConversationFilteringByContentFilter() {
         // Given
         let project = testEnv.createProject(name: "Project 1")
         _ = testEnv.createConversation(title: "Active", status: .active, purpose: .user)
@@ -84,26 +84,26 @@ final class QueryManagerTests: XCTestCase {
         // Then - standalone conversations are filtered by status and exclude system/project items
         let activeStandalone = queryManager.standaloneConversations(
             showSystemDialogs: false,
-            navigationMode: .chats
+            contentFilter: .active
         )
         XCTAssertEqual(activeStandalone.map(\.title), ["Active"])
 
         let archivedStandalone = queryManager.standaloneConversations(
             showSystemDialogs: false,
-            navigationMode: .archive
+            contentFilter: .archived
         )
         XCTAssertEqual(archivedStandalone.map(\.title), ["Archived"])
 
         let trashedStandalone = queryManager.standaloneConversations(
             showSystemDialogs: false,
-            navigationMode: .trash
+            contentFilter: .trashed
         )
         XCTAssertEqual(trashedStandalone.map(\.title), ["Trashed"])
 
         // System conversations are included in standalone when enabled
         let archivedStandaloneWithSystem = queryManager.standaloneConversations(
             showSystemDialogs: true,
-            navigationMode: .archive
+            contentFilter: .archived
         )
         XCTAssertEqual(
             Set(archivedStandaloneWithSystem.map(\.title)),

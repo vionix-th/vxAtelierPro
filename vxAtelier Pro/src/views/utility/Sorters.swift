@@ -26,13 +26,13 @@ struct ConversationSorter {
 }
 
 struct ProjectSorter {
-    private static func status(for navigationMode: NavigationMode) -> ItemStatus {
-        switch navigationMode {
-        case .chats:
+    private static func status(for contentFilter: ContentFilter) -> ItemStatus {
+        switch contentFilter {
+        case .active:
             return .active
-        case .archive:
+        case .archived:
             return .archived
-        case .trash:
+        case .trashed:
             return .trashed
         }
     }
@@ -41,8 +41,8 @@ struct ProjectSorter {
         project.conversations.compactMap { ConversationSorter.lastTurnTimestamp(for: $0) }.max()
     }
 
-    static func lastTurnTimestamp(for project: ProjectItem, navigationMode: NavigationMode) -> Date? {
-        let status = status(for: navigationMode)
+    static func lastTurnTimestamp(for project: ProjectItem, contentFilter: ContentFilter) -> Date? {
+        let status = status(for: contentFilter)
         let relevantConversations = project.conversations.filter { $0.status == status }
         return relevantConversations.compactMap { ConversationSorter.lastTurnTimestamp(for: $0) }.max()
     }
@@ -51,7 +51,7 @@ struct ProjectSorter {
         _ projects: [ProjectItem],
         descending: Bool,
         sortType: SidebarSortType,
-        navigationMode: NavigationMode
+        contentFilter: ContentFilter
     ) -> [ProjectItem] {
         sortItems(
             projects,
@@ -59,7 +59,7 @@ struct ProjectSorter {
             sortType: sortType,
             name: { $0.name },
             timestamp: { $0.timestamp },
-            lastMessage: { lastTurnTimestamp(for: $0, navigationMode: navigationMode) }
+            lastMessage: { lastTurnTimestamp(for: $0, contentFilter: contentFilter) }
         )
     }
 }

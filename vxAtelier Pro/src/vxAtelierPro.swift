@@ -11,7 +11,7 @@ import SwiftUI
 /// Custom commands for the application's main menu
 struct AppCommands: Commands {
     @AppStorage(AppSettings.Keys.showEmptySections) private var showEmptySections: Bool = AppDefaults.showEmptySections
-    @AppStorage(AppSettings.Keys.navigationMode) private var navigationMode: NavigationMode = .chats
+    @AppStorage(AppSettings.Keys.contentFilter) private var contentFilter: ContentFilter = .active
 
     var body: some Commands {
         CommandGroup(after: .sidebar) {
@@ -25,17 +25,17 @@ struct AppCommands: Commands {
             Divider()
 
             Button("Show Chats") {
-                setNavigationMode(.chats, navigationMode: $navigationMode)
+                setContentFilter(.active, contentFilter: $contentFilter)
             }
             .keyboardShortcut("1", modifiers: [.command])
 
             Button("Show Archive") {
-                setNavigationMode(.archive, navigationMode: $navigationMode)
+                setContentFilter(.archived, contentFilter: $contentFilter)
             }
             .keyboardShortcut("2", modifiers: [.command])
 
             Button("Show Trash") {
-                setNavigationMode(.trash, navigationMode: $navigationMode)
+                setContentFilter(.trashed, contentFilter: $contentFilter)
             }
             .keyboardShortcut("3", modifiers: [.command])
 

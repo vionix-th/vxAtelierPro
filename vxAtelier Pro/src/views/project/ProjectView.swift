@@ -39,7 +39,7 @@ struct ProjectView: View {
         )
     }
     
-    @AppStorage(AppSettings.Keys.navigationMode) private var navigationMode: NavigationMode = .chats
+    @AppStorage(AppSettings.Keys.contentFilter) private var contentFilter: ContentFilter = .active
     @AppStorage(AppSettings.Keys.projectDialogsSortDescending) private var conversationsSortDescending: Bool =
         AppDefaults.projectDialogsSortDescending
     @AppStorage(AppSettings.Keys.projectDialogsSortType) private var conversationsSortTypeRaw: String =
@@ -79,9 +79,9 @@ struct ProjectView: View {
             case .active:
                 return true
             case .archived:
-                return navigationMode == .archive
+                return contentFilter == .archived
             case .trashed:
-                return navigationMode == .trash
+                return contentFilter == .trashed
             }
         }
         // Sort by selected type and order

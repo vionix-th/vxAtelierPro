@@ -50,7 +50,7 @@ struct AppDefaults {
     static let sidebarDialogsSortType = "conversationDate"
     static let sidebarProjectsSortDescending = false
     static let sidebarProjectsSortType = "alphabetically"
-    static let navigationMode = NavigationMode.chats.rawValue
+    static let contentFilter = ContentFilter.active.rawValue
     // Conversation label toggles
     static let showConversationLastMessageLabel = true
     static let showConversationCreatedLabel = true
@@ -220,7 +220,7 @@ extension AppDefaults {
         defaults.set(AppDefaults.projectDialogsSortType, forKey: AppSettings.Keys.projectDialogsSortType)
         // Dialog/project filters
         defaults.set(AppDefaults.showEmptySections, forKey: AppSettings.Keys.showEmptySections)
-        defaults.set(AppDefaults.navigationMode, forKey: AppSettings.Keys.navigationMode)
+        defaults.set(AppDefaults.contentFilter, forKey: AppSettings.Keys.contentFilter)
         // Add any additional settings as needed
         defaults.synchronize()
     }

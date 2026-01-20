@@ -6,7 +6,7 @@ enum AppSettings {
     enum Keys {
         // Navigation & layout
         static let showEmptySections = "ShowEmptySections"
-        static let navigationMode = "NavigationMode"
+        static let contentFilter = "ContentFilter"
         static let statusBarVisible = "statusBarVisible"
         static let appearanceStyle = "appearanceStyle"
         static let showRowToolButtons = "showRowToolButtons"
@@ -69,4 +69,3 @@ enum AppSettings {
         static let statusBarLogTypeFilters = "statusBarLogTypeFilters"
     }
 }
-
