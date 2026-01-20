@@ -20,24 +20,24 @@ struct MessageView: View {
     let isBookmarked: Bool
     var streamingContent: String? = nil
 
-    @AppStorage("DisableAvatar") private var disableAvatar: Bool = false
-    @AppStorage("DefaultAvatarSize") private var defaultAvatarSize: Double = 40
-    @AppStorage("BubbleFontSize") private var bubbleFontSize: Double = AppDefaults.fontSizeMedium
-    @AppStorage("ShowToolCallChips") private var showToolCallChips: Bool = true
-    @AppStorage("MarkdownStreamFinalizeOnly") private var markdownStreamFinalizeOnly: Bool = false
+    @AppStorage(AppSettings.Keys.disableAvatar) private var disableAvatar: Bool = false
+    @AppStorage(AppSettings.Keys.defaultAvatarSize) private var defaultAvatarSize: Double = 40
+    @AppStorage(AppSettings.Keys.bubbleFontSize) private var bubbleFontSize: Double = AppDefaults.fontSizeMedium
+    @AppStorage(AppSettings.Keys.showToolCallChips) private var showToolCallChips: Bool = true
+    @AppStorage(AppSettings.Keys.markdownStreamFinalizeOnly) private var markdownStreamFinalizeOnly: Bool = false
     @State private var toolsExpanded: Bool = false
     @State private var didAutoExpand: Bool = false
     @State private var expandedResultIds: Set<PersistentIdentifier> = []
 
     private var avatar: some View {
-        let dialog = queryManager.allConversations.first(where: { $0.id == conversationID })
+        let dialog = queryManager.conversation(with: conversationID)
         
         let imageData: Data? = {
             if let data = dialog?.options.avatarImageData {
                 return data
             } else if let data = dialog?.project?.defaultOptions.avatarImageData {
                 return data
-            } else if let data = UserDefaults.standard.data(forKey: "defaultAvatar") {
+            } else if let data = UserDefaults.standard.data(forKey: AppSettings.Keys.defaultAvatarData) {
                 return data
             }
             return nil
@@ -49,7 +49,7 @@ struct MessageView: View {
     var body: some View {
         let message: MessageItem?
         let turn: ConversationTurn?
-        let dialog = queryManager.allConversations.first(where: { $0.id == conversationID })
+        let dialog = queryManager.conversation(with: conversationID)
         let isStreamingPlaceholder: Bool
         
         // Resolve models from IDs

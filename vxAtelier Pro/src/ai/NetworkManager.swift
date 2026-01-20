@@ -137,18 +137,18 @@ class NetworkManager {
     
     /// NEW: Allow self-signed certificates if set to true (default is false), stored in UserDefaults
     var allowSelfSignedCertificates: Bool {
-        get { UserDefaults.standard.bool(forKey: "allowSelfSignedCertificates") }
+        get { UserDefaults.standard.bool(forKey: AppSettings.Keys.allowSelfSignedCertificates) }
         set {
-            let oldValue = UserDefaults.standard.bool(forKey: "allowSelfSignedCertificates")
+            let oldValue = UserDefaults.standard.bool(forKey: AppSettings.Keys.allowSelfSignedCertificates)
             if oldValue != newValue {
-                UserDefaults.standard.set(newValue, forKey: "allowSelfSignedCertificates")
+                UserDefaults.standard.set(newValue, forKey: AppSettings.Keys.allowSelfSignedCertificates)
                 configureSession()
             }
         }
     }
     /// Whitelist of regex patterns for allowed hosts (from UserDefaults)
     var selfSignedCertWhitelist: [String] {
-        guard let json = UserDefaults.standard.string(forKey: "selfSignedCertWhitelist"),
+        guard let json = UserDefaults.standard.string(forKey: AppSettings.Keys.selfSignedCertWhitelist),
               let data = json.data(using: .utf8),
               let arr = try? JSONDecoder().decode([String].self, from: data) else {
             return []

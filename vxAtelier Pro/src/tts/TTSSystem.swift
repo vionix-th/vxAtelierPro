@@ -649,7 +649,8 @@ struct MessageContext {
             vxAtelierPro.log.debug("⏭️ Moving to next item (\(self.currentIndex + 2)/\(self.playlist.count))")
             jumpTo(self.currentIndex + 1, manualSelection: false)
         } else {
-            let repeatMode = UserDefaults.standard.string(forKey: "TTSRepeatMode") ?? AppDefaults.ttsRepeatMode
+            let repeatMode = UserDefaults.standard.string(
+                forKey: AppSettings.Keys.ttsRepeatMode) ?? AppDefaults.ttsRepeatMode
             if repeatMode == "all" {
                 vxAtelierPro.log.debug("🔄 Wrapping to start (repeat all mode)")
                 jumpTo(0, manualSelection: false)
@@ -677,7 +678,8 @@ struct MessageContext {
             vxAtelierPro.log.debug("⏮️ Moving to previous item (\(self.currentIndex)/\(self.playlist.count))")
             jumpTo(self.currentIndex - 1, manualSelection: false)
         } else {
-            let repeatMode = UserDefaults.standard.string(forKey: "TTSRepeatMode") ?? AppDefaults.ttsRepeatMode
+            let repeatMode = UserDefaults.standard.string(
+                forKey: AppSettings.Keys.ttsRepeatMode) ?? AppDefaults.ttsRepeatMode
             if repeatMode == "all" {
                 vxAtelierPro.log.debug("🔁 Wrapping to end (repeat all mode)")
                 jumpTo(self.playlist.count - 1, manualSelection: false)
@@ -797,8 +799,9 @@ struct MessageContext {
                 return
             }
             
-            let repeatMode = UserDefaults.standard.string(forKey: "TTSRepeatMode") ?? AppDefaults.ttsRepeatMode
-            let autoplay = UserDefaults.standard.bool(forKey: "TTSAutoplay")
+            let repeatMode = UserDefaults.standard.string(
+                forKey: AppSettings.Keys.ttsRepeatMode) ?? AppDefaults.ttsRepeatMode
+            let autoplay = UserDefaults.standard.bool(forKey: AppSettings.Keys.ttsAutoplay)
             
             switch repeatMode {
             case "one":

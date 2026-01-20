@@ -1,19 +1,19 @@
 import SwiftUI
 
 struct DeveloperSettingsView: View {
-    @AppStorage("IsMarkdownEnabled") private var isMarkdownEnabled: Bool = AppDefaults.isMarkdownEnabled
-    @AppStorage("IsMarkdownTextSelectable") private var isMarkdownTextSelectable: Bool = AppDefaults.isMarkdownTextSelectable
-    @AppStorage("ShowSystemDialogs") private var showSystemDialogs: Bool = AppDefaults.showSystemDialogs
-    @AppStorage("MakeKeyAndOrderFront") private var makeKeyAndOrderFront: Bool = false
+    @AppStorage(AppSettings.Keys.isMarkdownEnabled) private var isMarkdownEnabled: Bool = AppDefaults.isMarkdownEnabled
+    @AppStorage(AppSettings.Keys.isMarkdownTextSelectable) private var isMarkdownTextSelectable: Bool = AppDefaults.isMarkdownTextSelectable
+    @AppStorage(AppSettings.Keys.showSystemDialogs) private var showSystemDialogs: Bool = AppDefaults.showSystemDialogs
+    @AppStorage(AppSettings.Keys.makeKeyAndOrderFront) private var makeKeyAndOrderFront: Bool = false
     // New debug/streaming/scrolling flags
-    @AppStorage("AutoScrollDebugEnabled") private var autoScrollDebugEnabled: Bool = false
-    @AppStorage("AutoScrollGateEnabled") private var autoScrollGateEnabled: Bool = false
-    @AppStorage("StreamingThrottleEnabled") private var streamingThrottleEnabled: Bool = false
-    @AppStorage("StreamingThrottleIntervalMs") private var streamingThrottleIntervalMs: Int = 50
-    @AppStorage("StreamingDebugEnabled") private var streamingDebugEnabled: Bool = false
-    @AppStorage("MarkdownStreamFinalizeOnly") private var markdownStreamFinalizeOnly: Bool = false
-    @AppStorage("ShowToolCallChips") private var showToolCallChips: Bool = true
-    @AppStorage("selfSignedCertWhitelist") private var selfSignedCertWhitelistJSON: String = "[]"
+    @AppStorage(AppSettings.Keys.autoScrollDebugEnabled) private var autoScrollDebugEnabled: Bool = false
+    @AppStorage(AppSettings.Keys.autoScrollGateEnabled) private var autoScrollGateEnabled: Bool = false
+    @AppStorage(AppSettings.Keys.streamingThrottleEnabled) private var streamingThrottleEnabled: Bool = false
+    @AppStorage(AppSettings.Keys.streamingThrottleIntervalMs) private var streamingThrottleIntervalMs: Int = 50
+    @AppStorage(AppSettings.Keys.streamingDebugEnabled) private var streamingDebugEnabled: Bool = false
+    @AppStorage(AppSettings.Keys.markdownStreamFinalizeOnly) private var markdownStreamFinalizeOnly: Bool = false
+    @AppStorage(AppSettings.Keys.showToolCallChips) private var showToolCallChips: Bool = true
+    @AppStorage(AppSettings.Keys.selfSignedCertWhitelist) private var selfSignedCertWhitelistJSON: String = "[]"
     @State private var selfSignedCertWhitelist: [String] = []
 
     private func decodeWhitelist(from json: String) -> [String] {

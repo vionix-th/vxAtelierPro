@@ -16,12 +16,8 @@ struct ConversationOptionsView: View {
     @Environment(QueryManager.self) private var queryManager
     @Binding var options: ConversationOptions
 
-    // Replace direct @Query with QueryManager
-    // @Query(sort: \APIConfigurationItem.name)
-    // private var apiConfigurations: [APIConfigurationItem]
-
-    // @Query(sort: \ModelItem.name)
-    // private var models: [ModelItem]
+    @Query(sort: [SortDescriptor(\APIConfigurationItem.name)]) private var apiConfigurations: [APIConfigurationItem]
+    @Query(sort: [SortDescriptor(\ModelItem.name)]) private var models: [ModelItem]
     
     @State private var isAvatarImageImporting: Bool = false
     @State private var selectedTab = 0
@@ -40,12 +36,12 @@ struct ConversationOptionsView: View {
             Text("API Configuration")
                 .frame(width: 150, alignment: .leading)
             Picker("", selection: $options.apiConfiguration) {
-                ForEach(queryManager.apiConfigurations) { config in
+                ForEach(apiConfigurations) { config in
                     Text(config.name).tag(config as APIConfigurationItem?)
                 }
             }
             .pickerStyle(.menu)
-            .disabled(queryManager.apiConfigurations.isEmpty)
+            .disabled(apiConfigurations.isEmpty)
         }
     }
 

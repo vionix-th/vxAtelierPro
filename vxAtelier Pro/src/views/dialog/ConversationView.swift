@@ -4,7 +4,7 @@ import Foundation
 
 // MARK: - ConversationView
 struct ConversationView: View {
-    @ObservedObject var viewModel: ConversationViewModel
+    @Bindable var viewModel: ConversationViewModel
     
     let scrollHint: PersistentIdentifier?
     let onRequestOptions: (PersistentIdentifier) -> Void
@@ -14,7 +14,7 @@ struct ConversationView: View {
         scrollHint: PersistentIdentifier? = nil,
         onRequestOptions: @escaping (PersistentIdentifier) -> Void = { _ in }
     ) {
-        self.viewModel = viewModel
+        self._viewModel = Bindable(wrappedValue: viewModel)
         self.scrollHint = scrollHint
         self.onRequestOptions = onRequestOptions
     }
@@ -64,9 +64,14 @@ struct ConversationView: View {
                 if !viewModel.isSelectingMessages, let conversation = viewModel.conversation {
                     Divider()
                     MessageInputView(
-                        dialog: conversation,
+                        queryManager: viewModel.queryManager,
                         streamingState: viewModel.streamingState,
-                        didSend: { _ in
+                        contextConversation: conversation,
+                        resolveConversation: {
+                            if let conversation = viewModel.conversation {
+                                return conversation
+                            }
+                            throw AppError.invalidOperation("Conversation not available")
                         }
                     )
                     .padding(AppDefaults.paddingSmall)
@@ -194,7 +199,7 @@ fileprivate struct ConversationTurnView: View {
 }
 
 struct SelectionModeMenu: View {
-    @ObservedObject var viewModel: ConversationViewModel
+    @Bindable var viewModel: ConversationViewModel
     @Environment(TTSQueue.self) private var ttsQueue
 
     var body: some View {
@@ -273,7 +278,7 @@ struct SelectionModeMenu: View {
 }
 
 struct NormalModeMenu: View {
-    @ObservedObject var viewModel: ConversationViewModel
+    @Bindable var viewModel: ConversationViewModel
     @Environment(TTSQueue.self) private var ttsQueue
     let onRequestOptions: (PersistentIdentifier) -> Void
 

@@ -5,25 +5,26 @@ import SwiftUI
 struct ContentView: View {
     // MARK: - Environment & Context
     @Environment(QueryManager.self) private var queryManager
+    @Environment(NavigationRouter.self) private var router
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(ConversationViewModelStore.self) private var conversationStore
 
+    @Query(sort: [SortDescriptor(\ProjectItem.name)]) private var projects: [ProjectItem]
+    @Query(sort: [SortDescriptor(\ConversationItem.timestamp, order: .reverse)]) private var conversations: [ConversationItem]
+    @Query(sort: [SortDescriptor(\BookmarkItem.label)]) private var bookmarks: [BookmarkItem]
+
     // MARK: - View Options (UserDefaults-backed)
-    @AppStorage("ShowEmptySections") private var showEmptySections: Bool = AppDefaults.showEmptySections
-    @AppStorage("ShowSystemDialogs") private var showSystemDialogs: Bool = AppDefaults.showSystemDialogs
-    @AppStorage("NavigationMode") private var navigationMode: NavigationMode = .chats
-    @AppStorage("SidebarDialogsSortOrderDescending") private var sidebarDialogsSortDescending: Bool = true
-    @AppStorage("SidebarDialogsSortType") private var sidebarDialogsSortTypeRaw: String =
+    @AppStorage(AppSettings.Keys.showEmptySections) private var showEmptySections: Bool = AppDefaults.showEmptySections
+    @AppStorage(AppSettings.Keys.showSystemDialogs) private var showSystemDialogs: Bool = AppDefaults.showSystemDialogs
+    @AppStorage(AppSettings.Keys.navigationMode) private var navigationMode: NavigationMode = .chats
+    @AppStorage(AppSettings.Keys.sidebarDialogsSortDescending) private var sidebarDialogsSortDescending: Bool = true
+    @AppStorage(AppSettings.Keys.sidebarDialogsSortType) private var sidebarDialogsSortTypeRaw: String =
         SidebarSortType.conversationDate.rawValue
-    @AppStorage("SidebarProjectsSortOrderDescending") private var sidebarProjectsSortDescending: Bool = false
-    @AppStorage("SidebarProjectsSortType") private var sidebarProjectsSortTypeRaw: String =
+    @AppStorage(AppSettings.Keys.sidebarProjectsSortDescending) private var sidebarProjectsSortDescending: Bool = false
+    @AppStorage(AppSettings.Keys.sidebarProjectsSortType) private var sidebarProjectsSortTypeRaw: String =
         SidebarSortType.alphabetically.rawValue
 
     // MARK: - State & Bindings
-    @State private var selection: SidebarSelection?
-    @Binding var activeConversationID: PersistentIdentifier?
-    @Binding var selectionRequest: SidebarSelection?
-    @State private var pendingProjectConversationSelection: ProjectConversationSelection?
     let onRequestOptions: (PersistentIdentifier) -> Void
     let onRequestExportProject: (ProjectItem) -> Void
     let onRequestExportConversation: (ConversationItem) -> Void
@@ -32,24 +33,77 @@ struct ContentView: View {
     let onRequestTTS: () -> Void
     let onRequestLogHistory: () -> Void
 
-    private var sidebarDataSource: ContentSidebarDataSource {
-        ContentSidebarDataSource(
-            queryManager: queryManager,
-            navigationMode: navigationMode,
-            showSystemDialogs: showSystemDialogs
-        )
+    private var filteredProjects: [ProjectItem] {
+        switch navigationMode {
+        case .chats:
+            return projects.filter { $0.status == .active }
+        case .archive:
+            return projects.filter { $0.status == .archived }
+        case .trash:
+            return projects.filter { $0.status == .trashed }
+        }
+    }
+
+    private var standaloneDialogs: [ConversationItem] {
+        conversations.filter { conversation in
+            guard conversation.project == nil else { return false }
+            switch navigationMode {
+            case .chats:
+                if conversation.status != .active { return false }
+            case .archive:
+                if conversation.status != .archived { return false }
+            case .trash:
+                if conversation.status != .trashed { return false }
+            }
+            if !showSystemDialogs && conversation.purpose == .system {
+                return false
+            }
+            return true
+        }
+    }
+
+    private var visibleBookmarks: [BookmarkItem] {
+        navigationMode == .chats ? bookmarks : []
+    }
+    
+    private var hasVisibleSidebarItems: Bool {
+        !filteredProjects.isEmpty || !standaloneDialogs.isEmpty || !visibleBookmarks.isEmpty
+    }
+    
+    private var trashedDialogsCount: Int {
+        conversations.filter { $0.status == .trashed && $0.project == nil }.count
+    }
+    
+    private var trashedProjectsCount: Int {
+        projects.filter { $0.status == .trashed }.count
+    }
+    
+    private var archivedDialogsCount: Int {
+        conversations.filter { $0.status == .archived && $0.project == nil }.count
+    }
+    
+    private var archivedProjectsCount: Int {
+        projects.filter { $0.status == .archived }.count
     }
 
     // MARK: - Helper Methods
     // MARK: - Actions
     private func addConversation() {
-        let conversation = queryManager.createConversation()
-        selection = .conversation(conversation.id)
+        do {
+            let conversation = try queryManager.createConversation()
+            router.setSelection(.conversation(conversation.id))
+        } catch {
+            vxAtelierPro.log.error("Failed to create conversation: \(error.localizedDescription)")
+        }
     }
 
     private func addProject() {
-        let project = queryManager.createProject()
-        selection = .project(project.id)
+        do {
+            let project = try queryManager.createProject()
+            router.setSelection(.project(project.id))
+        } catch {
+            vxAtelierPro.log.error("Failed to create project: \(error.localizedDescription)")
+        }
     }
 
     private func assignConversationToProject(
@@ -66,9 +120,10 @@ struct ContentView: View {
     }
 
     private func initialConversationID(for projectID: PersistentIdentifier) -> PersistentIdentifier? {
-        guard let pending = pendingProjectConversationSelection,
-              pending.projectID == projectID else { return nil }
-        return pending.conversationID
+        if case .conversation(let id)? = router.path(for: projectID).last {
+            return id
+        }
+        return nil
     }
 
     private func selectConversationFromBookmark(_ bookmark: BookmarkItem) {
@@ -78,14 +133,9 @@ struct ContentView: View {
         }
 
         if let project = conversation.project {
-            selection = .project(project.id)
-            pendingProjectConversationSelection = ProjectConversationSelection(
-                projectID: project.id,
-                conversationID: conversation.id
-            )
+            router.openConversation(conversation.id, in: project.id)
         } else {
-            selection = .conversation(conversation.id)
-            pendingProjectConversationSelection = nil
+            router.openConversation(conversation.id, in: nil)
         }
     }
 
@@ -142,14 +192,21 @@ struct ContentView: View {
     // MARK: - View Components
     private var sidebarView: some View {
         ContentSidebarView(
-            dataSource: sidebarDataSource,
-            selection: $selection,
+            navigationMode: navigationMode,
+            projects: filteredProjects,
+            dialogs: standaloneDialogs,
+            bookmarks: visibleBookmarks,
+            selection: Binding(
+                get: { router.selection },
+                set: { router.setSelection($0) }
+            ),
             sidebarProjectsSortDescending: $sidebarProjectsSortDescending,
             sidebarProjectsSortTypeRaw: $sidebarProjectsSortTypeRaw,
             sidebarDialogsSortDescending: $sidebarDialogsSortDescending,
             sidebarDialogsSortTypeRaw: $sidebarDialogsSortTypeRaw,
             showEmptySections: showEmptySections,
-            actions: sidebarActions
+            actions: sidebarActions,
+            availableProjects: projects.filter { $0.status == .active }
         )
     }
 
@@ -158,7 +215,7 @@ struct ContentView: View {
         if let selection {
             switch selection {
             case .conversation(let id):
-                if let conversation = queryManager.allConversations.first(where: { $0.id == id }) {
+                if let conversation = standaloneDialogs.first(where: { $0.id == id }) {
                     ConversationView(
                         viewModel: conversationStore.viewModel(for: conversation.id),
                         onRequestOptions: onRequestOptions
@@ -168,11 +225,10 @@ struct ContentView: View {
                     Text("Item not found.")
                 }
             case .project(let id):
-                if let project = queryManager.allProjects.first(where: { $0.id == id }) {
+                if let project = filteredProjects.first(where: { $0.id == id }) {
                     ProjectView(
                         projectID: project.id,
                         initialConversationID: initialConversationID(for: project.id),
-                        onActiveConversationChange: { activeConversationID = $0 },
                         onRequestOptions: onRequestOptions,
                         onDeleteConversation: { conversation in
                             deleteItem(for: conversation)
@@ -316,7 +372,7 @@ struct ContentView: View {
     var body: some View {
         Group {
             #if os(iOS)
-                if horizontalSizeClass == .compact && !sidebarDataSource.hasVisibleItems {
+                if horizontalSizeClass == .compact && !hasVisibleSidebarItems {
                     DetailPlaceholderView(
                         hasAPIConfiguration: queryManager.defaultApiConfiguration != nil,
                         onNewDialog: addConversation,
@@ -333,24 +389,15 @@ struct ContentView: View {
             #endif
         }
         .onChange(of: navigationMode) { _, _ in
-            let visibleSelections = sidebarDataSource.visibleSelections
-            if let selection, !visibleSelections.contains(selection) {
-                self.selection = nil
+            let visibleSelections = filteredProjects.map { SidebarSelection.project($0.id) }
+                + standaloneDialogs.map { SidebarSelection.conversation($0.id) }
+            if let selection = router.selection, !visibleSelections.contains(selection) {
+                router.setSelection(nil)
             }
         }
-        .onChange(of: selection) { _, newValue in
-            activeConversationID = newValue?.conversationID
-            if case .conversation = newValue {
-                pendingProjectConversationSelection = nil
-            } else if case .project(let projectID) = newValue,
-                      pendingProjectConversationSelection?.projectID != projectID {
-                pendingProjectConversationSelection = nil
-            }
-        }
-        .onChange(of: selectionRequest) { _, newValue in
-            guard let newValue else { return }
-            selection = newValue
-            selectionRequest = nil
+        .onChange(of: conversations) { _, updated in
+            let ids = Set(updated.map(\.id))
+            conversationStore.prune(toExisting: ids)
         }
     }
 
@@ -359,11 +406,11 @@ struct ContentView: View {
         VStack(spacing: 0) {
             #if os(macOS)
                 NavigationSplitView {
-                    sidebarView
-                        .toolbar { sidebarToolbar }
-                } detail: {
-                    detailView(for: selection)
-                }
+            sidebarView
+            .toolbar { sidebarToolbar }
+        } detail: {
+            detailView(for: router.selection)
+        }
             #else
                 NavigationSplitView {
                     sidebarView
@@ -372,35 +419,7 @@ struct ContentView: View {
                     detailPlaceholderView
                 }
                 .navigationDestination(for: SidebarSelection.self) { selection in
-                    switch selection {
-                    case .conversation(let id):
-                        if let conversation = queryManager.allConversations.first(where: { $0.id == id }) {
-                            ConversationView(
-                                viewModel: conversationStore.viewModel(for: conversation.id),
-                                onRequestOptions: onRequestOptions
-                            )
-                            .id(conversation.id)
-                        } else {
-                            Text("Item not found.")
-                        }
-                    case .project(let id):
-                        if let project = queryManager.allProjects.first(where: { $0.id == id }) {
-                            ProjectView(
-                                projectID: project.id,
-                                initialConversationID: initialConversationID(for: project.id),
-                                onActiveConversationChange: { activeConversationID = $0 },
-                                onRequestOptions: onRequestOptions,
-                                onDeleteConversation: { conversation in
-                                    deleteItem(for: conversation)
-                                },
-                                onExportProject: { project in
-                                    onRequestExportProject(project)
-                                }
-                            )
-                        } else {
-                            Text("Item not found.")
-                        }
-                    }
+                    detailView(for: selection)
                 }
             #endif
 
@@ -408,8 +427,7 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .utilityPanelDidSendConversation)) {
             notification in
             if let conversationID = notification.object as? PersistentIdentifier {
-                selection = .conversation(conversationID)
-                pendingProjectConversationSelection = nil
+                router.openConversation(conversationID, in: nil)
             }
         }
     }
@@ -424,8 +442,8 @@ struct ContentView: View {
                         do {
                             // Store current state before emptying trash
                             let hadTrashedItems =
-                                !queryManager.trashedDialogs.isEmpty
-                                || !queryManager.trashedProjects.isEmpty
+                                trashedDialogsCount > 0
+                                || trashedProjectsCount > 0
 
                             // Empty trash
                             try queryManager.emptyTrash()
@@ -437,7 +455,7 @@ struct ContentView: View {
                                     navigationMode: $navigationMode,
                                     animated: true
                                 )
-                                self.selection = nil
+                                router.setSelection(nil)
                                 vxAtelierPro.log.info("Trash emptied, returning to Show Chats")
                             } else {
                                 vxAtelierPro.log.debug(
@@ -475,9 +493,12 @@ struct ContentView: View {
     private func deleteItem(for item: any PersistentModel) {
         let itemId = item.persistentModelID
         let itemType = type(of: item)
+        if let conversation = item as? ConversationItem {
+            conversationStore.remove(conversation.id)
+        }
 
-        if selectionMatches(selection, item: item) {
-            selection = nil
+        if selectionMatches(router.selection, item: item) {
+            router.setSelection(nil)
             vxAtelierPro.log.debug("Selected item (ID: \(itemId), Type: \(itemType)) cleared.")
         } else {
             vxAtelierPro.log.debug("Selected item (ID: \(itemId), Type: \(itemType)) not cleared.")
@@ -491,15 +512,14 @@ struct ContentView: View {
                 )
 
                 // Only reset navigation if there are NO trashed items remaining (both dialogs and projects)
-                let remainingTrashedItems =
-                    queryManager.trashedDialogs.count + queryManager.trashedProjects.count
+                let remainingTrashedItems = trashedDialogsCount + trashedProjectsCount
                 if remainingTrashedItems == 0 {
                     setNavigationMode(
                         .chats,
                         navigationMode: $navigationMode,
                         animated: true
                     )
-                    self.selection = nil
+                    router.setSelection(nil)
                     vxAtelierPro.log.info("Last trashed item removed, returning to Show Chats")
                 } else {
                     vxAtelierPro.log.debug(
@@ -527,13 +547,13 @@ struct ContentView: View {
             try queryManager.archiveItem(item)
             vxAtelierPro.log.debug("Successfully archived item (ID: \(itemId), Type: \(itemType)).")
 
-            if selectionMatches(selection, item: item) {
-                selection = nil
+            if selectionMatches(router.selection, item: item) {
+                router.setSelection(nil)
 
                 // If we're in archive view and this was the last item, return to Show Chats
                 if wasInArchive {
-                    let remainingArchivedItems = queryManager.archivedProjects.count
-                    let remainingArchivedDialogs = queryManager.archivedDialogs.count
+                    let remainingArchivedItems = archivedProjectsCount
+                    let remainingArchivedDialogs = archivedDialogsCount
 
                     if remainingArchivedItems == 0 && remainingArchivedDialogs == 0 {
                         setNavigationMode(

@@ -1,19 +1,19 @@
 import SwiftUI
 
 struct GeneralSettingsView: View {
-    @AppStorage("appearanceStyle") private var appearanceStyle: AppearanceStyle = .system    
-    @AppStorage("showRowToolButtons") private var showRowToolButtons: Bool = AppDefaults.showRowToolButtons
-    @AppStorage("autoNameDialogs") private var autoNameDialogs: Bool = AppDefaults.autoNameDialogs
-    @AppStorage("statusBarVisible") private var statusBarVisible: Bool = AppDefaults.statusBarVisible
-    @AppStorage("showConversationLastMessageLabel") private var showConversationLastMessageLabel: Bool = AppDefaults.showConversationLastMessageLabel
-    @AppStorage("showConversationCreatedLabel") private var showConversationCreatedLabel: Bool = AppDefaults.showConversationCreatedLabel
-    @AppStorage("shouldTerminateAfterLastWindowClosed") private var shouldTerminateAfterLastWindowClosed: Bool = AppDefaults.shouldTerminateAfterLastWindowClosed
-    @AppStorage("DialogTextEdit.buttonSize") private var dialogTextEditButtonSize: Double = AppDefaults.dialogTextEditButtonSize
-    @AppStorage("autoSendDialogTemplates") private var autoSendDialogTemplates: Bool = AppDefaults.autoSendDialogTemplates
-    @AppStorage("defaultAvatar") private var defaultAvatarData: Data?
-    @AppStorage("DisableAvatar") private var disableAvatar: Bool = AppDefaults.disableAvatar
-    @AppStorage("DefaultAvatarSize") private var defaultAvatarSize: Int = AppDefaults.defaultAvatarSize
-    @AppStorage("BubbleFontSize") private var bubbleFontSize: Double = AppDefaults.fontSizeMedium
+    @AppStorage(AppSettings.Keys.appearanceStyle) private var appearanceStyle: AppearanceStyle = .system    
+    @AppStorage(AppSettings.Keys.showRowToolButtons) private var showRowToolButtons: Bool = AppDefaults.showRowToolButtons
+    @AppStorage(AppSettings.Keys.autoNameDialogs) private var autoNameDialogs: Bool = AppDefaults.autoNameDialogs
+    @AppStorage(AppSettings.Keys.statusBarVisible) private var statusBarVisible: Bool = AppDefaults.statusBarVisible
+    @AppStorage(AppSettings.Keys.showConversationLastMessageLabel) private var showConversationLastMessageLabel: Bool = AppDefaults.showConversationLastMessageLabel
+    @AppStorage(AppSettings.Keys.showConversationCreatedLabel) private var showConversationCreatedLabel: Bool = AppDefaults.showConversationCreatedLabel
+    @AppStorage(AppSettings.Keys.shouldTerminateAfterLastWindowClosed) private var shouldTerminateAfterLastWindowClosed: Bool = AppDefaults.shouldTerminateAfterLastWindowClosed
+    @AppStorage(AppSettings.Keys.dialogTextEditButtonSize) private var dialogTextEditButtonSize: Double = AppDefaults.dialogTextEditButtonSize
+    @AppStorage(AppSettings.Keys.autoSendDialogTemplates) private var autoSendDialogTemplates: Bool = AppDefaults.autoSendDialogTemplates
+    @AppStorage(AppSettings.Keys.defaultAvatarData) private var defaultAvatarData: Data?
+    @AppStorage(AppSettings.Keys.disableAvatar) private var disableAvatar: Bool = AppDefaults.disableAvatar
+    @AppStorage(AppSettings.Keys.defaultAvatarSize) private var defaultAvatarSize: Int = AppDefaults.defaultAvatarSize
+    @AppStorage(AppSettings.Keys.bubbleFontSize) private var bubbleFontSize: Double = AppDefaults.fontSizeMedium
 
     var body: some View {
         ScrollView {

@@ -1,6 +1,6 @@
 # vxAtelier Pro Codebase Documentation
 
-> Last updated: 2026-01-16
+> Last updated: 2026-01-20
 
 This document provides an in-depth technical reference of the **vxAtelier Pro** source code.  Use it together with `README.md` for a complete understanding of architectural concepts and high-level features.
 
@@ -159,12 +159,19 @@ The `system/` module contains core application services, data management logic, 
 
 #### Query Manager (`QueryManager.swift`)
 
-`QueryManager.swift` implements the **Repository pattern** for the application. It is an `@Observable` class that acts as a centralized, reactive data access layer, abstracting all direct SwiftData interactions from the rest of the app.
+`QueryManager` is now a **command-only** façade over SwiftData. Reads are performed directly in views with `@Query`; `QueryManager` provides:
 
-*   **Single Source of Truth**: It is initialized with the main `ModelContext` and maintains a local, in-memory cache of all major data models (e.g., `allConversations`, `allProjects`). It automatically refreshes this cache in response to underlying database changes, ensuring the UI is always synchronized.
-*   **Filtered Views for UI**: It exposes targeted accessors used by the sidebar and project views, including `standaloneConversations(showSystemDialogs:navigationMode:)` plus explicit `active/archived/trashed` accessors for projects and dialogs. These feed `NavigationMode`-driven filtering and sorting in SwiftUI.
-*   **High-Level CRUD API**: It provides a clean, high-level API for all Create, Read, Update, and Delete (CRUD) operations (e.g., `insert()`, `delete()`, `archiveItem()`). This encapsulates all `ModelContext` interactions and ensures the local cache is refreshed after every mutation.
-*   **Data Integrity**: It contains logic to enforce application invariants, such as the `ensureSystemConversation()` method, which guarantees that a system-level conversation always exists.
+*   **Targeted lookups**: Lightweight `conversation(with:)` and `project(with:)` helpers for status bar and menu actions.
+*   **Commands**: Centralized create/delete/archive/restore/assign/cleanup/bookmark/model-sync routines with consistent save + logging semantics.
+*   **Invariants**: Utilities like `ensureSystemConversation()` to guarantee required system records exist.
+
+There is no cached read model; invalidation and refresh are handled by SwiftData/`@Query`.
+
+#### Settings Facade (`AppSettings.swift`, `AppDefaults.swift`)
+
+* **Keys**: `AppSettings.Keys` centralizes all `UserDefaults` keys; use these with `@AppStorage` and direct `UserDefaults` calls.
+* **Defaults**: `AppDefaults` retains default values and the `resetUserDefaults()` helper; it now writes using `AppSettings.Keys`.
+* **Usage**: Avoid string literals for settings; prefer `@AppStorage(AppSettings.Keys.someKey)` to keep tooling and refactors reliable.
 
 #### Streaming State Management
 

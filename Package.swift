@@ -107,6 +107,7 @@ let package = Package(
                 "system/JsonSerializer.swift",
                 "system/MenuItemStyle.swift",
                 "system/PermissionManager.swift",
+                "system/AppSettings.swift",
                 "system/QueryManager.swift",
                 // TTS
                 "tts/TTSControlView.swift",
@@ -127,7 +128,7 @@ let package = Package(
                 "views/AppShellView.swift",
                 "views/ContentView.swift",
                 "views/content/ContentRouting.swift",
-                "views/content/ContentSidebarDataSource.swift",
+                "views/content/NavigationRouter.swift",
                 "views/content/ContentSidebarView.swift",
                 "views/StatusBar.swift",
                 // Views - Components

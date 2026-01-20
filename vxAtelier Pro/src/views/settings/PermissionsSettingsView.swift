@@ -2,8 +2,8 @@ import SwiftUI
 
 struct PermissionsSettingsView: View {
     @StateObject private var permissionManager = PermissionManager()
-    @AppStorage("allowSelfSignedCertificates") private var allowSelfSignedCertificates: Bool = false
-    @AppStorage("selfSignedCertWhitelist") private var selfSignedCertWhitelistJSON: String = "[]"
+    @AppStorage(AppSettings.Keys.allowSelfSignedCertificates) private var allowSelfSignedCertificates: Bool = false
+    @AppStorage(AppSettings.Keys.selfSignedCertWhitelist) private var selfSignedCertWhitelistJSON: String = "[]"
     @State private var selfSignedCertWhitelist: [String] = []
 
     private func decodeWhitelist(from json: String) -> [String] {

@@ -31,7 +31,7 @@ class GlobalUtilityPanel {
         
         if let window = window {
             // Resolve the conversation on-demand from the QueryManager
-            guard let conversation = queryManager.allConversations.first(where: { $0.id == conversationID }) else {
+            guard let conversation = queryManager.conversation(with: conversationID) else {
                 vxAtelierPro.log.error("Failed to find conversation with ID: \(conversationID)")
                 return
             }
@@ -41,8 +41,15 @@ class GlobalUtilityPanel {
             window.contentViewController = NSHostingController(
                 rootView:
                     MessageInputView(
-                        dialog: conversation,
+                        queryManager: queryManager,
                         streamingState: StreamingState(),
+                        contextConversation: conversation,
+                        resolveConversation: {
+                            if let resolved = queryManager.conversation(with: conversationID) {
+                                return resolved
+                            }
+                            throw AppError.invalidOperation("Conversation not found")
+                        },
                         didSend: { _ in
                             vxAtelierPro.log.debug("Dialog completed, closing window")
                             didSend(conversationID)

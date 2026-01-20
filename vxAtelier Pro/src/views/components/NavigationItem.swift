@@ -14,15 +14,14 @@ struct NavigationItem: View {
     var onExport: (() -> Void)?
     var conversation: ConversationItem? = nil
     var project: ProjectItem? = nil
-
-    @Environment(QueryManager.self) private var queryManager
+    var availableProjects: [ProjectItem] = []
 
     @State private var isHoveringItem: Bool = false
     @State private var isEditing: Bool = false
     @FocusState private var isEditingFocus: Bool
 
-    @AppStorage("showConversationLastMessageLabel") private var showConversationLastMessageLabel: Bool = true
-    @AppStorage("showConversationCreatedLabel") private var showConversationCreatedLabel: Bool = true
+    @AppStorage(AppSettings.Keys.showConversationLastMessageLabel) private var showConversationLastMessageLabel: Bool = true
+    @AppStorage(AppSettings.Keys.showConversationCreatedLabel) private var showConversationCreatedLabel: Bool = true
 
     @ViewBuilder
     private var navigationItemContextMenu: some View {
@@ -60,9 +59,9 @@ struct NavigationItem: View {
                     }
                     .help("Remove from current project")
 
-                    if !queryManager.activeProjects.isEmpty {
+                    if !availableProjects.isEmpty {
                         Divider()
-                        ForEach(queryManager.activeProjects) { project in
+                        ForEach(availableProjects) { project in
                             Button {
                                 onProjectAssign(project)
                             } label: {
@@ -200,7 +199,7 @@ struct NavigationItem: View {
             .menuStyle(.borderlessButton)
             .opacity(
                 isHoveringItem
-                    && UserDefaults.standard.bool(forKey: "showRowToolButtons")
+                    && UserDefaults.standard.bool(forKey: AppSettings.Keys.showRowToolButtons)
                     ? 1 : 0)
         }
         .padding(AppDefaults.paddingMedium)

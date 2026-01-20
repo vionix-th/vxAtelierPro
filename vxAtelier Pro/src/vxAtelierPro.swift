@@ -10,8 +10,8 @@ import SwiftUI
 
 /// Custom commands for the application's main menu
 struct AppCommands: Commands {
-    @AppStorage("ShowEmptySections") private var showEmptySections: Bool = AppDefaults.showEmptySections
-    @AppStorage("NavigationMode") private var navigationMode: NavigationMode = .chats
+    @AppStorage(AppSettings.Keys.showEmptySections) private var showEmptySections: Bool = AppDefaults.showEmptySections
+    @AppStorage(AppSettings.Keys.navigationMode) private var navigationMode: NavigationMode = .chats
 
     var body: some Commands {
         CommandGroup(after: .sidebar) {
@@ -131,7 +131,7 @@ struct vxAtelierPro: App {
         private let hotkeyController: GlobalHotkeyController
     #endif
 
-    @AppStorage("appearanceStyle") private var appearanceStyle: AppearanceStyle = .system
+    @AppStorage(AppSettings.Keys.appearanceStyle) private var appearanceStyle: AppearanceStyle = .system
 
     private var effectiveColorScheme: ColorScheme? {
         switch appearanceStyle {
@@ -191,7 +191,7 @@ struct vxAtelierPro: App {
         vxAtelierPro.log.debug("Tools registered")
 
         #if os(macOS)
-            if UserDefaults.standard.bool(forKey: "MakeKeyAndOrderFront") {
+            if UserDefaults.standard.bool(forKey: AppSettings.Keys.makeKeyAndOrderFront) {
                 DispatchQueue.main.async {
                     NSApp.activate(ignoringOtherApps: true)
                     vxAtelierPro.log.debug("Brought app to front on startup")
@@ -331,22 +331,26 @@ extension Notification.Name {
                 )
             } else {
                 vxAtelierPro.log.notice("Creating new dialog for utility panel")
-                let item = queryManager.createConversation()
-                item.title = AppDefaults.newDialogName
-                if let config = item.options.apiConfiguration {
-                    item.options.setupAiRequestArguments(for: config, modelContext: modelContext)
-                }
-                utilityPanel.show(
-                    modelContext: modelContext,
-                    conversationID: item.id,
-                    queryManager: queryManager,
-                    didSend: { conversationID in
-                        NotificationCenter.default.post(
-                            name: .utilityPanelDidSendConversation,
-                            object: conversationID
-                        )
+                do {
+                    let item = try queryManager.createConversation()
+                    item.title = AppDefaults.newDialogName
+                    if let config = item.options.apiConfiguration {
+                        item.options.setupAiRequestArguments(for: config, modelContext: modelContext)
                     }
-                )
+                    utilityPanel.show(
+                        modelContext: modelContext,
+                        conversationID: item.id,
+                        queryManager: queryManager,
+                        didSend: { conversationID in
+                            NotificationCenter.default.post(
+                                name: .utilityPanelDidSendConversation,
+                                object: conversationID
+                            )
+                        }
+                    )
+                } catch {
+                    vxAtelierPro.log.error("Failed to create conversation for utility panel: \(error.localizedDescription)")
+                }
             }
         }
     }
@@ -362,7 +366,7 @@ extension Notification.Name {
 
         func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
             let shouldTerminate = UserDefaults.standard.bool(
-                forKey: "shouldTerminateAfterLastWindowClosed")
+                forKey: AppSettings.Keys.shouldTerminateAfterLastWindowClosed)
             vxAtelierPro.log.debug(
                 "Checking if should terminate after last window closed: \(shouldTerminate)")
             return shouldTerminate

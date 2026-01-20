@@ -7,8 +7,8 @@ struct TTSControlView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
     
-    @AppStorage("TTSAutoplay") private var autoplay: Bool = AppDefaults.ttsAutoplay
-    @AppStorage("TTSRepeatMode") private var repeatMode: String = AppDefaults.ttsRepeatMode
+    @AppStorage(AppSettings.Keys.ttsAutoplay) private var autoplay: Bool = AppDefaults.ttsAutoplay
+    @AppStorage(AppSettings.Keys.ttsRepeatMode) private var repeatMode: String = AppDefaults.ttsRepeatMode
     
     var body: some View {
         NavigationStack {

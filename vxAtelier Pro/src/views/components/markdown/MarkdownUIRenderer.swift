@@ -14,7 +14,7 @@ import UIKit
 struct MarkdownUIRenderer: View {
     let markdown: String
     
-    @AppStorage("IsMarkdownTextSelectable") private var isMarkdownTextSelectable: Bool = AppDefaults.isMarkdownTextSelectable
+    @AppStorage(AppSettings.Keys.isMarkdownTextSelectable) private var isMarkdownTextSelectable: Bool = AppDefaults.isMarkdownTextSelectable
     
     var body: some View {
         Group {
@@ -98,5 +98,4 @@ private func copyToClipboard(_ text: String) {
     UIPasteboard.general.string = text
     #endif
 }
-
 

@@ -11,12 +11,16 @@ import Observation
     // Throttling state
     private var pendingBuffer: String = ""
     private var throttleTimer: DispatchSourceTimer?
-    private var isThrottlingEnabled: Bool { UserDefaults.standard.bool(forKey: "StreamingThrottleEnabled") }
+    private var isThrottlingEnabled: Bool {
+        UserDefaults.standard.bool(forKey: AppSettings.Keys.streamingThrottleEnabled)
+    }
     private var throttleIntervalMs: Int {
-        let v = UserDefaults.standard.integer(forKey: "StreamingThrottleIntervalMs")
+        let v = UserDefaults.standard.integer(forKey: AppSettings.Keys.streamingThrottleIntervalMs)
         return v > 0 ? v : 50 // default ~20 Hz
     }
-    private var streamingDebugEnabled: Bool { UserDefaults.standard.bool(forKey: "StreamingDebugEnabled") }
+    private var streamingDebugEnabled: Bool {
+        UserDefaults.standard.bool(forKey: AppSettings.Keys.streamingDebugEnabled)
+    }
     
     public init() {}
     

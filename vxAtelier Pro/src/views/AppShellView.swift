@@ -5,9 +5,8 @@ struct AppShellView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(QueryManager.self) private var queryManager
     @Environment(TTSQueue.self) private var ttsQueue
-    @AppStorage("statusBarVisible") private var statusBarVisible: Bool = AppDefaults.statusBarVisible
-    @State private var activeConversationID: PersistentIdentifier?
-    @State private var selectionRequest: SidebarSelection?
+    @AppStorage(AppSettings.Keys.statusBarVisible) private var statusBarVisible: Bool = AppDefaults.statusBarVisible
+    @State private var router = NavigationRouter()
     @State private var applicationSettingsViewIsPresented: Bool = false
     @State private var ttsViewIsPresented: Bool = false
     @State private var settingsInitialTab: ApplicationSettingsView.SettingsTab? = nil
@@ -16,6 +15,7 @@ struct AppShellView: View {
     @State private var importRequested = false
     @State private var isLogHistoryShown: Bool = false
 
+    // todo: having this structure is suspicious as PersistentIdentifier is already Identifiable
     private struct OptionsSheetKey: Identifiable { let id: PersistentIdentifier }
 
     private enum ExportRequest: Identifiable {
@@ -65,8 +65,6 @@ struct AppShellView: View {
     var body: some View {
         VStack(spacing: 0) {
             ContentView(
-                activeConversationID: $activeConversationID,
-                selectionRequest: $selectionRequest,
                 onRequestOptions: requestOptions(for:),
                 onRequestExportProject: requestExport(project:),
                 onRequestExportConversation: requestExport(conversation:),
@@ -77,12 +75,10 @@ struct AppShellView: View {
             )
 
             if statusBarVisible {
-                StatusBar(
-                    activeItemId: activeConversationID,
-                    onRequestLogHistory: requestLogHistory
-                )
+                StatusBar(onRequestLogHistory: requestLogHistory)
             }
         }
+        .environment(router)
         #if os(iOS)
             .onChange(of: ttsQueue.isPlaying) {
                 if ttsQueue.isPlaying {
@@ -127,7 +123,7 @@ struct AppShellView: View {
                 vxAtelierPro.log.debug("AppShellView: options sheet dismissed (onDismiss)")
             }
         ) { key in
-            if let dialog = queryManager.allConversations.first(where: { $0.id == key.id }) {
+            if let dialog = queryManager.conversation(with: key.id) {
                 ConversationOptionsView(
                     options: Binding(get: { dialog.options }, set: { dialog.options = $0 })
                 )
@@ -207,11 +203,12 @@ struct AppShellView: View {
                 let importedItem = try await DataManager.shared.importData(into: modelContext)
                 if let project = importedItem as? ProjectItem {
                     try queryManager.insert(project)
-                    selectionRequest = .project(project.id)
+                    router.setSelection(.project(project.id))
+                    router.clearPath(for: project.id)
                     vxAtelierPro.log.info("Successfully imported project '\(project.name)'.")
                 } else if let dialog = importedItem as? ConversationItem {
                     try queryManager.insert(dialog)
-                    selectionRequest = .conversation(dialog.id)
+                    router.openConversation(dialog.id, in: dialog.project?.id)
                     vxAtelierPro.log.info("Successfully imported dialog '\(dialog.title)'.")
                 }
             } catch {

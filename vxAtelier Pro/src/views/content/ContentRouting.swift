@@ -15,6 +15,10 @@ enum SidebarSelection: Hashable {
     }
 }
 
+enum ProjectRoute: Hashable {
+    case conversation(PersistentIdentifier)
+}
+
 struct ProjectConversationSelection: Equatable {
     let projectID: PersistentIdentifier
     let conversationID: PersistentIdentifier

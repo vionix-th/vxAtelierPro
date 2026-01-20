@@ -1,11 +1,15 @@
 import SwiftUI
+import SwiftData
 
 struct APISettingsView: View {
     @Environment(QueryManager.self) private var queryManager
+    @Query(sort: [SortDescriptor(\APIConfigurationItem.name)]) private var apiConfigurations: [APIConfigurationItem]
     @State private var editingConfig: EditingConfig?
     @State private var showApiConfigError = false
     @State private var apiConfigErrorMessage = ""
     @State private var didPresentInitialEditor = false
+
+    init() {}
 
     struct EditingConfig: Identifiable {
         let id = UUID()
@@ -23,7 +27,7 @@ struct APISettingsView: View {
             try queryManager.cleanupReferences(for: config)
             try queryManager.delete(config)
             if configWasDefault {
-                if let newDefault = queryManager.apiConfigurations.sorted(by: { $0.name < $1.name }).first {
+                if let newDefault = apiConfigurations.sorted(by: { $0.name < $1.name }).first {
                     newDefault.isDefault = true
                     try queryManager.saveContext()
                 }
@@ -41,7 +45,7 @@ struct APISettingsView: View {
             baseURL: AppDefaults.OpenAi.baseURL,
             chatCompletionsEndpoint: AppDefaults.OpenAi.chatCompletionsEndpoint,
             modelsEndpoint: AppDefaults.OpenAi.modelsEndpoint,
-            isDefault: queryManager.apiConfigurations.count < 2
+            isDefault: apiConfigurations.count < 2
         ), isNew: true)
     }
 
@@ -62,7 +66,7 @@ struct APISettingsView: View {
             .padding(.vertical, AppDefaults.paddingSmall)
             .padding(.horizontal, AppDefaults.paddingSmall)
             
-            if queryManager.apiConfigurations.isEmpty {
+            if apiConfigurations.isEmpty {
                 ContentUnavailableView(
                     "No API Configurations",
                     systemImage: "key",
@@ -71,7 +75,7 @@ struct APISettingsView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
-                    ForEach(queryManager.apiConfigurations.sorted { $0.name < $1.name }) { config in
+                    ForEach(apiConfigurations.sorted { $0.name < $1.name }) { config in
                         SettingsListRow(
                             title: config.name,
                             subtitle: config.baseURL,
@@ -103,7 +107,7 @@ struct APISettingsView: View {
         }
         .navigationTitle("API")
         .onAppear {
-            if queryManager.apiConfigurations.isEmpty && !didPresentInitialEditor {
+            if apiConfigurations.isEmpty && !didPresentInitialEditor {
                 didPresentInitialEditor = true
                 startNewConfiguration()
             }

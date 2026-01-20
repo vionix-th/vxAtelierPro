@@ -7,6 +7,7 @@ struct WebSearchConfigurationEditView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(QueryManager.self) private var queryManager
+    @Query(sort: [SortDescriptor(\WebSearchConfigurationItem.name)]) private var webSearchConfigurations: [WebSearchConfigurationItem]
 
     @Bindable var configuration: WebSearchConfigurationItem
     var isNewConfiguration: Bool
@@ -246,7 +247,7 @@ struct WebSearchConfigurationEditView: View {
         // Check for duplicate name (only if creating new or changing name)
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         if isNewConfiguration || trimmedName != configuration.name {
-             let existingNames = queryManager.webSearchConfigurations.map { $0.name }
+             let existingNames = webSearchConfigurations.map { $0.name }
              if existingNames.contains(where: { $0.lowercased() == trimmedName.lowercased() }) {
                  validationErrorMessage = "A web search configuration with this name already exists."
                  showValidationError = true
@@ -277,7 +278,7 @@ struct WebSearchConfigurationEditView: View {
         // Handle default uniqueness
         if configToSave.isDefault {
             // Unset default for other configurations
-            let otherConfigs = queryManager.webSearchConfigurations.filter { $0.id != configToSave.id }
+            let otherConfigs = webSearchConfigurations.filter { $0.id != configToSave.id }
             for otherConfig in otherConfigs where otherConfig.isDefault {
                 otherConfig.isDefault = false
                 vxAtelierPro.log.debug("🕸️ WebSearchConfigurationEditView: Unset previous default: \(otherConfig.name)")
@@ -285,16 +286,16 @@ struct WebSearchConfigurationEditView: View {
             }
         } else if !isNewConfiguration {
             // If editing and unchecking default, ensure another default exists or set one
-             let originalConfig = queryManager.webSearchConfigurations.first { $0.id == configToSave.id }
+             let originalConfig = webSearchConfigurations.first { $0.id == configToSave.id }
              let wasOriginallyDefault = originalConfig?.isDefault ?? false
 
             if wasOriginallyDefault {
                  // Check if any *other* config is already default
-                 let anyOtherDefaultExists = queryManager.webSearchConfigurations.contains { $0.id != configToSave.id && $0.isDefault }
+                 let anyOtherDefaultExists = webSearchConfigurations.contains { $0.id != configToSave.id && $0.isDefault }
 
                  if !anyOtherDefaultExists {
                      // No other default exists, set the first *other* available one as default
-                     if let fallbackConfig = queryManager.webSearchConfigurations
+                    if let fallbackConfig = webSearchConfigurations
                          .filter({ $0.id != configToSave.id })
                          .sorted(by: { $0.name < $1.name })
                          .first

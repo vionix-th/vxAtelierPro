@@ -1,86 +1,138 @@
-import Observation
 import SwiftUI
 
-struct MessageInputView: View {
-    var dialog: ConversationItem? = nil
-    var streamingState: StreamingState
+@MainActor
+final class MessageInputViewModel: ObservableObject {
+    private let queryManager: QueryManager
+    private let resolveConversation: @MainActor () throws -> ConversationItem
+    private var sendTask: Task<Void, Never>?
 
-    var focusInputOnAppear: Bool = vxAtelierPro.macOS
+    let streamingState: StreamingState
 
-    @FocusState private var isInputFocused: Bool
-
-    @State private var message: String = ""
-    @State private var isPromptTemplatesPresented: Bool = false
-    @State private var isTaskRunning: Bool = false
-    @State private var showError: Bool = false
-    @State private var errorMessage: String = ""
-
-    @AppStorage("DialogTextEdit.buttonSize") var buttonSize: Double = AppDefaults
-        .dialogTextEditButtonSize
-    @AppStorage("autoNameDialogs") private var autoNameDialogs: Bool = AppDefaults.autoNameDialogs
-    @AppStorage("autoSendDialogTemplates") private var autoSendDialogTemplates: Bool = AppDefaults.autoSendDialogTemplates
-
+    @Published var message: String = ""
+    @Published var isPromptTemplatesPresented: Bool = false
+    @Published var isTaskRunning: Bool = false
+    @Published var showError: Bool = false
+    @Published var errorMessage: String = ""
+    @Published var isInputFocused: Bool
     var didSend: ((ConversationItem) -> Void)?
 
-    private func sendMessage(to: ConversationItem) {
-        guard !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+    init(
+        queryManager: QueryManager,
+        streamingState: StreamingState,
+        focusOnAppear: Bool,
+        resolveConversation: @escaping @MainActor () throws -> ConversationItem,
+        didSend: ((ConversationItem) -> Void)? = nil
+    ) {
+        self.queryManager = queryManager
+        self.streamingState = streamingState
+        self.resolveConversation = resolveConversation
+        self.didSend = didSend
+        self.isInputFocused = focusOnAppear
+    }
+
+    func applyTemplate(_ template: PromptTemplate, conversation: ConversationItem?) {
+        message = expandVariables(template.prompt, dialog: conversation)
+    }
+
+    func send(autoNameDialogs: Bool) {
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
             vxAtelierPro.log.info("Ignoring empty message")
             return
         }
 
-        if to.turns.isEmpty && to.title == AppDefaults.newDialogName && autoNameDialogs {
-            vxAtelierPro.log.notice("Auto-naming new dialog")
-
-            let separators = CharacterSet(charactersIn: "\n\r.:;")
-            var dialogTitle = message.components(separatedBy: separators).first ?? ""
-
-            if dialogTitle.isEmpty {
-                dialogTitle = message
-            }
-
-            if dialogTitle.lengthOfBytes(using: .utf8) > 64 {
-                dialogTitle = dialogTitle.prefix(64) + "..."
-            }
-
-            if !dialogTitle.isEmpty {
-                vxAtelierPro.log.notice("Auto-named dialog to '\(dialogTitle)'")
-                to.title = dialogTitle
-            }
-        }
-
-        let currentMessage = message
+        sendTask?.cancel()
+        streamingState.reset()
         isTaskRunning = true
+        let textToSend = message
 
-        Task {
+        sendTask = Task { @MainActor in
             do {
-                let expandedMessage = expandVariables(currentMessage, dialog: self.dialog)
+                let conversation = try resolveConversation()
+                autoNameIfNeeded(conversation: conversation, sourceText: textToSend, autoNameDialogs: autoNameDialogs)
 
-                // Use the new unified complete method, which handles streaming and non-streaming
-                try await to.complete(expandedMessage, streamingState: streamingState)
+                let expandedMessage = expandVariables(textToSend, dialog: conversation)
+                try await conversation.complete(expandedMessage, streamingState: streamingState)
+                try queryManager.saveContext()
 
-                message = ""  // Only clear input after successful completion
-                didSend?(to)
+                message = ""
+                didSend?(conversation)
                 vxAtelierPro.log.notice("Message sent and completed successfully")
             } catch {
+                if Task.isCancelled { return }
                 vxAtelierPro.log.error("Failed to complete message - \(error.localizedDescription)")
                 errorMessage = error.localizedDescription
                 showError = true
-                
-                let allMessages: [MessageItem] = to.turns.flatMap { turn in [turn.userMessage] + turn.events.map { $0.message } }
-                if let lastMessage = allMessages.last, lastMessage.role == "user", lastMessage.content.text == currentMessage {
-                    // Optionally implement removal logic if needed
-                    vxAtelierPro.log.notice("Would remove user message due to completion error (turn-based model).")
-                }
             }
             isTaskRunning = false
             isInputFocused = true
         }
     }
 
+    func cancel() {
+        sendTask?.cancel()
+        streamingState.reset()
+        isTaskRunning = false
+    }
+
+    private func autoNameIfNeeded(conversation: ConversationItem, sourceText: String, autoNameDialogs: Bool) {
+        guard autoNameDialogs,
+              conversation.turns.isEmpty,
+              conversation.title == AppDefaults.newDialogName else { return }
+
+        let separators = CharacterSet(charactersIn: "\n\r.:;")
+        var dialogTitle = sourceText.components(separatedBy: separators).first ?? ""
+
+        if dialogTitle.isEmpty {
+            dialogTitle = sourceText
+        }
+
+        if dialogTitle.lengthOfBytes(using: .utf8) > 64 {
+            dialogTitle = dialogTitle.prefix(64) + "..."
+        }
+
+        if !dialogTitle.isEmpty {
+            vxAtelierPro.log.notice("Auto-named dialog to '\(dialogTitle)'")
+            conversation.title = dialogTitle
+        }
+    }
+}
+
+struct MessageInputView: View {
+    @FocusState private var isInputFocused: Bool
+
+    @StateObject private var viewModel: MessageInputViewModel
+    private let contextConversation: ConversationItem?
+
+    @AppStorage(AppSettings.Keys.dialogTextEditButtonSize) var buttonSize: Double = AppDefaults
+        .dialogTextEditButtonSize
+    @AppStorage(AppSettings.Keys.autoNameDialogs) private var autoNameDialogs: Bool = AppDefaults.autoNameDialogs
+    @AppStorage(AppSettings.Keys.autoSendDialogTemplates) private var autoSendDialogTemplates: Bool = AppDefaults.autoSendDialogTemplates
+
+    init(
+        queryManager: QueryManager,
+        streamingState: StreamingState,
+        contextConversation: ConversationItem? = nil,
+        focusInputOnAppear: Bool = vxAtelierPro.macOS,
+        resolveConversation: @escaping @MainActor () throws -> ConversationItem,
+        didSend: ((ConversationItem) -> Void)? = nil
+    ) {
+        self.contextConversation = contextConversation
+        _viewModel = StateObject(
+            wrappedValue: MessageInputViewModel(
+                queryManager: queryManager,
+                streamingState: streamingState,
+                focusOnAppear: focusInputOnAppear,
+                resolveConversation: resolveConversation,
+                didSend: didSend
+            )
+        )
+    }
+
     var body: some View {
         ZStack {
             VStack {
-                TextEditor(text: $message)
+                TextEditor(text: $viewModel.message)
                     .padding(AppDefaults.paddingSmall)
                     .frame(minHeight: 32, maxHeight: 48)
                     .scrollContentBackground(.hidden)
@@ -92,9 +144,7 @@ struct MessageInputView: View {
                         if NSEvent.modifierFlags.contains(.shift) {
                             return .ignored
                         }
-                        if let dialog = self.dialog {
-                            sendMessage(to: dialog)
-                        }
+                        viewModel.send(autoNameDialogs: autoNameDialogs)
                         return .handled
                     }
                     #endif
@@ -111,7 +161,7 @@ struct MessageInputView: View {
                     .buttonStyle(PlainButtonStyle())
 
                     Button(action: {
-                        isPromptTemplatesPresented = true
+                        viewModel.isPromptTemplatesPresented = true
                     }) {
                         Image(systemName: "hare")
                             .resizable()
@@ -120,16 +170,16 @@ struct MessageInputView: View {
                     }
                     .padding(.leading, AppDefaults.paddingMedium)
                     .buttonStyle(PlainButtonStyle())
-                    .popover(isPresented: $isPromptTemplatesPresented) {
+                    .popover(isPresented: $viewModel.isPromptTemplatesPresented) {
                         PromptTemplateList(
                             category: PromptTemplate.Category.User,
                             onTemplateActivated: { template in
-                                message = expandVariables(template.prompt, dialog: self.dialog)
-                                isPromptTemplatesPresented = false
-                                isInputFocused = true
+                                viewModel.applyTemplate(template, conversation: contextConversation)
+                                viewModel.isPromptTemplatesPresented = false
+                                viewModel.isInputFocused = true
 
-                                if autoSendDialogTemplates, let dialog = self.dialog {
-                                    sendMessage(to: dialog)
+                                if autoSendDialogTemplates {
+                                    viewModel.send(autoNameDialogs: autoNameDialogs)
                                 }
                             })
                         .frame(minWidth: 200, idealWidth: 400, minHeight: 300, idealHeight: 500)
@@ -138,13 +188,7 @@ struct MessageInputView: View {
                     Spacer()
 
                     Button(action: {
-                        if let dialog = self.dialog {
-                            sendMessage(to: dialog)
-                        } else {
-                            vxAtelierPro.log.error("Cannot send message - no dialog available")
-                            errorMessage = "No dialog to send to"
-                            showError = true
-                        }
+                        viewModel.send(autoNameDialogs: autoNameDialogs)
                     }) {
                         Image(systemName: "location")
                             .resizable()
@@ -157,21 +201,27 @@ struct MessageInputView: View {
             .padding(AppDefaults.paddingMedium)
             .background(Color.secondary.opacity(0.2))
             .cornerRadius(AppDefaults.cornerRadiusMedium)
-            .disabled(isTaskRunning)
+            .disabled(viewModel.isTaskRunning)
 
-            if isTaskRunning {
+            if viewModel.isTaskRunning {
                 ProgressView()
                     .padding(0)
             }
         }
         .padding(AppDefaults.paddingSmall)
-        .alert("Error", isPresented: $showError) {
+        .alert("Error", isPresented: $viewModel.showError) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(errorMessage)
+            Text(viewModel.errorMessage)
         }
-        .onAppear {            
-            isInputFocused = self.focusInputOnAppear
+        .onAppear {
+            isInputFocused = viewModel.isInputFocused
+        }
+        .onChange(of: viewModel.isInputFocused) { _, newValue in
+            isInputFocused = newValue
+        }
+        .onChange(of: isInputFocused) { _, newValue in
+            viewModel.isInputFocused = newValue
         }
     }
 }

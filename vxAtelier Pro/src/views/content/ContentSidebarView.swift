@@ -14,7 +14,10 @@ struct ContentSidebarActions {
 }
 
 struct ContentSidebarView: View {
-    let dataSource: ContentSidebarDataSource
+    let navigationMode: NavigationMode
+    let projects: [ProjectItem]
+    let dialogs: [ConversationItem]
+    let bookmarks: [BookmarkItem]
     @Binding var selection: SidebarSelection?
     @Binding var sidebarProjectsSortDescending: Bool
     @Binding var sidebarProjectsSortTypeRaw: String
@@ -22,21 +25,38 @@ struct ContentSidebarView: View {
     @Binding var sidebarDialogsSortTypeRaw: String
     let showEmptySections: Bool
     let actions: ContentSidebarActions
+    let availableProjects: [ProjectItem]
+    
+    private var titleForProjects: String {
+        switch navigationMode {
+        case .chats: return "Projects"
+        case .archive: return "Archived Projects"
+        case .trash: return "Trashed Projects"
+        }
+    }
+    
+    private var titleForDialogs: String {
+        switch navigationMode {
+        case .chats: return "Standalone Dialogs"
+        case .archive: return "Archived Dialogs"
+        case .trash: return "Trashed Items"
+        }
+    }
 
     var body: some View {
         List(selection: $selection) {
             projectSection(
-                title: dataSource.projectTitle,
-                projects: dataSource.projects
+                title: titleForProjects,
+                projects: projects
             )
 
             dialogSection(
-                title: dataSource.dialogTitle,
-                dialogs: dataSource.dialogs
+                title: titleForDialogs,
+                dialogs: dialogs
             )
 
-            if dataSource.navigationMode == .chats {
-                bookmarkSection(title: "Bookmarks", bookmarks: dataSource.bookmarks)
+            if navigationMode == .chats {
+                bookmarkSection(title: "Bookmarks", bookmarks: bookmarks)
             }
         }
     }
@@ -104,7 +124,8 @@ struct ContentSidebarView: View {
                 onExport: {
                     actions.requestExportConversation(conversation)
                 },
-                conversation: conversation
+                conversation: conversation,
+                availableProjects: availableProjects
             )
         }
     }
@@ -135,7 +156,7 @@ struct ContentSidebarView: View {
                 descending: sidebarProjectsSortDescending,
                 sortType: SidebarSortType(rawValue: sidebarProjectsSortTypeRaw)
                     ?? .alphabetically,
-                navigationMode: dataSource.navigationMode
+                navigationMode: navigationMode
             )
             Section {
                 ForEach(

@@ -1,27 +1,29 @@
 import Foundation
 import SwiftUI
 import SwiftData
+import Observation
 
 // Stable token for sheet presentation identity
 // Removed OptionsSheetToken struct
 
 @MainActor
-final class ConversationViewModel: ObservableObject {
+@Observable
+final class ConversationViewModel {
     // Store the conversation ID instead of the direct reference
     private let conversationID: PersistentIdentifier
     var id: PersistentIdentifier { conversationID }
     
-    @Published var selectedMessages = Set<PersistentIdentifier>()
-    @Published var isSelectingMessages: Bool = false
-    @Published var streamingState = StreamingState()
-    @Published var errorAlert: ErrorAlert?
-    @Published var bookmarkMessage: MessageItem? = nil
-    @Published var bookmarkMessageLabel: String = ""
-    let queryManager: QueryManager
-    let ttsQueue: TTSQueue
+    var selectedMessages = Set<PersistentIdentifier>()
+    var isSelectingMessages: Bool = false
+    var streamingState = StreamingState()
+    var errorAlert: ErrorAlert?
+    var bookmarkMessage: MessageItem? = nil
+    var bookmarkMessageLabel: String = ""
+    @ObservationIgnored let queryManager: QueryManager
+    @ObservationIgnored let ttsQueue: TTSQueue
 
     var conversation: ConversationItem? {
-        queryManager.allConversations.first { $0.id == conversationID }
+        queryManager.conversation(with: conversationID)
     }
     
     var sortedTurns: [ConversationTurn] {
@@ -130,28 +132,17 @@ final class ConversationViewModel: ObservableObject {
         }
 
         let messagesToRemove = Set(ids)
-        let turnsToRemove = turnIDsContainingMessages(in: conversation, messageIDs: messagesToRemove)
-        if turnsToRemove.isEmpty {
-            vxAtelierPro.log.info("DialogViewModel: No turns removed during delete action.")
-            exitSelectionMode()
-            return
-        }
-
-        let initialCount = conversation.turns.count
-        conversation.turns.removeAll { turn in
-            turnsToRemove.contains(turn.id)
-        }
-        let removedCount = initialCount - conversation.turns.count
-
-        if removedCount > 0 {
-            conversation.forceUpdateTokenCount(updateContextCount: true, updateTotalCount: false)
-            do {
-                try queryManager.saveContext()
+        do {
+            let removedCount = try queryManager.deleteTurns(containing: messagesToRemove, in: conversation)
+            if removedCount == 0 {
+                vxAtelierPro.log.info("DialogViewModel: No turns removed during delete action.")
+            } else {
                 vxAtelierPro.log.notice("DialogViewModel: Deleted \(removedCount) turn(s) for selected messages.")
-            } catch {
-                vxAtelierPro.log.error("DialogViewModel: Failed to save context after deleting messages: \(error.localizedDescription)")
             }
-        }        
+        } catch {
+            vxAtelierPro.log.error("DialogViewModel: Failed to delete turns: \(error.localizedDescription)")
+            errorAlert = ErrorAlert(error: AppError.dataSaveFailed(error.localizedDescription))
+        }
     }
 
     func deleteSelectedMessages() {
@@ -289,13 +280,7 @@ final class ConversationViewModel: ObservableObject {
     func removeBookmarkForMessage(_ message: MessageItem) {
         guard let (turn, event) = turnAndEvent(for: message) else { return }
 
-        let bookmark = queryManager.bookmarks.first { bookmark in
-            if bookmark.turn != turn { return false }
-            if let event = event {
-                return bookmark.target === event
-            }
-            return bookmark.target == nil
-        }
+        let bookmark = queryManager.bookmark(for: turn, event: event)
 
         if let bookmark = bookmark {
             do {
@@ -360,21 +345,4 @@ final class ConversationViewModel: ObservableObject {
         return ids
     }
 
-    private func turnIDsContainingMessages(
-        in conversation: ConversationItem,
-        messageIDs: Set<PersistentIdentifier>
-    ) -> Set<PersistentIdentifier> {
-        guard !messageIDs.isEmpty else { return [] }
-        var turnIDs = Set<PersistentIdentifier>()
-        for turn in conversation.turns {
-            if messageIDs.contains(turn.userMessage.id) {
-                turnIDs.insert(turn.id)
-                continue
-            }
-            if turn.events.contains(where: { messageIDs.contains($0.message.id) }) {
-                turnIDs.insert(turn.id)
-            }
-        }
-        return turnIDs
-    }
 }

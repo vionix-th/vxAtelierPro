@@ -155,48 +155,72 @@ extension AppDefaults {
     static func resetUserDefaults() {
         let defaults = UserDefaults.standard
         // General settings
-        defaults.set(AppDefaults.appearanceStyle, forKey: "appearanceStyle")
-        defaults.set(AppDefaults.showRowToolButtons, forKey: "showRowToolButtons")
-        defaults.set(AppDefaults.autoNameDialogs, forKey: "autoNameDialogs")
-        defaults.set(AppDefaults.statusBarVisible, forKey: "statusBarVisible")
-        defaults.set(AppDefaults.showConversationLastMessageLabel, forKey: "showConversationLastMessageLabel")
-        defaults.set(AppDefaults.showConversationCreatedLabel, forKey: "showConversationCreatedLabel")
-        defaults.set(AppDefaults.shouldTerminateAfterLastWindowClosed, forKey: "shouldTerminateAfterLastWindowClosed")
-        defaults.set(AppDefaults.dialogTextEditButtonSize, forKey: "DialogTextEdit.buttonSize")
-        defaults.set(AppDefaults.autoSendDialogTemplates, forKey: "autoSendDialogTemplates")
-        defaults.set(AppDefaults.disableAvatar, forKey: "DisableAvatar")
-        defaults.set(AppDefaults.defaultAvatarSize, forKey: "DefaultAvatarSize")
-        defaults.set(AppDefaults.fontSizeMedium, forKey: "BubbleFontSize")
-        defaults.removeObject(forKey: "defaultAvatar")
+        defaults.set(AppDefaults.appearanceStyle, forKey: AppSettings.Keys.appearanceStyle)
+        defaults.set(AppDefaults.showRowToolButtons, forKey: AppSettings.Keys.showRowToolButtons)
+        defaults.set(AppDefaults.autoNameDialogs, forKey: AppSettings.Keys.autoNameDialogs)
+        defaults.set(AppDefaults.statusBarVisible, forKey: AppSettings.Keys.statusBarVisible)
+        defaults.set(
+            AppDefaults.showConversationLastMessageLabel,
+            forKey: AppSettings.Keys.showConversationLastMessageLabel)
+        defaults.set(
+            AppDefaults.showConversationCreatedLabel,
+            forKey: AppSettings.Keys.showConversationCreatedLabel)
+        defaults.set(
+            AppDefaults.shouldTerminateAfterLastWindowClosed,
+            forKey: AppSettings.Keys.shouldTerminateAfterLastWindowClosed)
+        defaults.set(
+            AppDefaults.dialogTextEditButtonSize,
+            forKey: AppSettings.Keys.dialogTextEditButtonSize)
+        defaults.set(AppDefaults.autoSendDialogTemplates, forKey: AppSettings.Keys.autoSendDialogTemplates)
+        defaults.set(AppDefaults.disableAvatar, forKey: AppSettings.Keys.disableAvatar)
+        defaults.set(AppDefaults.defaultAvatarSize, forKey: AppSettings.Keys.defaultAvatarSize)
+        defaults.set(AppDefaults.fontSizeMedium, forKey: AppSettings.Keys.bubbleFontSize)
+        defaults.removeObject(forKey: AppSettings.Keys.defaultAvatarData)
         // Developer/advanced settings
-        defaults.set(AppDefaults.isMarkdownEnabled, forKey: "IsMarkdownEnabled")
-        defaults.set(AppDefaults.isMarkdownTextSelectable, forKey: "IsMarkdownTextSelectable")
-        defaults.set(AppDefaults.showSystemDialogs, forKey: "ShowSystemDialogs")
-        defaults.set(AppDefaults.makeKeyAndOrderFront, forKey: "MakeKeyAndOrderFront")
-        defaults.set(AppDefaults.autoScrollDebugEnabled, forKey: "AutoScrollDebugEnabled")
-        defaults.set(AppDefaults.autoScrollGateEnabled, forKey: "AutoScrollGateEnabled")
-        defaults.set(AppDefaults.streamingThrottleEnabled, forKey: "StreamingThrottleEnabled")
-        defaults.set(AppDefaults.streamingThrottleIntervalMs, forKey: "StreamingThrottleIntervalMs")
-        defaults.set(AppDefaults.streamingDebugEnabled, forKey: "StreamingDebugEnabled")
-        defaults.set(AppDefaults.markdownStreamFinalizeOnly, forKey: "MarkdownStreamFinalizeOnly")
-        defaults.set(AppDefaults.showToolCallChips, forKey: "ShowToolCallChips")
+        defaults.set(AppDefaults.isMarkdownEnabled, forKey: AppSettings.Keys.isMarkdownEnabled)
+        defaults.set(
+            AppDefaults.isMarkdownTextSelectable,
+            forKey: AppSettings.Keys.isMarkdownTextSelectable)
+        defaults.set(AppDefaults.showSystemDialogs, forKey: AppSettings.Keys.showSystemDialogs)
+        defaults.set(AppDefaults.makeKeyAndOrderFront, forKey: AppSettings.Keys.makeKeyAndOrderFront)
+        defaults.set(AppDefaults.autoScrollDebugEnabled, forKey: AppSettings.Keys.autoScrollDebugEnabled)
+        defaults.set(AppDefaults.autoScrollGateEnabled, forKey: AppSettings.Keys.autoScrollGateEnabled)
+        defaults.set(
+            AppDefaults.streamingThrottleEnabled,
+            forKey: AppSettings.Keys.streamingThrottleEnabled)
+        defaults.set(
+            AppDefaults.streamingThrottleIntervalMs,
+            forKey: AppSettings.Keys.streamingThrottleIntervalMs)
+        defaults.set(AppDefaults.streamingDebugEnabled, forKey: AppSettings.Keys.streamingDebugEnabled)
+        defaults.set(
+            AppDefaults.markdownStreamFinalizeOnly,
+            forKey: AppSettings.Keys.markdownStreamFinalizeOnly)
+        defaults.set(AppDefaults.showToolCallChips, forKey: AppSettings.Keys.showToolCallChips)
         // Permissions
-        defaults.set(AppDefaults.allowSelfSignedCertificates, forKey: "allowSelfSignedCertificates")
-        defaults.set(AppDefaults.selfSignedCertWhitelist, forKey: "selfSignedCertWhitelist")
+        defaults.set(
+            AppDefaults.allowSelfSignedCertificates,
+            forKey: AppSettings.Keys.allowSelfSignedCertificates)
+        defaults.set(AppDefaults.selfSignedCertWhitelist, forKey: AppSettings.Keys.selfSignedCertWhitelist)
         // TTS
-        defaults.set(AppDefaults.ttsAutoplay, forKey: "TTSAutoplay")
-        defaults.set(AppDefaults.ttsRepeatMode, forKey: "TTSRepeatMode")
+        defaults.set(AppDefaults.ttsAutoplay, forKey: AppSettings.Keys.ttsAutoplay)
+        defaults.set(AppDefaults.ttsRepeatMode, forKey: AppSettings.Keys.ttsRepeatMode)
         // Sidebar sort
-        defaults.set(AppDefaults.sidebarDialogsSortDescending, forKey: "SidebarDialogsSortOrderDescending")
-        defaults.set(AppDefaults.sidebarDialogsSortType, forKey: "SidebarDialogsSortType")
-        defaults.set(AppDefaults.sidebarProjectsSortDescending, forKey: "SidebarProjectsSortOrderDescending")
-        defaults.set(AppDefaults.sidebarProjectsSortType, forKey: "SidebarProjectsSortType")
+        defaults.set(
+            AppDefaults.sidebarDialogsSortDescending,
+            forKey: AppSettings.Keys.sidebarDialogsSortDescending)
+        defaults.set(AppDefaults.sidebarDialogsSortType, forKey: AppSettings.Keys.sidebarDialogsSortType)
+        defaults.set(
+            AppDefaults.sidebarProjectsSortDescending,
+            forKey: AppSettings.Keys.sidebarProjectsSortDescending)
+        defaults.set(AppDefaults.sidebarProjectsSortType, forKey: AppSettings.Keys.sidebarProjectsSortType)
         // Project view sort
-        defaults.set(AppDefaults.projectDialogsSortDescending, forKey: "ProjectDialogsSortOrderDescending")
-        defaults.set(AppDefaults.projectDialogsSortType, forKey: "ProjectDialogsSortType")
+        defaults.set(
+            AppDefaults.projectDialogsSortDescending,
+            forKey: AppSettings.Keys.projectDialogsSortDescending)
+        defaults.set(AppDefaults.projectDialogsSortType, forKey: AppSettings.Keys.projectDialogsSortType)
         // Dialog/project filters
-        defaults.set(AppDefaults.showEmptySections, forKey: "ShowEmptySections")
-        defaults.set(AppDefaults.navigationMode, forKey: "NavigationMode")
+        defaults.set(AppDefaults.showEmptySections, forKey: AppSettings.Keys.showEmptySections)
+        defaults.set(AppDefaults.navigationMode, forKey: AppSettings.Keys.navigationMode)
         // Add any additional settings as needed
         defaults.synchronize()
     }

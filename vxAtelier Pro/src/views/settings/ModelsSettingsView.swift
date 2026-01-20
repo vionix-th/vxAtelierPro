@@ -1,7 +1,10 @@
 import SwiftUI
+import SwiftData
 
 struct ModelsSettingsView: View {
     @Environment(QueryManager.self) private var queryManager
+    @Query(sort: [SortDescriptor(\APIConfigurationItem.name)]) private var apiConfigurations: [APIConfigurationItem]
+    @Query(sort: [SortDescriptor(\ModelItem.name)]) private var models: [ModelItem]
     @State private var isUpdatingModels = false
     @State private var updateError: Error?
     @State private var updateModelsRequested = false
@@ -10,6 +13,8 @@ struct ModelsSettingsView: View {
     @State private var completionMessage: String = ""
     @State private var confirmationContext: ConfirmationContext? = nil
     @State private var showConfirmation: Bool = false
+
+    init() {}
 
     struct EditingModel: Identifiable {
         let id = UUID()
@@ -41,7 +46,7 @@ struct ModelsSettingsView: View {
     }
 
     private var modelsByProvider: [String: [ModelItem]] {
-        queryManager.models.reduce(into: [String: [ModelItem]]()) { result, model in
+        models.reduce(into: [String: [ModelItem]]()) { result, model in
             var updatedProviderModels = result[model.provider] ?? []
             updatedProviderModels.append(model)
             result[model.provider] = updatedProviderModels
@@ -96,14 +101,14 @@ struct ModelsSettingsView: View {
             if isUpdatingModels {
                 ProgressView("Updating models...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if queryManager.apiConfigurations.isEmpty {
+            } else if apiConfigurations.isEmpty {
                 ContentUnavailableView(
                     "No API Configurations",
                     systemImage: "key",
                     description: Text("Add API configurations in the API tab to fetch available models")
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if queryManager.models.isEmpty {
+            } else if models.isEmpty {
                 ContentUnavailableView(
                     "No Models Available",
                     systemImage: "cpu",
