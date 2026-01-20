@@ -10,13 +10,10 @@ struct AppShellView: View {
     @State private var applicationSettingsViewIsPresented: Bool = false
     @State private var ttsViewIsPresented: Bool = false
     @State private var settingsInitialTab: ApplicationSettingsView.SettingsTab? = nil
-    @State private var optionsSheetKey: OptionsSheetKey?
+    @State private var optionsSheetID: PersistentIdentifier?
     @State private var exportRequest: ExportRequest?
     @State private var importRequested = false
     @State private var isLogHistoryShown: Bool = false
-
-    // todo: having this structure is suspicious as PersistentIdentifier is already Identifiable
-    private struct OptionsSheetKey: Identifiable { let id: PersistentIdentifier }
 
     private enum ExportRequest: Identifiable {
         case project(ProjectItem, UUID)
@@ -34,7 +31,7 @@ struct AppShellView: View {
 
     private func requestOptions(for id: PersistentIdentifier) {
         vxAtelierPro.log.debug("AppShellView: options requested for dialog id \(id)")
-        optionsSheetKey = OptionsSheetKey(id: id)
+        optionsSheetID = id
     }
 
     private func requestExport(project: ProjectItem) {
@@ -118,12 +115,12 @@ struct AppShellView: View {
         }
         // Hoisted dialog options sheet (stable parent anchor)
         .sheet(
-            item: $optionsSheetKey,
+            item: $optionsSheetID,
             onDismiss: {
                 vxAtelierPro.log.debug("AppShellView: options sheet dismissed (onDismiss)")
             }
-        ) { key in
-            if let dialog = queryManager.conversation(with: key.id) {
+        ) { conversationID in
+            if let dialog = queryManager.conversation(with: conversationID) {
                 ConversationOptionsView(
                     options: Binding(get: { dialog.options }, set: { dialog.options = $0 })
                 )
@@ -153,7 +150,7 @@ struct AppShellView: View {
                 .frame(minWidth: 300, minHeight: 200)
                 .onAppear {
                     vxAtelierPro.log.debug(
-                        "AppShellView: options sheet waiting for conversation to resolve (requested id: \(key.id))"
+                        "AppShellView: options sheet waiting for conversation to resolve (requested id: \(conversationID))"
                     )
                 }
             }
