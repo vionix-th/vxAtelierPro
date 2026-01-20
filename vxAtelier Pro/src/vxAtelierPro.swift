@@ -127,6 +127,7 @@ struct vxAtelierPro: App {
     private let queryManager: QueryManager
     private let ttsQueue: TTSQueue
     private let conversationStore: ConversationViewModelStore
+    private let appSceneModel: AppSceneModel
     #if os(macOS)
         private let hotkeyController: GlobalHotkeyController
     #endif
@@ -161,6 +162,13 @@ struct vxAtelierPro: App {
         self.conversationStore = ConversationViewModelStore(
             queryManager: queryManager, ttsQueue: ttsQueue)
         vxAtelierPro.log.debug("Conversation ViewModel Store initialized")
+
+        vxAtelierPro.log.debug("Initializing App Scene Model")
+        self.appSceneModel = AppSceneModel(
+            queryManager: queryManager,
+            modelContext: sharedModelContainer.mainContext
+        )
+        vxAtelierPro.log.debug("App Scene Model initialized")
 
         #if os(macOS)
             vxAtelierPro.log.debug("Initializing Global Hotkey Controller")
@@ -238,6 +246,7 @@ struct vxAtelierPro: App {
             AppShellView()
                 .preferredColorScheme(effectiveColorScheme)
                 .environment(conversationStore)
+                .environment(appSceneModel)
         }
         .modelContainer(sharedModelContainer)
         .environment(queryManager)

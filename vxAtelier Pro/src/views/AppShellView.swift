@@ -1,3 +1,4 @@
+import Observation
 import SwiftData
 import SwiftUI
 
@@ -5,105 +6,50 @@ struct AppShellView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(QueryManager.self) private var queryManager
     @Environment(TTSQueue.self) private var ttsQueue
+    @Environment(AppSceneModel.self) private var sceneModel
     @AppStorage(AppSettings.Keys.statusBarVisible) private var statusBarVisible: Bool = AppDefaults.statusBarVisible
-    @State private var router = NavigationRouter()
-    @State private var applicationSettingsViewIsPresented: Bool = false
-    @State private var ttsViewIsPresented: Bool = false
-    @State private var settingsInitialTab: ApplicationSettingsView.SettingsTab? = nil
-    @State private var optionsSheetID: PersistentIdentifier?
-    @State private var exportRequest: ExportRequest?
-    @State private var importRequested = false
-    @State private var isLogHistoryShown: Bool = false
-
-    private enum ExportRequest: Identifiable {
-        case project(ProjectItem, UUID)
-        case conversation(ConversationItem, UUID)
-
-        var id: UUID {
-            switch self {
-            case .project(_, let id):
-                return id
-            case .conversation(_, let id):
-                return id
-            }
-        }
-    }
-
-    private func requestOptions(for id: PersistentIdentifier) {
-        vxAtelierPro.log.debug("AppShellView: options requested for dialog id \(id)")
-        optionsSheetID = id
-    }
-
-    private func requestExport(project: ProjectItem) {
-        exportRequest = .project(project, UUID())
-    }
-
-    private func requestExport(conversation: ConversationItem) {
-        exportRequest = .conversation(conversation, UUID())
-    }
-
-    private func requestImport() {
-        importRequested = true
-    }
-
-    private func requestSettings(_ tab: ApplicationSettingsView.SettingsTab?) {
-        settingsInitialTab = tab
-        applicationSettingsViewIsPresented = true
-    }
-
-    private func requestTTS() {
-        ttsViewIsPresented = true
-    }
-
-    private func requestLogHistory() {
-        isLogHistoryShown = true
-    }
 
     var body: some View {
+        @Bindable var scene = sceneModel
+
         VStack(spacing: 0) {
             ContentView(
-                onRequestOptions: requestOptions(for:),
-                onRequestExportProject: requestExport(project:),
-                onRequestExportConversation: requestExport(conversation:),
-                onRequestImport: requestImport,
-                onRequestSettings: requestSettings(_:),
-                onRequestTTS: requestTTS,
-                onRequestLogHistory: requestLogHistory
+                onRequestOptions: scene.requestOptions(for:),
+                onRequestExportProject: scene.requestExport(project:),
+                onRequestExportConversation: scene.requestExport(conversation:),
+                onRequestImport: scene.requestImport,
+                onRequestSettings: scene.requestSettings(_:),
+                onRequestTTS: scene.requestTTS,
+                onRequestLogHistory: scene.requestLogHistory
             )
 
             if statusBarVisible {
-                StatusBar(onRequestLogHistory: requestLogHistory)
+                StatusBar(onRequestLogHistory: scene.requestLogHistory)
             }
         }
-        .environment(router)
+        .environment(scene.router)
         #if os(iOS)
             .onChange(of: ttsQueue.isPlaying) {
-                if ttsQueue.isPlaying {
-                    vxAtelierPro.log.info("TTS playback started")
-                    ttsViewIsPresented = true
-                }
+                sceneModel.handleTTSPlayback(isPlaying: ttsQueue.isPlaying)
             }
         #else
             .onChange(of: ttsQueue.isPlaying) { _, _ in
-                if ttsQueue.isPlaying {
-                    vxAtelierPro.log.info("TTS playback started")
-                    ttsViewIsPresented = true
-                }
+                sceneModel.handleTTSPlayback(isPlaying: ttsQueue.isPlaying)
             }
         #endif
-        .task(id: exportRequest?.id) { await exportTask(for: exportRequest) }
-        .task(id: importRequested) { await importTask() }
-        .sheet(isPresented: $isLogHistoryShown) {
+        .task(id: scene.exportTaskID) { await scene.exportTask() }
+        .task(id: scene.importRequestFlag) { await scene.importTask() }
+        .sheet(isPresented: $scene.isLogHistoryShown) {
             LogHistorySheet()
         }
         // Present Settings from the toolbar menu entry
         .sheet(
-            isPresented: $applicationSettingsViewIsPresented,
+            isPresented: $scene.applicationSettingsViewIsPresented,
             onDismiss: {
-                settingsInitialTab = nil
+                scene.settingsInitialTab = nil
             }
         ) {
-            ApplicationSettingsView(initialTab: settingsInitialTab)
+            ApplicationSettingsView(initialTab: scene.settingsInitialTab)
                 .environment(queryManager)
                 .environment(\.modelContext, modelContext)
                 #if os(macOS)
@@ -115,11 +61,11 @@ struct AppShellView: View {
         }
         // Hoisted dialog options sheet (stable parent anchor)
         .sheet(
-            item: $optionsSheetID,
+            item: $scene.optionsSheetID,
             onDismiss: {
                 vxAtelierPro.log.debug("AppShellView: options sheet dismissed (onDismiss)")
             }
-        ) { conversationID in
+        ) { (conversationID: PersistentIdentifier) in
             if let dialog = queryManager.conversation(with: conversationID) {
                 ConversationOptionsView(
                     options: Binding(get: { dialog.options }, set: { dialog.options = $0 })
@@ -156,61 +102,9 @@ struct AppShellView: View {
             }
         }
         // TTS playlist sheet
-        .sheet(isPresented: $ttsViewIsPresented) {
+        .sheet(isPresented: $scene.ttsViewIsPresented) {
             TTSControlView()
                 .onAppear { vxAtelierPro.log.debug("AppShellView: TTSControlView presented") }
-        }
-    }
-
-    // MARK: - Async Tasks
-
-    /// Generic export task for Projects or Dialogs.
-    @MainActor
-    private func exportTask(for request: ExportRequest?) async {
-        guard let request = request else { return }
-
-        do {
-            switch request {
-            case .project(let project, _):
-                try await DataManager.shared.exportProject(project)
-                vxAtelierPro.log.info("Successfully exported project '\(project.name)'.")
-            case .conversation(let conversation, _):
-                try await DataManager.shared.exportDialog(conversation)
-                vxAtelierPro.log.info("Successfully exported conversation '\(conversation.title)'.")
-            }
-        } catch {
-            let itemType: String
-            switch request {
-            case .project:
-                itemType = "project"
-            case .conversation:
-                itemType = "dialog"
-            }
-            vxAtelierPro.log.error("Export \(itemType) failed: \(error.localizedDescription)")
-        }
-        exportRequest = nil
-    }
-
-    /// Task to handle importing data.
-    @MainActor
-    private func importTask() async {
-        if importRequested {
-            defer { importRequested = false }
-            do {
-                let importedItem = try await DataManager.shared.importData(into: modelContext)
-                if let project = importedItem as? ProjectItem {
-                    try queryManager.insert(project)
-                    router.setSelection(.project(project.id))
-                    router.clearPath(for: project.id)
-                    vxAtelierPro.log.info("Successfully imported project '\(project.name)'.")
-                } else if let dialog = importedItem as? ConversationItem {
-                    try queryManager.insert(dialog)
-                    router.openConversation(dialog.id, in: dialog.project?.id)
-                    vxAtelierPro.log.info("Successfully imported dialog '\(dialog.title)'.")
-                }
-            } catch {
-                vxAtelierPro.log.error("Import failed: \(error.localizedDescription)")
-            }
         }
     }
 }

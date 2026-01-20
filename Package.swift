@@ -125,6 +125,7 @@ let package = Package(
                 "utilities/ShortcutsManager.swift",
                 "utilities/TypeConversionUtils.swift",
                 "utilities/URLExtensions.swift",
+                "viewmodels/AppSceneModel.swift",
                 "views/AppShellView.swift",
                 "views/ContentView.swift",
                 "views/content/ContentRouting.swift",
