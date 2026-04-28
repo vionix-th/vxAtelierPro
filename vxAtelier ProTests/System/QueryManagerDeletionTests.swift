@@ -38,10 +38,7 @@ final class QueryManagerDeletionTests: XCTestCase {
         try queryManager.delete(dialog)
         
         // Then - Project should still exist but with empty dialogs array
-        queryManager.fetchAllData() // Force refresh
-        
-        // Find the project after refresh
-        let updatedProject = queryManager.allProjects.first { $0.persistentModelID == project.persistentModelID }
+        let updatedProject = try testEnv.projects().first { $0.persistentModelID == project.persistentModelID }
         XCTAssertNotNil(updatedProject, "Project should still exist after dialog deletion")
         XCTAssertEqual(updatedProject?.conversations.count, 0, "Project should have no dialogs after dialog deletion")
     }
@@ -58,17 +55,15 @@ final class QueryManagerDeletionTests: XCTestCase {
         try testEnv.save()
         
         // Initial state verification
-        queryManager.fetchAllData()
-        XCTAssertEqual(queryManager.allProjects.count, 1)
-        XCTAssertEqual(queryManager.allConversations.count, 2)
+        XCTAssertEqual(try testEnv.projects().count, 1)
+        XCTAssertEqual(try testEnv.conversations().count, 2)
         
         // When - Delete the project using deleteItemPermanently which handles cascades
         try queryManager.deleteItemPermanently(project)
         
         // Then - Both project and its dialogs should be deleted
-        queryManager.fetchAllData() // Force refresh
-        XCTAssertEqual(queryManager.allProjects.count, 0, "Project should be deleted")
-        XCTAssertEqual(queryManager.allConversations.count, 0, "All associated dialogs should be deleted")
+        XCTAssertEqual(try testEnv.projects().count, 0, "Project should be deleted")
+        XCTAssertEqual(try testEnv.conversations().count, 0, "All associated dialogs should be deleted")
     }
     
     func testDeleteAPIConfigurationWithCleanupReferences() throws {
@@ -79,7 +74,8 @@ final class QueryManagerDeletionTests: XCTestCase {
         
         dialog.options.apiConfiguration = config
         project.defaultOptions.apiConfiguration = config
-        try queryManager.insertItems([config, dialog, project])
+        try queryManager.insert(config)
+        try queryManager.saveContext()
         
         // Verify initial relationships
         XCTAssertEqual(dialog.options.apiConfiguration?.persistentModelID, config.persistentModelID)
@@ -89,11 +85,8 @@ final class QueryManagerDeletionTests: XCTestCase {
         try queryManager.cleanupReferences(for: config)
         
         // Then - References should be nullified
-        queryManager.fetchAllData() // Force refresh
-        
-        // Find updated objects
-        let updatedDialog = queryManager.allConversations.first { $0.persistentModelID == dialog.persistentModelID }
-        let updatedProject = queryManager.allProjects.first { $0.persistentModelID == project.persistentModelID }
+        let updatedDialog = try testEnv.conversations().first { $0.persistentModelID == dialog.persistentModelID }
+        let updatedProject = try testEnv.projects().first { $0.persistentModelID == project.persistentModelID }
         
         XCTAssertNotNil(updatedDialog)
         XCTAssertNotNil(updatedProject)
@@ -106,24 +99,22 @@ final class QueryManagerDeletionTests: XCTestCase {
     func testSequentialDeletions() throws {
         // Given - Create multiple objects
         let dialogs = (1...5).map { testEnv.createConversation(title: "Dialog \($0)") }
-        try queryManager.insertItems(dialogs)
+        try testEnv.save()
         
         // Initial state verification
-        queryManager.fetchAllData()
-        XCTAssertEqual(queryManager.allConversations.count, 5)
+        XCTAssertEqual(try testEnv.conversations().count, 5)
         
         // When - Delete each dialog one by one
         for dialog in dialogs {
             try queryManager.delete(dialog)
             // Verify after each deletion
-            queryManager.fetchAllData() // Refresh after each deletion
-            XCTAssertFalse(queryManager.allConversations.contains { $0.persistentModelID == dialog.persistentModelID },
+            let conversations = try testEnv.conversations()
+            XCTAssertFalse(conversations.contains { $0.persistentModelID == dialog.persistentModelID },
                            "Dialog should be removed after deletion")
         }
         
         // Then - All dialogs should be deleted
-        queryManager.fetchAllData() // Force refresh
-        XCTAssertEqual(queryManager.allConversations.count, 0, "All dialogs should be deleted")
+        XCTAssertEqual(try testEnv.conversations().count, 0, "All dialogs should be deleted")
     }
     
     func testDeleteThenImmediateFetch() throws {
@@ -132,23 +123,23 @@ final class QueryManagerDeletionTests: XCTestCase {
         try queryManager.insert(dialog)
         
         // Verify initial state
-        XCTAssertEqual(queryManager.allConversations.count, 1)
+        XCTAssertEqual(try testEnv.conversations().count, 1)
         
         // When - Delete and immediately fetch
         try queryManager.delete(dialog)
-        queryManager.fetchAllData() // Immediate fetch
         
         // Then - Dialog should be gone from fetched results
-        XCTAssertEqual(queryManager.allConversations.count, 0)
+        XCTAssertEqual(try testEnv.conversations().count, 0)
         
         // Create a new dialog with the same title to verify we can re-add after deletion
         let newDialog = testEnv.createConversation(title: "Test Dialog")
         try queryManager.insert(newDialog)
         
         // Then - New dialog should be added successfully
-        XCTAssertEqual(queryManager.allConversations.count, 1)
-        XCTAssertEqual(queryManager.allConversations.first?.title, "Test Dialog")
-        XCTAssertNotEqual(queryManager.allConversations.first?.persistentModelID, dialog.persistentModelID)
+        let conversations = try testEnv.conversations()
+        XCTAssertEqual(conversations.count, 1)
+        XCTAssertEqual(conversations.first?.title, "Test Dialog")
+        XCTAssertNotEqual(conversations.first?.persistentModelID, dialog.persistentModelID)
     }
     
     // MARK: - Edge Case Tests
@@ -162,15 +153,14 @@ final class QueryManagerDeletionTests: XCTestCase {
         XCTAssertNoThrow(try queryManager.delete(dialog), "Deleting unsaved object should not throw")
         
         // Verify no state change
-        queryManager.fetchAllData()
-        XCTAssertEqual(queryManager.allConversations.count, 0)
+        XCTAssertEqual(try testEnv.conversations().count, 0)
     }
     
     func testDeleteObjectAfterRelationshipModification() throws {
         // Given - Create related objects
         let project = testEnv.createProject(name: "Test Project")
         let dialog = testEnv.createConversation(title: "Test Dialog")
-        try queryManager.insertItems([project, dialog])
+        try testEnv.save()
         
         // Modify relationship
         dialog.project = project
@@ -185,8 +175,7 @@ final class QueryManagerDeletionTests: XCTestCase {
         try queryManager.delete(dialog)
         
         // Then - Project should exist with empty dialogs array
-        queryManager.fetchAllData()
-        let updatedProject = queryManager.allProjects.first { $0.persistentModelID == project.persistentModelID }
+        let updatedProject = try testEnv.projects().first { $0.persistentModelID == project.persistentModelID }
         XCTAssertNotNil(updatedProject)
         XCTAssertEqual(updatedProject?.conversations.count, 0)
     }
@@ -208,8 +197,7 @@ final class QueryManagerDeletionTests: XCTestCase {
                 try queryManager.deleteItems(dialogs)
                 
                 // Then - Verify all deleted
-                queryManager.fetchAllData()
-                XCTAssertEqual(queryManager.allConversations.count, 0)
+                XCTAssertEqual(try testEnv.conversations().count, 0)
             } catch {
                 XCTFail("Bulk deletion failed: \(error)")
             }
@@ -233,17 +221,15 @@ final class QueryManagerDeletionTests: XCTestCase {
         try queryManager.insert(bookmark)
         
         // Verify initial state
-        queryManager.fetchAllData()
-        XCTAssertEqual(queryManager.allConversations.count, 1)
-        XCTAssertEqual(queryManager.bookmarks.count, 1)
+        XCTAssertEqual(try testEnv.conversations().count, 1)
+        XCTAssertEqual(try testEnv.bookmarks().count, 1)
         
         // When - Delete the dialog
         try queryManager.deleteItemPermanently(dialog)
         
         // Then - Both dialog and bookmarks should be deleted
-        queryManager.fetchAllData()
-        XCTAssertEqual(queryManager.allConversations.count, 0, "Dialog should be deleted")
-        XCTAssertEqual(queryManager.bookmarks.count, 0, "Associated bookmarks should be deleted")
+        XCTAssertEqual(try testEnv.conversations().count, 0, "Dialog should be deleted")
+        XCTAssertEqual(try testEnv.bookmarks().count, 0, "Associated bookmarks should be deleted")
     }
     
     func testDeleteMessageReferencedByBookmark() throws {
@@ -266,8 +252,7 @@ final class QueryManagerDeletionTests: XCTestCase {
         try queryManager.insert(bookmark)
         
         // Verify initial state
-        queryManager.fetchAllData()
-        XCTAssertEqual(queryManager.bookmarks.count, 1)
+        XCTAssertEqual(try testEnv.bookmarks().count, 1)
         
         // When - Delete the turn containing the message (simulates modifying conversation)
         dialog.turns.removeAll { $0.persistentModelID == turn.persistentModelID }
@@ -275,11 +260,11 @@ final class QueryManagerDeletionTests: XCTestCase {
         
         // Then - Bookmark should have invalid message reference but still exist
         // Note: This test documents current behavior, not necessarily ideal behavior
-        queryManager.fetchAllData()
-        XCTAssertEqual(queryManager.bookmarks.count, 1, "Bookmark still exists after referenced message is deleted")
+        let bookmarks = try testEnv.bookmarks()
+        XCTAssertEqual(bookmarks.count, 1, "Bookmark still exists after referenced message is deleted")
         
         // Validate the bookmark still exists, which is the important part of the test
-        let bookmarkAfterDeletion = queryManager.bookmarks.first
+        let bookmarkAfterDeletion = bookmarks.first
         XCTAssertNotNil(bookmarkAfterDeletion, "Bookmark should still exist after referenced message deletion")
     }
 }

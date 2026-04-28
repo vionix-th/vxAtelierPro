@@ -47,6 +47,51 @@ final class TestEnvironment {
     func save() throws {
         try modelContext.save()
     }
+
+    func fetchAll<T: PersistentModel>(_ type: T.Type) throws -> [T] {
+        try modelContext.fetch(FetchDescriptor<T>())
+    }
+
+    func conversations() throws -> [ConversationItem] {
+        try fetchAll(ConversationItem.self)
+            .sorted { $0.timestamp > $1.timestamp }
+    }
+
+    func projects() throws -> [ProjectItem] {
+        try fetchAll(ProjectItem.self)
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    func bookmarks() throws -> [BookmarkItem] {
+        try fetchAll(BookmarkItem.self)
+            .sorted { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
+    }
+
+    func apiConfigurations() throws -> [APIConfigurationItem] {
+        try fetchAll(APIConfigurationItem.self)
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    func standaloneConversations(
+        showSystemDialogs: Bool,
+        contentFilter: ContentFilter
+    ) throws -> [ConversationItem] {
+        try conversations().filter { conversation in
+            guard conversation.project == nil else { return false }
+            switch contentFilter {
+            case .active:
+                guard conversation.status == .active else { return false }
+            case .archived:
+                guard conversation.status == .archived else { return false }
+            case .trashed:
+                guard conversation.status == .trashed else { return false }
+            }
+            if !showSystemDialogs && conversation.purpose == .system {
+                return false
+            }
+            return true
+        }
+    }
 }
 
 // MARK: - Model Factories

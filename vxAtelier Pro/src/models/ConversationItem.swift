@@ -94,11 +94,12 @@ final class ConversationItem {
             title: "\(self.title) (Fork)",
             options: forkedOptions
         )
-        guard let upTo = upToTurnIndex, upTo >= 0, upTo < self.turns.count else {
+        let sortedTurns = self.turns.sorted { $0.sequenceNumber < $1.sequenceNumber }
+        guard let upTo = upToTurnIndex, upTo >= 0, upTo < sortedTurns.count else {
             forkedDialog.project = self.project
             return forkedDialog
         }
-        for turn in self.turns[0...upTo] {
+        for turn in sortedTurns[0...upTo] {
             // Deep copy userMessage
             let userMsgCopy = MessageItem(
                 role: turn.userMessage.role,

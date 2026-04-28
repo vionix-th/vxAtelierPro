@@ -21,10 +21,10 @@ final class QueryManagerTests: XCTestCase {
     
     // MARK: - Initialization Tests
     
-    func testInitialization() {
+    func testInitialization() throws {
         XCTAssertNotNil(queryManager)
-        XCTAssertEqual(queryManager.allConversations.count, 0)
-        XCTAssertEqual(queryManager.allProjects.count, 0)
+        XCTAssertEqual(try testEnv.conversations().count, 0)
+        XCTAssertEqual(try testEnv.projects().count, 0)
     }
     
     // MARK: - Data Fetching Tests
@@ -35,35 +35,32 @@ final class QueryManagerTests: XCTestCase {
         _ = testEnv.createProject(name: "Project 1")
         try testEnv.save()
         
-        // When
-        queryManager.fetchAllData()
-        
         // Then
-        XCTAssertEqual(queryManager.allConversations.count, 1)
-        XCTAssertEqual(queryManager.allProjects.count, 1)
-        XCTAssertEqual(queryManager.allConversations.first?.title, "Test 1")
-        XCTAssertEqual(queryManager.allProjects.first?.name, "Project 1")
+        let conversations = try testEnv.conversations()
+        let projects = try testEnv.projects()
+        XCTAssertEqual(conversations.count, 1)
+        XCTAssertEqual(projects.count, 1)
+        XCTAssertEqual(conversations.first?.title, "Test 1")
+        XCTAssertEqual(projects.first?.name, "Project 1")
     }
     
     // MARK: - Status Management Tests
     
-    func testActiveItemsVisibility() {
+    func testActiveItemsVisibility() throws {
         // Given
         let activeDialog = testEnv.createConversation(title: "Active", status: .active)
-        try? testEnv.save()
-        
-        // When
-        queryManager.fetchAllData()
+        try testEnv.save()
         
         // Then - active items should always be visible
-        XCTAssertEqual(queryManager.allConversations.count, 1)
-        XCTAssertEqual(queryManager.allConversations.first?.title, "Active")
+        let conversations = try testEnv.conversations()
+        XCTAssertEqual(conversations.count, 1)
+        XCTAssertEqual(conversations.first?.title, "Active")
         
         // Clean up
-        try? queryManager.deleteItems([activeDialog])
+        try queryManager.deleteItems([activeDialog])
     }
     
-    func testStandaloneAndSystemConversationFilteringByContentFilter() {
+    func testStandaloneAndSystemConversationFilteringByContentFilter() throws {
         // Given
         let project = testEnv.createProject(name: "Project 1")
         _ = testEnv.createConversation(title: "Active", status: .active, purpose: .user)
@@ -76,32 +73,29 @@ final class QueryManagerTests: XCTestCase {
             purpose: .user,
             project: project
         )
-        try? testEnv.save()
-
-        // When
-        queryManager.fetchAllData()
+        try testEnv.save()
 
         // Then - standalone conversations are filtered by status and exclude system/project items
-        let activeStandalone = queryManager.standaloneConversations(
+        let activeStandalone = try testEnv.standaloneConversations(
             showSystemDialogs: false,
             contentFilter: .active
         )
         XCTAssertEqual(activeStandalone.map(\.title), ["Active"])
 
-        let archivedStandalone = queryManager.standaloneConversations(
+        let archivedStandalone = try testEnv.standaloneConversations(
             showSystemDialogs: false,
             contentFilter: .archived
         )
         XCTAssertEqual(archivedStandalone.map(\.title), ["Archived"])
 
-        let trashedStandalone = queryManager.standaloneConversations(
+        let trashedStandalone = try testEnv.standaloneConversations(
             showSystemDialogs: false,
             contentFilter: .trashed
         )
         XCTAssertEqual(trashedStandalone.map(\.title), ["Trashed"])
 
         // System conversations are included in standalone when enabled
-        let archivedStandaloneWithSystem = queryManager.standaloneConversations(
+        let archivedStandaloneWithSystem = try testEnv.standaloneConversations(
             showSystemDialogs: true,
             contentFilter: .archived
         )
@@ -119,36 +113,33 @@ final class QueryManagerTests: XCTestCase {
         
         // When - insert
         try queryManager.insert(dialog)
-        queryManager.fetchAllData()
         
         // Then - should be in the list
-        XCTAssertEqual(queryManager.allConversations.count, 1)
-        XCTAssertEqual(queryManager.allConversations.first?.title, "Test Dialog")
+        var conversations = try testEnv.conversations()
+        XCTAssertEqual(conversations.count, 1)
+        XCTAssertEqual(conversations.first?.title, "Test Dialog")
         
         // When - delete
         try queryManager.delete(dialog)
-        queryManager.fetchAllData()
         
         // Then - should be removed
-        XCTAssertTrue(queryManager.allConversations.isEmpty)
+        conversations = try testEnv.conversations()
+        XCTAssertTrue(conversations.isEmpty)
     }
     
     func testArchiveItem() throws {
         // Given
         let dialog = testEnv.createConversation(title: "Test Dialog")
         try queryManager.insert(dialog)
-        queryManager.fetchAllData()
         
         // When - archive
         try queryManager.archiveItem(dialog)
-        queryManager.fetchAllData()
         
         // Then - should be archived
         XCTAssertEqual(dialog.status, .archived)
         
         // When - unarchive
         try queryManager.restoreItem(dialog)
-        queryManager.fetchAllData()
         
         // Then - should be active again
         XCTAssertEqual(dialog.status, .active)
@@ -170,8 +161,8 @@ final class QueryManagerTests: XCTestCase {
         XCTAssertNoThrow(try queryManager.deleteItems([dialog]))
         
         // Verify the item wasn't added to the context
-        queryManager.fetchAllData()
-        XCTAssertFalse(queryManager.allConversations.contains(where: { $0.title == "Not in context" }))
+        let conversations = try testEnv.conversations()
+        XCTAssertFalse(conversations.contains(where: { $0.title == "Not in context" }))
     }
     
     func testArchiveNonModifiableItem() throws {
@@ -209,7 +200,8 @@ final class QueryManagerTests: XCTestCase {
                                          isDefault: true)
         
         // When - insert configurations
-        try queryManager.insertItems([config1, config2])
+        try queryManager.insert(config1)
+        try queryManager.insert(config2)
         
         // Then - should return the default configuration
         XCTAssertEqual(queryManager.defaultApiConfiguration?.name, "Config 2")

@@ -597,10 +597,3 @@ struct VoiceConfigurationEditView: View {
         return preset?.label ?? "Custom"
     }
 }
-
-// MARK: - Preview Provider
-
-#Preview {
-    VoiceConfigurationListView()
-        .modelContainer(for: VoiceConfigurationItem.self, inMemory: true)
-} 
