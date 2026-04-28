@@ -20,21 +20,21 @@ private let knownSettings: [String: SettingInfo] = [
     "shouldTerminateAfterLastWindowClosed": .init(type: Bool.self),
     "appearanceStyle": .init(type: String.self, allowedValues: ["System", "Light", "Dark"]),
     "showRowToolButtons": .init(type: Bool.self),
-    "DialogTextEdit.buttonSize": .init(type: Double.self), // Range: 12...48
+    "ConversationTextEdit.buttonSize": .init(type: Double.self), // Range: 12...48
     "DisableAvatar": .init(type: Bool.self),
     "DefaultAvatarSize": .init(type: Int.self), // Range: 16...128, Step: 2
     "BubbleFontSize": .init(type: Double.self), // Range: 8...28
-    "autoNameDialogs": .init(type: Bool.self), // Used in GeneralSettingsView
+    "autoNameConversations": .init(type: Bool.self), // Used in GeneralSettingsView
     "statusBarVisible": .init(type: Bool.self),
     "showConversationLastMessageLabel": .init(type: Bool.self), // Used in GeneralSettingsView
     "showConversationCreatedLabel": .init(type: Bool.self), // Used in GeneralSettingsView
     "defaultAvatar": .init(type: Data.self, isWritable: false), // Special case: Read-only for existence check
     "IsMarkdownEnabled": .init(type: Bool.self),
     "IsMarkdownTextSelectable": .init(type: Bool.self),
-    "ShowSystemDialogs": .init(type: Bool.self),
-    "ProjectDialogsSortOrderDescending": .init(type: Bool.self),
-    "ProjectDialogsSortType": .init(type: String.self, allowedValues: ["conversationDate", "lastMessageDate", "alphabetically"]),
-    "autoSendDialogTemplates": .init(type: Bool.self), // Used in GeneralSettingsView
+    "ShowSystemConversations": .init(type: Bool.self),
+    "ProjectConversationsSortOrderDescending": .init(type: Bool.self),
+    "ProjectConversationsSortType": .init(type: String.self, allowedValues: ["conversationDate", "lastMessageDate", "alphabetically"]),
+    "autoSendConversationTemplates": .init(type: Bool.self), // Used in GeneralSettingsView
     "TTSAutoplay": .init(type: Bool.self),
     "TTSRepeatMode": .init(type: String.self, allowedValues: ["none", "one", "all"]),
     "allowSelfSignedCertificates": .init(type: Bool.self), // Used in PermissionsSettingsView
@@ -86,7 +86,7 @@ public struct ListSettingsTool: ExecutableTool {
             listDescription += "\n"
         }
         // Add notes about ranges if needed, e.g.:
-        listDescription += "\nNote: Some numeric settings have specific ranges (e.g., 'DialogTextEdit.buttonSize': 12-48)."
+        listDescription += "\nNote: Some numeric settings have specific ranges (e.g., 'ConversationTextEdit.buttonSize': 12-48)."
         return listDescription
     }
 
@@ -258,8 +258,8 @@ public struct WriteSettingTool: ExecutableTool {
                   return "Error: Missing or incorrect type for 'new_double_value' argument for setting '\(settingKey)'. Expected number."
               }
 
-            // Add range validation if known (example for DialogTextEdit.buttonSize)
-             if settingKey == "DialogTextEdit.buttonSize" && !(12...48).contains(finalDoubleVal) {
+            // Add range validation if known (example for ConversationTextEdit.buttonSize)
+             if settingKey == "ConversationTextEdit.buttonSize" && !(12...48).contains(finalDoubleVal) {
                  return "Error: Value \(finalDoubleVal) for '\(settingKey)' is outside the allowed range (12-48)."
              }
              if settingKey == "BubbleFontSize" && !(8...28).contains(finalDoubleVal) {

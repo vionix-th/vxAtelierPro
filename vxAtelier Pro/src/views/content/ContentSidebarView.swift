@@ -16,13 +16,13 @@ struct ContentSidebarActions {
 struct ContentSidebarView: View {
     let contentFilter: ContentFilter
     let projects: [ProjectItem]
-    let dialogs: [ConversationItem]
+    let conversations: [ConversationItem]
     let bookmarks: [BookmarkItem]
     @Binding var selection: SidebarSelection?
     @Binding var sidebarProjectsSortDescending: Bool
     @Binding var sidebarProjectsSortTypeRaw: String
-    @Binding var sidebarDialogsSortDescending: Bool
-    @Binding var sidebarDialogsSortTypeRaw: String
+    @Binding var sidebarConversationsSortDescending: Bool
+    @Binding var sidebarConversationsSortTypeRaw: String
     let showEmptySections: Bool
     let actions: ContentSidebarActions
     let availableProjects: [ProjectItem]
@@ -35,11 +35,11 @@ struct ContentSidebarView: View {
         }
     }
     
-    private var titleForDialogs: String {
+    private var titleForConversations: String {
         switch contentFilter {
-        case .active: return "Standalone Dialogs"
-        case .archived: return "Archived Dialogs"
-        case .trashed: return "Trashed Items"
+        case .active: return "Standalone Conversations"
+        case .archived: return "Archived Conversations"
+        case .trashed: return "Trashed Conversations"
         }
     }
 
@@ -50,9 +50,9 @@ struct ContentSidebarView: View {
                 projects: projects
             )
 
-            dialogSection(
-                title: titleForDialogs,
-                dialogs: dialogs
+            conversationSection(
+                title: titleForConversations,
+                conversations: conversations
             )
 
             if contentFilter == .active {
@@ -116,7 +116,7 @@ struct ContentSidebarView: View {
                     ? {
                         actions.archiveItem(conversation)
                     } : nil,
-                imageName: AppDefaults.dialogImageSystemName,
+                imageName: AppDefaults.conversationImageSystemName,
                 onProjectAssign: conversation.status == .active
                     ? { project in
                         actions.assignConversationToProject(conversation, project)
@@ -189,28 +189,28 @@ struct ContentSidebarView: View {
     }
 
     @ViewBuilder
-    private func dialogSection(title: String, dialogs: [ConversationItem]) -> some View {
-        if !dialogs.isEmpty || showEmptySections {
+    private func conversationSection(title: String, conversations: [ConversationItem]) -> some View {
+        if !conversations.isEmpty || showEmptySections {
             let sorted = ConversationSorter.sort(
-                dialogs,
-                descending: sidebarDialogsSortDescending,
-                sortType: SidebarSortType(rawValue: sidebarDialogsSortTypeRaw)
+                conversations,
+                descending: sidebarConversationsSortDescending,
+                sortType: SidebarSortType(rawValue: sidebarConversationsSortTypeRaw)
                     ?? .conversationDate
             )
             Section {
                 ForEach(
                     sorted
-                ) { dialog in
-                    conversationNavigationLink(for: dialog)
+                ) { conversation in
+                    conversationNavigationLink(for: conversation)
                 }
                 .onDelete { indexSet in
                     indexSet.forEach { index in
                         if index < sorted.count {
-                            let dialog = sorted[index]
-                            actions.deleteItem(dialog)
+                            let conversation = sorted[index]
+                            actions.deleteItem(conversation)
                         } else {
                             vxAtelierPro.log.warning(
-                                "ContentSidebarView: Invalid index \(index) encountered in dialogSection.onDelete for dialogs array count \(dialogs.count)."
+                                "ContentSidebarView: Invalid index \(index) encountered in conversationSection.onDelete for conversations array count \(conversations.count)."
                             )
                         }
                     }
@@ -218,8 +218,8 @@ struct ContentSidebarView: View {
             } header: {
                 HStack {
                     SidebarSortButton(
-                        sortDescending: $sidebarDialogsSortDescending,
-                        sortTypeRaw: $sidebarDialogsSortTypeRaw,
+                        sortDescending: $sidebarConversationsSortDescending,
+                        sortTypeRaw: $sidebarConversationsSortTypeRaw,
                         allowedTypes: SidebarSortType.allCases)
                     Text(title)
                 }

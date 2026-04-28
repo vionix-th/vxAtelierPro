@@ -31,10 +31,10 @@ final class MessageInputViewModel: ObservableObject {
     }
 
     func applyTemplate(_ template: PromptTemplate, conversation: ConversationItem?) {
-        message = expandVariables(template.prompt, dialog: conversation)
+        message = expandVariables(template.prompt, conversation: conversation)
     }
 
-    func send(autoNameDialogs: Bool) {
+    func send(autoNameConversations: Bool) {
         let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             vxAtelierPro.log.info("Ignoring empty message")
@@ -49,9 +49,9 @@ final class MessageInputViewModel: ObservableObject {
         sendTask = Task { @MainActor in
             do {
                 let conversation = try resolveConversation()
-                autoNameIfNeeded(conversation: conversation, sourceText: textToSend, autoNameDialogs: autoNameDialogs)
+                autoNameIfNeeded(conversation: conversation, sourceText: textToSend, autoNameConversations: autoNameConversations)
 
-                let expandedMessage = expandVariables(textToSend, dialog: conversation)
+                let expandedMessage = expandVariables(textToSend, conversation: conversation)
                 try await conversation.complete(expandedMessage, streamingState: streamingState)
                 try queryManager.saveContext()
 
@@ -75,25 +75,25 @@ final class MessageInputViewModel: ObservableObject {
         isTaskRunning = false
     }
 
-    private func autoNameIfNeeded(conversation: ConversationItem, sourceText: String, autoNameDialogs: Bool) {
-        guard autoNameDialogs,
+    private func autoNameIfNeeded(conversation: ConversationItem, sourceText: String, autoNameConversations: Bool) {
+        guard autoNameConversations,
               conversation.turns.isEmpty,
-              conversation.title == AppDefaults.newDialogName else { return }
+              conversation.title == AppDefaults.newConversationName else { return }
 
         let separators = CharacterSet(charactersIn: "\n\r.:;")
-        var dialogTitle = sourceText.components(separatedBy: separators).first ?? ""
+        var conversationTitle = sourceText.components(separatedBy: separators).first ?? ""
 
-        if dialogTitle.isEmpty {
-            dialogTitle = sourceText
+        if conversationTitle.isEmpty {
+            conversationTitle = sourceText
         }
 
-        if dialogTitle.lengthOfBytes(using: .utf8) > 64 {
-            dialogTitle = dialogTitle.prefix(64) + "..."
+        if conversationTitle.lengthOfBytes(using: .utf8) > 64 {
+            conversationTitle = conversationTitle.prefix(64) + "..."
         }
 
-        if !dialogTitle.isEmpty {
-            vxAtelierPro.log.notice("Auto-named dialog to '\(dialogTitle)'")
-            conversation.title = dialogTitle
+        if !conversationTitle.isEmpty {
+            vxAtelierPro.log.notice("Auto-named conversation to '\(conversationTitle)'")
+            conversation.title = conversationTitle
         }
     }
 }
@@ -104,10 +104,10 @@ struct MessageInputView: View {
     @StateObject private var viewModel: MessageInputViewModel
     private let contextConversation: ConversationItem?
 
-    @AppStorage(AppSettings.Keys.dialogTextEditButtonSize) var buttonSize: Double = AppDefaults
-        .dialogTextEditButtonSize
-    @AppStorage(AppSettings.Keys.autoNameDialogs) private var autoNameDialogs: Bool = AppDefaults.autoNameDialogs
-    @AppStorage(AppSettings.Keys.autoSendDialogTemplates) private var autoSendDialogTemplates: Bool = AppDefaults.autoSendDialogTemplates
+    @AppStorage(AppSettings.Keys.conversationTextEditButtonSize) var buttonSize: Double = AppDefaults
+        .conversationTextEditButtonSize
+    @AppStorage(AppSettings.Keys.autoNameConversations) private var autoNameConversations: Bool = AppDefaults.autoNameConversations
+    @AppStorage(AppSettings.Keys.autoSendConversationTemplates) private var autoSendConversationTemplates: Bool = AppDefaults.autoSendConversationTemplates
 
     init(
         queryManager: QueryManager,
@@ -144,22 +144,12 @@ struct MessageInputView: View {
                         if NSEvent.modifierFlags.contains(.shift) {
                             return .ignored
                         }
-                        viewModel.send(autoNameDialogs: autoNameDialogs)
+                        viewModel.send(autoNameConversations: autoNameConversations)
                         return .handled
                     }
                     #endif
 
                 HStack {
-                    Button(action: {
-
-                    }) {
-                        Image(systemName: "paperclip")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: buttonSize, height: buttonSize)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-
                     Button(action: {
                         viewModel.isPromptTemplatesPresented = true
                     }) {
@@ -168,7 +158,6 @@ struct MessageInputView: View {
                             .scaledToFit()
                             .frame(width: buttonSize, height: buttonSize)
                     }
-                    .padding(.leading, AppDefaults.paddingMedium)
                     .buttonStyle(PlainButtonStyle())
                     .popover(isPresented: $viewModel.isPromptTemplatesPresented) {
                         PromptTemplateList(
@@ -178,8 +167,8 @@ struct MessageInputView: View {
                                 viewModel.isPromptTemplatesPresented = false
                                 viewModel.isInputFocused = true
 
-                                if autoSendDialogTemplates {
-                                    viewModel.send(autoNameDialogs: autoNameDialogs)
+                                if autoSendConversationTemplates {
+                                    viewModel.send(autoNameConversations: autoNameConversations)
                                 }
                             })
                         .frame(minWidth: 200, idealWidth: 400, minHeight: 300, idealHeight: 500)
@@ -188,7 +177,7 @@ struct MessageInputView: View {
                     Spacer()
 
                     Button(action: {
-                        viewModel.send(autoNameDialogs: autoNameDialogs)
+                        viewModel.send(autoNameConversations: autoNameConversations)
                     }) {
                         Image(systemName: "location")
                             .resizable()

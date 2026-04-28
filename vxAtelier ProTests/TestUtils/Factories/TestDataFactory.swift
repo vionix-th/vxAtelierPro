@@ -1,5 +1,9 @@
 import Foundation
+#if canImport(vxAtelier_Pro_debug)
 @testable import vxAtelier_Pro_debug
+#else
+@testable import vxAtelier_Pro
+#endif
 
 /// Protocol defining the interface for test data factories
 protocol TestDataFactory {

@@ -30,12 +30,12 @@ struct MessageView: View {
     @State private var expandedResultIds: Set<PersistentIdentifier> = []
 
     private var avatar: some View {
-        let dialog = queryManager.conversation(with: conversationID)
+        let conversation = queryManager.conversation(with: conversationID)
         
         let imageData: Data? = {
-            if let data = dialog?.options.avatarImageData {
+            if let data = conversation?.options.avatarImageData {
                 return data
-            } else if let data = dialog?.project?.defaultOptions.avatarImageData {
+            } else if let data = conversation?.project?.defaultOptions.avatarImageData {
                 return data
             } else if let data = UserDefaults.standard.data(forKey: AppSettings.Keys.defaultAvatarData) {
                 return data
@@ -49,20 +49,20 @@ struct MessageView: View {
     var body: some View {
         let message: MessageItem?
         let turn: ConversationTurn?
-        let dialog = queryManager.conversation(with: conversationID)
+        let conversation = queryManager.conversation(with: conversationID)
         let isStreamingPlaceholder: Bool
         
         // Resolve models from IDs
         if let messageID = messageID {
             // Normal message with ID
-            // Find the turn in the dialog's turns collection
-            turn = dialog?.turns.first(where: { $0.id == turnID })
+            // Find the turn in the conversation's turns collection
+            turn = conversation?.turns.first(where: { $0.id == turnID })
             message = turn?.userMessage.id == messageID ? turn?.userMessage : 
                      turn?.events.first(where: { $0.message.id == messageID })?.message
             isStreamingPlaceholder = false
         } else if let streamText = streamingContent {
             // Streaming content - create temp message
-            turn = dialog?.turns.first(where: { $0.id == turnID })
+            turn = conversation?.turns.first(where: { $0.id == turnID })
             message = MessageItem(
                 role: "assistant",
                 content: ContentItem(streamText),
@@ -79,12 +79,12 @@ struct MessageView: View {
         }
         
         return HStack {
-            if message == nil || dialog == nil {
+            if message == nil || conversation == nil {
                 // Error state - message or conversation not found
                 Text("Message not available")
                     .foregroundColor(.secondary)
                     .italic()
-            } else if let message = message, let dialog = dialog {
+            } else if let message = message, let conversation = conversation {
                 if isSelecting {
                     Image(systemName: isSelected ? "checkmark.circle" : "circle")
                         .onTapGesture { onSelect() }
@@ -92,7 +92,7 @@ struct MessageView: View {
                 
                 if message.role == "user" {
                     Spacer()
-                    bubbleContent(message: message, dialog: dialog, isStreaming: isStreamingPlaceholder)
+                    bubbleContent(message: message, conversation: conversation, isStreaming: isStreamingPlaceholder)
                 } else if message.role == "assistant" {
                     // If tool chips are disabled and the assistant text is empty (non-streaming), omit the bubble entirely
                     let assistantTextIsEmpty = message.content.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -104,7 +104,7 @@ struct MessageView: View {
                                     Spacer()
                                 }
                             }
-                            bubbleContent(message: message, dialog: dialog, isStreaming: isStreamingPlaceholder)
+                            bubbleContent(message: message, conversation: conversation, isStreaming: isStreamingPlaceholder)
                         }
                         Spacer()
                     }
@@ -127,7 +127,7 @@ struct MessageView: View {
         }
     }
 
-    func bubbleContent(message: MessageItem, dialog: ConversationItem, isStreaming: Bool = false) -> some View {
+    func bubbleContent(message: MessageItem, conversation: ConversationItem, isStreaming: Bool = false) -> some View {
         ZStack(alignment: .bottomTrailing) {
             VStack(alignment: .leading, spacing: 8) {
                 // Main content bubble
@@ -144,7 +144,7 @@ struct MessageView: View {
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
-                        } else if dialog.options.isMarkdownEnabled && !(isStreaming && markdownStreamFinalizeOnly) {
+                        } else if conversation.options.isMarkdownEnabled && !(isStreaming && markdownStreamFinalizeOnly) {
                             MarkdownUIRenderer(markdown: message.content.text)
                         } else {
                             Text(message.content.text)
@@ -187,7 +187,7 @@ struct MessageView: View {
 
                 // Tool results section (gated by ShowToolCallChips)
                 if message.role == "assistant" && showToolCallChips {
-                    let turn = dialog.turns.first(where: { $0.id == turnID })
+                    let turn = conversation.turns.first(where: { $0.id == turnID })
                     let toolResults = turn?.events.filter { $0.type == .toolResult && $0.message.toolCallId != nil } ?? []
                     let calls = message.getToolCalls() ?? []
                     let callById: [String: AIToolCall] = {
@@ -343,7 +343,7 @@ struct MessageView: View {
             } label: {
                 MenuItemStyle.label("Fork from Here", systemImage: "arrow.branch")
             }
-            .help("Create a new dialog forked from all turns preceding the turn containing this message")
+            .help("Create a new conversation forked from all turns preceding the turn containing this message")
             Button {
                 onAction(.addToPlaylist)
             } label: {

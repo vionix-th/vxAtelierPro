@@ -1,10 +1,10 @@
 import SwiftUI
 
-func expandVariables(_ inString: String, dialog: ConversationItem? = nil) -> String {
+func expandVariables(_ inString: String, conversation: ConversationItem? = nil) -> String {
     var rval = inString
     
     let variables: [String: Any] = [
-        "$dialogid": dialog.map { "\"\(String(describing: $0.id).stableHash())\"" } ?? "[ERROR: NO DIALOG ID]",
+        "$conversationid": conversation.map { "\"\(String(describing: $0.id).stableHash())\"" } ?? "[ERROR: NO CONVERSATION ID]",
         "$isodate": {
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd"

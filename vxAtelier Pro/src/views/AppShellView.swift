@@ -7,6 +7,9 @@ struct AppShellView: View {
     @Environment(QueryManager.self) private var queryManager
     @Environment(TTSQueue.self) private var ttsQueue
     @Environment(AppSceneModel.self) private var sceneModel
+    #if os(macOS)
+        @Environment(\.openWindow) private var openWindow
+    #endif
     @AppStorage(AppSettings.Keys.statusBarVisible) private var statusBarVisible: Bool = AppDefaults.statusBarVisible
 
     var body: some View {
@@ -39,6 +42,12 @@ struct AppShellView: View {
         #endif
         .task(id: scene.exportTaskID) { await scene.exportTask() }
         .task(id: scene.importRequestFlag) { await scene.importTask() }
+        #if os(macOS)
+            .onChange(of: scene.utilityPanelRequestID) { _, requestID in
+                guard requestID != nil else { return }
+                openWindow(id: "utilityPanel")
+            }
+        #endif
         .sheet(isPresented: $scene.isLogHistoryShown) {
             LogHistorySheet()
         }
@@ -59,27 +68,27 @@ struct AppShellView: View {
                     .presentationDragIndicator(.visible)
                 #endif
         }
-        // Hoisted dialog options sheet (stable parent anchor)
+        // Hoisted conversation options sheet (stable parent anchor)
         .sheet(
             item: $scene.optionsSheetID,
             onDismiss: {
                 vxAtelierPro.log.debug("AppShellView: options sheet dismissed (onDismiss)")
             }
         ) { (conversationID: PersistentIdentifier) in
-            if let dialog = queryManager.conversation(with: conversationID) {
+            if let conversation = queryManager.conversation(with: conversationID) {
                 ConversationOptionsView(
-                    options: Binding(get: { dialog.options }, set: { dialog.options = $0 })
+                    options: Binding(get: { conversation.options }, set: { conversation.options = $0 })
                 )
                 .onAppear {
                     vxAtelierPro.log.debug(
-                        "AppShellView: options sheet presented for dialog '\(dialog.title)' (id: \(dialog.id))"
+                        "AppShellView: options sheet presented for conversation '\(conversation.title)' (id: \(conversation.id))"
                     )
                 }
                 .onDisappear {
                     do {
                         try queryManager.saveContext()
                         vxAtelierPro.log.debug(
-                            "AppShellView: Saved context after options dismissed for dialog '\(dialog.title)'."
+                            "AppShellView: Saved context after options dismissed for conversation '\(conversation.title)'."
                         )
                     } catch {
                         vxAtelierPro.log.error(

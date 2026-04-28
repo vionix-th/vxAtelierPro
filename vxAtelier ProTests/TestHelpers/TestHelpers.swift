@@ -1,6 +1,10 @@
 import SwiftData
 import XCTest
+#if canImport(vxAtelier_Pro_debug)
 @testable import vxAtelier_Pro_debug
+#else
+@testable import vxAtelier_Pro
+#endif
 
 // MARK: - Test Helpers
 
@@ -73,7 +77,7 @@ final class TestEnvironment {
     }
 
     func standaloneConversations(
-        showSystemDialogs: Bool,
+        showSystemConversations: Bool,
         contentFilter: ContentFilter
     ) throws -> [ConversationItem] {
         try conversations().filter { conversation in
@@ -86,7 +90,7 @@ final class TestEnvironment {
             case .trashed:
                 guard conversation.status == .trashed else { return false }
             }
-            if !showSystemDialogs && conversation.purpose == .system {
+            if !showSystemConversations && conversation.purpose == .system {
                 return false
             }
             return true
@@ -101,7 +105,7 @@ extension TestEnvironment {
     func createConversation(
         title: String = "Test Conversation",
         status: ItemStatus = .active,
-        purpose: ConversationItem.DialogPurpose = .user,
+        purpose: ConversationItem.ConversationPurpose = .user,
         project: ProjectItem? = nil,
         timestamp: Date = Date()
     ) -> ConversationItem {

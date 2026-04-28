@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 import SwiftUI
 
-/// Represents a conversation dialog between a user and an AI assistant.
+/// Represents a conversation between a user and an AI assistant.
 ///
 /// This model stores a complete conversation, including:
 /// - All messages and their content
@@ -12,7 +12,7 @@ import SwiftUI
 /// - Tool call history and capabilities
 @Model
 final class ConversationItem {
-    /// When this dialog was created
+    /// When this conversation was created
     var timestamp: Date
 
     /// Display name for this conversation
@@ -21,47 +21,37 @@ final class ConversationItem {
     /// Conversation turns (user message + assistant/tool events)
     @Relationship(deleteRule: .cascade, inverse: \ConversationTurn.conversation) var turns: [ConversationTurn] = []
 
-    /// Configuration options for this dialog
+    /// Configuration options for this conversation
     @Relationship(deleteRule: .cascade) var options: ConversationOptions
 
-    /// Optional project this dialog belongs to
+    /// Optional project this conversation belongs to
     @Relationship(deleteRule: .nullify) var project: ProjectItem? = nil
 
-    /// Current status of this dialog (active, archived, trashed)
+    /// Current status of this conversation (active, archived, trashed)
     var status: ItemStatus = ItemStatus.active
 
-    /// Purpose of this dialog (system or user)
-    var purpose: DialogPurpose = ConversationItem.DialogPurpose.user
+    /// Purpose of this conversation (system or user)
+    var purpose: ConversationPurpose = ConversationItem.ConversationPurpose.user
 
     /// Estimated token count for the current context
     var tokenCount: Int = 0
 
-    /// Total tokens used in all requests for this dialog
+    /// Total tokens used in all requests for this conversation
     var usedTokenCount: Int = 0
 
-    /// Purpose categories for dialogs
-    enum DialogPurpose: String, Codable {
-        /// System-generated dialog
+    /// Purpose categories for conversations
+    enum ConversationPurpose: String, Codable {
+        /// System-generated conversation
         case system = "System"
 
-        /// User-created dialog
+        /// User-created conversation
         case user = "User"
     }
 
-    /// Stores ID of the dialog linked to the utility panel
-    private static var dialogItemLinkedToUtilityPanel: PersistentIdentifier? = nil
+    /// Whether this conversation is currently linked to the utility panel.
+    var isUtilityConversation: Bool = false
 
-    /// Whether this dialog is currently linked to the utility panel
-    var isLinkedToUtilityPanel: Bool {
-        get {
-            return ConversationItem.dialogItemLinkedToUtilityPanel == self.id
-        }
-        set {
-            ConversationItem.dialogItemLinkedToUtilityPanel = newValue ? self.id : nil
-        }
-    }
-
-    /// Creates a new dialog with a title and options.
+    /// Creates a new conversation with a title and options.
     ///
     /// - Parameters:
     ///   - title: Display name for this conversation
@@ -70,10 +60,10 @@ final class ConversationItem {
         self.init(timestamp: Date(), title: title, options: options)
     }
 
-    /// Creates a new dialog with specified properties.
+    /// Creates a new conversation with specified properties.
     ///
     /// - Parameters:
-    ///   - timestamp: When this dialog was created
+    ///   - timestamp: When this conversation was created
     ///   - title: Display name for this conversation
     ///   - options: Configuration options
     init(timestamp: Date, title: String, options: ConversationOptions) {
@@ -82,22 +72,22 @@ final class ConversationItem {
         self.options = options
     }
 
-    /// Creates a fork (copy) of this dialog up to a specific turn index (inclusive).
+    /// Creates a fork (copy) of this conversation up to a specific turn index (inclusive).
     ///
     /// - Parameter upToTurnIndex: Optional index of the last turn to include (inclusive). Nil means no turns.
-    /// - Returns: A new dialog containing copied turns
+    /// - Returns: A new conversation containing copied turns
     func fork(upToTurnIndex: Int?) -> ConversationItem {
         // Copy options
         let forkedOptions = self.options.copy()
-        let forkedDialog = ConversationItem(
+        let forkedConversation = ConversationItem(
             timestamp: Date(),
             title: "\(self.title) (Fork)",
             options: forkedOptions
         )
         let sortedTurns = self.turns.sorted { $0.sequenceNumber < $1.sequenceNumber }
         guard let upTo = upToTurnIndex, upTo >= 0, upTo < sortedTurns.count else {
-            forkedDialog.project = self.project
-            return forkedDialog
+            forkedConversation.project = self.project
+            return forkedConversation
         }
         for turn in sortedTurns[0...upTo] {
             // Deep copy userMessage
@@ -112,7 +102,7 @@ final class ConversationItem {
                 sequenceNumber: turn.sequenceNumber,
                 timestamp: turn.timestamp,
                 userMessage: userMsgCopy,
-                conversation: forkedDialog
+                conversation: forkedConversation
             )
             // Deep copy events
             for event in turn.events {
@@ -126,13 +116,13 @@ final class ConversationItem {
                 let eventCopy = TurnEvent(type: event.type, timestamp: event.timestamp, message: eventMsgCopy, turn: turnCopy)
                 turnCopy.events.append(eventCopy)
             }
-            forkedDialog.turns.append(turnCopy)
+            forkedConversation.turns.append(turnCopy)
         }
-        forkedDialog.project = self.project
-        return forkedDialog
+        forkedConversation.project = self.project
+        return forkedConversation
     }
 
-    /// Creates chat messages from the dialog's turn history.
+    /// Creates chat messages from the conversation's turn history.
     ///
     /// - Parameter service: The AI service to use
     /// - Returns: Array of chat messages formatted for the service
@@ -183,7 +173,7 @@ final class ConversationItem {
 
     public func forceUpdateTokenCount(updateContextCount: Bool, updateTotalCount: Bool) {
         updateTokenCount(updateContextCount: updateContextCount, updateTotalCount: updateTotalCount)
-        vxAtelierPro.log.debug("Force Updated token count for dialog '\(title)': \(tokenCount)")
+        vxAtelierPro.log.debug("Force Updated token count for conversation '\(title)': \(tokenCount)")
     }
 
     /// Updates the token count for the current context
@@ -205,12 +195,12 @@ final class ConversationItem {
                 return sum + chatMessage.estimatedTokenCount()
             }
             tokenCount = newTokenCount
-            vxAtelierPro.log.debug("Updated context token count for dialog '\(title)': \(newTokenCount)")
+            vxAtelierPro.log.debug("Updated context token count for conversation '\(title)': \(newTokenCount)")
         }
 
         if updateTotalCount {
             usedTokenCount += newTokenCount
-            vxAtelierPro.log.debug("Updated total token count for dialog '\(title)': \(usedTokenCount)")
+            vxAtelierPro.log.debug("Updated total token count for conversation '\(title)': \(usedTokenCount)")
         }
     }
 
@@ -281,11 +271,11 @@ final class ConversationItem {
     @MainActor
     func complete(_ message: String, streamingState: StreamingState) async throws {
         guard let apiConfig = self.options.apiConfiguration else {
-            vxAtelierPro.log.error("DialogItem.complete: No API configuration available")
+            vxAtelierPro.log.error("ConversationItem.complete: No API configuration available")
             throw AIServiceError.noConfiguration
         }
 
-        vxAtelierPro.log.info("DialogItem.complete: Starting completion for dialog '\(self.title)'")
+        vxAtelierPro.log.info("ConversationItem.complete: Starting completion for conversation '\(self.title)'")
 
         let service = AIServiceManager.shared.getService(with: apiConfig)
         let allTools = AIToolRegistry.shared.getTools()
@@ -348,7 +338,7 @@ final class ConversationItem {
             }
         } catch {
             streamingState.isActive = false
-            vxAtelierPro.log.error("DialogItem.complete: Streaming error: \(error.localizedDescription)")
+            vxAtelierPro.log.error("ConversationItem.complete: Streaming error: \(error.localizedDescription)")
             throw error
         }
     }
@@ -420,7 +410,7 @@ final class ConversationItem {
             let toolConfig = self.options.getToolConfiguration(toolName)
             guard self.options.isToolEnabled(toolName) else {
                 throw AIServiceError.unsupportedOperation(
-                    "Tool '\(toolName)' is not enabled for this dialog")
+                    "Tool '\(toolName)' is not enabled for this conversation")
             }
             return GenericToolCall(
                 id: toolCall.id,
@@ -472,7 +462,7 @@ final class ConversationItem {
                 return response
             }
         } catch {
-            vxAtelierPro.log.error("DialogItem.handleToolCallsRecursively: Streaming error: \(error.localizedDescription)")
+            vxAtelierPro.log.error("ConversationItem.handleToolCallsRecursively: Streaming error: \(error.localizedDescription)")
             throw error
         }
         return nil

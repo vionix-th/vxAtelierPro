@@ -3,7 +3,7 @@ import SwiftUI
 struct DeveloperSettingsView: View {
     @AppStorage(AppSettings.Keys.isMarkdownEnabled) private var isMarkdownEnabled: Bool = AppDefaults.isMarkdownEnabled
     @AppStorage(AppSettings.Keys.isMarkdownTextSelectable) private var isMarkdownTextSelectable: Bool = AppDefaults.isMarkdownTextSelectable
-    @AppStorage(AppSettings.Keys.showSystemDialogs) private var showSystemDialogs: Bool = AppDefaults.showSystemDialogs
+    @AppStorage(AppSettings.Keys.showSystemConversations) private var showSystemConversations: Bool = AppDefaults.showSystemConversations
     @AppStorage(AppSettings.Keys.makeKeyAndOrderFront) private var makeKeyAndOrderFront: Bool = false
     // New debug/streaming/scrolling flags
     @AppStorage(AppSettings.Keys.autoScrollDebugEnabled) private var autoScrollDebugEnabled: Bool = false
@@ -32,9 +32,9 @@ struct DeveloperSettingsView: View {
             VStack(spacing: AppDefaults.paddingLarge) {
                 SettingsSectionView(title: "Developer Settings") {
                     VStack(spacing: AppDefaults.paddingMedium) {
-                        ToggleRow(title: "Default Markdown Support (for new dialogs)", isOn: $isMarkdownEnabled, titleWidth: 300)
+                        ToggleRow(title: "Default Markdown Support (for new conversations)", isOn: $isMarkdownEnabled, titleWidth: 300)
                         ToggleRow(title: "Markdown Selectable", isOn: $isMarkdownTextSelectable, titleWidth: 250)
-                        ToggleRow(title: "Show System Dialogs (Debug)", isOn: $showSystemDialogs, titleWidth: 250)
+                        ToggleRow(title: "Show System Conversations (Debug)", isOn: $showSystemConversations, titleWidth: 250)
                         ToggleRow(title: "Show Tool Call Chips", isOn: $showToolCallChips, titleWidth: 250)
                         ToggleRow(title: "Make Key and Order Front", isOn: $makeKeyAndOrderFront, titleWidth: 250)
                     }

@@ -15,10 +15,10 @@ struct ContentView: View {
 
     // MARK: - View Options (UserDefaults-backed)
     @AppStorage(AppSettings.Keys.showEmptySections) private var showEmptySections: Bool = AppDefaults.showEmptySections
-    @AppStorage(AppSettings.Keys.showSystemDialogs) private var showSystemDialogs: Bool = AppDefaults.showSystemDialogs
+    @AppStorage(AppSettings.Keys.showSystemConversations) private var showSystemConversations: Bool = AppDefaults.showSystemConversations
     @AppStorage(AppSettings.Keys.contentFilter) private var contentFilter: ContentFilter = .active
-    @AppStorage(AppSettings.Keys.sidebarDialogsSortDescending) private var sidebarDialogsSortDescending: Bool = true
-    @AppStorage(AppSettings.Keys.sidebarDialogsSortType) private var sidebarDialogsSortTypeRaw: String =
+    @AppStorage(AppSettings.Keys.sidebarConversationsSortDescending) private var sidebarConversationsSortDescending: Bool = true
+    @AppStorage(AppSettings.Keys.sidebarConversationsSortType) private var sidebarConversationsSortTypeRaw: String =
         SidebarSortType.conversationDate.rawValue
     @AppStorage(AppSettings.Keys.sidebarProjectsSortDescending) private var sidebarProjectsSortDescending: Bool = false
     @AppStorage(AppSettings.Keys.sidebarProjectsSortType) private var sidebarProjectsSortTypeRaw: String =
@@ -44,7 +44,7 @@ struct ContentView: View {
         }
     }
 
-    private var standaloneDialogs: [ConversationItem] {
+    private var standaloneConversations: [ConversationItem] {
         conversations.filter { conversation in
             guard conversation.project == nil else { return false }
             switch contentFilter {
@@ -55,7 +55,7 @@ struct ContentView: View {
             case .trashed:
                 if conversation.status != .trashed { return false }
             }
-            if !showSystemDialogs && conversation.purpose == .system {
+            if !showSystemConversations && conversation.purpose == .system {
                 return false
             }
             return true
@@ -67,10 +67,10 @@ struct ContentView: View {
     }
     
     private var hasVisibleSidebarItems: Bool {
-        !filteredProjects.isEmpty || !standaloneDialogs.isEmpty || !visibleBookmarks.isEmpty
+        !filteredProjects.isEmpty || !standaloneConversations.isEmpty || !visibleBookmarks.isEmpty
     }
     
-    private var trashedDialogsCount: Int {
+    private var trashedConversationsCount: Int {
         conversations.filter { $0.status == .trashed && $0.project == nil }.count
     }
     
@@ -78,7 +78,7 @@ struct ContentView: View {
         projects.filter { $0.status == .trashed }.count
     }
     
-    private var archivedDialogsCount: Int {
+    private var archivedConversationsCount: Int {
         conversations.filter { $0.status == .archived && $0.project == nil }.count
     }
     
@@ -194,7 +194,7 @@ struct ContentView: View {
         ContentSidebarView(
             contentFilter: contentFilter,
             projects: filteredProjects,
-            dialogs: standaloneDialogs,
+            conversations: standaloneConversations,
             bookmarks: visibleBookmarks,
             selection: Binding(
                 get: { router.selection },
@@ -202,8 +202,8 @@ struct ContentView: View {
             ),
             sidebarProjectsSortDescending: $sidebarProjectsSortDescending,
             sidebarProjectsSortTypeRaw: $sidebarProjectsSortTypeRaw,
-            sidebarDialogsSortDescending: $sidebarDialogsSortDescending,
-            sidebarDialogsSortTypeRaw: $sidebarDialogsSortTypeRaw,
+            sidebarConversationsSortDescending: $sidebarConversationsSortDescending,
+            sidebarConversationsSortTypeRaw: $sidebarConversationsSortTypeRaw,
             showEmptySections: showEmptySections,
             actions: sidebarActions,
             availableProjects: projects.filter { $0.status == .active }
@@ -215,7 +215,7 @@ struct ContentView: View {
         if let selection {
             switch selection {
             case .conversation(let id):
-                if let conversation = standaloneDialogs.first(where: { $0.id == id }) {
+                if let conversation = standaloneConversations.first(where: { $0.id == id }) {
                     ConversationView(
                         viewModel: conversationStore.viewModel(for: conversation.id),
                         onRequestOptions: onRequestOptions
@@ -249,7 +249,7 @@ struct ContentView: View {
     private var detailPlaceholderView: some View {
         DetailPlaceholderView(
             hasAPIConfiguration: queryManager.defaultApiConfiguration != nil,
-            onNewDialog: addConversation,
+            onNewConversation: addConversation,
             onNewProject: addProject,
             onConfigureAPI: {
                 onRequestSettings(.api)
@@ -265,14 +265,14 @@ struct ContentView: View {
         Button {
             if queryManager.defaultApiConfiguration == nil {
                 vxAtelierPro.log.info(
-                    "Attempted to create dialog from menu without API configuration")
+                    "Attempted to create conversation from menu without API configuration")
                 return
             }
             addConversation()
         } label: {
-            MenuItemStyle.label("New Dialog", systemImage: "plus.bubble")
+            MenuItemStyle.label("New Conversation", systemImage: "plus.bubble")
         }
-        .help("Create a new dialog")
+        .help("Create a new conversation")
         .keyboardShortcut("n", modifiers: [.command])
         .disabled(queryManager.defaultApiConfiguration == nil)
 
@@ -298,7 +298,7 @@ struct ContentView: View {
         } label: {
             MenuItemStyle.label("Import...", systemImage: "arrow.down.doc")
         }
-        .help("Import a dialog or project from file")
+        .help("Import a conversation or project from file")
     }
 
     /// Menu items for controlling view options.
@@ -315,10 +315,10 @@ struct ContentView: View {
         Button {
             setContentFilter(.active, contentFilter: $contentFilter)
         } label: {
-            MenuItemStyle.label("Show Chats", systemImage: "tray.full")
+            MenuItemStyle.label("Show Conversations", systemImage: "tray.full")
         }
         .keyboardShortcut("1", modifiers: [.command])
-        .help("Show active chats")
+        .help("Show active conversations")
 
         Button {
             setContentFilter(.archived, contentFilter: $contentFilter)
@@ -375,7 +375,7 @@ struct ContentView: View {
                 if horizontalSizeClass == .compact && !hasVisibleSidebarItems {
                     DetailPlaceholderView(
                         hasAPIConfiguration: queryManager.defaultApiConfiguration != nil,
-                        onNewDialog: addConversation,
+                        onNewConversation: addConversation,
                         onNewProject: addProject,
                         onConfigureAPI: {
                             onRequestSettings(.api)
@@ -390,7 +390,7 @@ struct ContentView: View {
         }
         .onChange(of: contentFilter) { _, _ in
             let visibleSelections = filteredProjects.map { SidebarSelection.project($0.id) }
-                + standaloneDialogs.map { SidebarSelection.conversation($0.id) }
+                + standaloneConversations.map { SidebarSelection.conversation($0.id) }
             if let selection = router.selection, !visibleSelections.contains(selection) {
                 router.setSelection(nil)
             }
@@ -422,13 +422,6 @@ struct ContentView: View {
                     detailView(for: selection)
                 }
             #endif
-
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .utilityPanelDidSendConversation)) {
-            notification in
-            if let conversationID = notification.object as? PersistentIdentifier {
-                router.openConversation(conversationID, in: nil)
-            }
         }
     }
 
@@ -442,7 +435,7 @@ struct ContentView: View {
                         do {
                             // Store current state before emptying trash
                             let hadTrashedItems =
-                                trashedDialogsCount > 0
+                                trashedConversationsCount > 0
                                 || trashedProjectsCount > 0
 
                             // Empty trash
@@ -456,7 +449,7 @@ struct ContentView: View {
                                     animated: true
                                 )
                                 router.setSelection(nil)
-                                vxAtelierPro.log.info("Trash emptied, returning to Show Chats")
+                                vxAtelierPro.log.info("Trash emptied, returning to Show Conversations")
                             } else {
                                 vxAtelierPro.log.debug(
                                     "Empty trash requested, but trash was already empty")
@@ -511,8 +504,8 @@ struct ContentView: View {
                     "Successfully initiated permanent deletion for item (ID: \(itemId), Type: \(itemType)) via swipe/delete from trash."
                 )
 
-                // Only reset navigation if there are NO trashed items remaining (both dialogs and projects)
-                let remainingTrashedItems = trashedDialogsCount + trashedProjectsCount
+                // Only reset navigation if there are NO trashed items remaining (both conversations and projects)
+                let remainingTrashedItems = trashedConversationsCount + trashedProjectsCount
                 if remainingTrashedItems == 0 {
                     setContentFilter(
                         .active,
@@ -520,7 +513,7 @@ struct ContentView: View {
                         animated: true
                     )
                     router.setSelection(nil)
-                    vxAtelierPro.log.info("Last trashed item removed, returning to Show Chats")
+                    vxAtelierPro.log.info("Last trashed item removed, returning to Show Conversations")
                 } else {
                     vxAtelierPro.log.debug(
                         "\(remainingTrashedItems) trashed items still remain")
@@ -550,18 +543,18 @@ struct ContentView: View {
             if selectionMatches(router.selection, item: item) {
                 router.setSelection(nil)
 
-                // If we're in archive view and this was the last item, return to Show Chats
+                // If we're in archive view and this was the last item, return to Show Conversations
                 if wasInArchive {
                     let remainingArchivedItems = archivedProjectsCount
-                    let remainingArchivedDialogs = archivedDialogsCount
+                    let remainingArchivedConversations = archivedConversationsCount
 
-                    if remainingArchivedItems == 0 && remainingArchivedDialogs == 0 {
+                    if remainingArchivedItems == 0 && remainingArchivedConversations == 0 {
                         setContentFilter(
                             .active,
                             contentFilter: $contentFilter,
                             animated: true
                         )
-                        vxAtelierPro.log.info("Last archived item removed, returning to Show Chats")
+                        vxAtelierPro.log.info("Last archived item removed, returning to Show Conversations")
                     }
                 }
             }

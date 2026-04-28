@@ -4,7 +4,7 @@ import SwiftUI
 
 /// Represents a bookmark to a specific message in a conversation.
 ///
-/// Bookmarks provide quick access to important messages within dialogs,
+/// Bookmarks provide quick access to important messages within conversations,
 /// allowing users to save and recall significant points in a conversation.
 @Model
 final class BookmarkItem {
@@ -47,4 +47,3 @@ final class BookmarkItem {
         self.targetMessageIDCache = event.message.id
     }
 }
-

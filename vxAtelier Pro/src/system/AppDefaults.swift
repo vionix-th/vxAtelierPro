@@ -24,30 +24,30 @@ struct AppDefaults {
     static let newProjectName = "Unnamed Project"
     static let projectImageSystemName: String = "folder"
     
-    static let newDialogName = "Unnamed Dialog"
-    static let dialogImageSystemName: String = "document"
+    static let newConversationName = "Unnamed Conversation"
+    static let conversationImageSystemName: String = "document"
     
     static let newApiConfigurationName = "New Configuration"
     
     // Add new defaults for application settings
     static let shouldTerminateAfterLastWindowClosed = true    
-    static let dialogTextEditButtonSize = 24.0
+    static let conversationTextEditButtonSize = 24.0
     static let disableAvatar = false
     static let defaultAvatarSize = 40
     static let avatarImageSize = 80.0
     static let avatarStrokeWidth = 2.0
-    static let autoNameDialogs = true
+    static let autoNameConversations = true
     static let isMarkdownEnabled = true
     static let isMarkdownTextSelectable = false
     static let statusBarVisible = true
-    static let showSystemDialogs = false
-    static let autoSendDialogTemplates = true
+    static let showSystemConversations = false
+    static let autoSendConversationTemplates = true
     static let showRowToolButtons = true
     static let showEmptySections = false 
-    static let projectDialogsSortDescending = true
-    static let projectDialogsSortType = "conversationDate"
-    static let sidebarDialogsSortDescending = true
-    static let sidebarDialogsSortType = "conversationDate"
+    static let projectConversationsSortDescending = true
+    static let projectConversationsSortType = "conversationDate"
+    static let sidebarConversationsSortDescending = true
+    static let sidebarConversationsSortType = "conversationDate"
     static let sidebarProjectsSortDescending = false
     static let sidebarProjectsSortType = "alphabetically"
     static let contentFilter = ContentFilter.active.rawValue
@@ -157,7 +157,7 @@ extension AppDefaults {
         // General settings
         defaults.set(AppDefaults.appearanceStyle, forKey: AppSettings.Keys.appearanceStyle)
         defaults.set(AppDefaults.showRowToolButtons, forKey: AppSettings.Keys.showRowToolButtons)
-        defaults.set(AppDefaults.autoNameDialogs, forKey: AppSettings.Keys.autoNameDialogs)
+        defaults.set(AppDefaults.autoNameConversations, forKey: AppSettings.Keys.autoNameConversations)
         defaults.set(AppDefaults.statusBarVisible, forKey: AppSettings.Keys.statusBarVisible)
         defaults.set(
             AppDefaults.showConversationLastMessageLabel,
@@ -169,9 +169,9 @@ extension AppDefaults {
             AppDefaults.shouldTerminateAfterLastWindowClosed,
             forKey: AppSettings.Keys.shouldTerminateAfterLastWindowClosed)
         defaults.set(
-            AppDefaults.dialogTextEditButtonSize,
-            forKey: AppSettings.Keys.dialogTextEditButtonSize)
-        defaults.set(AppDefaults.autoSendDialogTemplates, forKey: AppSettings.Keys.autoSendDialogTemplates)
+            AppDefaults.conversationTextEditButtonSize,
+            forKey: AppSettings.Keys.conversationTextEditButtonSize)
+        defaults.set(AppDefaults.autoSendConversationTemplates, forKey: AppSettings.Keys.autoSendConversationTemplates)
         defaults.set(AppDefaults.disableAvatar, forKey: AppSettings.Keys.disableAvatar)
         defaults.set(AppDefaults.defaultAvatarSize, forKey: AppSettings.Keys.defaultAvatarSize)
         defaults.set(AppDefaults.fontSizeMedium, forKey: AppSettings.Keys.bubbleFontSize)
@@ -181,7 +181,7 @@ extension AppDefaults {
         defaults.set(
             AppDefaults.isMarkdownTextSelectable,
             forKey: AppSettings.Keys.isMarkdownTextSelectable)
-        defaults.set(AppDefaults.showSystemDialogs, forKey: AppSettings.Keys.showSystemDialogs)
+        defaults.set(AppDefaults.showSystemConversations, forKey: AppSettings.Keys.showSystemConversations)
         defaults.set(AppDefaults.makeKeyAndOrderFront, forKey: AppSettings.Keys.makeKeyAndOrderFront)
         defaults.set(AppDefaults.autoScrollDebugEnabled, forKey: AppSettings.Keys.autoScrollDebugEnabled)
         defaults.set(AppDefaults.autoScrollGateEnabled, forKey: AppSettings.Keys.autoScrollGateEnabled)
@@ -206,19 +206,19 @@ extension AppDefaults {
         defaults.set(AppDefaults.ttsRepeatMode, forKey: AppSettings.Keys.ttsRepeatMode)
         // Sidebar sort
         defaults.set(
-            AppDefaults.sidebarDialogsSortDescending,
-            forKey: AppSettings.Keys.sidebarDialogsSortDescending)
-        defaults.set(AppDefaults.sidebarDialogsSortType, forKey: AppSettings.Keys.sidebarDialogsSortType)
+            AppDefaults.sidebarConversationsSortDescending,
+            forKey: AppSettings.Keys.sidebarConversationsSortDescending)
+        defaults.set(AppDefaults.sidebarConversationsSortType, forKey: AppSettings.Keys.sidebarConversationsSortType)
         defaults.set(
             AppDefaults.sidebarProjectsSortDescending,
             forKey: AppSettings.Keys.sidebarProjectsSortDescending)
         defaults.set(AppDefaults.sidebarProjectsSortType, forKey: AppSettings.Keys.sidebarProjectsSortType)
         // Project view sort
         defaults.set(
-            AppDefaults.projectDialogsSortDescending,
-            forKey: AppSettings.Keys.projectDialogsSortDescending)
-        defaults.set(AppDefaults.projectDialogsSortType, forKey: AppSettings.Keys.projectDialogsSortType)
-        // Dialog/project filters
+            AppDefaults.projectConversationsSortDescending,
+            forKey: AppSettings.Keys.projectConversationsSortDescending)
+        defaults.set(AppDefaults.projectConversationsSortType, forKey: AppSettings.Keys.projectConversationsSortType)
+        // Conversation/project filters
         defaults.set(AppDefaults.showEmptySections, forKey: AppSettings.Keys.showEmptySections)
         defaults.set(AppDefaults.contentFilter, forKey: AppSettings.Keys.contentFilter)
         // Add any additional settings as needed

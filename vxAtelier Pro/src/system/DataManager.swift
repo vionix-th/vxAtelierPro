@@ -13,7 +13,7 @@ class DataManager {
     @MainActor
     func createBackup(
         projects: [ProjectItem],
-        dialogs: [ConversationItem],
+        conversations: [ConversationItem],
         bookmarks: [BookmarkItem],
         promptTemplates: [PromptTemplate],
         voiceConfigurations: [VoiceConfigurationItem],
@@ -22,7 +22,7 @@ class DataManager {
         webSearchConfigurations: [WebSearchConfigurationItem]
     ) async throws -> Data {
         let projectExports = projects.map { ProjectExportData($0) }
-        let dialogExports = dialogs.map { ConversationExportData($0) }
+        let conversationExports = conversations.map { ConversationExportData($0) }
         let bookmarkExports = bookmarks.map { BookmarkExportData($0) }
         let templateExports = promptTemplates.map { PromptTemplateExportData($0) }
         let voiceConfigExports = voiceConfigurations.map { VoiceConfigurationExportData($0) }
@@ -32,7 +32,7 @@ class DataManager {
         
         let backup = FullBackup(
             projects: projectExports,
-            dialogs: dialogExports,
+            conversations: conversationExports,
             bookmarks: bookmarkExports,
             promptTemplates: templateExports,
             voiceConfigurations: voiceConfigExports,
@@ -48,7 +48,7 @@ class DataManager {
     @MainActor
     func saveBackup(
         projects: [ProjectItem],
-        dialogs: [ConversationItem],
+        conversations: [ConversationItem],
         bookmarks: [BookmarkItem],
         promptTemplates: [PromptTemplate],
         voiceConfigurations: [VoiceConfigurationItem],
@@ -58,7 +58,7 @@ class DataManager {
     ) async throws {
         let data = try await createBackup(
             projects: projects,
-            dialogs: dialogs,
+            conversations: conversations,
             bookmarks: bookmarks,
             promptTemplates: promptTemplates,
             voiceConfigurations: voiceConfigurations,
@@ -146,21 +146,21 @@ class DataManager {
                 }
             }
             
-            for dialogData in backup.dialogs {
+            for conversationData in backup.conversations {
                 do {
-                    let dialog = try dialogData.toDataItem(context: context)
-                    context.insert(dialog)
+                    let conversation = try conversationData.toDataItem(context: context)
+                    context.insert(conversation)
                 } catch {
                     throw DataManagerError.modelConversionFailed(
-                        model: "Dialog",
-                        field: dialogData.title,
+                        model: "Conversation",
+                        field: conversationData.title,
                         reason: error.localizedDescription
                     )
                 }
             }
             
             for bookmarkData in backup.bookmarks {
-                // Find the ConversationTurn by turnSequence in all dialogs
+                // Find the ConversationTurn by turnSequence in all conversations
                 let allTurns = try context.fetch(FetchDescriptor<ConversationTurn>())
                 if let turn = allTurns.first(where: { $0.sequenceNumber == bookmarkData.turnSequence }) {
                     let bookmark = bookmarkData.toDataItem(turn: turn)
@@ -206,8 +206,8 @@ class DataManager {
     @MainActor
     func createBackup(from context: ModelContext) async throws -> Data {
         let projects = try context.fetch(FetchDescriptor<ProjectItem>())
-        let allDialogs = try context.fetch(FetchDescriptor<ConversationItem>())
-        let standaloneDialogs = allDialogs.filter { $0.project == nil }
+        let allConversations = try context.fetch(FetchDescriptor<ConversationItem>())
+        let standaloneConversations = allConversations.filter { $0.project == nil }
         let bookmarks = try context.fetch(FetchDescriptor<BookmarkItem>())
         let promptTemplates = try context.fetch(FetchDescriptor<PromptTemplate>())
         let voiceConfigurations = try context.fetch(FetchDescriptor<VoiceConfigurationItem>())
@@ -217,7 +217,7 @@ class DataManager {
         
         return try await createBackup(
             projects: projects,
-            dialogs: standaloneDialogs,
+            conversations: standaloneConversations,
             bookmarks: bookmarks,
             promptTemplates: promptTemplates,
             voiceConfigurations: voiceConfigurations,
@@ -236,9 +236,9 @@ class DataManager {
     // MARK: - Import/Export
     
     @MainActor
-    func exportDialog(_ dialog: ConversationItem) async throws {
-        let data = try JsonSerializer.exportDialog(dialog)
-        try await FileHelper.shared.save(data: data, filename: "\(dialog.title).json")
+    func exportConversation(_ conversation: ConversationItem) async throws {
+        let data = try JsonSerializer.exportConversation(conversation)
+        try await FileHelper.shared.save(data: data, filename: "\(conversation.title).json")
     }
     
     @MainActor
@@ -247,9 +247,9 @@ class DataManager {
         try await FileHelper.shared.save(data: data, filename: "\(project.name).json")
     }
     
-    /// Imports a project or dialog from a file.
+    /// Imports a project or conversation from a file.
     /// - Parameter context: The ModelContext to import into
-    /// - Returns: The imported item (either ProjectItem or DialogItem)
+    /// - Returns: The imported item (either ProjectItem or ConversationItem)
     /// - Throws: If the import fails or the format is not recognized
     @MainActor
     func importData(into context: ModelContext) async throws -> Any {
@@ -284,39 +284,39 @@ class DataManager {
             vxAtelierPro.log.debug("Failed to import as project: \(error.localizedDescription)")
         }
         
-        // Try as dialog format
-        var dialogError: Error?
+        // Try as conversation format
+        var conversationError: Error?
         do {
-            let dialog = try JsonSerializer.importDialog(from: data, context: context)
+            let conversation = try JsonSerializer.importConversation(from: data, context: context)
             try await normalizeModelContext(context)
-            return dialog
+            return conversation
         } catch {
-            dialogError = error
-            vxAtelierPro.log.debug("Failed to import as dialog: \(error.localizedDescription)")
+            conversationError = error
+            vxAtelierPro.log.debug("Failed to import as conversation: \(error.localizedDescription)")
         }
         
         // Analyze errors to provide better feedback
-        if projectError is DecodingError, dialogError is DecodingError {
+        if projectError is DecodingError, conversationError is DecodingError {
             // Some other errors occurred during processing
             throw DataManagerError.importFailed(
                 reason: "File format recognized but couldn't process data", 
-                underlyingErrors: [projectError, dialogError].compactMap { $0 }
+                underlyingErrors: [projectError, conversationError].compactMap { $0 }
             )        
         } else {
             // Both were JSON parsing errors - likely wrong format entirely
             throw DataManagerError.invalidFileFormat(
-                description: "File doesn't match project or dialog format"
+                description: "File doesn't match project or conversation format"
             )
         }
     }
     
     @MainActor
-    func exportSelectedMessages(_ messages: [MessageItem], dialogTitle: String) async throws {
+    func exportSelectedMessages(_ messages: [MessageItem], conversationTitle: String) async throws {
         let exportData = messages.map { MessageExportData($0) }
         let data = try ExportUtils.encodeToData(exportData)
         try await FileHelper.shared.save(
             data: data,
-            filename: "\(dialogTitle)_selected_messages.json"
+            filename: "\(conversationTitle)_selected_messages.json"
         )
     }
     
@@ -352,12 +352,12 @@ class DataManager {
             
             // Update references to use canonical configurations
             do {
-                let dialogs = try context.fetch(FetchDescriptor<ConversationItem>())
-                for dialog in dialogs {
-                    if let config = dialog.options.apiConfiguration,
+                let conversations = try context.fetch(FetchDescriptor<ConversationItem>())
+                for conversation in conversations {
+                    if let config = conversation.options.apiConfiguration,
                        let duplicate = duplicates.first(where: { $0.duplicate.id == config.id }) {
-                        dialog.options.apiConfiguration = duplicate.original
-                        vxAtelierPro.log.debug("Updated dialog '\(dialog.title)' to use canonical API configuration")
+                        conversation.options.apiConfiguration = duplicate.original
+                        vxAtelierPro.log.debug("Updated conversation '\(conversation.title)' to use canonical API configuration")
                     }
                 }
                 

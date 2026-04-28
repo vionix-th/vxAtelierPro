@@ -10,28 +10,28 @@ enum AppSettings {
         static let statusBarVisible = "statusBarVisible"
         static let appearanceStyle = "appearanceStyle"
         static let showRowToolButtons = "showRowToolButtons"
-        static let showSystemDialogs = "ShowSystemDialogs"
+        static let showSystemConversations = "ShowSystemConversations"
 
         // Sidebar sorting
-        static let sidebarDialogsSortDescending = "SidebarDialogsSortOrderDescending"
-        static let sidebarDialogsSortType = "SidebarDialogsSortType"
+        static let sidebarConversationsSortDescending = "SidebarConversationsSortOrderDescending"
+        static let sidebarConversationsSortType = "SidebarConversationsSortType"
         static let sidebarProjectsSortDescending = "SidebarProjectsSortOrderDescending"
         static let sidebarProjectsSortType = "SidebarProjectsSortType"
 
         // Project view sorting
-        static let projectDialogsSortDescending = "ProjectDialogsSortOrderDescending"
-        static let projectDialogsSortType = "ProjectDialogsSortType"
+        static let projectConversationsSortDescending = "ProjectConversationsSortOrderDescending"
+        static let projectConversationsSortType = "ProjectConversationsSortType"
 
         // Conversation labels
         static let showConversationLastMessageLabel = "showConversationLastMessageLabel"
         static let showConversationCreatedLabel = "showConversationCreatedLabel"
 
-        // Dialog creation
-        static let autoNameDialogs = "autoNameDialogs"
-        static let autoSendDialogTemplates = "autoSendDialogTemplates"
+        // Conversation creation
+        static let autoNameConversations = "autoNameConversations"
+        static let autoSendConversationTemplates = "autoSendConversationTemplates"
 
         // Message input
-        static let dialogTextEditButtonSize = "DialogTextEdit.buttonSize"
+        static let conversationTextEditButtonSize = "ConversationTextEdit.buttonSize"
 
         // Avatar & bubble presentation
         static let disableAvatar = "DisableAvatar"

@@ -110,7 +110,7 @@ final class QueryManager {
     }
 
     var utilityPanelConversation: ConversationItem? {
-        fetchConversations().first(where: { $0.isLinkedToUtilityPanel })
+        fetchConversations().first(where: { $0.isUtilityConversation })
     }
 
     var systemConversation: ConversationItem? {
@@ -131,7 +131,7 @@ final class QueryManager {
             options = ConversationOptions()
         }
 
-        let conversation = ConversationItem("System Dialog", options: options)
+        let conversation = ConversationItem("System Conversation", options: options)
         conversation.purpose = .system
         modelContext.insert(conversation)
 
@@ -207,8 +207,8 @@ final class QueryManager {
 
     // MARK: - Cleanup & Deletion
     func emptyTrash() throws {
-        let trashedDialogs = fetchConversations().filter { $0.status == .trashed }
-        try deleteItems(trashedDialogs)
+        let trashedConversations = fetchConversations().filter { $0.status == .trashed }
+        try deleteItems(trashedConversations)
 
         let trashedProjects = fetchProjects().filter { $0.status == .trashed }
         try deleteItems(trashedProjects)
@@ -257,7 +257,7 @@ final class QueryManager {
             options = ConversationOptions()
         }
 
-        let conversation = ConversationItem(AppDefaults.newDialogName, options: options)
+        let conversation = ConversationItem(AppDefaults.newConversationName, options: options)
         conversation.project = project
         modelContext.insert(conversation)
 
@@ -286,6 +286,21 @@ final class QueryManager {
             vxAtelierPro.log.error("Failed to insert new project: \(error.localizedDescription)")
             throw error
         }
+    }
+
+    @discardableResult
+    func ensureUtilityPanelConversation() throws -> ConversationItem {
+        if let existing = utilityPanelConversation {
+            return existing
+        }
+
+        let conversation = try createConversation()
+        conversation.title = AppDefaults.newConversationName
+        if let config = conversation.options.apiConfiguration {
+            conversation.options.setupAiRequestArguments(for: config, modelContext: modelContext)
+        }
+        try setUtilityPanelConversation(conversation, isLinked: true)
+        return conversation
     }
 
     // MARK: - Status Changes
@@ -338,6 +353,17 @@ final class QueryManager {
         let projectName = project?.name ?? "none"
         vxAtelierPro.log.debug(
             "Assigned conversation '\(conversation.title)' (ID: \(conversation.id)) to project '\(projectName)'."
+        )
+    }
+
+    func setUtilityPanelConversation(_ conversation: ConversationItem, isLinked: Bool) throws {
+        for item in fetchConversations() where item.isUtilityConversation && item.id != conversation.id {
+            item.isUtilityConversation = false
+        }
+        conversation.isUtilityConversation = isLinked
+        try saveContext()
+        vxAtelierPro.log.debug(
+            "Set utility panel link for conversation '\(conversation.title)' to \(isLinked)."
         )
     }
 

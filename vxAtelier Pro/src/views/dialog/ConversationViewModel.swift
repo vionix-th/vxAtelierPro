@@ -59,7 +59,7 @@ final class ConversationViewModel {
     deinit {
         let id = conversationID
         Task { @MainActor in
-            vxAtelierPro.log.debug("DialogViewModel.deinit for conversationID=\(id)")
+            vxAtelierPro.log.debug("ConversationViewModel.deinit for conversationID=\(id)")
         }
     }
 
@@ -110,7 +110,7 @@ final class ConversationViewModel {
             }
         case .addToPlaylist:
             vxAtelierPro.log.info("Adding single message to playlist. ID: \(message.id)")
-            ttsQueue.add(message, dialogTitle: conversation.title, messageIndex: 0, projectName: conversation.project?.name)
+            ttsQueue.add(message, conversationTitle: conversation.title, messageIndex: 0, projectName: conversation.project?.name)
         case .select:
             isSelectingMessages = true
             selectedMessages.insert(message.id)
@@ -135,12 +135,12 @@ final class ConversationViewModel {
         do {
             let removedCount = try queryManager.deleteTurns(containing: messagesToRemove, in: conversation)
             if removedCount == 0 {
-                vxAtelierPro.log.info("DialogViewModel: No turns removed during delete action.")
+                vxAtelierPro.log.info("ConversationViewModel: No turns removed during delete action.")
             } else {
-                vxAtelierPro.log.notice("DialogViewModel: Deleted \(removedCount) turn(s) for selected messages.")
+                vxAtelierPro.log.notice("ConversationViewModel: Deleted \(removedCount) turn(s) for selected messages.")
             }
         } catch {
-            vxAtelierPro.log.error("DialogViewModel: Failed to delete turns: \(error.localizedDescription)")
+            vxAtelierPro.log.error("ConversationViewModel: Failed to delete turns: \(error.localizedDescription)")
             errorAlert = ErrorAlert(error: AppError.dataSaveFailed(error.localizedDescription))
         }
     }
@@ -155,19 +155,19 @@ final class ConversationViewModel {
     @MainActor
     func onAppear() {
         guard let conversation = conversation else {
-            vxAtelierPro.log.debug("DialogViewModel.onAppear: no dialog available")
+            vxAtelierPro.log.debug("ConversationViewModel.onAppear: no conversation available")
             return
         }
-        vxAtelierPro.log.debug("DialogViewModel.onAppear: \(conversation.title)")
+        vxAtelierPro.log.debug("ConversationViewModel.onAppear: \(conversation.title)")
     }
 
     @MainActor
     func onDisappear() {
         guard let conversation = conversation else {
-            vxAtelierPro.log.debug("DialogViewModel.onDisappear: no conversation available")
+            vxAtelierPro.log.debug("ConversationViewModel.onDisappear: no conversation available")
             return
         }
-        vxAtelierPro.log.debug("DialogViewModel.onDisappear: \(conversation.title)")
+        vxAtelierPro.log.debug("ConversationViewModel.onDisappear: \(conversation.title)")
     }
 
     func saveContext() throws {
@@ -197,7 +197,7 @@ final class ConversationViewModel {
         for (index, message) in messagesToAdd.enumerated() {
             ttsQueue.add(
                 message,
-                dialogTitle: conversation.title,
+                conversationTitle: conversation.title,
                 messageIndex: index,
                 projectName: conversation.project?.name
             )
@@ -249,7 +249,7 @@ final class ConversationViewModel {
         do {
             try await DataManager.shared.exportSelectedMessages(
                 selectedMessageItems,
-                dialogTitle: conversation.title
+                conversationTitle: conversation.title
             )
         } catch {
             vxAtelierPro.log.error("Failed to export messages: \(error.localizedDescription)")

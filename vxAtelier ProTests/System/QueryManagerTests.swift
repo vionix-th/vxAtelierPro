@@ -1,6 +1,10 @@
 import XCTest
 import SwiftData
+#if canImport(vxAtelier_Pro_debug)
 @testable import vxAtelier_Pro_debug
+#else
+@testable import vxAtelier_Pro
+#endif
 
 @MainActor
 final class QueryManagerTests: XCTestCase {
@@ -77,26 +81,26 @@ final class QueryManagerTests: XCTestCase {
 
         // Then - standalone conversations are filtered by status and exclude system/project items
         let activeStandalone = try testEnv.standaloneConversations(
-            showSystemDialogs: false,
+            showSystemConversations: false,
             contentFilter: .active
         )
         XCTAssertEqual(activeStandalone.map(\.title), ["Active"])
 
         let archivedStandalone = try testEnv.standaloneConversations(
-            showSystemDialogs: false,
+            showSystemConversations: false,
             contentFilter: .archived
         )
         XCTAssertEqual(archivedStandalone.map(\.title), ["Archived"])
 
         let trashedStandalone = try testEnv.standaloneConversations(
-            showSystemDialogs: false,
+            showSystemConversations: false,
             contentFilter: .trashed
         )
         XCTAssertEqual(trashedStandalone.map(\.title), ["Trashed"])
 
         // System conversations are included in standalone when enabled
         let archivedStandaloneWithSystem = try testEnv.standaloneConversations(
-            showSystemDialogs: true,
+            showSystemConversations: true,
             contentFilter: .archived
         )
         XCTAssertEqual(

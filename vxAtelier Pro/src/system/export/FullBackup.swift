@@ -14,7 +14,7 @@ struct FullBackup: Codable {
     let version: Int        // Add version field
     let timestamp: Date
     let projects: [ProjectExportData]
-    let dialogs: [ConversationExportData]
+    let conversations: [ConversationExportData]
     let bookmarks: [BookmarkExportData]    
     let promptTemplates: [PromptTemplateExportData]
     let voiceConfigurations: [VoiceConfigurationExportData]
@@ -25,7 +25,7 @@ struct FullBackup: Codable {
     // Add initializer to ensure version is set
     init(
         projects: [ProjectExportData],
-        dialogs: [ConversationExportData],
+        conversations: [ConversationExportData],
         bookmarks: [BookmarkExportData],
         promptTemplates: [PromptTemplateExportData],
         voiceConfigurations: [VoiceConfigurationExportData],
@@ -36,7 +36,7 @@ struct FullBackup: Codable {
         self.version = BackupVersion.current
         self.timestamp = Date()
         self.projects = projects
-        self.dialogs = dialogs
+        self.conversations = conversations
         self.bookmarks = bookmarks
         self.promptTemplates = promptTemplates
         self.voiceConfigurations = voiceConfigurations
@@ -60,7 +60,7 @@ struct FullBackup: Codable {
         // Decode remaining fields
         timestamp = try container.decode(Date.self, forKey: .timestamp)
         projects = try container.decode([ProjectExportData].self, forKey: .projects)
-        dialogs = try container.decode([ConversationExportData].self, forKey: .dialogs)
+        conversations = try container.decode([ConversationExportData].self, forKey: .conversations)
         bookmarks = try container.decode([BookmarkExportData].self, forKey: .bookmarks)
         promptTemplates = try container.decode([PromptTemplateExportData].self, forKey: .promptTemplates)
         voiceConfigurations = try container.decode([VoiceConfigurationExportData].self, forKey: .voiceConfigurations)
@@ -75,7 +75,7 @@ struct FullBackup: Codable {
         try container.encode(version, forKey: .version)
         try container.encode(timestamp, forKey: .timestamp)
         try container.encode(projects, forKey: .projects)
-        try container.encode(dialogs, forKey: .dialogs)
+        try container.encode(conversations, forKey: .conversations)
         try container.encode(bookmarks, forKey: .bookmarks)
         try container.encode(promptTemplates, forKey: .promptTemplates)
         try container.encode(voiceConfigurations, forKey: .voiceConfigurations)
@@ -86,7 +86,7 @@ struct FullBackup: Codable {
     
     // Updated CodingKeys
     private enum CodingKeys: String, CodingKey {
-        case version, timestamp, projects, dialogs, bookmarks, promptTemplates, voiceConfigurations, apiConfigurations, models, webSearchConfigurations
+        case version, timestamp, projects, conversations, bookmarks, promptTemplates, voiceConfigurations, apiConfigurations, models, webSearchConfigurations
     }
 }
 

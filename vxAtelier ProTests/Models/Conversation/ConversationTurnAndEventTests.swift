@@ -1,6 +1,10 @@
 import XCTest
 import SwiftData
+#if canImport(vxAtelier_Pro_debug)
 @testable import vxAtelier_Pro_debug
+#else
+@testable import vxAtelier_Pro
+#endif
 
 @MainActor
 final class ConversationTurnAndEventTests: XCTestCase {

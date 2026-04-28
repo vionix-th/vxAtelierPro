@@ -7,8 +7,8 @@ import SwiftUI
     import AppKit
 #endif
 
-// MARK: - Dialog Options View
-/// A view for configuring dialog options including model parameters, system prompt, and avatar.
+// MARK: - Conversation Options View
+/// A view for configuring conversation options including model parameters, system prompt, and avatar.
 /// Provides a tabbed interface for organizing different settings categories.
 struct ConversationOptionsView: View {
     @Environment(\.dismiss) private var dismiss
@@ -289,7 +289,7 @@ struct ConversationOptionsView: View {
                 }
             }
         }
-        .navigationTitle("Dialog Options")
+        .navigationTitle("Conversation Options")
         #if os(macOS)
             .fileImporter(isPresented: $isAvatarImageImporting, allowedContentTypes: [.image]) { result in
                 switch result {

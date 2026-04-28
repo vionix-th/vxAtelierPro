@@ -2,9 +2,9 @@ import SwiftUI
 import SwiftData
 import Foundation
 
-/// Handles streaming updates for a dialog, updating the UI in real-time
+/// Handles streaming updates for a conversation, updating the UI in real-time
 public class StreamingConversationHandler {
-    private let dialog: ConversationItem
+    private let conversation: ConversationItem
     private let queryManager: QueryManager
     private var currentMessage: MessageItem?
     private let streamingState: StreamingState
@@ -12,8 +12,8 @@ public class StreamingConversationHandler {
     private let errorStream: AsyncStream<Error>
     private let errorContinuation: AsyncStream<Error>.Continuation
     
-    init(dialog: ConversationItem, queryManager: QueryManager, streamingState: StreamingState) {
-        self.dialog = dialog
+    init(conversation: ConversationItem, queryManager: QueryManager, streamingState: StreamingState) {
+        self.conversation = conversation
         self.queryManager = queryManager
         self.streamingState = streamingState
         
@@ -48,7 +48,7 @@ public class StreamingConversationHandler {
                 streamingState.updateToolCalls(toolCalls)
             }
             
-            // Prepare the message object (not added to dialog yet)
+            // Prepare the message object (not added to conversation yet)
             if currentMessage == nil {
                 // Create a new message object that will be added when streaming completes
                 currentMessage = MessageItem(
@@ -72,20 +72,20 @@ public class StreamingConversationHandler {
     
     public func onComplete() {
         Task { @MainActor in
-            // Add the completed message to the dialog
+            // Add the completed message to the conversation
             if let message = currentMessage {
                 if message.role == "assistant" {
-                    if let lastTurn = dialog.turns.max(by: { $0.sequenceNumber < $1.sequenceNumber }) {
+                    if let lastTurn = conversation.turns.max(by: { $0.sequenceNumber < $1.sequenceNumber }) {
                         let event = TurnEvent(type: .assistant, timestamp: message.timestamp, message: message, turn: lastTurn)
                         lastTurn.events.append(event)
                     }
                 } else if message.role == "tool" {
-                    if let lastTurn = dialog.turns.max(by: { $0.sequenceNumber < $1.sequenceNumber }) {
+                    if let lastTurn = conversation.turns.max(by: { $0.sequenceNumber < $1.sequenceNumber }) {
                         let event = TurnEvent(type: .toolResult, timestamp: message.timestamp, message: message, turn: lastTurn)
                         lastTurn.events.append(event)
                     }
                 }
-                dialog.forceUpdateTokenCount(updateContextCount: true, updateTotalCount: true)
+                conversation.forceUpdateTokenCount(updateContextCount: true, updateTotalCount: true)
                 
                 // If we received tool calls, we need to handle them
                 if receivedToolCalls, let toolCalls = message.getToolCalls(), !toolCalls.isEmpty {
@@ -95,21 +95,21 @@ public class StreamingConversationHandler {
                             guard let toolName = toolCall.name as String? else {
                                 throw AIServiceError.unsupportedOperation("Tool call has invalid name")
                             }
-                            let toolConfig = dialog.options.getToolConfiguration(toolName)
-                            guard dialog.options.isToolEnabled(toolName) else {
+                            let toolConfig = conversation.options.getToolConfiguration(toolName)
+                            guard conversation.options.isToolEnabled(toolName) else {
                                 throw AIServiceError.unsupportedOperation(
-                                    "Tool '\(toolName)' is not enabled for this dialog")
+                                    "Tool '\(toolName)' is not enabled for this conversation")
                             }
                             return GenericToolCall(
                                 id: toolCall.id,
                                 name: toolCall.name,
                                 arguments: toolCall.arguments,
                                 configuration: toolConfig,
-                                context: dialog
+                                context: conversation
                             )
                         }
                         let toolResults = try await DefaultToolHandler().handleToolCalls(configuredToolCalls)
-                        if let lastTurn = dialog.turns.max(by: { $0.sequenceNumber < $1.sequenceNumber }) {
+                        if let lastTurn = conversation.turns.max(by: { $0.sequenceNumber < $1.sequenceNumber }) {
                             // Anchor tool result timestamps to the assistant message timestamp for deterministic ordering
                             let baseTimestamp = message.timestamp
                             for (idx, result) in toolResults.enumerated() {
@@ -134,7 +134,7 @@ public class StreamingConversationHandler {
                 do {
                     try queryManager.saveContext()
                 } catch {
-                    vxAtelierPro.log.error("Failed to save dialog changes: \(error.localizedDescription)")
+                    vxAtelierPro.log.error("Failed to save conversation changes: \(error.localizedDescription)")
                     reportError(error)
                     return
                 }
@@ -152,7 +152,7 @@ public class StreamingConversationHandler {
             // Reset streaming state
             streamingState.reset()
             
-            // No need to remove message from dialog as it was never added
+            // No need to remove message from conversation as it was never added
             currentMessage = nil
             
             vxAtelierPro.log.error("Error during streaming - \(error.localizedDescription)")

@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-// MARK: - Dialog Export
+// MARK: - Conversation Export
 
 struct ConversationExportData: Codable {
     private enum CodingKeys: String, CodingKey {
@@ -17,15 +17,15 @@ struct ConversationExportData: Codable {
     let tokenCount: Int
     let usedTokenCount: Int
     
-    init(_ dialog: ConversationItem) {
-        self.timestamp = dialog.timestamp
-        self.title = dialog.title
-        self.turns = dialog.turns.map { TurnExportData($0) }
-        self.options = ConversationOptionsExportData(dialog.options)
-        self.status = dialog.status.rawValue
-        self.purpose = dialog.purpose.rawValue
-        self.tokenCount = dialog.tokenCount
-        self.usedTokenCount = dialog.usedTokenCount
+    init(_ conversation: ConversationItem) {
+        self.timestamp = conversation.timestamp
+        self.title = conversation.title
+        self.turns = conversation.turns.map { TurnExportData($0) }
+        self.options = ConversationOptionsExportData(conversation.options)
+        self.status = conversation.status.rawValue
+        self.purpose = conversation.purpose.rawValue
+        self.tokenCount = conversation.tokenCount
+        self.usedTokenCount = conversation.usedTokenCount
     }
     
     init(from decoder: Decoder) throws {
@@ -35,24 +35,24 @@ struct ConversationExportData: Codable {
         turns = try container.decode([TurnExportData].self, forKey: .turns)
         options = try container.decode(ConversationOptionsExportData.self, forKey: .options)
         status = try container.decodeIfPresent(String.self, forKey: .status) ?? ItemStatus.active.rawValue
-        purpose = try container.decodeIfPresent(String.self, forKey: .purpose) ?? ConversationItem.DialogPurpose.user.rawValue
+        purpose = try container.decodeIfPresent(String.self, forKey: .purpose) ?? ConversationItem.ConversationPurpose.user.rawValue
         tokenCount = try container.decodeIfPresent(Int.self, forKey: .tokenCount) ?? 0
         usedTokenCount = try container.decodeIfPresent(Int.self, forKey: .usedTokenCount) ?? 0
     }
     
     func toDataItem(context: ModelContext) throws -> ConversationItem {
-        let dialog = ConversationItem(title)
-        dialog.timestamp = timestamp
-        dialog.options = options.toDataItem(context: context)
-        dialog.status = ItemStatus(rawValue: status) ?? ItemStatus.active
-        dialog.purpose = ConversationItem.DialogPurpose(rawValue: purpose) ?? .user
-        dialog.tokenCount = tokenCount
-        dialog.usedTokenCount = usedTokenCount
+        let conversation = ConversationItem(title)
+        conversation.timestamp = timestamp
+        conversation.options = options.toDataItem(context: context)
+        conversation.status = ItemStatus(rawValue: status) ?? ItemStatus.active
+        conversation.purpose = ConversationItem.ConversationPurpose(rawValue: purpose) ?? .user
+        conversation.tokenCount = tokenCount
+        conversation.usedTokenCount = usedTokenCount
         for turnData in turns {
-            let turn = try turnData.toDataItem(context: context, conversation: dialog)
-            dialog.turns.append(turn)
+            let turn = try turnData.toDataItem(context: context, conversation: conversation)
+            conversation.turns.append(turn)
         }
-        return dialog
+        return conversation
     }
 }
 

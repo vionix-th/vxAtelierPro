@@ -27,6 +27,7 @@ final class AppSceneModel {
     var exportRequest: ExportRequest?
     var importRequested: Bool = false
     var isLogHistoryShown: Bool = false
+    var utilityPanelRequestID: UUID?
 
     private let queryManager: QueryManager
     private let modelContext: ModelContext
@@ -45,7 +46,7 @@ final class AppSceneModel {
     }
 
     func requestOptions(for id: PersistentIdentifier) {
-        vxAtelierPro.log.debug("AppSceneModel: options requested for dialog id \(id)")
+        vxAtelierPro.log.debug("AppSceneModel: options requested for conversation id \(id)")
         optionsSheetID = id
     }
 
@@ -74,6 +75,10 @@ final class AppSceneModel {
         isLogHistoryShown = true
     }
 
+    func requestUtilityPanel() {
+        utilityPanelRequestID = UUID()
+    }
+
     func handleTTSPlayback(isPlaying: Bool) {
         if isPlaying {
             vxAtelierPro.log.info("TTS playback started")
@@ -92,7 +97,7 @@ final class AppSceneModel {
                     vxAtelierPro.log.info("Successfully exported project '\(project.name)'.")
                 }
             case .conversation(let conversation, _):
-                try await DataManager.shared.exportDialog(conversation)
+                try await DataManager.shared.exportConversation(conversation)
                 await MainActor.run {
                     vxAtelierPro.log.info("Successfully exported conversation '\(conversation.title)'.")
                 }
@@ -103,7 +108,7 @@ final class AppSceneModel {
             case .project:
                 itemType = "project"
             case .conversation:
-                itemType = "dialog"
+                itemType = "conversation"
             }
             await MainActor.run {
                 vxAtelierPro.log.error("Export \(itemType) failed: \(error.localizedDescription)")
@@ -127,11 +132,11 @@ final class AppSceneModel {
                 await MainActor.run {
                     vxAtelierPro.log.info("Successfully imported project '\(project.name)'.")
                 }
-            } else if let dialog = importedItem as? ConversationItem {
-                try queryManager.insert(dialog)
-                router.openConversation(dialog.id, in: dialog.project?.id)
+            } else if let conversation = importedItem as? ConversationItem {
+                try queryManager.insert(conversation)
+                router.openConversation(conversation.id, in: conversation.project?.id)
                 await MainActor.run {
-                    vxAtelierPro.log.info("Successfully imported dialog '\(dialog.title)'.")
+                    vxAtelierPro.log.info("Successfully imported conversation '\(conversation.title)'.")
                 }
             }
         } catch {

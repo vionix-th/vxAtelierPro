@@ -25,11 +25,11 @@ struct ConversationView: View {
                 ZStack(alignment: .bottomTrailing) {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 10) {
-                            if let dialog = viewModel.conversation {
+                            if let conversation = viewModel.conversation {
                                 let turns = viewModel.sortedTurns
                                 ForEach(turns, id: \.id) { turn in
                                     ConversationTurnView(
-                                        conversationID: dialog.id,
+                                        conversationID: conversation.id,
                                         turn: turn,
                                         isLastTurn: turn.id == turns.last?.id,
                                         streamingState: viewModel.streamingState,
@@ -216,7 +216,7 @@ struct SelectionModeMenu: View {
         Button { viewModel.selectAllMessages() } label: {
             MenuItemStyle.label("Select All Messages", systemImage: "checkmark.circle.fill")
         }
-        .help("Select all messages in this dialog")
+        .help("Select all messages in this conversation")
 
         Button { viewModel.invertSelection() } label: {
             MenuItemStyle.label("Invert Selection", systemImage: "arrow.2.circlepath")
@@ -301,19 +301,17 @@ struct NormalModeMenu: View {
         if viewModel.conversation?.status == .active {
             Divider()
 #if os(macOS)
-            if let dialog = viewModel.conversation {
-                Toggle(isOn: Binding(get: { dialog.isLinkedToUtilityPanel }, set: { dialog.isLinkedToUtilityPanel = $0 })) {
+            if let conversation = viewModel.conversation {
+                Toggle(isOn: Binding(get: { conversation.isUtilityConversation }, set: { newValue in
+                    do {
+                        try viewModel.queryManager.setUtilityPanelConversation(conversation, isLinked: newValue)
+                    } catch {
+                        vxAtelierPro.log.error("ConversationView: Failed to update utility panel link: \(error.localizedDescription)")
+                    }
+                })) {
                     MenuItemStyle.label("Link to Utility Panel", systemImage: "dock.rectangle")
                 }
-                .help("Link this dialog to the utility panel")
-                .onChange(of: dialog.isLinkedToUtilityPanel) { oldValue, newValue in
-                    do {
-                        try viewModel.saveContext()
-                        vxAtelierPro.log.debug("DialogView: Saved utility panel link status change ('\(newValue)') for dialog '\(dialog.title)'.")
-                    } catch {
-                        vxAtelierPro.log.error("DialogView: Failed to save context after utility panel link change: \(error.localizedDescription)")
-                    }
-                }
+                .help("Link this conversation to the utility panel")
             }
 #endif
         }
@@ -324,9 +322,9 @@ struct NormalModeMenu: View {
             Button {
                 if let id = viewModel.conversation?.id { onRequestOptions(id) }
             } label: {
-                MenuItemStyle.label("Dialog Options", systemImage: "slider.horizontal.3")
+                MenuItemStyle.label("Conversation Options", systemImage: "slider.horizontal.3")
             }
-            .help("Configure dialog settings")
+            .help("Configure conversation settings")
             .keyboardShortcut(",", modifiers: [.command, .option])
         }
     }

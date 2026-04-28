@@ -1,5 +1,9 @@
 import XCTest
+#if canImport(vxAtelier_Pro_debug)
 @testable import vxAtelier_Pro_debug
+#else
+@testable import vxAtelier_Pro
+#endif
 import SwiftData
 
 /// Performance and scalability tests for ConversationItem and related models.

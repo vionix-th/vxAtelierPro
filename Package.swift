@@ -50,7 +50,7 @@ let package = Package(
                 "ai/OpenAIDefaults.swift",
                 "ai/OpenAIModel.swift",
                 "ai/OpenAIService.swift",                
-                "ai/tooling/AIToolDialog.swift",
+                "ai/tooling/AIToolConversation.swift",
                 "ai/tooling/AITooling.swift",
                 "ai/tooling/AIToolRegistry.swift",
                 "ai/tooling/AIToolShortcuts.swift",
@@ -143,7 +143,7 @@ let package = Package(
                 // Splash removed: no highlighter helpers
                 "views/components/HybridNumericInputView.swift",        
                 "views/components/ImagePicker.swift",        
-                // Views - Dialog
+                // Views - Conversation
                 "views/dialog/MessageView.swift",                
                 "views/dialog/BookmarkSheetView.swift",
                 "views/dialog/MessageInputView.swift",
@@ -186,7 +186,7 @@ let package = Package(
                 "views/settings/components/SettingsListRow.swift",
                 "views/settings/components/SettingsRowActions.swift",
                 // Views - Utility
-                "views/utility/GlobalUtilityPanel.swift",
+                "views/utility/UtilityPanelView.swift",
                 "views/utility/LogHistorySheet.swift",
                 "views/utility/ContentFilter.swift",
                 "views/utility/Sorters.swift"
@@ -195,6 +195,12 @@ let package = Package(
                 .define("DEBUG", .when(configuration: .debug)),
                 .define("RELEASE", .when(configuration: .release))
             ]
+        ),
+        .testTarget(
+            name: "vxAtelier-ProTests",
+            dependencies: ["vxAtelier-Pro"],
+            path: "vxAtelier ProTests",
+            exclude: ["System/SwiftDataLimitations.md"]
         )
     ]
 ) 

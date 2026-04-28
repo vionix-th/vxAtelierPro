@@ -40,10 +40,10 @@ struct ProjectView: View {
     }
     
     @AppStorage(AppSettings.Keys.contentFilter) private var contentFilter: ContentFilter = .active
-    @AppStorage(AppSettings.Keys.projectDialogsSortDescending) private var conversationsSortDescending: Bool =
-        AppDefaults.projectDialogsSortDescending
-    @AppStorage(AppSettings.Keys.projectDialogsSortType) private var conversationsSortTypeRaw: String =
-        AppDefaults.projectDialogsSortType
+    @AppStorage(AppSettings.Keys.projectConversationsSortDescending) private var conversationsSortDescending: Bool =
+        AppDefaults.projectConversationsSortDescending
+    @AppStorage(AppSettings.Keys.projectConversationsSortType) private var conversationsSortTypeRaw: String =
+        AppDefaults.projectConversationsSortType
     
     private var conversationsSortType: SidebarSortType {
         get { SidebarSortType(rawValue: conversationsSortTypeRaw) ?? .conversationDate }

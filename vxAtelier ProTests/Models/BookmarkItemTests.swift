@@ -1,7 +1,11 @@
 import SwiftData
 import XCTest
 
+#if canImport(vxAtelier_Pro_debug)
 @testable import vxAtelier_Pro_debug
+#else
+@testable import vxAtelier_Pro
+#endif
 
 @MainActor
 final class BookmarkItemTests: XCTestCase {

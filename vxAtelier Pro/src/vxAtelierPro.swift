@@ -24,7 +24,7 @@ struct AppCommands: Commands {
 
             Divider()
 
-            Button("Show Chats") {
+            Button("Show Conversations") {
                 setContentFilter(.active, contentFilter: $contentFilter)
             }
             .keyboardShortcut("1", modifiers: [.command])
@@ -145,8 +145,6 @@ struct vxAtelierPro: App {
         }
     }
 
-    @State private var isDialogShown: Bool = false
-
     init() {
         vxAtelierPro.log.debug("Initializing vxAtelierPro")
 
@@ -172,14 +170,11 @@ struct vxAtelierPro: App {
 
         #if os(macOS)
             vxAtelierPro.log.debug("Initializing Global Hotkey Controller")
-            self.hotkeyController = GlobalHotkeyController()
+            self.hotkeyController = GlobalHotkeyController(appSceneModel: appSceneModel)
             appDelegate.onDidFinishLaunching = {
-                [queryManager, modelContext = sharedModelContainer.mainContext, hotkeyController] in
+                [hotkeyController] in
                 Task { @MainActor in
-                    hotkeyController.register(
-                        modelContext: modelContext,
-                        queryManager: queryManager
-                    )
+                    hotkeyController.register()
                 }
             }
 
@@ -215,11 +210,11 @@ struct vxAtelierPro: App {
         let registry = AIToolRegistry.shared
         let context = sharedModelContainer.mainContext
 
-        // Dialog Tools
-        registry.registerTool(ListDialogsTool(modelContext: context))
-        registry.registerTool(RenameDialogTool(modelContext: context))
-        registry.registerTool(FindDialogTool(modelContext: context))
-        registry.registerTool(CurrentDialogTool())
+        // Conversation Tools
+        registry.registerTool(ListConversationsTool(modelContext: context))
+        registry.registerTool(RenameConversationTool(modelContext: context))
+        registry.registerTool(FindConversationTool(modelContext: context))
+        registry.registerTool(CurrentConversationTool())
 
         // Shortcut Tools
         #if os(macOS)
@@ -264,16 +259,22 @@ struct vxAtelierPro: App {
                     .environment(\.modelContext, sharedModelContainer.mainContext)
             }
 
+            Window("Utility", id: "utilityPanel") {
+                UtilityPanelView()
+                    .preferredColorScheme(effectiveColorScheme)
+                    .environment(queryManager)
+                    .environment(appSceneModel)
+                    .environment(ttsQueue)
+                    .modelContainer(sharedModelContainer)
+            }
+            .windowResizability(.contentSize)
+            .defaultSize(width: 420, height: 140)
+
             MenuBarExtra("vxAtelier Pro", systemImage: "message.circle") {
                 MenuBarContent()
             }
         #endif
     }
-}
-
-extension Notification.Name {
-    static let utilityPanelDidSendConversation = Notification.Name(
-        "utilityPanelDidSendConversation")
 }
 
 // MARK: - Platform-Specific Components
@@ -302,10 +303,14 @@ extension Notification.Name {
     @MainActor
     final class GlobalHotkeyController {
         private let hotkeys = HotkeyManager()
-        private let utilityPanel = GlobalUtilityPanel()
+        private let appSceneModel: AppSceneModel
         private var didRegister = false
 
-        func register(modelContext: ModelContext, queryManager: QueryManager) {
+        init(appSceneModel: AppSceneModel) {
+            self.appSceneModel = appSceneModel
+        }
+
+        func register() {
             guard !didRegister else { return }
             didRegister = true
             vxAtelierPro.log.debug("Registering global hotkeys")
@@ -316,51 +321,11 @@ extension Notification.Name {
                     guard let self else { return false }
                     vxAtelierPro.log.debug("Global utility panel hotkey triggered")
                     Task { @MainActor in
-                        self.showUtilityPanel(
-                            modelContext: modelContext, queryManager: queryManager)
+                        self.appSceneModel.requestUtilityPanel()
                     }
                     return true
                 }
             )
-        }
-
-        private func showUtilityPanel(modelContext: ModelContext, queryManager: QueryManager) {
-            if let item = queryManager.utilityPanelConversation {
-                vxAtelierPro.log.notice("Showing utility panel for existing dialog '\(item.title)'")
-                utilityPanel.show(
-                    modelContext: modelContext,
-                    conversationID: item.id,
-                    queryManager: queryManager,
-                    didSend: { conversationID in
-                        NotificationCenter.default.post(
-                            name: .utilityPanelDidSendConversation,
-                            object: conversationID
-                        )
-                    }
-                )
-            } else {
-                vxAtelierPro.log.notice("Creating new dialog for utility panel")
-                do {
-                    let item = try queryManager.createConversation()
-                    item.title = AppDefaults.newDialogName
-                    if let config = item.options.apiConfiguration {
-                        item.options.setupAiRequestArguments(for: config, modelContext: modelContext)
-                    }
-                    utilityPanel.show(
-                        modelContext: modelContext,
-                        conversationID: item.id,
-                        queryManager: queryManager,
-                        didSend: { conversationID in
-                            NotificationCenter.default.post(
-                                name: .utilityPanelDidSendConversation,
-                                object: conversationID
-                            )
-                        }
-                    )
-                } catch {
-                    vxAtelierPro.log.error("Failed to create conversation for utility panel: \(error.localizedDescription)")
-                }
-            }
         }
     }
 

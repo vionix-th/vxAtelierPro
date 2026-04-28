@@ -154,11 +154,10 @@ struct StatusBar: View {
                         onRequestLogHistory()
                     }
                 
-                // Only show dialog info inline if we have an active dialog and not compact
-                if let dialog = activeConversation,
+                if let conversation = activeConversation,
                    !isCompact {
                     HStack(spacing: 6) {
-                        DialogInfoHeader(dialog: dialog, isCompact: false, queryManager: queryManager)
+                        ConversationInfoHeader(conversation: conversation, isCompact: false, queryManager: queryManager)
                             .layoutPriority(1)
                     }
                     .frame(minWidth: 200, idealWidth: 400, maxWidth: 500, alignment: .trailing)
@@ -167,10 +166,9 @@ struct StatusBar: View {
             .frame(height: 32)
             .background(Color.secondary.opacity(0.1))
             
-            // On compact (iPhone), show DialogInfoHeader below if active
-            if let dialog = activeConversation,
+            if let conversation = activeConversation,
                isCompact {
-                DialogInfoHeader(dialog: dialog, isCompact: true, queryManager: queryManager)
+                ConversationInfoHeader(conversation: conversation, isCompact: true, queryManager: queryManager)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(Color.secondary.opacity(0.05))
@@ -397,16 +395,16 @@ struct TokenDisplay: View {
     }
 }
 
-// MARK: - Dialog Info Header
-struct DialogInfoHeader: View {
-    let dialog: ConversationItem
+// MARK: - Conversation Info Header
+struct ConversationInfoHeader: View {
+    let conversation: ConversationItem
     let isCompact: Bool
     let queryManager: QueryManager
     @State private var isModelPickerPresented: Bool = false
     @State private var refreshTrigger = UUID()
     
     private var modelParam: AiRequestArgument? {
-        dialog.options.parameters.first(where: { $0.name == "model" })
+        conversation.options.parameters.first(where: { $0.name == "model" })
     }
     
     private var modelName: String {
@@ -418,12 +416,12 @@ struct DialogInfoHeader: View {
     }
     
     private var isStreamingEnabled: Bool {
-        let streamParam = dialog.options.parameters.first(where: { $0.name == "stream" })
+        let streamParam = conversation.options.parameters.first(where: { $0.name == "stream" })
         return streamParam?.boolValue ?? false
     }
     
     private var currentProvider: AIServiceProvider {
-        if let config = dialog.options.apiConfiguration {
+        if let config = conversation.options.apiConfiguration {
             return AIServiceProvider.detectProvider(from: config)
         }
         return .openAI // Default provider
@@ -431,8 +429,7 @@ struct DialogInfoHeader: View {
     
     var body: some View {
         HStack(spacing: 6) {
-            // Add utility panel link icon if the dialog is linked
-            if dialog.isLinkedToUtilityPanel {
+            if conversation.isUtilityConversation {
                 Image(systemName: "menubar.dock.rectangle")
                     .foregroundColor(.green)
                     .font(.caption)
@@ -442,7 +439,7 @@ struct DialogInfoHeader: View {
                     .frame(height: 14)
             }
             
-            Text(dialog.options.apiConfiguration?.name ?? "No API Config")
+            Text(conversation.options.apiConfiguration?.name ?? "No API Config")
                 .fontWeight(.medium)
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -458,18 +455,18 @@ struct DialogInfoHeader: View {
                 .padding(.horizontal, 2)
                 .id(refreshTrigger) // Force refresh when this ID changes
                             .onTapGesture {
-                                if dialog.options.apiConfiguration != nil {
+                                if conversation.options.apiConfiguration != nil {
                                     isModelPickerPresented = true
                                     vxAtelierPro.log.debug("Opening model picker from status bar")
                                 }
                             }
                             .sheet(isPresented: $isModelPickerPresented) {
-                                if dialog.options.apiConfiguration != nil {
+                                if conversation.options.apiConfiguration != nil {
                                     ModelSelectionView(
                                         selectedModel: modelName,
                                         onModelSelected: { newModel in
                                             do {
-                                                try queryManager.setModel(newModel, for: dialog)
+                                                try queryManager.setModel(newModel, for: conversation)
                                                 refreshTrigger = UUID()
                                             } catch {
                                                 vxAtelierPro.log.error("Failed to set model \(newModel): \(error.localizedDescription)")
@@ -485,8 +482,8 @@ struct DialogInfoHeader: View {
 
             // Update token count display to use distinct sections for context and total
             HStack(spacing: 6) {
-                TokenDisplay(count: dialog.tokenCount, type: .context, compactMode: true)
-                TokenDisplay(count: dialog.usedTokenCount, type: .total, compactMode: true)
+                TokenDisplay(count: conversation.tokenCount, type: .context, compactMode: true)
+                TokenDisplay(count: conversation.usedTokenCount, type: .total, compactMode: true)
             }
             .padding(.horizontal, 2)
             .layoutPriority(2) // Increase layout priority for token displays
@@ -508,10 +505,10 @@ struct DialogInfoHeader: View {
                 .onTapGesture {
                     let newStreamValue = !isStreamingEnabled
                     do {
-                        try queryManager.setStreamingEnabled(newStreamValue, for: dialog)
+                        try queryManager.setStreamingEnabled(newStreamValue, for: conversation)
                     } catch {
                         vxAtelierPro.log.error(
-                            "Stream parameter not found for \(dialog.title)")
+                            "Stream parameter not found for \(conversation.title)")
                     }
                 }
                 .layoutPriority(3)
