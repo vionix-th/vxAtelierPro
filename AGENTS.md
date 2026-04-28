@@ -23,6 +23,7 @@
 - In `async` functions use `await vxAtelierPro.log…`; otherwise use `vxAtelierPro.log…`.
 
 ## Build / Test
+- Do not needlessly compile or test; those are token expensive operations and they can pollute context.
 - Maintain **both** build systems: Swift Package Manager (SPM) and Xcode (`xcodebuild`).
 - Use SPM (`swift build`, `swift test`, `swift package`) for IDE indexing/linting-style workflows and fast compile/test-build checks.
 - Use `xcodebuild` for actually running/debugging, unit tests, UI tests, and release/archival builds.
