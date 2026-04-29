@@ -1,161 +1,159 @@
-# AI Provider Modernization Plan
+# AI Provider Modernization Implementation Plan
 
-## Purpose
+## Objective
 
-Modernize the AI provider layer so vxAtelier Pro can support:
+Refactor the AI provider layer so vxAtelier Pro can support multiple endpoint families and provider-specific behavior behind a stable internal abstraction.
 
-- OpenAI Platform through both Responses API and Chat Completions API.
-- OpenAI Codex / ChatGPT subscription access through Codex ChatGPT authentication.
-- OpenAI-compatible providers such as OpenRouter, LM Studio, Ollama, xAI, and DeepSeek.
-- Native non-OpenAI providers such as Anthropic Messages.
-- Modern content parts, tool calls, streaming events, and provider-specific parameter drift without ad hoc request shaping.
+Required provider families:
 
-This document is an implementation planning artifact. It records current findings, required abstractions, dependencies, and likely work order.
+- OpenAI Platform: Responses API and Chat Completions API.
+- OpenAI Codex / ChatGPT subscription route.
+- OpenAI-compatible providers: OpenRouter, LM Studio, Ollama, xAI, DeepSeek.
+- Native providers: Anthropic Messages.
 
-## Current Local State
+Required application capabilities:
 
-The existing provider system already has a useful top-level shape:
+- Typed content parts instead of string-only messages.
+- First-class tool-call lifecycle.
+- Provider-neutral streaming events.
+- Provider/model-aware parameter mapping.
+- Provider/model-aware model metadata.
+- Normalized usage accounting.
+- Normalized provider errors.
+- Cancellation and retry for transport failures.
+- SwiftUI streaming state that does not churn SwiftData.
 
-- `AIService` owns model fetching, default models, default parameters, parameter application, and a `chat` service.
-- `AIChatCompletionServiceStreamable` gives every provider one streaming entry point: `completeStream(request:)`.
-- `GenericChatCompletionRequest` stores messages, tools, tool choice, and arbitrary parameters.
-- `CompletionStreamProcessor` consumes stream chunks and turns them into a `GenericChatCompletionResponse`.
-- `ConversationItem` builds provider-specific messages from SwiftData turns, applies parameters, runs completion, persists assistant messages, executes tool calls, and persists tool results.
+## Scope
 
-Existing concrete providers:
+In scope:
 
-- `OpenAIService`: OpenAI Chat Completions only.
+- Provider profile registry.
+- Endpoint family abstraction.
+- Auth profile abstraction.
+- Message/content-part schema refactor.
+- Tool-call schema refactor.
+- Request option and parameter schema refactor.
+- Model descriptor and model-fetch refactor.
+- Stream event pipeline.
+- Conversation draft state for streaming UI.
+- Normalized provider errors and usage.
+- Cancellation and retry policy for request transport.
+- Export/import verification for new SwiftData entities.
+- Test fixtures and matrix for providers, endpoints, streaming, tools, and model fetch.
+
+Out of scope for this refactor:
+
+- General logging/security overhaul.
+- Tool permission and safety policy.
+- Long-term backward compatibility with old persisted schemas.
+- Automatic support for every provider-specific feature exposed by every provider.
+- Parallel tool execution as default behavior.
+
+## Current Implementation Baseline
+
+Provider entry points:
+
+- `AIService`
+- `AIChatCompletionServiceStreamable`
+- `GenericChatCompletionRequest`
+- `CompletionStreamProcessor`
+- `ConversationItem.complete`
+
+Current providers:
+
+- `OpenAIService`: Chat Completions only.
 - `XAIService`: subclasses `OpenAIService`.
 - `DeepSeekService`: subclasses `OpenAIService`.
-- `AnthropicService`: separate Anthropic Messages implementation.
+- `AnthropicService`: separate Messages API implementation.
 
-Useful existing configuration:
+Current configuration model:
 
-- `APIConfigurationItem` already stores `apiKey`, `baseURL`, `chatCompletionsEndpoint`, `modelsEndpoint`, `defaultModel`, and default status.
-- This is enough for simple OpenAI-compatible providers, but not enough for auth profile, endpoint family, request mode, provider-specific headers, or model metadata.
+- `APIConfigurationItem` stores API key, base URL, chat endpoint, models endpoint, default model, and default status.
 
-Current weak points:
+Current limitations to remove:
 
-- Message content is `String` only; no typed content parts.
-- Internal request model is chat-completion-shaped.
-- `stream` is modeled as a user parameter, but it is really transport/execution mode.
-- Parameter support is provider-default arrays plus arbitrary dictionary values; this causes hidden drift and invalid payloads.
-- Tool-call streaming parser is fragile. It assumes each streamed tool delta has an id, does not robustly merge by index, and mixes provider accumulation with processor accumulation.
-- SwiftData persistence happens around final messages, but streaming state and tool-call lifecycle are not cleanly represented.
-- Model fetching assumes provider responses look like OpenAI `/v1/models` in several places.
-- Provider detection is URL string sniffing and defaults unknown providers to OpenAI.
-- Config validation requires live model fetching before save, which is brittle for local servers and providers with different model-list schemas.
-- OpenAI Responses API is not implemented.
-- OpenAI Codex / ChatGPT subscription access is not implemented.
+- Message content is string-only.
+- Request model is chat-completion-shaped.
+- `stream` is stored as a normal model parameter.
+- Parameters are arbitrary key/value rows without provider/model capability rules.
+- Tool calls are serialized into message JSON instead of durable queryable state.
+- Streaming tool-call parsing is brittle and not event based.
+- SwiftData persistence and streaming UI state are not separated cleanly.
+- Model fetch expects OpenAI-like model payloads in places where providers return different metadata.
+- Provider detection relies on URL string matching and falls back to OpenAI.
+- Configuration save is blocked by live model fetch failures.
 
-## External API Findings
+## Architecture Decisions
 
-### OpenAI Platform
+### Compatibility
 
-OpenAI has not moved to an "API v2" naming model for normal platform use. The current shift is from Chat Completions toward the Responses API under `/v1/responses`.
+- No long-lived compatibility bridge around old chat-shaped data.
+- Short-lived refactor helpers are allowed only when they sequence risky changes and have a clear removal point.
+- Existing local development stores may be reset or destructively converted if that is simpler than migration.
 
-Relevant endpoint families:
+### Endpoint Selection
 
-- `/v1/responses`: current primary endpoint for modern text generation, tools, multimodal input, reasoning, and state-related features.
-- `/v1/chat/completions`: still supported and important for compatibility.
-- `/v1/models`: model listing, but not sufficient by itself for all model metadata needed by the app.
+- Endpoint family is explicit.
+- Endpoint family may be user-selected when multiple valid choices exist.
+- Endpoint family may be constrained by provider or model metadata.
+- OpenAI Platform must support both Responses and Chat Completions.
+- OpenAI-compatible providers may support Chat Completions, Responses, or both depending on provider/model capability.
 
-Key drift from current app model:
+### Streaming
 
-- Responses uses `input` / content items rather than chat `messages` only.
-- Output is event/item based, not just `choices[0].message.content`.
-- Parameters include modern fields such as `max_output_tokens`, `reasoning`, `text.verbosity`, `service_tier`, `store`, `include`, and tool-specific settings.
-- Tool calls and streaming need event-level parsing.
+- `stream` is execution/transport configuration, not a model parameter.
+- Streaming emits provider-neutral events.
+- Provider adapters own provider-specific parsing.
+- Application UI consumes only the internal event model.
+- SwiftData writes occur only at stable persistence boundaries.
 
-### OpenAI Codex / ChatGPT Subscription
+### Tool Calls
 
-Earlier assumption that ChatGPT Pro cannot be used for app inference was incomplete.
+- Tool calls are first-class persisted records.
+- Tool-call deltas are assembled in transient state during streaming.
+- Tool calls preserve provider order by `index`.
+- First implementation executes tool calls sequentially.
+- Parallel tool execution requires explicit future policy.
+- Tool failures are durable tool-call status and are also surfaced to the model as structured tool errors.
 
-Correct distinction:
+### Parameters
 
-- ChatGPT subscription is not a normal OpenAI Platform API billing source.
-- Codex officially supports ChatGPT sign-in for subscription access.
-- Codex CLI, IDE, and app can authenticate with ChatGPT or an API key.
-- ChatGPT auth returns access tokens and stores/refreshes credentials locally.
-- Codex usage through ChatGPT auth follows ChatGPT workspace permissions and policies, not API organization billing.
+- Parameters are described by provider/model/endpoint-aware specs.
+- Unsupported parameters are omitted, transformed, or rejected by explicit policy.
+- Provider-specific escape hatches stay available through advanced extras.
+- Tool/JSON schema support is modeled as provider/model capability.
 
-Implications:
+### Model Metadata
 
-- Treat this as a distinct provider/auth route, not as an OpenAI API key.
-- Likely transport is Codex Responses over `chatgpt.com/backend-api/codex/responses`.
-- It may need SSE and WebSocket handling.
-- It should be labeled experimental until vxAtelier Pro verifies auth, refresh, limits, model availability, and transport behavior.
-- Token storage must be treated as sensitive credential storage.
+- Model fetch returns normalized `LLMModelDescriptor` records.
+- Saved model metadata stores fields needed by the app abstraction.
+- Raw provider metadata may be retained for diagnostics and future remapping.
+- Model metadata can constrain endpoint family, parameters, modalities, and schema features.
 
-### OpenAI-Compatible Providers
+### Configuration Validation
 
-Providers like OpenRouter, LM Studio, Ollama, xAI, and DeepSeek expose OpenAI-compatible surfaces, but not identical semantics.
+- Save configuration even when validation/model fetch fails.
+- Show validation warnings instead of blocking.
+- Keep explicit "Test connection" separate from save.
 
-Common pattern:
+### Auth
 
-- Usually `POST /v1/chat/completions`.
-- Some also expose `POST /v1/responses`.
-- Usually `GET /v1/models`, but schema and metadata vary.
-- Auth may be bearer token, no auth, ignored auth, or custom headers.
+- Auth mode is provider profile metadata, not implicit URL behavior.
+- API key routes and ChatGPT/Codex subscription routes are separate provider profiles.
+- Codex/ChatGPT subscription support should use an OpenAI-supported OAuth/auth-key route where available.
+- Reusing existing Codex auth files is not the primary design and is only a possible fallback after verification.
 
-Provider notes:
+### SwiftUI / SwiftData
 
-- OpenRouter:
-  - Chat completions endpoint resembles OpenAI.
-  - Model IDs are often provider-qualified, for example `openai/gpt-...`.
-  - Model metadata includes context length, pricing, architecture, modalities, and supported parameters.
-  - Needs custom model decoder.
-- LM Studio:
-  - Local OpenAI-compatible server, commonly `http://localhost:1234/v1`.
-  - Supports chat completions, models, embeddings, and Responses in current docs.
-  - Auth may be absent or ignored.
-- Ollama:
-  - Local OpenAI-compatible server, commonly `http://localhost:11434/v1`.
-  - Supports chat completions, models, embeddings, and Responses compatibility.
-  - Responses compatibility has limitations around state.
-- xAI and DeepSeek:
-  - Existing code treats them as OpenAI-chat-compatible.
-  - Keep this where valid, but move behavior into profiles rather than inheritance.
+- Streaming UI uses transient draft state.
+- SwiftData stores completed/stable records only.
+- Network and stream parsing run off the main actor.
+- Draft/UI updates run on the main actor.
+- SwiftData writes run on the correct model-context actor.
 
-### Anthropic
-
-Anthropic is a native Messages API path, not OpenAI-compatible.
-
-Existing app support is separate and should remain separate, but it needs modernization:
-
-- Typed content parts.
-- Native tool-use blocks.
-- Native streaming event mapping.
-- Parameter schema separate from OpenAI.
-
-## Required Internal Abstractions
-
-## Agreed Planning Decisions
-
-- First milestone should be foundation-only. Do not add visible new providers or switch OpenAI behavior until the internal abstraction is stable.
-- `stream` must move out of conversation/model parameters and into execution/transport configuration.
-- Backward compatibility is not required. Schema changes are allowed when they produce the correct model.
-- Saving API/provider configurations should be warning-based, not blocked by failed validation.
-- Users are expected to be experienced. Prefer explicit control and clear warnings over restrictive guardrails.
-- Endpoint family should be partly user-selectable and partly model/provider-constrained. Determine allowed combinations from provider and model metadata.
-- Model metadata should be stored when needed by the saved model abstraction. Raw metadata can be retained for diagnostics, but normalized fields should drive behavior.
-- ChatGPT/Codex subscription support should use an OpenAI-supported auth path rather than blindly reusing Codex auth files as the primary design.
-- Do not keep long-lived compatibility bridges around old chat-shaped data. Short-lived refactor helpers are acceptable only when they reduce patch risk and have a clear removal point.
-- Tool calls should become durable first-class records, while token/tool-argument streaming remains transient UI state until stable persistence boundaries.
-- Default tool execution should preserve provider order and run sequentially first. Parallel execution should be explicit provider/app policy, not accidental behavior.
-- Usage/accounting should be normalized in the provider abstraction because providers report usage differently.
-- Cancellation should be first-class across request transport, stream parsing, transient UI state, and tool execution.
-- Retry should be supported for retryable transport failures and configured through application settings. Tool failures should be surfaced to the model through structured tool errors rather than retried blindly by infrastructure.
-- JSON/tool schema compatibility belongs in the abstraction. Concrete providers must translate or reject schemas according to their capabilities.
-- Provider-specific errors must be normalized so app code can work against one error vocabulary.
-- File/image content parts must respect the app's existing sandbox and security-scoped-resource practices.
-- Streaming, SwiftUI updates, and SwiftData writes need explicit actor boundaries.
+## Target Internal Types
 
 ### Provider Profile
-
-Need explicit provider metadata instead of URL sniffing.
-
-Proposed shape:
 
 ```swift
 struct LLMProviderProfile {
@@ -171,7 +169,7 @@ struct LLMProviderProfile {
 }
 ```
 
-Provider IDs should include:
+Initial provider IDs:
 
 - `openAIPlatform`
 - `openAICodexSubscription`
@@ -183,9 +181,7 @@ Provider IDs should include:
 - `anthropic`
 - `customOpenAICompatible`
 
-### Endpoint Families
-
-Need distinguish API family from provider.
+### Endpoint Family
 
 ```swift
 enum LLMEndpointKind {
@@ -197,9 +193,7 @@ enum LLMEndpointKind {
 }
 ```
 
-### Auth Profiles
-
-Need auth type independent from provider.
+### Auth Profile
 
 ```swift
 enum LLMAuthKind {
@@ -211,11 +205,7 @@ enum LLMAuthKind {
 }
 ```
 
-Codex auth should not store tokens in normal API key fields. Prefer keychain or explicit import/reuse of existing Codex auth cache after user consent.
-
 ### Content Parts
-
-Need replace `String`-only message payloads with typed content.
 
 ```swift
 enum LLMContentPart {
@@ -236,37 +226,7 @@ struct LLMMessage {
 }
 ```
 
-SwiftData can initially persist only text-compatible parts, then add media/file persistence later. The abstraction should not block media even if first implementation handles text.
-
-Because backward compatibility is not required, the preferred schema direction is first-class persisted content parts rather than string-only messages with an adapter layer. A temporary bridge may still be useful inside code during refactor, but not as a long-term data model.
-
-Any temporary bridge must be treated as scaffolding:
-
-- It exists only to sequence risky refactors.
-- It should not define new public/provider-facing APIs.
-- It should have a removal task in the same milestone or the next one.
-- It should not preserve old persistence semantics if those semantics conflict with the target model.
-
-Proposed persistence direction:
-
-```swift
-@Model
-final class MessageContentPartItem {
-    var kind: String
-    var text: String?
-    var mimeType: String?
-    var fileName: String?
-    var dataReference: String?
-    var order: Int
-    var message: MessageItem?
-}
-```
-
-`MessageItem.content` can be replaced by ordered content parts. If keeping a derived `text` property helps UI/search, it should be computed or denormalized intentionally, not be the source of truth.
-
-### Request Options and Parameter Schema
-
-Need typed request options plus provider-specific extras.
+### Generation Options
 
 ```swift
 struct LLMGenerationOptions {
@@ -285,9 +245,7 @@ struct LLMGenerationOptions {
 }
 ```
 
-`stream` belongs here as execution/transport mode, not as a model parameter row.
-
-Need parameter specs:
+### Parameter Spec
 
 ```swift
 struct LLMParameterSpec {
@@ -302,31 +260,7 @@ struct LLMParameterSpec {
 }
 ```
 
-Behavior examples:
-
-- forward as-is
-- map key, for example `maxOutputTokens` to `max_tokens`
-- omit when unsupported
-- fail when unsupported
-- include only for native OpenAI/Codex
-
-Tool/JSON schema compatibility must be modeled by provider/model capability, not guessed at request time.
-
-Examples:
-
-- strict JSON schema support
-- loose tool schema support
-- `enum` support
-- `additionalProperties` behavior
-- nullable value representation
-- maximum schema size or nesting limits
-- provider-specific schema transforms
-
-Unsupported schema features should either be transformed by the concrete provider adapter or rejected with a normalized unsupported-capability error.
-
 ### Model Descriptor
-
-Need model metadata not tied to provider response schema.
 
 ```swift
 struct LLMModelDescriptor {
@@ -344,11 +278,7 @@ struct LLMModelDescriptor {
 }
 ```
 
-Model fetch should return descriptors, not provider-specific Codable model objects.
-
-### Stream Events
-
-Need event model instead of content/toolCalls chunks.
+### Stream Event
 
 ```swift
 enum LLMStreamEvent {
@@ -364,9 +294,7 @@ enum LLMStreamEvent {
 }
 ```
 
-Adapters emit provider-neutral events. UI and persistence consume one stable event vocabulary.
-
-Usage should be normalized across streaming and non-streaming responses:
+### Usage
 
 ```swift
 struct LLMUsage {
@@ -380,7 +308,7 @@ struct LLMUsage {
 }
 ```
 
-Provider errors should be normalized:
+### Provider Error
 
 ```swift
 enum LLMProviderErrorKind {
@@ -400,23 +328,28 @@ enum LLMProviderErrorKind {
 }
 ```
 
-Application code should handle `LLMProviderErrorKind`, not provider-specific HTTP bodies.
+## Target SwiftData Model Direction
+
+### Message Content Parts
+
+Replace string-only message content as source of truth with ordered content parts.
+
+```swift
+@Model
+final class MessageContentPartItem {
+    var kind: String
+    var text: String?
+    var mimeType: String?
+    var fileName: String?
+    var dataReference: String?
+    var order: Int
+    var message: MessageItem?
+}
+```
+
+Text may be denormalized for search/display if useful, but ordered content parts are the canonical message payload.
 
 ### Tool Calls
-
-Tool calls should become first-class state instead of JSON payloads embedded in assistant messages.
-
-Current problems:
-
-- Tool calls are serialized into `MessageItem.toolCallsData`, so they are opaque to SwiftData queries and difficult to validate.
-- Streaming tool call assembly is provider-specific and fragile.
-- Current stream parsing assumes tool-call ids are present on each delta, but common OpenAI-style streams may send deltas keyed by `index` with id/name only on early chunks.
-- Provider service and `CompletionStreamProcessor` both perform accumulation/merging, which risks duplicated arguments and inconsistent final tool calls.
-- Tool-call lifecycle is not explicit. The app mixes assistant text, tool-call request, tool execution, tool result, and follow-up model call into one recursive flow.
-- Error/cancellation states for tool calls are not modeled as durable state.
-- Parallel tool calls have no clear persistence or execution policy.
-
-Preferred model:
 
 ```swift
 @Model
@@ -434,85 +367,74 @@ final class ToolCallItem {
 }
 ```
 
-This makes tool calls inspectable, retryable, and easier to bind in SwiftUI.
+Tool-call statuses should cover at least:
 
-Execution policy:
+- pending
+- streamingArguments
+- readyToExecute
+- executing
+- completed
+- failed
+- cancelled
 
-- Assemble streamed tool calls in transient state.
-- Persist `ToolCallItem` after call name and arguments are complete enough to execute.
-- Execute tool calls sequentially by provider `index` for first implementation.
-- Add explicit parallel execution later only after persistence, cancellation, and result ordering are deterministic.
-- Persist tool failures as durable tool-call status, not only as log output.
+### Attachments
 
-### SwiftUI / SwiftData Conversation Draft
+File/image content parts must use the app's existing sandbox approach:
 
-Need transient streaming state separate from persisted SwiftData rows.
+- security-scoped access when referencing external user files
+- app-private copied storage where durable access is required
+- cleanup when owning message/conversation is deleted
 
-Proposed lifecycle:
+## Work Plan
 
-- Persist user message before request.
-- Maintain transient `ConversationDraft` during streaming.
-- Update SwiftUI from draft events.
-- Persist assistant message only when complete or tool-call boundary reached.
-- Persist tool call as assistant event with structured tool calls.
-- Persist tool result after tool execution.
-- Persist failed response state if needed, but avoid per-token SwiftData writes.
-- Cancellation should cancel network work, stop stream parsing, mark transient draft as cancelled, and persist only chosen stable state.
-- Retry should reuse stable persisted context and avoid re-executing completed tool calls unless the model explicitly requests a new tool call.
+### Phase 0: Test Fixtures and Regression Matrix
 
-This reduces SwiftData churn, fixes ordering, and makes cancellation/retry clearer.
-
-Actor boundaries:
-
-- Network request and stream parsing should run off the main actor.
-- Draft/UI updates should happen on the main actor.
-- SwiftData writes should happen on the correct model context actor.
-- Stream assemblers must avoid shared mutable parser state races.
-
-Import/export:
-
-- SwiftData export/import must be checked after adding content part and tool-call entities.
-- If current export is model-driven, confirm new relationships are included and ordering survives round trip.
-
-## Dependency-Ordered Implementation Plan
-
-### Phase 0: Design Lock and Test Harness
-
-Impact: high. Dependency: none.
+Dependency: none  
+Impact: high
 
 Deliverables:
 
-- Add unit tests or fixtures for current provider request conversion and stream parsing before replacing internals.
-- Capture representative fixtures:
-  - OpenAI Chat Completions non-streaming.
+- Add representative provider fixtures:
+  - OpenAI Chat Completions non-streaming text.
   - OpenAI Chat Completions streaming text.
   - OpenAI Chat Completions streaming tool call with argument deltas.
   - OpenAI Responses streaming text.
   - OpenAI Responses streaming tool call.
   - Anthropic Messages streaming text.
   - Anthropic tool-use stream.
-  - OpenRouter models response.
-  - LM Studio models response.
-  - Ollama models response.
-- Define test matrix for provider x endpoint x streaming x tools x model fetch.
-- Include cancellation, retryable network failure, malformed stream, unsupported parameter, unsupported schema feature, and local-provider-offline cases.
-- Decide first implementation scope for media parts: text-only persistence with typed IR, or immediate image/file support.
+  - OpenRouter model list.
+  - LM Studio model list.
+  - Ollama model list.
+- Define test matrix:
+  - provider
+  - endpoint family
+  - streaming mode
+  - tool usage
+  - model fetch
+  - cancellation
+  - retryable network failure
+  - malformed stream
+  - unsupported parameter
+  - unsupported schema feature
+  - local provider offline
 
-Why first:
+Acceptance criteria:
 
-- Current streaming/tool-call behavior is fragile. Need regression fixtures before refactor.
+- Existing provider request conversion behavior is covered before refactor.
+- Existing streaming behavior is covered before parser replacement.
+- Fixtures can be reused by new adapters.
 
-### Phase 1: Provider and Endpoint Profiles
+### Phase 1: Provider, Endpoint, and Auth Profiles
 
-Impact: high. Dependency: Phase 0.
+Dependency: Phase 0  
+Impact: high
 
 Deliverables:
 
-- Introduce `LLMProviderProfile`, `LLMEndpointKind`, `LLMAuthKind`.
 - Add provider profile registry.
-- Stop relying only on URL sniffing.
-- Keep old `AIServiceProvider` compatibility temporarily by mapping existing configurations into profiles.
-- Add presets:
+- Add endpoint family model.
+- Add auth profile model.
+- Add profile-backed presets for:
   - OpenAI Platform
   - OpenAI Codex / ChatGPT subscription
   - OpenRouter
@@ -522,300 +444,296 @@ Deliverables:
   - DeepSeek
   - Anthropic
   - Custom OpenAI-compatible
+- Replace URL-only provider detection with explicit profile selection.
+- Keep only short-lived conversion helpers where needed to sequence existing configs.
 
-Why early:
+Acceptance criteria:
 
-- Everything else depends on knowing provider, endpoint family, and auth mode explicitly.
+- Existing OpenAI, xAI, DeepSeek, and Anthropic configs resolve through provider profiles.
+- Unknown/custom OpenAI-compatible provider can be represented without pretending it is OpenAI Platform.
+- Config save does not require successful model fetch.
 
-### Phase 2: Internal Message and Request IR
+### Phase 2: Content IR and SwiftData Content Parts
 
-Impact: high. Dependency: Phase 1.
-
-Deliverables:
-
-- Add `LLMMessage`, `LLMContentPart`, `LLMGenerationOptions`, `LLMTool`, `LLMToolCall`.
-- Design and implement first-class SwiftData content part schema.
-- Write conversion helpers from SwiftData message/content-part entities into IR.
-- Replace `AIChatCompletionRequest` internals or bridge old protocol to new IR.
-- Remove or demote string-only content as source of truth.
-
-Why early:
-
-- Responses API, modern content parts, and robust tool calls need this foundation.
-
-### Phase 3: Parameter Schema and Request Shaping
-
-Impact: high. Dependency: Phase 2.
+Dependency: Phase 1  
+Impact: high
 
 Deliverables:
 
+- Add `LLMContentPart`.
+- Add `LLMMessage`.
+- Add first-class `MessageContentPartItem`.
+- Make ordered content parts canonical.
+- Add conversion from SwiftData conversation state to `LLMMessage`.
+- Remove or demote string-only message content as source of truth.
+
+Acceptance criteria:
+
+- Conversation messages can represent multiple content parts.
+- Existing text conversations still render and send as text.
+- SwiftData does not require long-lived bridge code around old content semantics.
+
+### Phase 3: Tool-Call Model and Lifecycle
+
+Dependency: Phase 2  
+Impact: very high
+
+Deliverables:
+
+- Add first-class `ToolCallItem`.
+- Add transient tool-call assembler for streaming deltas.
+- Merge streamed tool calls by provider `index`, then attach `id` and `name` when available.
+- Persist completed/ready tool calls as durable records.
+- Execute first implementation sequentially by provider index.
+- Persist tool-call failure/cancellation status.
+- Surface tool failures to the model as structured tool results.
+
+Acceptance criteria:
+
+- Streaming tool-call arguments are not duplicated.
+- Tool-call deltas without repeated ids assemble correctly.
+- Tool calls are queryable SwiftData records.
+- Tool execution and tool result persistence have deterministic ordering.
+
+### Phase 4: Request Options, Parameters, and Schema Capabilities
+
+Dependency: Phase 2  
+Impact: high
+
+Deliverables:
+
+- Add `LLMGenerationOptions`.
+- Move `stream` to execution/transport config.
 - Add `LLMParameterSpec` registry.
-- Move `stream` out of normal model parameter UI into execution/transport config.
-- Add app-level retry policy setting for retryable transport failures.
-- Define mapping policies:
-  - `maxOutputTokens` -> `max_tokens` for Chat Completions.
-  - `maxOutputTokens` -> `max_output_tokens` for Responses.
-  - `reasoning` and `text.verbosity` only for supported Responses routes.
-  - `service_tier` only for native OpenAI/Codex routes.
-  - `top_k` only for providers that support it.
-- UI should show only valid parameters for selected provider + endpoint + model where known.
-- Unknown provider extras stay possible through advanced config.
-- Add schema compatibility checks to request shaping.
+- Add endpoint/provider/model-aware parameter mapping.
+- Add app-level retry policy for retryable transport failures.
+- Add schema capability model for tool/JSON schemas.
+- Add unsupported parameter/capability handling policy.
 
-Why now:
+Required mappings:
 
-- Prevents implementing new endpoints with more hacks.
+- `maxOutputTokens` to `max_tokens` for Chat Completions.
+- `maxOutputTokens` to `max_output_tokens` for Responses.
+- OpenAI Responses reasoning/text options only where supported.
+- Anthropic-specific parameters only for Anthropic.
+- Provider extras only through explicit advanced path.
 
-### Phase 4: Model Descriptor and Model Fetching
+Acceptance criteria:
 
-Impact: high. Dependency: Phase 1, benefits from Phase 3.
+- UI can derive valid parameters from provider, endpoint, and model.
+- Adapters do not send known unsupported parameters.
+- Unsupported schema features produce normalized errors or explicit transformations.
+- Streaming toggle no longer appears as a normal model parameter.
+
+### Phase 5: Model Descriptor and Model Fetch
+
+Dependency: Phases 1 and 4  
+Impact: high
 
 Deliverables:
 
 - Add `LLMModelDescriptor`.
-- Implement model fetch decoders:
-  - OpenAI Platform.
-  - OpenRouter metadata.
-  - LM Studio sparse OpenAI-compatible.
-  - Ollama sparse OpenAI-compatible.
-  - Anthropic.
-- Merge static catalog with live metadata.
-- Store supported parameters and modality hints when available.
-- Persist normalized model descriptors as the app's saved model abstraction.
-- Retain raw provider metadata where useful for diagnostics and future remapping.
-- Persist normalized schema capability metadata when available.
-- Make config save tolerant:
-  - Save without successful model fetch.
-  - Show validation warning instead of blocking.
-  - Provide "Test connection" separately.
+- Add provider-specific model list decoders:
+  - OpenAI Platform
+  - OpenRouter
+  - LM Studio
+  - Ollama
+  - Anthropic
+- Persist normalized descriptors for saved models.
+- Persist endpoint support, modalities, context window, max output tokens, supported parameters, and schema capabilities when available.
+- Retain raw metadata only where useful for diagnostics or future remapping.
 
-Why after parameter schema:
+Acceptance criteria:
 
-- Model metadata can refine supported parameters and UI.
+- OpenRouter model metadata maps into normalized descriptors.
+- Local provider sparse metadata maps into usable descriptors.
+- Model metadata can constrain endpoint and parameter choices.
+- Failed model fetch produces warning, not blocked save.
 
-### Phase 5: Stream Event Engine
+### Phase 6: Stream Event Engine
 
-Impact: very high. Dependency: Phase 2.
+Dependency: Phases 2 and 3  
+Impact: very high
 
 Deliverables:
 
 - Add `LLMStreamEvent`.
-- Replace chunk-level provider parsing with event-level adapters.
-- Implement robust tool-call assembly:
-  - Merge by index first.
-  - Attach id/name when received.
-  - Accumulate argument deltas safely.
-  - Emit completed tool call only once.
-- Move accumulation out of provider-specific services where possible.
-- Add cancellation and partial-failure behavior.
-- Emit normalized provider errors from stream parsers and transports.
-- Emit normalized usage data when provider reports it.
-- Persist completed tool calls as `ToolCallItem` records rather than opaque JSON.
+- Replace chunk-level provider parsing with provider-neutral stream events.
+- Move accumulation out of provider-specific service code where possible.
+- Emit normalized provider errors from transports and stream parsers.
+- Emit normalized usage when providers report it.
+- Support cancellation.
+- Preserve partial draft state without per-token SwiftData writes.
 
-Why before adding many providers:
+Acceptance criteria:
 
-- Same event engine serves OpenAI Chat, OpenAI Responses, Codex Responses, Anthropic, OpenRouter, LM Studio, and Ollama.
+- Current Chat Completions streaming text still updates UI.
+- Current Chat Completions streaming tool calls assemble correctly.
+- Stream cancellation leaves consistent UI state.
+- Malformed streams produce normalized provider errors.
+- No per-token or per-argument-delta SwiftData writes.
 
-### Phase 6: Conversation Draft and Persistence Boundary
+### Phase 7: Conversation Draft and Persistence Boundaries
 
-Impact: very high. Dependency: Phase 5.
+Dependency: Phase 6  
+Impact: very high
 
 Deliverables:
 
-- Add transient `ConversationDraft` or equivalent observable state.
-- SwiftUI renders draft during streaming.
-- SwiftData persists stable boundaries only:
+- Add transient `ConversationDraft`.
+- Render streaming output from draft state.
+- Persist only stable records:
   - user message
-  - assistant final text
-  - assistant tool-call event
+  - completed assistant message
+  - ready/completed tool call
   - tool result
-  - response completed/error metadata
-- Define retry/cancel behavior.
-- Define ordering rules for multi-tool calls and parallel tool calls.
-- Enforce actor boundaries for network, stream parser, UI draft, and SwiftData writes.
+  - completed or failed response metadata
+- Enforce actor boundaries:
+  - network and stream parsing off main actor
+  - draft updates on main actor
+  - SwiftData writes on correct model-context actor
+- Define cancelled/interrupted response persistence behavior.
+- Ensure retry reuses stable persisted context and does not re-execute completed tool calls.
 
-Why after stream events:
+Acceptance criteria:
 
-- Draft state should be driven by provider-neutral events.
+- SwiftUI updates smoothly from transient state.
+- SwiftData stores stable conversation records only.
+- Cancellation and retry do not corrupt turn ordering.
+- Tool calls and tool results preserve deterministic order.
 
-### Phase 7: OpenAI Platform Responses Adapter
+### Phase 8: OpenAI Platform Responses Adapter
 
-Impact: high. Dependency: Phases 2, 3, 5.
-
-Deliverables:
-
-- Implement `/v1/responses` request adapter.
-- Implement Responses stream parser.
-- Implement non-streaming Responses parser.
-- Map content parts, tools, reasoning summaries, usage.
-- Preserve Chat Completions adapter for compatibility.
-- Add endpoint selector per provider/model.
-
-Why here:
-
-- Responses is main target, but should sit on stable IR/event foundation.
-
-### Phase 8: OpenAI-Compatible Providers
-
-Impact: medium-high. Dependency: Phases 1, 3, 4, 5.
+Dependency: Phases 4, 6, 7  
+Impact: high
 
 Deliverables:
 
-- Add OpenRouter profile and model decoder.
-- Add LM Studio profile.
-- Add Ollama profile.
-- Convert xAI and DeepSeek from inheritance to profile + OpenAI-compatible adapter where possible.
+- Add OpenAI `/v1/responses` request adapter.
+- Add non-streaming Responses parser.
+- Add streaming Responses parser.
+- Map content parts, tool calls, reasoning summaries, usage, and normalized errors.
+- Keep Chat Completions adapter available.
+- Use provider/model metadata to determine allowed endpoint family.
+
+Acceptance criteria:
+
+- OpenAI Platform can run Responses text requests.
+- OpenAI Platform can run Responses tool-call requests.
+- OpenAI Platform Chat Completions remains functional.
+- Endpoint selection is explicit or model-constrained.
+
+### Phase 9: OpenAI-Compatible Providers
+
+Dependency: Phases 1, 4, 5, 6  
+Impact: medium-high
+
+Deliverables:
+
+- Add OpenRouter provider profile and model decoder.
+- Add LM Studio provider profile.
+- Add Ollama provider profile.
+- Convert xAI and DeepSeek from inheritance to profile-backed OpenAI-compatible adapters where practical.
+- Add optional/no-auth support for local providers.
 - Add provider-specific header support.
-- Add no-auth/optional-auth support for local providers.
 
-Why after core:
+Acceptance criteria:
 
-- Avoid copying old `OpenAIService` mistakes into more subclasses.
+- OpenRouter can fetch models and run chat completions.
+- LM Studio can run against local server with no-auth/default local profile.
+- Ollama can run against local server with no-auth/default local profile.
+- xAI and DeepSeek continue to work.
 
-### Phase 9: Anthropic Modernization
+### Phase 10: Anthropic Modernization
 
-Impact: medium-high. Dependency: Phases 2, 3, 5, 6.
+Dependency: Phases 2, 3, 4, 6, 7  
+Impact: medium-high
 
 Deliverables:
 
-- Convert Anthropic Messages to IR.
-- Add native content blocks.
-- Add native tool-use and tool-result mapping.
+- Convert Anthropic Messages implementation to IR.
+- Add native Anthropic content block mapping.
+- Add native Anthropic tool-use and tool-result mapping.
 - Add Anthropic streaming event parser.
-- Remove claim that Anthropic tools are unsupported if implementation catches up.
+- Add Anthropic-specific parameter/schema capabilities.
 
-Why after stream/tool base:
+Acceptance criteria:
 
-- Anthropic tool-use shape differs enough that good event abstraction should exist first.
+- Anthropic text requests still work.
+- Anthropic streaming maps to `LLMStreamEvent`.
+- Anthropic tool-use maps to first-class tool-call records.
 
-### Phase 10: OpenAI Codex / ChatGPT Subscription Provider
+### Phase 11: OpenAI Codex / ChatGPT Subscription Provider
 
-Impact: high for user value, high risk. Dependency: Phases 1, 2, 3, 5, 6, 7.
+Dependency: Phases 1, 4, 6, 7, 8  
+Impact: high  
+Risk: high
 
 Deliverables:
 
 - Add `openAICodexSubscription` provider profile.
-- Auth choices:
-  - Research OpenAI-supported OAuth / auth-key routes for Codex subscription access.
-  - Prefer first-party OAuth/device/browser auth over direct reuse of Codex auth files.
-  - Allow importing/reusing existing Codex auth only as optional fallback if it is technically and policy safe.
-- Store credentials in keychain where possible.
-- Implement token refresh through the selected supported auth route.
+- Research and implement OpenAI-supported OAuth/auth-key path.
+- Store credentials through appropriate app credential storage.
+- Implement token refresh for selected auth route.
 - Implement Codex Responses transport.
-- Support HTTP/SSE first; add WebSocket only if needed.
-- Add clear UX:
-  - "ChatGPT/Codex subscription"
-  - "Experimental"
-  - visible account/status
-  - no token logging
-- Add rate-limit/error mapping specific to subscription route.
+- Support HTTP/SSE first.
+- Add WebSocket only if required by verified transport behavior.
+- Add visible account/status UI.
+- Add subscription-route error mapping.
 
-Why late:
+Acceptance criteria:
 
-- It needs the most plumbing and highest care.
-- It should not drive the base abstraction; it should fit into it.
+- ChatGPT/Codex subscription auth can be established through supported route.
+- Requests use Codex subscription transport, not OpenAI Platform API key billing.
+- Expired auth maps to normalized provider error.
+- Tokens are not stored in normal API key fields.
 
-### Phase 11: UI Cleanup
+### Phase 12: UI and Settings Integration
 
-Impact: medium. Dependency: most previous phases.
-
-Deliverables:
-
-- Provider preset UI based on profiles.
-- Endpoint selector where provider supports both Chat Completions and Responses.
-- Parameter UI based on valid parameter schema.
-- Model details view using `LLMModelDescriptor`.
-- Connection test separate from save.
-- Streaming/tool-call status UI driven by `ConversationDraft`.
-
-Why late:
-
-- UI should reflect stable model, not temporary bridge types.
-
-### Phase 12: Cleanup and Migration
-
-Impact: medium. Dependency: implementation maturity.
+Dependency: Phases 1-11 as applicable  
+Impact: medium
 
 Deliverables:
 
-- Remove old provider inheritance where obsolete.
-- Deprecate old `AIChatCompletionRequest` if replaced.
-- Convert or reset existing configurations to provider profiles depending on current development-store needs. No long-term backward compatibility requirement.
-- Add docs:
+- Provider preset UI from profile registry.
+- Endpoint selector where multiple endpoint families are valid.
+- Parameter UI from parameter/schema capability metadata.
+- Model details view from `LLMModelDescriptor`.
+- Connection test separate from config save.
+- Retry policy application setting.
+- Streaming/tool-call status from `ConversationDraft`.
+
+Acceptance criteria:
+
+- UI exposes only valid provider/endpoint/model controls.
+- Advanced users can override provider extras intentionally.
+- Local provider setup does not require successful connection before save.
+
+### Phase 13: Export, Import, and Cleanup
+
+Dependency: SwiftData schema changes  
+Impact: medium
+
+Deliverables:
+
+- Verify backup/export/import includes:
+  - content parts
+  - tool calls
+  - tool results
+  - model descriptors
+  - provider profile references
+- Remove obsolete provider inheritance where replaced.
+- Remove obsolete chat-shaped bridge helpers.
+- Remove obsolete request/response types after adapters move to IR.
+- Update docs:
   - provider setup
   - local provider setup
-  - Codex subscription auth cautions
-  - parameter compatibility matrix
-- Add troubleshooting entries for:
-  - local server stopped
-  - model fetch schema mismatch
-  - unsupported parameter
-  - tool-call parsing error
-  - ChatGPT auth expired
-- Verify backup/export/import includes content part and tool-call relationships.
+  - endpoint selection
+  - parameter compatibility
+  - Codex subscription setup
+  - troubleshooting provider errors
 
-## Impact Ranking
+Acceptance criteria:
 
-Highest impact:
-
-1. Stream event engine and tool-call lifecycle.
-2. Internal message/content IR.
-3. Parameter schema and endpoint-specific request shaping.
-4. Responses API adapter.
-5. Provider profiles and auth profiles.
-6. Conversation draft separating SwiftUI streaming from SwiftData persistence.
-
-Medium impact:
-
-1. Model descriptor and model fetch decoders.
-2. OpenRouter / LM Studio / Ollama provider profiles.
-3. Anthropic modernization.
-4. Config validation becoming warning-based.
-
-High value but high risk:
-
-1. OpenAI Codex / ChatGPT subscription provider.
-2. WebSocket transport support.
-3. OAuth/device-code auth implementation.
-
-## Open Questions
-
-- What exact SwiftData schema should replace string-only message content?
-- How should existing local stores be handled if no backward compatibility/migration is required: reset, destructive migration, or developer-only migration script?
-- Which endpoint families are permitted per OpenAI model, OpenRouter model, LM Studio model, and Ollama model?
-- Should local providers default to configurable auth mode, with no-auth as the default for LM Studio and Ollama?
-- Which normalized model metadata fields are required for saved models, and which raw metadata should be retained only for diagnostics?
-- Which OpenAI-supported OAuth/auth-key path is available for third-party app use of Codex ChatGPT subscription access?
-- Should WebSocket support be delayed until HTTP/SSE Codex Responses is proven insufficient?
-- What exact application settings should control retry policy?
-- What exact interrupted/cancelled response state should be persisted?
-
-## Suggested First Milestone
-
-Build foundation without changing user-visible provider behavior:
-
-1. Add stream/tool-call fixtures and tests.
-2. Add provider profile registry while keeping existing providers functional.
-3. Add internal IR types.
-4. Add first-class SwiftData content parts and tool-call entities.
-5. Add conversion helpers from persisted conversation state into IR.
-6. Add parameter schema for existing OpenAI, xAI, DeepSeek, and Anthropic paths.
-7. Add schema capability checks and normalized provider error types.
-8. Replace stream chunk parsing with provider-neutral stream events for current Chat Completions.
-9. Add normalized usage output where current providers already report it.
-10. Add cancellation path for current streaming requests.
-11. Check backup/export/import round trip for new SwiftData entities.
-
-Success criteria:
-
-- Current OpenAI/xAI/DeepSeek/Anthropic behavior still works.
-- Streaming text still updates UI.
-- Streaming tool calls merge correctly by index/id.
-- Provider-specific errors map into normalized app errors.
-- Cancellation leaves consistent UI and persistence state.
-- No per-token SwiftData writes.
-- Existing configurations still load.
-- Message content and tool calls have durable first-class persisted structure.
-- Export/import preserves content part and tool-call relationships.
-
-Only after this should vxAtelier Pro add OpenAI Responses and new providers.
+- Export/import round trip preserves conversation content part ordering.
+- Export/import round trip preserves tool-call relationships.
