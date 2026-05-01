@@ -28,7 +28,7 @@ final class ConversationOptions: Equatable {
     /// Configuration data for each enabled tool
     var toolConfigurations: [String: String]
 
-    /// Whether markdown rendering is enabled for this dialog
+    /// Whether markdown rendering is enabled for this conversation
     var isMarkdownEnabled: Bool = AppDefaults.isMarkdownEnabled
 
     /// Checks if a specific tool is enabled.
@@ -122,7 +122,7 @@ final class ConversationOptions: Equatable {
         }
     }
 
-    /// Creates a copy of this dialog options instance.
+    /// Creates a copy of this conversation options instance.
     ///
     /// - Parameter from: Options to copy from
     convenience init(from: ConversationOptions) {
@@ -138,7 +138,7 @@ final class ConversationOptions: Equatable {
         }
     }
 
-    /// Creates a new dialog options instance.
+    /// Creates a new conversation options instance.
     ///
     /// - Parameters:
     ///   - avatarImageData: Custom avatar image data
@@ -201,7 +201,7 @@ final class ConversationOptions: Equatable {
         }
     }
 
-    /// Creates a copy of this dialog options instance.
+    /// Creates a copy of this conversation options instance.
     ///
     /// - Returns: A new DialogOptions instance with copied values
     func copy() -> ConversationOptions {

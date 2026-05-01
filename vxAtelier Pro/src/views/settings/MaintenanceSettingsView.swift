@@ -124,7 +124,6 @@ struct MaintenanceSettingsView: View {
                     Task { @MainActor in
                         do {
                             try await DataManager.shared.restoreBackup(from: data, into: modelContext)
-                            queryManager.refresh()
                             queryManager.ensureSystemConversation()
                             showCompletion(message: "Database restored successfully")
                         } catch {

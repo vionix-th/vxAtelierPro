@@ -1,19 +1,19 @@
 import SwiftUI
 
 struct GeneralSettingsView: View {
-    @AppStorage("appearanceStyle") private var appearanceStyle: AppearanceStyle = .system    
-    @AppStorage("showRowToolButtons") private var showRowToolButtons: Bool = AppDefaults.showRowToolButtons
-    @AppStorage("autoNameDialogs") private var autoNameDialogs: Bool = AppDefaults.autoNameDialogs
-    @AppStorage("statusBarVisible") private var statusBarVisible: Bool = AppDefaults.statusBarVisible
-    @AppStorage("showConversationLastMessageLabel") private var showConversationLastMessageLabel: Bool = AppDefaults.showConversationLastMessageLabel
-    @AppStorage("showConversationCreatedLabel") private var showConversationCreatedLabel: Bool = AppDefaults.showConversationCreatedLabel
-    @AppStorage("shouldTerminateAfterLastWindowClosed") private var shouldTerminateAfterLastWindowClosed: Bool = AppDefaults.shouldTerminateAfterLastWindowClosed
-    @AppStorage("DialogTextEdit.buttonSize") private var dialogTextEditButtonSize: Double = AppDefaults.dialogTextEditButtonSize
-    @AppStorage("autoSendDialogTemplates") private var autoSendDialogTemplates: Bool = AppDefaults.autoSendDialogTemplates
-    @AppStorage("defaultAvatar") private var defaultAvatarData: Data?
-    @AppStorage("DisableAvatar") private var disableAvatar: Bool = AppDefaults.disableAvatar
-    @AppStorage("DefaultAvatarSize") private var defaultAvatarSize: Int = AppDefaults.defaultAvatarSize
-    @AppStorage("BubbleFontSize") private var bubbleFontSize: Double = AppDefaults.fontSizeMedium
+    @AppStorage(AppSettings.Keys.appearanceStyle) private var appearanceStyle: AppearanceStyle = .system    
+    @AppStorage(AppSettings.Keys.showRowToolButtons) private var showRowToolButtons: Bool = AppDefaults.showRowToolButtons
+    @AppStorage(AppSettings.Keys.autoNameConversations) private var autoNameConversations: Bool = AppDefaults.autoNameConversations
+    @AppStorage(AppSettings.Keys.statusBarVisible) private var statusBarVisible: Bool = AppDefaults.statusBarVisible
+    @AppStorage(AppSettings.Keys.showConversationLastMessageLabel) private var showConversationLastMessageLabel: Bool = AppDefaults.showConversationLastMessageLabel
+    @AppStorage(AppSettings.Keys.showConversationCreatedLabel) private var showConversationCreatedLabel: Bool = AppDefaults.showConversationCreatedLabel
+    @AppStorage(AppSettings.Keys.shouldTerminateAfterLastWindowClosed) private var shouldTerminateAfterLastWindowClosed: Bool = AppDefaults.shouldTerminateAfterLastWindowClosed
+    @AppStorage(AppSettings.Keys.conversationTextEditButtonSize) private var conversationTextEditButtonSize: Double = AppDefaults.conversationTextEditButtonSize
+    @AppStorage(AppSettings.Keys.autoSendConversationTemplates) private var autoSendConversationTemplates: Bool = AppDefaults.autoSendConversationTemplates
+    @AppStorage(AppSettings.Keys.defaultAvatarData) private var defaultAvatarData: Data?
+    @AppStorage(AppSettings.Keys.disableAvatar) private var disableAvatar: Bool = AppDefaults.disableAvatar
+    @AppStorage(AppSettings.Keys.defaultAvatarSize) private var defaultAvatarSize: Int = AppDefaults.defaultAvatarSize
+    @AppStorage(AppSettings.Keys.bubbleFontSize) private var bubbleFontSize: Double = AppDefaults.fontSizeMedium
 
     var body: some View {
         ScrollView {
@@ -35,15 +35,15 @@ struct GeneralSettingsView: View {
                             #endif
                         }
                         ToggleRow(title: "Show Context Menu Button for Lists", isOn: $showRowToolButtons)
-                        ToggleRow(title: "Automatically name new dialogs", isOn: $autoNameDialogs)
+                        ToggleRow(title: "Automatically name new conversations", isOn: $autoNameConversations)
                         ToggleRow(title: "Show Status Bar", isOn: $statusBarVisible)
                         ToggleRow(title: "Last Message Timestamp", isOn: $showConversationLastMessageLabel)
                         ToggleRow(title: "Creation Timestamp", isOn: $showConversationCreatedLabel)
 #if os(macOS)
                         ToggleRow(title: "Terminate after the last window is closed", isOn: $shouldTerminateAfterLastWindowClosed, titleWidth: 250)
-                        SliderRow(title: "Button size", bounds: 12...48, step: 1, value: Binding(get: { dialogTextEditButtonSize }, set: { dialogTextEditButtonSize = $0 }))
+                        SliderRow(title: "Button size", bounds: 12...48, step: 1, value: Binding(get: { conversationTextEditButtonSize }, set: { conversationTextEditButtonSize = $0 }))
 #endif
-                        ToggleRow(title: "Auto-send Dialog Templates", isOn: $autoSendDialogTemplates, titleWidth: 250)
+                        ToggleRow(title: "Auto-send Conversation Templates", isOn: $autoSendConversationTemplates, titleWidth: 250)
                     }
                 }
                 SettingsSectionView(title: "Avatar Settings") {

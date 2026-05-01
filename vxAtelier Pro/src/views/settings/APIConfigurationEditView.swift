@@ -15,6 +15,7 @@ struct APIConfigurationEditView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(QueryManager.self) private var queryManager
+    @Query(sort: [SortDescriptor(\APIConfigurationItem.name)]) private var apiConfigurations: [APIConfigurationItem]
 
     @Bindable var configuration: APIConfigurationItem
     var isNewConfiguration: Bool
@@ -81,7 +82,7 @@ struct APIConfigurationEditView: View {
                         }
                         // Default Configuration Toggle
                         VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
-                            let configsCount = queryManager.apiConfigurations.count
+                            let configsCount = apiConfigurations.count
                             let toggleDisabled: Bool = {
                                 if configsCount == 0 { return true } // first config must stay default
                                 if configsCount == 1 && !isNewConfiguration { return true } // only config cannot be unset
@@ -429,7 +430,7 @@ struct APIConfigurationEditView: View {
         configToSave.chatCompletionsEndpoint = chatEndpoint
         configToSave.modelsEndpoint = modelsEndpoint
 
-        let configsCount = queryManager.apiConfigurations.count
+        let configsCount = apiConfigurations.count
         if configsCount == 0 {
             isDefault = true
         } else if configsCount == 1 && !isNewConfiguration {
@@ -438,7 +439,7 @@ struct APIConfigurationEditView: View {
 
         configToSave.isDefault = isDefault
         if configToSave.isDefault {
-            for other in queryManager.apiConfigurations
+            for other in apiConfigurations
             where other.id != configToSave.id && other.isDefault {
                 other.isDefault = false
                 vxAtelierPro.log.debug("🔑 Unset previous default: \(other.name)")

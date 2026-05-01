@@ -1,19 +1,19 @@
 import SwiftUI
 
 struct DeveloperSettingsView: View {
-    @AppStorage("IsMarkdownEnabled") private var isMarkdownEnabled: Bool = AppDefaults.isMarkdownEnabled
-    @AppStorage("IsMarkdownTextSelectable") private var isMarkdownTextSelectable: Bool = AppDefaults.isMarkdownTextSelectable
-    @AppStorage("ShowUserDialogsOnly") private var showUserDialogsOnly: Bool = AppDefaults.showUserDialogsOnly
-    @AppStorage("MakeKeyAndOrderFront") private var makeKeyAndOrderFront: Bool = false
+    @AppStorage(AppSettings.Keys.isMarkdownEnabled) private var isMarkdownEnabled: Bool = AppDefaults.isMarkdownEnabled
+    @AppStorage(AppSettings.Keys.isMarkdownTextSelectable) private var isMarkdownTextSelectable: Bool = AppDefaults.isMarkdownTextSelectable
+    @AppStorage(AppSettings.Keys.showSystemConversations) private var showSystemConversations: Bool = AppDefaults.showSystemConversations
+    @AppStorage(AppSettings.Keys.makeKeyAndOrderFront) private var makeKeyAndOrderFront: Bool = false
     // New debug/streaming/scrolling flags
-    @AppStorage("AutoScrollDebugEnabled") private var autoScrollDebugEnabled: Bool = false
-    @AppStorage("AutoScrollGateEnabled") private var autoScrollGateEnabled: Bool = false
-    @AppStorage("StreamingThrottleEnabled") private var streamingThrottleEnabled: Bool = false
-    @AppStorage("StreamingThrottleIntervalMs") private var streamingThrottleIntervalMs: Int = 50
-    @AppStorage("StreamingDebugEnabled") private var streamingDebugEnabled: Bool = false
-    @AppStorage("MarkdownStreamFinalizeOnly") private var markdownStreamFinalizeOnly: Bool = false
-    @AppStorage("ShowToolCallChips") private var showToolCallChips: Bool = true
-    @AppStorage("selfSignedCertWhitelist") private var selfSignedCertWhitelistJSON: String = "[]"
+    @AppStorage(AppSettings.Keys.autoScrollDebugEnabled) private var autoScrollDebugEnabled: Bool = false
+    @AppStorage(AppSettings.Keys.autoScrollGateEnabled) private var autoScrollGateEnabled: Bool = false
+    @AppStorage(AppSettings.Keys.streamingThrottleEnabled) private var streamingThrottleEnabled: Bool = false
+    @AppStorage(AppSettings.Keys.streamingThrottleIntervalMs) private var streamingThrottleIntervalMs: Int = 50
+    @AppStorage(AppSettings.Keys.streamingDebugEnabled) private var streamingDebugEnabled: Bool = false
+    @AppStorage(AppSettings.Keys.markdownStreamFinalizeOnly) private var markdownStreamFinalizeOnly: Bool = false
+    @AppStorage(AppSettings.Keys.showToolCallChips) private var showToolCallChips: Bool = true
+    @AppStorage(AppSettings.Keys.selfSignedCertWhitelist) private var selfSignedCertWhitelistJSON: String = "[]"
     @State private var selfSignedCertWhitelist: [String] = []
 
     private func decodeWhitelist(from json: String) -> [String] {
@@ -32,9 +32,9 @@ struct DeveloperSettingsView: View {
             VStack(spacing: AppDefaults.paddingLarge) {
                 SettingsSectionView(title: "Developer Settings") {
                     VStack(spacing: AppDefaults.paddingMedium) {
-                        ToggleRow(title: "Default Markdown Support (for new dialogs)", isOn: $isMarkdownEnabled, titleWidth: 300)
+                        ToggleRow(title: "Default Markdown Support (for new conversations)", isOn: $isMarkdownEnabled, titleWidth: 300)
                         ToggleRow(title: "Markdown Selectable", isOn: $isMarkdownTextSelectable, titleWidth: 250)
-                        ToggleRow(title: "Show User Dialogs Only", isOn: $showUserDialogsOnly, titleWidth: 250)
+                        ToggleRow(title: "Show System Conversations (Debug)", isOn: $showSystemConversations, titleWidth: 250)
                         ToggleRow(title: "Show Tool Call Chips", isOn: $showToolCallChips, titleWidth: 250)
                         ToggleRow(title: "Make Key and Order Front", isOn: $makeKeyAndOrderFront, titleWidth: 250)
                     }

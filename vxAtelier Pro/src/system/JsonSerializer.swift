@@ -25,20 +25,20 @@ class JsonSerializer {
         return try projectData.toDataItem(context: context)
     }
     
-    static func exportDialog(_ dialog: ConversationItem) throws -> Data {
+    static func exportConversation(_ conversation: ConversationItem) throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
         encoder.dateEncodingStrategy = .iso8601
         
-        let exportData = ConversationExportData(dialog)
+        let exportData = ConversationExportData(conversation)
         return try encoder.encode(exportData)
     }
     
-    static func importDialog(from data: Data, context: ModelContext) throws -> ConversationItem {
+    static func importConversation(from data: Data, context: ModelContext) throws -> ConversationItem {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        let dialogData = try decoder.decode(ConversationExportData.self, from: data)
-        return try dialogData.toDataItem(context: context)
+        let conversationData = try decoder.decode(ConversationExportData.self, from: data)
+        return try conversationData.toDataItem(context: context)
     }
     
     static func exportMessages(_ messages: [MessageItem]) throws -> Data {
@@ -105,9 +105,9 @@ class JsonSerializer {
             return project
         }
         
-        // Then try dialog
-        if let dialog = try? importDialog(from: data, context: context) {
-            return dialog
+        // Then try conversation
+        if let conversation = try? importConversation(from: data, context: context) {
+            return conversation
         }
         
         // Try voice configuration

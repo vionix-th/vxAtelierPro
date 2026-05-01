@@ -1,5 +1,9 @@
 import XCTest
+#if canImport(vxAtelier_Pro_debug)
 @testable import vxAtelier_Pro_debug
+#else
+@testable import vxAtelier_Pro
+#endif
 import SwiftData
 
 /// Tests edge-cases and error-handling for ConversationItem and related models.

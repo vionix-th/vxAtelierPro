@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-// MARK: - Dialog Options Export
+// MARK: - Conversation Options Export
 
 struct ConversationOptionsExportData: Codable {
     let avatarImageData: Data?

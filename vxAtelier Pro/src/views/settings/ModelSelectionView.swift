@@ -6,6 +6,7 @@ import SwiftUI
 struct ModelSelectionView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(QueryManager.self) private var queryManager
+    @Query(sort: [SortDescriptor(\ModelItem.name)]) private var allModels: [ModelItem]
     
     /// The currently selected model (used for display purposes)
     let selectedModel: String
@@ -27,7 +28,7 @@ struct ModelSelectionView: View {
     
     /// Filtered models based on current provider, showAllModels setting, and search text
     private var filteredModels: [ModelItem] {
-        var models = queryManager.models
+        var models = allModels
         
         // Filter by provider if not showing all models
         if !showAllModels {

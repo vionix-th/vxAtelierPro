@@ -7,8 +7,8 @@ import SwiftUI
     import AppKit
 #endif
 
-// MARK: - Dialog Options View
-/// A view for configuring dialog options including model parameters, system prompt, and avatar.
+// MARK: - Conversation Options View
+/// A view for configuring conversation options including model parameters, system prompt, and avatar.
 /// Provides a tabbed interface for organizing different settings categories.
 struct ConversationOptionsView: View {
     @Environment(\.dismiss) private var dismiss
@@ -16,12 +16,8 @@ struct ConversationOptionsView: View {
     @Environment(QueryManager.self) private var queryManager
     @Binding var options: ConversationOptions
 
-    // Replace direct @Query with QueryManager
-    // @Query(sort: \APIConfigurationItem.name)
-    // private var apiConfigurations: [APIConfigurationItem]
-
-    // @Query(sort: \ModelItem.name)
-    // private var models: [ModelItem]
+    @Query(sort: [SortDescriptor(\APIConfigurationItem.name)]) private var apiConfigurations: [APIConfigurationItem]
+    @Query(sort: [SortDescriptor(\ModelItem.name)]) private var models: [ModelItem]
     
     @State private var isAvatarImageImporting: Bool = false
     @State private var selectedTab = 0
@@ -40,12 +36,12 @@ struct ConversationOptionsView: View {
             Text("API Configuration")
                 .frame(width: 150, alignment: .leading)
             Picker("", selection: $options.apiConfiguration) {
-                ForEach(queryManager.apiConfigurations) { config in
+                ForEach(apiConfigurations) { config in
                     Text(config.name).tag(config as APIConfigurationItem?)
                 }
             }
             .pickerStyle(.menu)
-            .disabled(queryManager.apiConfigurations.isEmpty)
+            .disabled(apiConfigurations.isEmpty)
         }
     }
 
@@ -293,7 +289,7 @@ struct ConversationOptionsView: View {
                 }
             }
         }
-        .navigationTitle("Dialog Options")
+        .navigationTitle("Conversation Options")
         #if os(macOS)
             .fileImporter(isPresented: $isAvatarImageImporting, allowedContentTypes: [.image]) { result in
                 switch result {

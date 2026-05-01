@@ -20,6 +20,7 @@ struct VoiceConfigurationListView: View {
     
     @Environment(\.modelContext) private var modelContext
     @Environment(QueryManager.self) private var queryManager
+    @Query(sort: [SortDescriptor(\VoiceConfigurationItem.language)]) private var voiceConfigurations: [VoiceConfigurationItem]
     
     @State private var editingConfig: EditingConfig?
     @State private var showError = false
@@ -35,7 +36,7 @@ struct VoiceConfigurationListView: View {
     
     var body: some View {
         VStack(spacing: AppDefaults.paddingMedium) {
-            if queryManager.voiceConfigurations.isEmpty {
+            if voiceConfigurations.isEmpty {
                 ContentUnavailableView(
                     "No Voice Configurations",
                     systemImage: "waveform",
@@ -47,7 +48,7 @@ struct VoiceConfigurationListView: View {
                 }
             } else {
                 VStack {
-                    ForEach(queryManager.voiceConfigurations) { config in
+                    ForEach(voiceConfigurations) { config in
                         SettingsListRow(
                             title: config.role.capitalized,
                             subtitle: Locale.current.localizedString(forIdentifier: config.language) ?? config.language,
@@ -113,7 +114,7 @@ struct VoiceConfigurationListView: View {
                 VoiceConfigurationEditView(
                     configuration: editing.config,
                     isNewConfig: editing.isNew,
-                    configurations: queryManager.voiceConfigurations,
+                    configurations: voiceConfigurations,
                     onComplete: { success in
                         if success {
                             do {
@@ -596,10 +597,3 @@ struct VoiceConfigurationEditView: View {
         return preset?.label ?? "Custom"
     }
 }
-
-// MARK: - Preview Provider
-
-#Preview {
-    VoiceConfigurationListView()
-        .modelContainer(for: VoiceConfigurationItem.self, inMemory: true)
-} 

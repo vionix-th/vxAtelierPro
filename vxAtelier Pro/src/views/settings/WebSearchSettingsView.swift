@@ -1,10 +1,14 @@
 import SwiftUI
+import SwiftData
 
 struct WebSearchSettingsView: View {
     @Environment(QueryManager.self) private var queryManager
+    @Query(sort: [SortDescriptor(\WebSearchConfigurationItem.name)]) private var webSearchConfigurations: [WebSearchConfigurationItem]
     @State private var editingConfig: EditingConfig?
     @State private var showWebSearchConfigError = false
     @State private var webSearchConfigErrorMessage = ""
+
+    init() {}
 
     struct EditingConfig: Identifiable {
         let id = UUID()
@@ -17,7 +21,7 @@ struct WebSearchSettingsView: View {
         do {
             try queryManager.delete(config)
             if configWasDefault {
-                if let newDefault = queryManager.webSearchConfigurations.sorted(by: { $0.name < $1.name }).first {
+                if let newDefault = webSearchConfigurations.sorted(by: { $0.name < $1.name }).first {
                     newDefault.isDefault = true
                     try queryManager.saveContext()
                 }
@@ -48,7 +52,7 @@ struct WebSearchSettingsView: View {
             .padding(.vertical, AppDefaults.paddingSmall)
             .padding(.horizontal, AppDefaults.paddingSmall)
 
-            if queryManager.webSearchConfigurations.isEmpty {
+            if webSearchConfigurations.isEmpty {
                 ContentUnavailableView(
                     "No Web Search Configurations",
                     systemImage: "magnifyingglass",
@@ -57,7 +61,7 @@ struct WebSearchSettingsView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
-                    ForEach(queryManager.webSearchConfigurations.sorted { $0.name < $1.name }) { config in
+                    ForEach(webSearchConfigurations.sorted { $0.name < $1.name }) { config in
                         SettingsListRow(
                             title: config.name,
                             subtitle: "Provider: \(config.provider)",

@@ -9,7 +9,8 @@ struct PromptTemplateList: View {
     let onSelect: (PersistentIdentifier) -> Void
     let onDeselect: (PersistentIdentifier) -> Void
 
-    @Environment(QueryManager.self) private var queryManager    
+    @Environment(QueryManager.self) private var queryManager
+    @Query(sort: [SortDescriptor(\PromptTemplate.name)]) private var promptTemplates: [PromptTemplate]
 
     let category: PromptTemplate.Category? // Optional category to filter by
     let onTemplateActivated: (PromptTemplate) -> Void // Callback when a template is chosen
@@ -27,11 +28,11 @@ struct PromptTemplateList: View {
 
     private var filteredTemplates: [PromptTemplate] {
         if let category = category {
-            return queryManager.promptTemplates.filter { $0.category == category }
+            return promptTemplates.filter { $0.category == category }
         } else {
             // If no category specified, maybe show all? Or adjust as needed.
             // For now, showing all if category is nil.
-            return queryManager.promptTemplates
+            return promptTemplates
         }
     }
 
@@ -106,7 +107,7 @@ struct PromptTemplateList: View {
                 PromptTemplateEditView(
                     template: editing.template,
                     isNewTemplate: editing.isNew,
-                    templates: queryManager.promptTemplates,
+                    templates: promptTemplates,
                     onComplete: { success in
                         if success {
                             do {

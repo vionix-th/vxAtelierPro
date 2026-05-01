@@ -3,6 +3,7 @@ import SwiftData
 
 struct PromptsSettingsView: View {
     @Environment(QueryManager.self) private var queryManager
+    @Query(sort: [SortDescriptor(\PromptTemplate.name)]) private var promptTemplates: [PromptTemplate]
     @State private var editingTemplate: EditingTemplate?
     @State private var showPromptTemplateError = false
     @State private var promptTemplateErrorMessage = ""
@@ -30,7 +31,7 @@ struct PromptsSettingsView: View {
     }
 
     private func exportSelectedTemplates() {
-        let selectedTemplates = queryManager.promptTemplates.filter { selectedTemplateIDs.contains($0.id) }
+        let selectedTemplates = promptTemplates.filter { selectedTemplateIDs.contains($0.id) }
         guard !selectedTemplates.isEmpty else { return }
 
         let exportData = selectedTemplates.map { PromptTemplateExportData($0) }
@@ -90,7 +91,7 @@ struct PromptsSettingsView: View {
             }
 
             // Always show Select All/None in selection mode
-            let allSelected = selectedTemplateIDs.count == queryManager.promptTemplates.count
+            let allSelected = selectedTemplateIDs.count == promptTemplates.count
             actions.append(CurrentSettingsActionBar.ActionItem(
                 title: allSelected ? "Select None" : "Select All",
                 iconName: allSelected ? "circle" : "checkmark.circle.fill",
@@ -98,7 +99,7 @@ struct PromptsSettingsView: View {
                     if allSelected {
                         selectedTemplateIDs.removeAll()
                     } else {
-                        selectedTemplateIDs = Set(queryManager.promptTemplates.map { $0.id })
+                        selectedTemplateIDs = Set(promptTemplates.map { $0.id })
                     }
                 }
             ))
@@ -195,7 +196,7 @@ struct PromptsSettingsView: View {
                 PromptTemplateEditView(
                     template: editing.template,
                     isNewTemplate: editing.isNew,
-                    templates: queryManager.promptTemplates,
+                    templates: promptTemplates,
                     onComplete: { success in
                         if success {
                             do {

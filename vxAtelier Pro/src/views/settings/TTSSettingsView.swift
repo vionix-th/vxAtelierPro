@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct TTSSettingsView: View {
-    @AppStorage("TTSAutoplay") private var ttsAutoplay: Bool = AppDefaults.ttsAutoplay
-    @AppStorage("TTSRepeatMode") private var ttsRepeatMode: String = AppDefaults.ttsRepeatMode
+    @AppStorage(AppSettings.Keys.ttsAutoplay) private var ttsAutoplay: Bool = AppDefaults.ttsAutoplay
+    @AppStorage(AppSettings.Keys.ttsRepeatMode) private var ttsRepeatMode: String = AppDefaults.ttsRepeatMode
     
     var body: some View {
         ScrollView {

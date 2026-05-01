@@ -1,18 +1,18 @@
 # AGENTS.md (vxAtelier Pro)
 
 ## Swift / SwiftUI / SwiftData
+- Generate code targeting Swift 5.9+ 
+- Prefer @Observable over ObservableObject
+- Prefer @Environment over @EnvironmentObject
 - Apply SwiftUI and SwiftData best practices.
 - Fully implement requested functionality: no new TODOs, placeholders, or missing pieces.
 - Do **not** add `#Preview` blocks or any other SwiftUI preview-related code.
 - Do not make assumptions about existing types/properties/functions; verify in the codebase first.
 - Do not implement backward compatibility or data migrations unless explicitly requested.
 
-## SwiftUI View Lifecycle & State Management
-
-1.  **Never rely on `init` for updates.** Treat `init` only as the *initial* allocation blueprint.
-2.  **Use `let` properties + Computed Vars** for data that drives display directly (stateless views).
-3.  **Use `.task(id:)` or `.onChange(of:)`** to sync external parameters with internal `@State` (e.g., `.task(id: userId) { self.user = await fetch(userId) }`).
-4.  **Reserve `.id()`** only for "nuclear" resets where discarding all local state (scroll position, navigation, user input) is explicitly desired.
+## Comments
+- Only add comments when explanation if code is not self explainatory 
+- Do not leave comments for removed code
 
 ## Project Structure
 - Read `Package.swift` to understand the application structure.
@@ -23,6 +23,7 @@
 - In `async` functions use `await vxAtelierPro.log…`; otherwise use `vxAtelierPro.log…`.
 
 ## Build / Test
+- Do not needlessly compile or test; those are token expensive operations and they can pollute context.
 - Maintain **both** build systems: Swift Package Manager (SPM) and Xcode (`xcodebuild`).
 - Use SPM (`swift build`, `swift test`, `swift package`) for IDE indexing/linting-style workflows and fast compile/test-build checks.
 - Use `xcodebuild` for actually running/debugging, unit tests, UI tests, and release/archival builds.

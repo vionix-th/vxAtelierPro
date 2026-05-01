@@ -10,7 +10,7 @@ struct SettingsListRow<Content: View>: View {
     let onDelete: (() -> Void)?
     let content: Content?
     
-    @AppStorage("showRowToolButtons") private var showRowToolButtons: Bool = AppDefaults.showRowToolButtons
+    @AppStorage(AppSettings.Keys.showRowToolButtons) private var showRowToolButtons: Bool = AppDefaults.showRowToolButtons
     
     init(
         title: String,

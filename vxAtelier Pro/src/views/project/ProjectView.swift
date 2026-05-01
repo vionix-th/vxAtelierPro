@@ -6,85 +6,90 @@ import Observation
 // MARK: - Project View
 struct ProjectView: View {
     // MARK: - Environment & Properties
-    @Environment(\.modelContext) private var modelContext
-    @Environment(QueryManager.self) private var queryManager
+    @Environment(QueryManager.self) private var queryManager: QueryManager
+    @Environment(ConversationViewModelStore.self) private var conversationStore: ConversationViewModelStore
+    @Environment(NavigationRouter.self) private var router
+    @Query private var projectResult: [ProjectItem]
+    @Query private var projectConversations: [ConversationItem]
     
     // Store the project ID directly in the view
     private let projectID: PersistentIdentifier
     
-    var onConversationViewAppear: (ConversationItem) -> Void = { _ in }
+    private let initialConversationID: PersistentIdentifier?
     var onRequestOptions: (PersistentIdentifier) -> Void = { _ in }
-    
+    var onDeleteConversation: (ConversationItem) -> Void
+    var onExportProject: (ProjectItem) -> Void
+
     // Computed property to resolve project by ID
     private var project: ProjectItem? {
-        queryManager.allProjects.first { $0.id == projectID }
+        projectResult.first
     }
     
     // MARK: - State
     @State private var projectOptionsIsPresented: Bool = false
     @State private var isPromptTemplatesPresented: Bool = false
     @State private var systemPromptValue: String = ""
+    @State private var didApplyInitialConversation: Bool = false
+    @State private var composerStreamingState = StreamingState()
+
+    private var pathBinding: Binding<[ProjectRoute]> {
+        Binding(
+            get: { router.path(for: projectID) },
+            set: { router.setPath($0, for: projectID) }
+        )
+    }
     
-    @AppStorage("DialogTextEdit.buttonSize") var buttonSize: Double = AppDefaults.dialogTextEditButtonSize
-    
-    @AppStorage("ShowArchived") private var showArchived: Bool = false
-    @AppStorage("ShowTrashed") private var showTrashed: Bool = false
-    @AppStorage("DialogsSortOrderDescending") private var conversationsSortDescending: Bool = true
-    @AppStorage("DialogsSortType") private var conversationsSortTypeRaw: String = SidebarSortType.conversationDate.rawValue
+    @AppStorage(AppSettings.Keys.contentFilter) private var contentFilter: ContentFilter = .active
+    @AppStorage(AppSettings.Keys.projectConversationsSortDescending) private var conversationsSortDescending: Bool =
+        AppDefaults.projectConversationsSortDescending
+    @AppStorage(AppSettings.Keys.projectConversationsSortType) private var conversationsSortTypeRaw: String =
+        AppDefaults.projectConversationsSortType
     
     private var conversationsSortType: SidebarSortType {
         get { SidebarSortType(rawValue: conversationsSortTypeRaw) ?? .conversationDate }
         set { conversationsSortTypeRaw = newValue.rawValue }
     }
     
-    init(projectID: PersistentIdentifier, onConversationViewAppear: @escaping (ConversationItem) -> Void = { _ in }, onRequestOptions: @escaping (PersistentIdentifier) -> Void = { _ in }) {
+    init(
+        projectID: PersistentIdentifier,
+        initialConversationID: PersistentIdentifier? = nil,
+        onRequestOptions: @escaping (PersistentIdentifier) -> Void = { _ in },
+        onDeleteConversation: @escaping (ConversationItem) -> Void,
+        onExportProject: @escaping (ProjectItem) -> Void
+    ) {
         self.projectID = projectID
-        self.onConversationViewAppear = onConversationViewAppear
+        self.initialConversationID = initialConversationID
         self.onRequestOptions = onRequestOptions
-    }
-    
-    // Backward compatibility initializer
-    init(project: ProjectItem, onConversationViewAppear: @escaping (ConversationItem) -> Void = { _ in }, onRequestOptions: @escaping (PersistentIdentifier) -> Void = { _ in }) {
-        self.init(projectID: project.id, onConversationViewAppear: onConversationViewAppear, onRequestOptions: onRequestOptions)
+        self.onDeleteConversation = onDeleteConversation
+        self.onExportProject = onExportProject
+        self._projectResult = Query(
+            filter: #Predicate<ProjectItem> { $0.id == projectID },
+            sort: [SortDescriptor(\ProjectItem.name)]
+        )
+        self._projectConversations = Query(
+            filter: #Predicate<ConversationItem> { $0.project?.id == projectID },
+            sort: [SortDescriptor(\ConversationItem.timestamp, order: .reverse)]
+        )
     }
     
     // MARK: - Computed Properties
     var filteredConversations: [ConversationItem] {
-        guard let project = self.project else { return [] }
-        
-        let filtered = project.conversations.filter { conversation in
+        let filtered = projectConversations.filter { conversation in
             switch conversation.status {
             case .active:
                 return true
             case .archived:
-                return showArchived
+                return contentFilter == .archived
             case .trashed:
-                return showTrashed
+                return contentFilter == .trashed
             }
         }
         // Sort by selected type and order
-        let sorted: [ConversationItem]
-        switch conversationsSortType {
-        case .conversationDate:
-            if conversationsSortDescending {
-                sorted = filtered.sorted { $0.timestamp > $1.timestamp }
-            } else {
-                sorted = filtered.sorted { $0.timestamp < $1.timestamp }
-            }
-        case .lastMessageDate:
-            sorted = filtered.sorted {
-                let lhsDate = queryManager.lastTurnTimestamp(for: $0) ?? $0.timestamp
-                let rhsDate = queryManager.lastTurnTimestamp(for: $1) ?? $1.timestamp
-                return conversationsSortDescending ? lhsDate > rhsDate : lhsDate < rhsDate
-            }
-        case .alphabetically:
-            if conversationsSortDescending {
-                sorted = filtered.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedDescending }
-            } else {
-                sorted = filtered.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-            }
-        }
-        return sorted
+        return ConversationSorter.sort(
+            filtered,
+            descending: conversationsSortDescending,
+            sortType: conversationsSortType
+        )
     }
     
     // MARK: - View Components
@@ -185,45 +190,30 @@ struct ProjectView: View {
         VStack(spacing: AppDefaults.paddingMedium) {
             VStack {
                 ForEach(filteredConversations) { conversation in
-                    NavigationLink {
-                        Group { ConversationView(conversation: conversation, onRequestOptions: onRequestOptions) }
-                        .id(conversation.id)
-                            .onAppear() {
-                                onConversationViewAppear(conversation)
-                            }
-                    } label: {
+                    NavigationLink(value: ProjectRoute.conversation(conversation.id)) {
                         NavigationItem(
                             title: Binding(get: { conversation.title} , set: { conversation.title = $0 }),
                             subtitle: conversation.timestamp.formatted(.dateTime.year().month().day().hour().minute()),
                             onDelete: {
-                                // Use QueryManager to move to trash (or delete if bookmark)
-                                do {
-                                    try queryManager.moveItemToTrash(conversation)
-                                    vxAtelierPro.log.debug("ProjectView: Moved conversation '\(conversation.title)' to trash via context menu.")
-                                } catch {
-                                    vxAtelierPro.log.error("ProjectView: Failed to move conversation '\(conversation.title)' to trash via context menu: \(error.localizedDescription)")
-                                    // Consider showing an error alert
-                                }
+                                onDeleteConversation(conversation)
                             },
                             onRename: { conversation.title = $0 },
                             imageName: "document",
                             onProjectAssign: { targetProject in
                                 vxAtelierPro.log.debug("Assigning conversation '\(conversation.title)' to project '\(targetProject?.name ?? "<nil>")'")
-                                conversation.project = targetProject
                                 do {
-                                    try queryManager.saveContext()
+                                    try queryManager.assignConversation(conversation, to: targetProject)
                                 } catch {
-                                    vxAtelierPro.log.error("ProjectView: Failed to save context after assigning conversation to project: \(error.localizedDescription)")
+                                    vxAtelierPro.log.error("ProjectView: Failed to assign conversation to project: \(error.localizedDescription)")
                                 }
                             },
                             onExport: {
-                                Task {
-                                    do {
-                                        vxAtelierPro.log.debug("Exporting project '\(self.project?.name ?? "Unknown")'")
-                                        try await DataManager.shared.exportProject(self.project!)
-                                    } catch {
-                                        vxAtelierPro.log.error("Failed to export project - \(error.localizedDescription)")
-                                    }
+                                if let project = self.project {
+                                    onExportProject(project)
+                                } else {
+                                    vxAtelierPro.log.warning(
+                                        "ProjectView: Export requested but project not resolved for id \(projectID)."
+                                    )
                                 }
                             },
                             conversation: conversation
@@ -231,18 +221,10 @@ struct ProjectView: View {
                     }
                 }                
                 .onDelete { indexSet in
-                    // Use QueryManager to move to trash (or delete if bookmark)
                     for index in indexSet {
-                        // Ensure index is valid before accessing
                         if index < filteredConversations.count {
                             let conversation = filteredConversations[index]
-                            do {
-                                try queryManager.moveItemToTrash(conversation)
-                                vxAtelierPro.log.debug("ProjectView: Moved conversation '\(conversation.title)' to trash via swipe delete.")
-                            } catch {
-                                vxAtelierPro.log.error("ProjectView: Failed to move conversation '\(conversation.title)' to trash via swipe delete: \(error.localizedDescription)")
-                                // Consider showing an error alert
-                            }
+                            onDeleteConversation(conversation)
                         } else {
                             vxAtelierPro.log.warning("ProjectView: Invalid index \(index) encountered in sectionDialogs.onDelete for filteredConversations count \(filteredConversations.count).")
                         }
@@ -256,12 +238,34 @@ struct ProjectView: View {
     
     // MARK: - View Body
     var body: some View {
-        // Extract the main content to reduce complexity
-        bodyContent
+        NavigationStack(path: pathBinding) {
+            bodyContent
+                .navigationDestination(for: ProjectRoute.self) { route in
+                    switch route {
+                    case .conversation(let id):
+                        ConversationView(
+                            viewModel: conversationStore.viewModel(for: id),
+                            onRequestOptions: onRequestOptions
+                        )
+                        .id(id)
+                    }
+                }
+        }
         .padding(AppDefaults.paddingSmall)
         .onTapGesture {
             hideKeyboard()
         }
+        .onAppear {
+            applyInitialConversationIfNeeded()
+        }
+    }
+
+    private func applyInitialConversationIfNeeded() {
+        guard !didApplyInitialConversation else { return }
+        guard let initialID = initialConversationID else { return }
+        guard project?.conversations.contains(where: { $0.id == initialID }) == true else { return }
+        router.setPath([.conversation(initialID)], for: projectID)
+        didApplyInitialConversation = true
     }
     
     var bodyContent: some View {
@@ -288,16 +292,21 @@ struct ProjectView: View {
             Divider()
             
             if let project = self.project {
-                MessageInputView(dialog: ConversationItem(AppDefaults.newDialogName, options: project.defaultOptions.copy()), streamingState: StreamingState(), didSend: { conversation in
-                    vxAtelierPro.log.debug("Created new conversation '\(conversation.title)' in project '\(project.name)'")
-                    conversation.project = project
-                    do {
-                        try queryManager.saveContext()
-                    } catch {
-                        vxAtelierPro.log.error("ProjectView: Failed to save context after setting project for new conversation: \(error.localizedDescription)")
+                MessageInputView(
+                    queryManager: queryManager,
+                    streamingState: composerStreamingState,
+                    resolveConversation: {
+                        guard let project = self.project else {
+                            throw AppError.invalidOperation("Project not found")
+                        }
+                        return try queryManager.createConversation(in: project)
+                    },
+                    didSend: { conversation in
+                        vxAtelierPro.log.debug("Created new conversation '\(conversation.title)' in project '\(project.name)'")
+                        router.setPath([.conversation(conversation.id)], for: projectID)
                     }
-                    onConversationViewAppear(conversation)
-                }).padding(AppDefaults.paddingSmall)
+                )
+                .padding(AppDefaults.paddingSmall)
             }
             
         }
@@ -353,4 +362,3 @@ struct ProjectView: View {
         }
     }
 }
-

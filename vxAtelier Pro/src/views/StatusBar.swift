@@ -8,18 +8,18 @@ struct StatusBar: View {
     @State private var isStatusBarFilterPopoverOpen: Bool = false
     @State private var popupLogTypeFilters: Set<LoggingService.LogType> = []
     @State private var statusBarLogTypeFilters: Set<LoggingService.LogType> = []
-    @Environment(\.showLogHistory) private var showLogHistory
     @State private var displayedMessage: String = ""
+    let onRequestLogHistory: () -> Void
+    @State private var activeConversation: ConversationItem?
+    private let messageAnimation: Animation = .easeInOut(duration: 0.18)
     
     // Environment access
     @Environment(QueryManager.self) private var queryManager
-    
-    // Track the active item from ContentView
-    @Binding var activeItemId: PersistentIdentifier?
+    @Environment(NavigationRouter.self) private var router
     
     // UserDefaults keys
-    private let popupFilterKey = "popupLogTypeFilters"
-    private let statusBarFilterKey = "statusBarLogTypeFilters"
+    private let popupFilterKey = AppSettings.Keys.popupLogTypeFilters
+    private let statusBarFilterKey = AppSettings.Keys.statusBarLogTypeFilters
 
     // Computed property to determine if the view is in compact mode
     private var isCompact: Bool {
@@ -51,11 +51,31 @@ struct StatusBar: View {
         return filteredMessages(with: statusBarLogTypeFilters).last?.type ?? .info
     }
 
-    // MARK: - Initialization
-    init(activeItemId: Binding<PersistentIdentifier?>) {
-        self._activeItemId = activeItemId
+    private func updateDisplayedMessage(animated: Bool = true) {
+        let next = latestFilteredMessage
+        guard next != displayedMessage else { return }
+        if animated {
+            withAnimation(messageAnimation) {
+                displayedMessage = next
+            }
+        } else {
+            displayedMessage = next
+        }
+    }
+
+    private func refreshActiveConversation() {
+        guard let id = router.activeConversationID else {
+            activeConversation = nil
+            return
+        }
+        activeConversation = queryManager.conversation(with: id)
     }
     
+    // MARK: - Initialization
+    init(onRequestLogHistory: @escaping () -> Void) {
+        self.onRequestLogHistory = onRequestLogHistory
+    }
+
     // MARK: - Filter Persistence Methods
     
     /// Save the current filter settings to UserDefaults
@@ -118,9 +138,7 @@ struct StatusBar: View {
                         showNote: true,
                         onClear: {                        
                             statusBarLogTypeFilters.removeAll()
-                            withAnimation {
-                                displayedMessage = latestFilteredMessage
-                            }
+                            updateDisplayedMessage()
                             saveFiltersToUserDefaults()
                         }
                     )
@@ -133,15 +151,13 @@ struct StatusBar: View {
                     .padding(.horizontal, 2)
                     .frame(minWidth: 100, maxWidth: .infinity, alignment: .leading)
                     .onTapGesture {
-                        showLogHistory()
+                        onRequestLogHistory()
                     }
                 
-                // Only show dialog info inline if we have an active dialog and not compact
-                if let activeItemId = activeItemId,
-                   let dialog = queryManager.allConversations.first(where: { $0.id == activeItemId }),
+                if let conversation = activeConversation,
                    !isCompact {
                     HStack(spacing: 6) {
-                        DialogInfoHeader(dialog: dialog, isCompact: false)
+                        ConversationInfoHeader(conversation: conversation, isCompact: false, queryManager: queryManager)
                             .layoutPriority(1)
                     }
                     .frame(minWidth: 200, idealWidth: 400, maxWidth: 500, alignment: .trailing)
@@ -150,33 +166,31 @@ struct StatusBar: View {
             .frame(height: 32)
             .background(Color.secondary.opacity(0.1))
             
-            // On compact (iPhone), show DialogInfoHeader below if active
-            if let activeItemId = activeItemId,
-               let dialog = queryManager.allConversations.first(where: { $0.id == activeItemId }),
+            if let conversation = activeConversation,
                isCompact {
-                DialogInfoHeader(dialog: dialog, isCompact: true)
+                ConversationInfoHeader(conversation: conversation, isCompact: true, queryManager: queryManager)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(Color.secondary.opacity(0.05))
             }
         }
         .onChange(of: loggingService.latestMessage) { _, _ in
-            withAnimation {
-                displayedMessage = latestFilteredMessage
-            }
+            updateDisplayedMessage()
         }
         .onChange(of: statusBarLogTypeFilters) { _, _ in
             saveFiltersToUserDefaults()
-            withAnimation {
-                displayedMessage = latestFilteredMessage
-            }
+            updateDisplayedMessage()
         }
         .onChange(of: popupLogTypeFilters) { _, _ in
             saveFiltersToUserDefaults()
         }
+        .onChange(of: router.activeConversationID) { _, _ in
+            refreshActiveConversation()
+        }
         .onAppear {
             loadFiltersFromUserDefaults()
-            displayedMessage = latestFilteredMessage
+            updateDisplayedMessage(animated: false)
+            refreshActiveConversation()
         }
     }
     
@@ -381,15 +395,16 @@ struct TokenDisplay: View {
     }
 }
 
-// MARK: - Dialog Info Header
-struct DialogInfoHeader: View {
-    let dialog: ConversationItem
+// MARK: - Conversation Info Header
+struct ConversationInfoHeader: View {
+    let conversation: ConversationItem
     let isCompact: Bool
+    let queryManager: QueryManager
     @State private var isModelPickerPresented: Bool = false
     @State private var refreshTrigger = UUID()
     
     private var modelParam: AiRequestArgument? {
-        dialog.options.parameters.first(where: { $0.name == "model" })
+        conversation.options.parameters.first(where: { $0.name == "model" })
     }
     
     private var modelName: String {
@@ -401,12 +416,12 @@ struct DialogInfoHeader: View {
     }
     
     private var isStreamingEnabled: Bool {
-        let streamParam = dialog.options.parameters.first(where: { $0.name == "stream" })
+        let streamParam = conversation.options.parameters.first(where: { $0.name == "stream" })
         return streamParam?.boolValue ?? false
     }
     
     private var currentProvider: AIServiceProvider {
-        if let config = dialog.options.apiConfiguration {
+        if let config = conversation.options.apiConfiguration {
             return AIServiceProvider.detectProvider(from: config)
         }
         return .openAI // Default provider
@@ -414,8 +429,7 @@ struct DialogInfoHeader: View {
     
     var body: some View {
         HStack(spacing: 6) {
-            // Add utility panel link icon if the dialog is linked
-            if dialog.isLinkedToUtilityPanel {
+            if conversation.isUtilityConversation {
                 Image(systemName: "menubar.dock.rectangle")
                     .foregroundColor(.green)
                     .font(.caption)
@@ -425,7 +439,7 @@ struct DialogInfoHeader: View {
                     .frame(height: 14)
             }
             
-            Text(dialog.options.apiConfiguration?.name ?? "No API Config")
+            Text(conversation.options.apiConfiguration?.name ?? "No API Config")
                 .fontWeight(.medium)
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -440,27 +454,27 @@ struct DialogInfoHeader: View {
                 .foregroundColor(.secondary)                
                 .padding(.horizontal, 2)
                 .id(refreshTrigger) // Force refresh when this ID changes
-                .onTapGesture {
-                    if dialog.options.apiConfiguration != nil {
-                        isModelPickerPresented = true
-                        vxAtelierPro.log.debug("Opening model picker from status bar")
-                    }
-                }
-                .sheet(isPresented: $isModelPickerPresented) {
-                    if dialog.options.apiConfiguration != nil {
-                        ModelSelectionView(
-                            selectedModel: modelName,
-                            onModelSelected: { newModel in
-                                if let param = modelParam {
-                                    param.setValue(newModel)
-                                    // Force refresh of the view
-                                    refreshTrigger = UUID()
-                                    vxAtelierPro.log.debug("Changed model to \(newModel) for \(dialog.title)")
+                            .onTapGesture {
+                                if conversation.options.apiConfiguration != nil {
+                                    isModelPickerPresented = true
+                                    vxAtelierPro.log.debug("Opening model picker from status bar")
                                 }
-                            },
-                            currentProvider: currentProvider
-                        )
-                    }
+                            }
+                            .sheet(isPresented: $isModelPickerPresented) {
+                                if conversation.options.apiConfiguration != nil {
+                                    ModelSelectionView(
+                                        selectedModel: modelName,
+                                        onModelSelected: { newModel in
+                                            do {
+                                                try queryManager.setModel(newModel, for: conversation)
+                                                refreshTrigger = UUID()
+                                            } catch {
+                                                vxAtelierPro.log.error("Failed to set model \(newModel): \(error.localizedDescription)")
+                                            }
+                                        },
+                                        currentProvider: currentProvider
+                                    )
+                                }
                 }
             
             Divider()
@@ -468,8 +482,8 @@ struct DialogInfoHeader: View {
 
             // Update token count display to use distinct sections for context and total
             HStack(spacing: 6) {
-                TokenDisplay(count: dialog.tokenCount, type: .context, compactMode: true)
-                TokenDisplay(count: dialog.usedTokenCount, type: .total, compactMode: true)
+                TokenDisplay(count: conversation.tokenCount, type: .context, compactMode: true)
+                TokenDisplay(count: conversation.usedTokenCount, type: .total, compactMode: true)
             }
             .padding(.horizontal, 2)
             .layoutPriority(2) // Increase layout priority for token displays
@@ -489,23 +503,12 @@ struct DialogInfoHeader: View {
                 .frame(width: 55, alignment: .leading)
                 .padding(.horizontal, 2)
                 .onTapGesture {
-                    // Check if stream parameter exists
-                    if let streamParam = dialog.options.parameters.first(where: {
-                        $0.name == "stream"
-                    }) {
-                        // Toggle the value
-                        let newStreamValue = !(streamParam.boolValue ?? false)
-
-                        // Update both the value and enabled state
-                        streamParam.setValue(newStreamValue)
-                        streamParam.isEnabled = newStreamValue
-
-                        vxAtelierPro.log.info(
-                            "Toggled streaming to \(newStreamValue ? "enabled" : "disabled") for \(dialog.title)"
-                        )
-                    } else {
+                    let newStreamValue = !isStreamingEnabled
+                    do {
+                        try queryManager.setStreamingEnabled(newStreamValue, for: conversation)
+                    } catch {
                         vxAtelierPro.log.error(
-                            "Stream parameter not found for \(dialog.title)")
+                            "Stream parameter not found for \(conversation.title)")
                     }
                 }
                 .layoutPriority(3)
@@ -534,4 +537,3 @@ struct DialogInfoHeader: View {
         }
     }
 }
-

@@ -19,34 +19,55 @@ struct AppDefaults {
     static let sectionBackgroundOpacity = 0.1
     static let sectionHeaderColor = Color.secondary
     
-    static let appearanceStyle = "Auto"
+    static let appearanceStyle = "System"
     
     static let newProjectName = "Unnamed Project"
     static let projectImageSystemName: String = "folder"
     
-    static let newDialogName = "Unnamed Dialog"
-    static let dialogImageSystemName: String = "document"
+    static let newConversationName = "Unnamed Conversation"
+    static let conversationImageSystemName: String = "document"
     
     static let newApiConfigurationName = "New Configuration"
     
     // Add new defaults for application settings
     static let shouldTerminateAfterLastWindowClosed = true    
-    static let dialogTextEditButtonSize = 24.0
+    static let conversationTextEditButtonSize = 24.0
     static let disableAvatar = false
     static let defaultAvatarSize = 40
     static let avatarImageSize = 80.0
     static let avatarStrokeWidth = 2.0
-    static let autoNameDialogs = true
+    static let autoNameConversations = true
     static let isMarkdownEnabled = true
     static let isMarkdownTextSelectable = false
     static let statusBarVisible = true
-    static let showUserDialogsOnly = false
-    static let autoSendDialogTemplates = true
+    static let showSystemConversations = false
+    static let autoSendConversationTemplates = true
     static let showRowToolButtons = true
     static let showEmptySections = false 
+    static let projectConversationsSortDescending = true
+    static let projectConversationsSortType = "conversationDate"
+    static let sidebarConversationsSortDescending = true
+    static let sidebarConversationsSortType = "conversationDate"
+    static let sidebarProjectsSortDescending = false
+    static let sidebarProjectsSortType = "alphabetically"
+    static let contentFilter = ContentFilter.active.rawValue
     // Conversation label toggles
     static let showConversationLastMessageLabel = true
     static let showConversationCreatedLabel = true
+    
+    // Developer/advanced settings
+    static let makeKeyAndOrderFront = false
+    static let autoScrollDebugEnabled = false
+    static let autoScrollGateEnabled = false
+    static let streamingThrottleEnabled = false
+    static let streamingThrottleIntervalMs = 50
+    static let streamingDebugEnabled = false
+    static let markdownStreamFinalizeOnly = false
+    static let showToolCallChips = true
+    
+    // Permissions
+    static let allowSelfSignedCertificates = false
+    static let selfSignedCertWhitelist = "[]"
         
     // TTS Settings
     static let ttsAutoplay = true
@@ -134,39 +155,73 @@ extension AppDefaults {
     static func resetUserDefaults() {
         let defaults = UserDefaults.standard
         // General settings
-        defaults.set(AppDefaults.appearanceStyle, forKey: "appearanceStyle")
-        defaults.set(AppDefaults.showRowToolButtons, forKey: "showRowToolButtons")
-        defaults.set(AppDefaults.autoNameDialogs, forKey: "autoNameDialogs")
-        defaults.set(AppDefaults.statusBarVisible, forKey: "statusBarVisible")
-        defaults.set(AppDefaults.showConversationLastMessageLabel, forKey: "showConversationLastMessageLabel")
-        defaults.set(AppDefaults.showConversationCreatedLabel, forKey: "showConversationCreatedLabel")
-        defaults.set(AppDefaults.shouldTerminateAfterLastWindowClosed, forKey: "shouldTerminateAfterLastWindowClosed")
-        defaults.set(AppDefaults.dialogTextEditButtonSize, forKey: "DialogTextEdit.buttonSize")
-        defaults.set(AppDefaults.autoSendDialogTemplates, forKey: "autoSendDialogTemplates")
-        defaults.set(AppDefaults.disableAvatar, forKey: "DisableAvatar")
-        defaults.set(AppDefaults.defaultAvatarSize, forKey: "DefaultAvatarSize")
-        defaults.set(AppDefaults.fontSizeMedium, forKey: "BubbleFontSize")
+        defaults.set(AppDefaults.appearanceStyle, forKey: AppSettings.Keys.appearanceStyle)
+        defaults.set(AppDefaults.showRowToolButtons, forKey: AppSettings.Keys.showRowToolButtons)
+        defaults.set(AppDefaults.autoNameConversations, forKey: AppSettings.Keys.autoNameConversations)
+        defaults.set(AppDefaults.statusBarVisible, forKey: AppSettings.Keys.statusBarVisible)
+        defaults.set(
+            AppDefaults.showConversationLastMessageLabel,
+            forKey: AppSettings.Keys.showConversationLastMessageLabel)
+        defaults.set(
+            AppDefaults.showConversationCreatedLabel,
+            forKey: AppSettings.Keys.showConversationCreatedLabel)
+        defaults.set(
+            AppDefaults.shouldTerminateAfterLastWindowClosed,
+            forKey: AppSettings.Keys.shouldTerminateAfterLastWindowClosed)
+        defaults.set(
+            AppDefaults.conversationTextEditButtonSize,
+            forKey: AppSettings.Keys.conversationTextEditButtonSize)
+        defaults.set(AppDefaults.autoSendConversationTemplates, forKey: AppSettings.Keys.autoSendConversationTemplates)
+        defaults.set(AppDefaults.disableAvatar, forKey: AppSettings.Keys.disableAvatar)
+        defaults.set(AppDefaults.defaultAvatarSize, forKey: AppSettings.Keys.defaultAvatarSize)
+        defaults.set(AppDefaults.fontSizeMedium, forKey: AppSettings.Keys.bubbleFontSize)
+        defaults.removeObject(forKey: AppSettings.Keys.defaultAvatarData)
         // Developer/advanced settings
-        defaults.set(AppDefaults.isMarkdownEnabled, forKey: "IsMarkdownEnabled")
-        defaults.set(AppDefaults.isMarkdownTextSelectable, forKey: "IsMarkdownTextSelectable")
-        defaults.set(AppDefaults.showUserDialogsOnly, forKey: "ShowUserDialogsOnly")
+        defaults.set(AppDefaults.isMarkdownEnabled, forKey: AppSettings.Keys.isMarkdownEnabled)
+        defaults.set(
+            AppDefaults.isMarkdownTextSelectable,
+            forKey: AppSettings.Keys.isMarkdownTextSelectable)
+        defaults.set(AppDefaults.showSystemConversations, forKey: AppSettings.Keys.showSystemConversations)
+        defaults.set(AppDefaults.makeKeyAndOrderFront, forKey: AppSettings.Keys.makeKeyAndOrderFront)
+        defaults.set(AppDefaults.autoScrollDebugEnabled, forKey: AppSettings.Keys.autoScrollDebugEnabled)
+        defaults.set(AppDefaults.autoScrollGateEnabled, forKey: AppSettings.Keys.autoScrollGateEnabled)
+        defaults.set(
+            AppDefaults.streamingThrottleEnabled,
+            forKey: AppSettings.Keys.streamingThrottleEnabled)
+        defaults.set(
+            AppDefaults.streamingThrottleIntervalMs,
+            forKey: AppSettings.Keys.streamingThrottleIntervalMs)
+        defaults.set(AppDefaults.streamingDebugEnabled, forKey: AppSettings.Keys.streamingDebugEnabled)
+        defaults.set(
+            AppDefaults.markdownStreamFinalizeOnly,
+            forKey: AppSettings.Keys.markdownStreamFinalizeOnly)
+        defaults.set(AppDefaults.showToolCallChips, forKey: AppSettings.Keys.showToolCallChips)
         // Permissions
-        defaults.set(false, forKey: "allowSelfSignedCertificates")
-        defaults.set("[]", forKey: "selfSignedCertWhitelist")
+        defaults.set(
+            AppDefaults.allowSelfSignedCertificates,
+            forKey: AppSettings.Keys.allowSelfSignedCertificates)
+        defaults.set(AppDefaults.selfSignedCertWhitelist, forKey: AppSettings.Keys.selfSignedCertWhitelist)
         // TTS
-        defaults.set(AppDefaults.ttsAutoplay, forKey: "TTSAutoplay")
-        defaults.set(AppDefaults.ttsRepeatMode, forKey: "TTSRepeatMode")
+        defaults.set(AppDefaults.ttsAutoplay, forKey: AppSettings.Keys.ttsAutoplay)
+        defaults.set(AppDefaults.ttsRepeatMode, forKey: AppSettings.Keys.ttsRepeatMode)
         // Sidebar sort
-        defaults.set(true, forKey: "SidebarDialogsSortOrderDescending")
-        defaults.set("conversationDate", forKey: "SidebarDialogsSortType")
-        defaults.set(false, forKey: "SidebarProjectsSortOrderDescending")
-        defaults.set("alphabetically", forKey: "SidebarProjectsSortType")
-        // Dialog/project filters
-        defaults.set(false, forKey: "ShowEmptySections")
-        defaults.set(true, forKey: "ShowArchived")
-        defaults.set(false, forKey: "ShowTrashed")
+        defaults.set(
+            AppDefaults.sidebarConversationsSortDescending,
+            forKey: AppSettings.Keys.sidebarConversationsSortDescending)
+        defaults.set(AppDefaults.sidebarConversationsSortType, forKey: AppSettings.Keys.sidebarConversationsSortType)
+        defaults.set(
+            AppDefaults.sidebarProjectsSortDescending,
+            forKey: AppSettings.Keys.sidebarProjectsSortDescending)
+        defaults.set(AppDefaults.sidebarProjectsSortType, forKey: AppSettings.Keys.sidebarProjectsSortType)
+        // Project view sort
+        defaults.set(
+            AppDefaults.projectConversationsSortDescending,
+            forKey: AppSettings.Keys.projectConversationsSortDescending)
+        defaults.set(AppDefaults.projectConversationsSortType, forKey: AppSettings.Keys.projectConversationsSortType)
+        // Conversation/project filters
+        defaults.set(AppDefaults.showEmptySections, forKey: AppSettings.Keys.showEmptySections)
+        defaults.set(AppDefaults.contentFilter, forKey: AppSettings.Keys.contentFilter)
         // Add any additional settings as needed
         defaults.synchronize()
     }
 }
-

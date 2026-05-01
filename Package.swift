@@ -50,7 +50,7 @@ let package = Package(
                 "ai/OpenAIDefaults.swift",
                 "ai/OpenAIModel.swift",
                 "ai/OpenAIService.swift",                
-                "ai/tooling/AIToolDialog.swift",
+                "ai/tooling/AIToolConversation.swift",
                 "ai/tooling/AITooling.swift",
                 "ai/tooling/AIToolRegistry.swift",
                 "ai/tooling/AIToolShortcuts.swift",
@@ -107,6 +107,7 @@ let package = Package(
                 "system/JsonSerializer.swift",
                 "system/MenuItemStyle.swift",
                 "system/PermissionManager.swift",
+                "system/AppSettings.swift",
                 "system/QueryManager.swift",
                 // TTS
                 "tts/TTSControlView.swift",
@@ -124,7 +125,12 @@ let package = Package(
                 "utilities/ShortcutsManager.swift",
                 "utilities/TypeConversionUtils.swift",
                 "utilities/URLExtensions.swift",
+                "viewmodels/AppSceneModel.swift",
+                "views/AppShellView.swift",
                 "views/ContentView.swift",
+                "views/content/ContentRouting.swift",
+                "views/content/NavigationRouter.swift",
+                "views/content/ContentSidebarView.swift",
                 "views/StatusBar.swift",
                 // Views - Components
                 "views/components/AvatarView.swift",
@@ -137,7 +143,7 @@ let package = Package(
                 // Splash removed: no highlighter helpers
                 "views/components/HybridNumericInputView.swift",        
                 "views/components/ImagePicker.swift",        
-                // Views - Dialog
+                // Views - Conversation
                 "views/dialog/MessageView.swift",                
                 "views/dialog/BookmarkSheetView.swift",
                 "views/dialog/MessageInputView.swift",
@@ -145,6 +151,7 @@ let package = Package(
                 "views/dialog/ConversationOptionsView.swift",                
                 "views/dialog/MessageAction.swift",
                 "views/dialog/ConversationViewModel.swift",
+                "views/dialog/ConversationViewModelStore.swift",
                 // Views - Project
                 "views/project/ProjectView.swift",
                 // Views - Status Bar
@@ -179,13 +186,21 @@ let package = Package(
                 "views/settings/components/SettingsListRow.swift",
                 "views/settings/components/SettingsRowActions.swift",
                 // Views - Utility
-                "views/utility/GlobalUtilityPanel.swift",
-                "views/utility/LogHistorySheet.swift"
+                "views/utility/UtilityPanelView.swift",
+                "views/utility/LogHistorySheet.swift",
+                "views/utility/ContentFilter.swift",
+                "views/utility/Sorters.swift"
             ],
             swiftSettings: [
                 .define("DEBUG", .when(configuration: .debug)),
                 .define("RELEASE", .when(configuration: .release))
             ]
+        ),
+        .testTarget(
+            name: "vxAtelier-ProTests",
+            dependencies: ["vxAtelier-Pro"],
+            path: "vxAtelier ProTests",
+            exclude: ["System/SwiftDataLimitations.md"]
         )
     ]
 ) 

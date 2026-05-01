@@ -30,7 +30,7 @@ enum PermissionType: String, CaseIterable, Identifiable {
     var usageDescription: String {
         switch self {
         case .photos:
-            return "Used to select avatar images for dialogs or the default application avatar."
+            return "Used to select avatar images for conversations or the default application avatar."
         case .microphone:
             return "Required for voice input or dictation features (if implemented)."
         case .speech:

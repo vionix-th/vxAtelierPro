@@ -6,14 +6,14 @@ import SwiftData
 struct ProjectExportData: Codable {
     let name: String
     let defaultOptions: ConversationOptionsExportData
-    let dialogs: [ConversationExportData]?
+    let conversations: [ConversationExportData]?
     let status: String
     let timestamp: Date
     
     init(_ project: ProjectItem) {
         self.name = project.name
         self.defaultOptions = ConversationOptionsExportData(project.defaultOptions)
-        self.dialogs = project.conversations.isEmpty ? nil : project.conversations.map { ConversationExportData($0) }
+        self.conversations = project.conversations.isEmpty ? nil : project.conversations.map { ConversationExportData($0) }
         self.status = project.status.rawValue
         self.timestamp = project.timestamp
     }
@@ -24,7 +24,7 @@ struct ProjectExportData: Codable {
         // Required fields with defaults if decoding fails
         name = try container.decode(String.self, forKey: .name)
         defaultOptions = try container.decodeIfPresent(ConversationOptionsExportData.self, forKey: .defaultOptions) ?? ConversationOptionsExportData(ConversationOptions())
-        dialogs = try container.decodeIfPresent([ConversationExportData].self, forKey: .dialogs)
+        conversations = try container.decodeIfPresent([ConversationExportData].self, forKey: .conversations)
         status = try container.decodeIfPresent(String.self, forKey: .status) ?? ItemStatus.active.rawValue
         timestamp = try container.decodeIfPresent(Date.self, forKey: .timestamp) ?? Date()
     }
@@ -32,15 +32,15 @@ struct ProjectExportData: Codable {
     func toDataItem(context: ModelContext) throws -> ProjectItem {
         let project = ProjectItem(name, defaultOptions: defaultOptions.toDataItem(context: context), status: ItemStatus(rawValue: status) ?? ItemStatus.active, timestamp: timestamp)
         
-        if let dialogs = dialogs {
-            for dialogData in dialogs {
+        if let conversations = conversations {
+            for conversationData in conversations {
                 do {
-                    let dialog = try dialogData.toDataItem(context: context)
-                    project.conversations.append(dialog)
+                    let conversation = try conversationData.toDataItem(context: context)
+                    project.conversations.append(conversation)
                 } catch {
                     throw DataManagerError.modelConversionFailed(
-                        model: "Project.dialogs",
-                        field: "dialog[\(dialogData.title)]",
+                        model: "Project.conversations",
+                        field: "conversation[\(conversationData.title)]",
                         reason: error.localizedDescription
                     )
                 }

@@ -1,25 +1,25 @@
 import Foundation
 import SwiftData
 
-/// Tool for renaming a DialogItem
-public struct RenameDialogTool: ExecutableTool {
-    public let name = "rename_dialog"
-    public let description = "Renames a specific chat dialog. Requires the dialog's unique hashed ID (obtainable from 'list_dialogs' or 'get_current_dialog') and the desired new title."
+/// Tool for renaming a ConversationItem
+public struct RenameConversationTool: ExecutableTool {
+    public let name = "rename_conversation"
+    public let description = "Renames a specific chat conversation. Requires the conversation's unique hashed ID (obtainable from 'list_conversations' or 'get_current_conversation') and the desired new title."
     private let modelContext: ModelContext
     
     public var parameters: any AIToolParameters {
         GenericToolParameters(
             properties: [
-                "dialog_id": GenericToolProperty(
+                "conversation_id": GenericToolProperty(
                     type: "string",
-                    description: "The hashed identifier of the dialog to rename"
+                    description: "The hashed identifier of the conversation to rename"
                 ),
                 "new_title": GenericToolProperty(
                     type: "string",
-                    description: "The new title for the dialog"
+                    description: "The new title for the conversation"
                 )
             ],
-            required: ["dialog_id", "new_title"]
+            required: ["conversation_id", "new_title"]
         )
     }
     
@@ -34,43 +34,43 @@ public struct RenameDialogTool: ExecutableTool {
         
         do {
             let args = try JSONDecoder().decode([String: String].self, from: jsonData)
-            guard let dialogId = args["dialog_id"],
+            guard let conversationId = args["conversation_id"],
                   let newTitle = args["new_title"] else {
-                throw AppError.invalidArguments("Missing required arguments: dialog_id or new_title")
+                throw AppError.invalidArguments("Missing required arguments: conversation_id or new_title")
             }
             
-            // Fetch the dialog using the stably hashed ID string
+            // Fetch the conversation using the stably hashed ID string
             let descriptor = FetchDescriptor<ConversationItem>()
-            let dialogs: [ConversationItem]
+            let conversations: [ConversationItem]
             do {
-                dialogs = try modelContext.fetch(descriptor)
+                conversations = try modelContext.fetch(descriptor)
             } catch {
                 await vxAtelierPro.log.error("Failed to fetch \(ConversationItem.self): \(error.localizedDescription)")
                 throw AppError.dataFetchFailed(error.localizedDescription)
             }
 
-            guard let dialog = dialogs.first(where: { String(describing: $0.id).stableHash() == dialogId }) else {
-                return "Dialog not found"
+            guard let conversation = conversations.first(where: { String(describing: $0.id).stableHash() == conversationId }) else {
+                return "Conversation not found"
             }
             
-            // Store the dialog ID instead of capturing the dialog instance
-            let targetDialogId = dialog.id
+            // Store the conversation ID instead of capturing the conversation instance
+            let targetConversationId = conversation.id
             
-            // Update the dialog title on the main thread since it's a UI operation
+            // Update the conversation title on the main thread since it's a UI operation
             await MainActor.run {
-                // Fetch the dialog again on the main actor
+                // Fetch the conversation again on the main actor
                 let descriptor = FetchDescriptor<ConversationItem>()
-                if let dialog = try? modelContext.fetch(descriptor).first(where: { $0.id == targetDialogId }) {
-                    dialog.title = newTitle
+                if let conversation = try? modelContext.fetch(descriptor).first(where: { $0.id == targetConversationId }) {
+                    conversation.title = newTitle
                 }
             }
             
-            return "Dialog renamed to: \(newTitle)"
+            return "Conversation renamed to: \(newTitle)"
         } catch let decodingError as DecodingError {
-            await vxAtelierPro.log.error("Failed to decode rename dialog arguments: \(decodingError.localizedDescription)")
+            await vxAtelierPro.log.error("Failed to decode rename conversation arguments: \(decodingError.localizedDescription)")
             throw AppError.invalidArguments("Invalid argument format: \(decodingError.localizedDescription)")
         } catch {
-            await vxAtelierPro.log.error("Failed to rename dialog: \(error.localizedDescription)")
+            await vxAtelierPro.log.error("Failed to rename conversation: \(error.localizedDescription)")
             throw error
         }
     }
@@ -80,10 +80,10 @@ public struct RenameDialogTool: ExecutableTool {
     }
 }
 
-/// Tool for listing all dialogs with their IDs and titles
-public struct ListDialogsTool: ExecutableTool {
-    public let name = "list_dialogs"
-    public let description = "Returns a JSON list of all existing chat dialogs, including their unique hashed ID (for use with other dialog tools), title, and purpose."
+/// Tool for listing all conversations with their IDs and titles
+public struct ListConversationsTool: ExecutableTool {
+    public let name = "list_conversations"
+    public let description = "Returns a JSON list of all existing chat conversations, including their unique hashed ID (for use with other conversation tools), title, and purpose."
     private let modelContext: ModelContext
     
     public var parameters: any AIToolParameters {
@@ -95,32 +95,32 @@ public struct ListDialogsTool: ExecutableTool {
     }
     
     public func execute(arguments: String, configuration: [String: Any]? = nil, context: Any? = nil) async throws -> String {
-        // Fetch all dialogs
+        // Fetch all conversations
         let descriptor = FetchDescriptor<ConversationItem>()
         do {
-            let dialogs = try modelContext.fetch(descriptor)
+            let conversations = try modelContext.fetch(descriptor)
             
-            if dialogs.isEmpty {
-                return "No dialogs found"
+            if conversations.isEmpty {
+                return "No conversations found"
             }
             
-            // Create a JSON array of dialog objects with stably hashed id and title
-            let dialogList = dialogs.map { dialog -> [String: String] in
+            // Create a JSON array of conversation objects with stably hashed id and title
+            let conversationList = conversations.map { conversation -> [String: String] in
                 return [
-                    "id": String(describing: dialog.id).stableHash(),
-                    "title": dialog.title,
-                    "purpose": String(describing: dialog.purpose)
+                    "id": String(describing: conversation.id).stableHash(),
+                    "title": conversation.title,
+                    "purpose": String(describing: conversation.purpose)
                 ]
             }
             
             // Convert to JSON string
-            let jsonData = try JSONEncoder().encode(dialogList)
+            let jsonData = try JSONEncoder().encode(conversationList)
             guard let jsonString = String(data: jsonData, encoding: .utf8) else {
-                throw AppError.encodingFailed("Failed to encode dialog list as UTF-8 string")
+                throw AppError.encodingFailed("Failed to encode conversation list as UTF-8 string")
             }
             return jsonString
         } catch let error as AppError {
-            await vxAtelierPro.log.error("Failed to process dialogs: \(error.localizedDescription)")
+            await vxAtelierPro.log.error("Failed to process conversations: \(error.localizedDescription)")
             throw error
         } catch {
             await vxAtelierPro.log.error("Unexpected error: \(error.localizedDescription)")
@@ -133,10 +133,10 @@ public struct ListDialogsTool: ExecutableTool {
     }
 }
 
-/// Tool for finding a dialog by its title
-public struct FindDialogTool: ExecutableTool {
-    public let name = "find_dialog"
-    public let description = "Finds the first chat dialog whose title contains the provided search string. Returns a JSON object with the dialog's hashed ID and full title if found, otherwise a 'not found' message."
+/// Tool for finding a conversation by its title
+public struct FindConversationTool: ExecutableTool {
+    public let name = "find_conversation"
+    public let description = "Finds the first chat conversation whose title contains the provided search string. Returns a JSON object with the conversation's hashed ID and full title if found, otherwise a 'not found' message."
     private let modelContext: ModelContext
     
     public var parameters: any AIToolParameters {
@@ -166,31 +166,31 @@ public struct FindDialogTool: ExecutableTool {
                 throw AppError.invalidArguments("Missing required argument: title")
             }
             
-            // Fetch all dialogs
+            // Fetch all conversations
             let descriptor = FetchDescriptor<ConversationItem>()
-            let dialogs = try modelContext.fetch(descriptor)
+            let conversations = try modelContext.fetch(descriptor)
             
-            // Find the first dialog with matching title
-            if let dialog = dialogs.first(where: { $0.title.contains(title) }) {
-                let dialogInfo: [String: String] = [
-                    "id": String(describing: dialog.id).stableHash(),
-                    "title": dialog.title
+            // Find the first conversation with matching title
+            if let conversation = conversations.first(where: { $0.title.contains(title) }) {
+                let conversationInfo: [String: String] = [
+                    "id": String(describing: conversation.id).stableHash(),
+                    "title": conversation.title
                 ]
                 
                 // Convert to JSON string
-                let jsonData = try JSONEncoder().encode(dialogInfo)
+                let jsonData = try JSONEncoder().encode(conversationInfo)
                 guard let jsonString = String(data: jsonData, encoding: .utf8) else {
-                    throw AppError.encodingFailed("Failed to encode dialog information as UTF-8 string")
+                    throw AppError.encodingFailed("Failed to encode conversation information as UTF-8 string")
                 }
                 return jsonString
             } else {
-                return "No dialog found with title containing: \(title)"
+                return "No conversation found with title containing: \(title)"
             }
         } catch let error as DecodingError {
-            await vxAtelierPro.log.error("Failed to decode find dialog arguments: \(error.localizedDescription)")
+            await vxAtelierPro.log.error("Failed to decode find conversation arguments: \(error.localizedDescription)")
             throw AppError.invalidArguments("Invalid argument format: \(error.localizedDescription)")
         } catch let error as AppError {
-            await vxAtelierPro.log.error("Failed to process dialog: \(error.localizedDescription)")
+            await vxAtelierPro.log.error("Failed to process conversation: \(error.localizedDescription)")
             throw error
         } catch {
             await vxAtelierPro.log.error("Unexpected error: \(error.localizedDescription)")
@@ -203,10 +203,10 @@ public struct FindDialogTool: ExecutableTool {
     }
 }
 
-/// Tool for getting the current dialog's ID
-public struct CurrentDialogTool: ExecutableTool {
-    public let name = "get_current_dialog"
-    public let description = "Returns a JSON object containing the unique hashed ID, title, and purpose of the chat dialog currently active in the application context."
+/// Tool for getting the current conversation's ID
+public struct CurrentConversationTool: ExecutableTool {
+    public let name = "get_current_conversation"
+    public let description = "Returns a JSON object containing the unique hashed ID, title, and purpose of the chat conversation currently active in the application context."
     
     public var parameters: any AIToolParameters {
         GenericToolParameters(properties: [:])
@@ -216,27 +216,27 @@ public struct CurrentDialogTool: ExecutableTool {
     }
     
     public func execute(arguments: String, configuration: [String: Any]? = nil, context: Any? = nil) async throws -> String {
-        // Get the current dialog ID from configuration
-        guard let dialogItem = context as? ConversationItem else {
-            return "No current dialog information available in context"
+        // Get the current conversation ID from configuration
+        guard let conversationItem = context as? ConversationItem else {
+            return "No current conversation information available in context"
         }
         
-        // Create a response object with dialog info
+        // Create a response object with conversation info
         let response: [String: String] = [
-            "id": String(describing: dialogItem.id).stableHash(),
-            "title": dialogItem.title,
-            "purpose": String(describing: dialogItem.purpose)
+            "id": String(describing: conversationItem.id).stableHash(),
+            "title": conversationItem.title,
+            "purpose": String(describing: conversationItem.purpose)
         ]
         
         // Convert to JSON string
         do {
             let jsonData = try JSONEncoder().encode(response)
             guard let jsonString = String(data: jsonData, encoding: .utf8) else {
-                throw AppError.encodingFailed("Failed to encode dialog information as UTF-8 string")
+                throw AppError.encodingFailed("Failed to encode conversation information as UTF-8 string")
             }
             return jsonString
         } catch let error as EncodingError {
-            await vxAtelierPro.log.error("Failed to encode current dialog information: \(error.localizedDescription)")
+            await vxAtelierPro.log.error("Failed to encode current conversation information: \(error.localizedDescription)")
             throw AppError.encodingFailed(error.localizedDescription)
         } catch {
             await vxAtelierPro.log.error("Unexpected error: \(error.localizedDescription)")

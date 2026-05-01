@@ -102,6 +102,18 @@ final class MyModel {
 
 ### 4. Making SwiftData Models Sendable
 
+### 5. Settings Keys Drift
+
+**Problem:**  
+Hard-coded `@AppStorage("SomeKey")` strings get out of sync when keys are renamed, causing silent preference resets.
+
+**Solution:**  
+Use the centralized facade:
+```swift
+@AppStorage(AppSettings.Keys.appearanceStyle) private var appearanceStyle: AppearanceStyle = .system
+```
+All keys live in `system/AppSettings.swift`; defaults remain in `system/AppDefaults.swift`.
+
 **Problem:**  
 Attempting to make SwiftData `@Model` classes conform to `Sendable` protocol, often as a quick fix for compiler warnings about capturing model instances in async contexts.
 

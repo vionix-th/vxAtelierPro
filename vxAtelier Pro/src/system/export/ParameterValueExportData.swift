@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-// MARK: - Dialog Options Export - Parameter Value
+// MARK: - Conversation Options Export - Parameter Value
 
 // Parameter value export for serialization
 struct ParameterValueExportData: Codable {

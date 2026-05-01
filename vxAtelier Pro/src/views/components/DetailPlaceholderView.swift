@@ -2,7 +2,7 @@ import SwiftUI
 
 struct DetailPlaceholderView: View {
     let hasAPIConfiguration: Bool
-    let onNewDialog: () -> Void
+    let onNewConversation: () -> Void
     let onNewProject: () -> Void
     let onConfigureAPI: () -> Void
 
@@ -22,8 +22,8 @@ struct DetailPlaceholderView: View {
                 .padding(.bottom, AppDefaults.paddingSmall)
             Text(
                 hasAPIConfiguration
-                    ? "Start by creating a new dialog or project. Organize your conversations and ideas with ease."
-                    : "Configure an API provider to create dialogs and projects."
+                    ? "Start by creating a new conversation or project. Organize your conversations and ideas with ease."
+                    : "Configure an API provider to create conversations and projects."
             )
                 .font(.title3)
                 .foregroundColor(.secondary)
@@ -33,16 +33,16 @@ struct DetailPlaceholderView: View {
             VStack(spacing: AppDefaults.paddingLarge) {
                 if hasAPIConfiguration {
                     Button(action: {
-                        onNewDialog()
+                        onNewConversation()
                     }) {
-                        Label("New Dialog", systemImage: "plus.bubble")
+                        Label("New Conversation", systemImage: "plus.bubble")
                             .font(.title3.bold())
                             .padding(.vertical, AppDefaults.paddingSmall)
                             .padding(.horizontal, AppDefaults.paddingLarge)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.accentColor)
-                    .accessibilityIdentifier("welcome-new-dialog")
+                    .accessibilityIdentifier("welcome-new-conversation")
 
                     Button(action: {
                         onNewProject()

@@ -3,16 +3,10 @@ import SwiftUI
 // MARK: - Log History Sheet
 struct LogHistorySheet: View {
     @Environment(\.dismiss) private var dismiss
-    @Binding var filters: Set<LoggingService.LogType>
-    @State private var displayedMessages: [LogEntry] = []
+    @State private var filters: Set<LoggingService.LogType> = []
     
     // Use @StateObject to track the logging service for live updates
     @StateObject private var loggingService = LoggingService.shared
-    
-    // Initialize with filters but compute displayed messages internally
-    init(filters: Binding<Set<LoggingService.LogType>>) {
-        self._filters = filters
-    }
     
     // Computed property to apply filters
     private var filteredMessages: [LogEntry] {

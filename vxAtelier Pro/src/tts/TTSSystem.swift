@@ -44,12 +44,12 @@ enum TTSRepeatMode: String {
 ///
 /// Requirements:
 /// - MessageItem must be valid and contain text content
-/// - Dialog title must not be empty
+/// - Conversation title must not be empty
 /// - Message index must be non-negative
 ///
 /// Dependencies:
 /// - Requires MessageItem model from the data layer
-/// - Integrates with the project/dialog hierarchy system
+/// - Integrates with the project/conversation hierarchy system
 struct MessageContext {
     // MARK: Properties
     
@@ -57,27 +57,27 @@ struct MessageContext {
     /// Must be a valid MessageItem with non-empty content
     let message: MessageItem
     
-    /// The title of the dialog this message belongs to
+    /// The title of the conversation this message belongs to
     /// Must not be empty
-    let dialogTitle: String
+    let conversationTitle: String
     
     /// Optional project name if the message is part of a project
-    /// Can be nil for standalone dialogs
+    /// Can be nil for standalone conversations
     let projectName: String?
     
-    /// The index of this message in its dialog
+    /// The index of this message in its conversation
     /// Must be non-negative
     let messageIndex: Int
     
     // MARK: Computed Properties
     
     /// Formatted string for display in the UI
-    /// Format: "[Project >] Dialog #Index"
+    /// Format: "[Project >] Conversation #Index"
     var displayString: String {
         if let project = projectName {
-            return "\(project) › \(dialogTitle) #\(messageIndex + 1)"
+            return "\(project) › \(conversationTitle) #\(messageIndex + 1)"
         }
-        return "\(dialogTitle) #\(messageIndex + 1)"
+        return "\(conversationTitle) #\(messageIndex + 1)"
     }
 }
 
@@ -451,7 +451,7 @@ struct MessageContext {
     ///
     /// Requirements:
     /// - Valid message with non-empty content
-    /// - Valid dialog title
+    /// - Valid conversation title
     /// - Non-negative message index
     ///
     /// Constraints:
@@ -464,13 +464,13 @@ struct MessageContext {
     ///
     /// - Parameters:
     ///   - message: The message to add
-    ///   - dialogTitle: Title of the dialog
-    ///   - messageIndex: Index in the dialog
+    ///   - conversationTitle: Title of the conversation
+    ///   - messageIndex: Index in the conversation
     ///   - projectName: Optional project name
-    func add(_ message: MessageItem, dialogTitle: String, messageIndex: Int, projectName: String? = nil) {
+    func add(_ message: MessageItem, conversationTitle: String, messageIndex: Int, projectName: String? = nil) {
         let messageContext = MessageContext(
             message: message,
-            dialogTitle: dialogTitle,
+            conversationTitle: conversationTitle,
             projectName: projectName,
             messageIndex: messageIndex
         )
@@ -649,7 +649,8 @@ struct MessageContext {
             vxAtelierPro.log.debug("⏭️ Moving to next item (\(self.currentIndex + 2)/\(self.playlist.count))")
             jumpTo(self.currentIndex + 1, manualSelection: false)
         } else {
-            let repeatMode = UserDefaults.standard.string(forKey: "TTSRepeatMode") ?? AppDefaults.ttsRepeatMode
+            let repeatMode = UserDefaults.standard.string(
+                forKey: AppSettings.Keys.ttsRepeatMode) ?? AppDefaults.ttsRepeatMode
             if repeatMode == "all" {
                 vxAtelierPro.log.debug("🔄 Wrapping to start (repeat all mode)")
                 jumpTo(0, manualSelection: false)
@@ -677,7 +678,8 @@ struct MessageContext {
             vxAtelierPro.log.debug("⏮️ Moving to previous item (\(self.currentIndex)/\(self.playlist.count))")
             jumpTo(self.currentIndex - 1, manualSelection: false)
         } else {
-            let repeatMode = UserDefaults.standard.string(forKey: "TTSRepeatMode") ?? AppDefaults.ttsRepeatMode
+            let repeatMode = UserDefaults.standard.string(
+                forKey: AppSettings.Keys.ttsRepeatMode) ?? AppDefaults.ttsRepeatMode
             if repeatMode == "all" {
                 vxAtelierPro.log.debug("🔁 Wrapping to end (repeat all mode)")
                 jumpTo(self.playlist.count - 1, manualSelection: false)
@@ -797,8 +799,9 @@ struct MessageContext {
                 return
             }
             
-            let repeatMode = UserDefaults.standard.string(forKey: "TTSRepeatMode") ?? AppDefaults.ttsRepeatMode
-            let autoplay = UserDefaults.standard.bool(forKey: "TTSAutoplay")
+            let repeatMode = UserDefaults.standard.string(
+                forKey: AppSettings.Keys.ttsRepeatMode) ?? AppDefaults.ttsRepeatMode
+            let autoplay = UserDefaults.standard.bool(forKey: AppSettings.Keys.ttsAutoplay)
             
             switch repeatMode {
             case "one":

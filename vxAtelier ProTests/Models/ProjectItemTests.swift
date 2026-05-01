@@ -1,6 +1,10 @@
 import XCTest
 import SwiftData
+#if canImport(vxAtelier_Pro_debug)
 @testable import vxAtelier_Pro_debug
+#else
+@testable import vxAtelier_Pro
+#endif
 
 @MainActor
 final class ProjectItemTests: XCTestCase {
@@ -154,26 +158,26 @@ final class ProjectItemTests: XCTestCase {
     
     // MARK: - Sorted Dialogs Tests
     
-    func testSortedDialogs() {
+    func testSortedConversations() {
         // Given
         let project = testEnv.createProject()
-        let dialog1 = testEnv.createConversation()
-        let dialog2 = testEnv.createConversation()
+        let conversation1 = testEnv.createConversation()
+        let conversation2 = testEnv.createConversation()
         
         // Set different timestamps
-        dialog1.timestamp = Date().addingTimeInterval(-3600) // 1 hour ago
-        dialog2.timestamp = Date() // now
+        conversation1.timestamp = Date().addingTimeInterval(-3600) // 1 hour ago
+        conversation2.timestamp = Date() // now
         
         // Add to project
-        project.conversations = [dialog1, dialog2]
+        project.conversations = [conversation1, conversation2]
         
         // When
-        // Sort dialogs by timestamp descending to mirror sortedDialogs logic (SwiftData relationships are unordered)
-        let sorted = project.sortedDialogs
+        // Sort conversations by timestamp descending to mirror sortedConversations logic (SwiftData relationships are unordered)
+        let sorted = project.sortedConversations
         
         // Then - should be sorted by timestamp descending
         XCTAssertEqual(sorted.count, 2)
-        XCTAssertEqual(sorted[0], dialog2) // Newest first
-        XCTAssertEqual(sorted[1], dialog1)
+        XCTAssertEqual(sorted[0], conversation2) // Newest first
+        XCTAssertEqual(sorted[1], conversation1)
     }
 }

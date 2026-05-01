@@ -5,6 +5,7 @@ import Foundation
 public struct SelfSignedCertWhitelistView: View {
     @Binding var whitelist: [String]
     @Environment(\.isEnabled) private var isEnabled
+    private let listAnimation: Animation = .easeInOut(duration: 0.18)
     
     @State private var editingRegexIndex: Int? = nil
     @State private var editingRegexText: String = ""
@@ -32,7 +33,7 @@ public struct SelfSignedCertWhitelistView: View {
     }
     
     private func deleteRegex(at offset: Int) {
-        withAnimation {
+        withAnimation(listAnimation) {
             var arr = whitelist
             arr.remove(at: offset)
             whitelist = arr
@@ -76,7 +77,6 @@ public struct SelfSignedCertWhitelistView: View {
                     .stroke(Color.accentColor, lineWidth: 1)
                     .opacity(0.18)
             )
-            .animation(.easeInOut(duration: 0.18), value: whitelist)
             if !isEnabled {
                 DisabledOverlayView(mainBackground: mainBackground)
             }
@@ -110,7 +110,7 @@ public struct SelfSignedCertWhitelistView: View {
                                 if let idx = editingRegexIndex {
                                     whitelist[idx] = editingRegexText
                                 } else {
-                                    withAnimation { whitelist.append(editingRegexText) }
+                                    withAnimation(listAnimation) { whitelist.append(editingRegexText) }
                                 }
                                 showRegexEditSheet = false
                             } else {
