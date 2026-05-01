@@ -93,6 +93,13 @@ struct vxAtelierPro: App {
                     VoiceConfigurationItem.self,
                     APIConfigurationItem.self,
                     ModelItem.self,
+                    MessageItem.self,
+                    MessageContentPartItem.self,
+                    ToolCallItem.self,
+                    ResponseRunItem.self,
+                    ConversationTurn.self,
+                    TurnEvent.self,
+                    ConversationOptions.self,
                     WebSearchConfigurationItem.self,
                 ]
             }
@@ -105,6 +112,12 @@ struct vxAtelierPro: App {
             APIConfigurationItem.self,
             ModelItem.self,
             ConversationOptions.self,
+            MessageItem.self,
+            MessageContentPartItem.self,
+            ToolCallItem.self,
+            ResponseRunItem.self,
+            ConversationTurn.self,
+            TurnEvent.self,
             ConversationItem.self,
             ProjectItem.self,
             BookmarkItem.self,
@@ -184,10 +197,6 @@ struct vxAtelierPro: App {
         vxAtelierPro.log.debug("Ensuring system conversation")
         queryManager.ensureSystemConversation()
         vxAtelierPro.log.debug("System conversation ensured")
-
-        vxAtelierPro.log.debug("Initializing AIServiceManager")
-        _ = AIServiceManager.shared
-        vxAtelierPro.log.debug("AIServiceManager initialized")
 
         vxAtelierPro.log.debug("Registering Tools")
         registerDefaultTools()

@@ -397,7 +397,7 @@ struct MessageContext {
     /// - Parameter message: The message to speak
     private func startSpeaking(_ message: MessageItem) {
         // Segment the text and store for sequential playback
-        currentSegments = segmentText(message.content.text)
+        currentSegments = segmentText(message.displayText)
         currentSegmentIndex = 0
         
         guard !currentSegments.isEmpty else { return }

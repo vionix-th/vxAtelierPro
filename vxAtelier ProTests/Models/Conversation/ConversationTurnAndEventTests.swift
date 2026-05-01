@@ -24,8 +24,8 @@ final class ConversationTurnAndEventTests: XCTestCase {
     func testTurnSequenceAndPersistence() throws {
         let context = testEnv.modelContext
         let conversation = testEnv.createConversation()
-        let msg1 = MessageItem(role: "user", content: ContentItem("A"), timestamp: Date())
-        let msg2 = MessageItem(role: "user", content: ContentItem("B"), timestamp: Date())
+        let msg1 = MessageItem(role: "user", text: "A", timestamp: Date())
+        let msg2 = MessageItem(role: "user", text: "B", timestamp: Date())
         let turn1 = ConversationTurn(sequenceNumber: 1, userMessage: msg1, conversation: conversation)
         let turn2 = ConversationTurn(sequenceNumber: 2, userMessage: msg2, conversation: conversation)
         conversation.turns = [turn1, turn2]
@@ -41,7 +41,7 @@ final class ConversationTurnAndEventTests: XCTestCase {
     // MARK: - Event Management
     func testTurnEventCRUDAndOrdering() throws {
         let context = testEnv.modelContext
-        let msg = MessageItem(role: "user", content: ContentItem("Prompt"), timestamp: Date())
+        let msg = MessageItem(role: "user", text: "Prompt", timestamp: Date())
         let conversation = testEnv.createConversation()
 let turn = ConversationTurn(sequenceNumber: 1, userMessage: msg, conversation: conversation)
 let event1 = TurnEvent(type: .assistant, timestamp: Date().addingTimeInterval(-10), message: msg, turn: turn)
@@ -66,7 +66,7 @@ try context.save()
     // MARK: - Cascade Delete
     func testCascadeDeleteRemovesEvents() throws {
         let context = testEnv.modelContext
-        let msg = MessageItem(role: "user", content: ContentItem("Prompt"), timestamp: Date())
+        let msg = MessageItem(role: "user", text: "Prompt", timestamp: Date())
         let conversation = testEnv.createConversation()
 let turn = ConversationTurn(sequenceNumber: 1, userMessage: msg, conversation: conversation)
 let event = TurnEvent(type: .assistant, message: msg, turn: turn)
@@ -83,7 +83,7 @@ XCTAssertFalse(remaining.contains { $0.id == eventId })
 
     // MARK: - Edge Cases
     func testDuplicateTurnSequenceNumbers() {
-        let msg = MessageItem(role: "user", content: ContentItem("Prompt"), timestamp: Date())
+        let msg = MessageItem(role: "user", text: "Prompt", timestamp: Date())
         let conversation = testEnv.createConversation()
 let turn1 = ConversationTurn(sequenceNumber: 1, userMessage: msg, conversation: conversation)
 let turn2 = ConversationTurn(sequenceNumber: 1, userMessage: msg, conversation: conversation)

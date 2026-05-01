@@ -30,7 +30,7 @@ final class ConversationItemRelationshipTests: XCTestCase {
     func testDeleteTurnCascadesFromConversation() throws {
         let context = testEnv.modelContext
         let conversation = ConversationItem(timestamp: Date(), title: "Cascade Turn", options: ConversationOptions())
-        let userMessage = MessageItem(role: "user", content: ContentItem("Cascade Turn Test"), timestamp: Date(), toolCallId: nil, toolCallsData: nil)
+        let userMessage = MessageItem(role: "user", text: "Cascade Turn Test", timestamp: Date(), toolCallId: nil)
         let turn = ConversationTurn(sequenceNumber: 0, timestamp: Date(), userMessage: userMessage, conversation: conversation)
         conversation.turns.append(turn)
         context.insert(conversation)

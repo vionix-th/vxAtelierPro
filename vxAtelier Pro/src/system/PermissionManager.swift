@@ -402,7 +402,7 @@ class PermissionManager: ObservableObject {
                     if let error = error {
                         vxAtelierPro.log.error("Error requesting calendar access: \(error.localizedDescription)")
                     } else {
-                        vxAtelierPro.log.info("Calendars permission granted (legacy): \(granted)")
+                        vxAtelierPro.log.info("Calendars permission granted through EventKit callback: \(granted)")
                     }
                     self?.checkCalendarsPermission() // Re-check status
                 }
@@ -415,7 +415,7 @@ class PermissionManager: ObservableObject {
                  if let error = error {
                      vxAtelierPro.log.error("Error requesting calendar access: \(error.localizedDescription)")
                  } else {
-                     vxAtelierPro.log.info("Calendars permission granted (legacy): \(granted)")
+                     vxAtelierPro.log.info("Calendars permission granted through EventKit callback: \(granted)")
                  }
                  self?.checkCalendarsPermission() // Re-check status
              }
@@ -636,11 +636,11 @@ fileprivate class LocationDelegate: NSObject, CLLocationManagerDelegate {
     
     // Handle older delegate method if needed (iOS < 14)
     func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
-         vxAtelierPro.log.debug("LocationDelegate: didChangeAuthorization (legacy) called. Status: \(status.rawValue)")
+         vxAtelierPro.log.debug("LocationDelegate: didChangeAuthorization called. Status: \(status.rawValue)")
          // Avoid calling completion twice if both methods are somehow invoked
          // Check if status is not undetermined, as the new method handles all transitions
          if status != .notDetermined {
              completion(status)
          }
      }
-} 
+}

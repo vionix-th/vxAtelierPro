@@ -32,7 +32,7 @@ struct ConversationView: View {
                                         conversationID: conversation.id,
                                         turn: turn,
                                         isLastTurn: turn.id == turns.last?.id,
-                                        streamingState: viewModel.streamingState,
+                                        draftStore: viewModel.draftStore,
                                         isSelecting: viewModel.isSelectingMessages,
                                         isSelected: { viewModel.selectedMessages.contains($0) },
                                         onSelect: { viewModel.toggleSelection(for: $0) },
@@ -65,7 +65,7 @@ struct ConversationView: View {
                     Divider()
                     MessageInputView(
                         queryManager: viewModel.queryManager,
-                        streamingState: viewModel.streamingState,
+                        draftStore: viewModel.draftStore,
                         contextConversation: conversation,
                         resolveConversation: {
                             if let conversation = viewModel.conversation {
@@ -75,7 +75,7 @@ struct ConversationView: View {
                         }
                     )
                     .padding(AppDefaults.paddingSmall)
-                    .disabled(viewModel.streamingState.isActive)
+                    .disabled(viewModel.draftStore.isActive)
                 }
             }
         }
@@ -130,7 +130,7 @@ fileprivate struct ConversationTurnView: View {
     let conversationID: PersistentIdentifier
     let turn: ConversationTurn
     let isLastTurn: Bool
-    let streamingState: StreamingState
+    let draftStore: ConversationDraftStore
 
     let isSelecting: Bool
     let isSelected: (PersistentIdentifier) -> Bool
@@ -177,8 +177,15 @@ fileprivate struct ConversationTurnView: View {
                 .id(assistant.message.id)
             }
 
-            // Streaming placeholder for last turn when no assistant events exist yet
-            if assistantEvents.isEmpty && streamingState.isActive && isLastTurn {
+            let draft = draftStore.draft(for: conversationID)
+            let latestRun = turn.responseRuns.sorted { $0.startedAt < $1.startedAt }.last
+            let latestRunFailed = latestRun?.status == .failed || latestRun?.status == .cancelled
+            let draftFailed = draft.runStatus == .failed || draft.runStatus == .cancelled
+            let shouldRenderDraft = assistantEvents.isEmpty
+                && isLastTurn
+                && (draft.isActive || draftFailed || latestRunFailed)
+
+            if shouldRenderDraft {
                 MessageView(
                     messageID: nil,
                     turnID: turn.id,
@@ -189,7 +196,10 @@ fileprivate struct ConversationTurnView: View {
                     onTap: {},
                     onAction: { _ in },
                     isBookmarked: false,
-                    streamingContent: streamingState.text
+                    streamingContent: draft.text,
+                    streamingToolCalls: draft.toolCalls,
+                    streamingRunStatus: latestRun?.status ?? draft.runStatus,
+                    streamingErrorMessage: latestRun?.errorMessage ?? draft.errorMessage
                 )
                 .id("stream-\(turn.id)")
             }

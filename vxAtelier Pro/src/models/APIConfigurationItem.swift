@@ -6,7 +6,6 @@ import SwiftUI
 ///
 /// Stores connection details for AI service providers, including:
 /// - Authentication credentials
-/// - API endpoints
 /// - Service identifiers
 /// - Base URLs
 @Model
@@ -14,17 +13,14 @@ final class APIConfigurationItem {
     /// Display name for this configuration
     var name: String
 
+    var providerID: String
+    var authKind: String
+
     /// Authentication key for the API
     var apiKey: String
 
     /// Base URL for the API service
     var baseURL: String
-
-    /// Endpoint for chat completion requests
-    var chatCompletionsEndpoint: String
-
-    /// Endpoint for listing available models
-    var modelsEndpoint: String
 
     /// Indicates if this configuration is the default one
     @Attribute var isDefault: Bool
@@ -32,31 +28,86 @@ final class APIConfigurationItem {
     /// The default model for this API configuration (overrides global defaults if set)
     var defaultModel: String?
 
+    var defaultEndpointFamily: String
+    var headersJSON: String
+    var optionsJSON: String
+
+    var providerIDEnum: LLMProviderID {
+        get { LLMProviderID(rawValue: providerID) ?? .customOpenAICompatible }
+        set { providerID = newValue.rawValue }
+    }
+
+    var authKindEnum: LLMAuthKind {
+        get { LLMAuthKind(rawValue: authKind) ?? LLMProviderRegistry.shared.profile(for: providerIDEnum).authKind }
+        set { authKind = newValue.rawValue }
+    }
+
+    var defaultEndpointFamilyEnum: LLMEndpointFamily {
+        get { LLMEndpointFamily(rawValue: defaultEndpointFamily) ?? LLMProviderRegistry.shared.profile(for: providerIDEnum).defaultEndpointFamily }
+        set { defaultEndpointFamily = newValue.rawValue }
+    }
+
+    var defaultModelID: String? {
+        get { defaultModel }
+        set { defaultModel = newValue }
+    }
+
+    var decodedHeaders: [String: String] {
+        get { Self.decodeDictionary(headersJSON) }
+        set { headersJSON = Self.encodeDictionary(newValue) }
+    }
+
+    var decodedOptions: [String: String] {
+        get { Self.decodeDictionary(optionsJSON) }
+        set { optionsJSON = Self.encodeDictionary(newValue) }
+    }
+
     /// Creates a new API configuration with default or specified values.
     ///
     /// - Parameters:
     ///   - name: Display name for this configuration
     ///   - apiKey: Authentication key for the API
     ///   - baseURL: Base URL for the API service
-    ///   - chatCompletionsEndpoint: Endpoint for chat requests
-    ///   - modelsEndpoint: Endpoint for model listing
     ///   - isDefault: Whether this configuration should be the default
     ///   - defaultModel: The default model for this configuration (optional)
     init(
         name: String = "Default",
         apiKey: String = AppDefaults.OpenAi.apiKey,
         baseURL: String = AppDefaults.OpenAi.baseURL,
-        chatCompletionsEndpoint: String = AppDefaults.OpenAi.chatCompletionsEndpoint,
-        modelsEndpoint: String = AppDefaults.OpenAi.modelsEndpoint,
         isDefault: Bool = false, // Default to false for new items
-        defaultModel: String? = nil
+        defaultModel: String? = nil,
+        providerID: LLMProviderID = .openAIPlatform
     ) {
+        let profile = LLMProviderRegistry.shared.profile(for: providerID)
         self.name = name
+        self.providerID = providerID.rawValue
+        self.authKind = profile.authKind.rawValue
         self.apiKey = apiKey
         self.baseURL = baseURL
-        self.chatCompletionsEndpoint = chatCompletionsEndpoint
-        self.modelsEndpoint = modelsEndpoint
         self.isDefault = isDefault
         self.defaultModel = defaultModel
+        self.defaultEndpointFamily = profile.defaultEndpointFamily.rawValue
+        self.headersJSON = "{}"
+        self.optionsJSON = "{}"
     }
-} 
+
+    func endpointPath(for endpointFamily: LLMEndpointFamily) -> String? {
+        LLMProviderRegistry.shared.profile(for: providerIDEnum).endpointPaths[endpointFamily]
+    }
+
+    private static func decodeDictionary(_ json: String) -> [String: String] {
+        guard let data = json.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([String: String].self, from: data) else {
+            return [:]
+        }
+        return decoded
+    }
+
+    private static func encodeDictionary(_ dictionary: [String: String]) -> String {
+        guard let data = try? JSONEncoder().encode(dictionary),
+              let json = String(data: data, encoding: .utf8) else {
+            return "{}"
+        }
+        return json
+    }
+}

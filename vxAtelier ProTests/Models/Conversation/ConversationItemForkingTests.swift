@@ -25,8 +25,8 @@ final class ConversationItemForkingTests: XCTestCase {
         let project = ProjectItem("Fork Project")
         let conversation = ConversationItem(timestamp: Date(), title: "Fork Source", options: ConversationOptions())
         conversation.project = project
-        let userMsg1 = MessageItem(role: "user", content: ContentItem("First"), timestamp: Date(), toolCallId: nil, toolCallsData: nil)
-        let userMsg2 = MessageItem(role: "user", content: ContentItem("Second"), timestamp: Date(), toolCallId: nil, toolCallsData: nil)
+        let userMsg1 = MessageItem(role: "user", text: "First", timestamp: Date(), toolCallId: nil)
+        let userMsg2 = MessageItem(role: "user", text: "Second", timestamp: Date(), toolCallId: nil)
         let turn1 = ConversationTurn(sequenceNumber: 0, timestamp: Date(), userMessage: userMsg1, conversation: conversation)
         let turn2 = ConversationTurn(sequenceNumber: 1, timestamp: Date(), userMessage: userMsg2, conversation: conversation)
         conversation.turns.append(turn1)
@@ -47,21 +47,21 @@ final class ConversationItemForkingTests: XCTestCase {
         let sortedForkedOneTurns = forkedOne.turns.sorted { $0.sequenceNumber < $1.sequenceNumber }
         let sortedOrigTurns = conversation.turns.sorted { $0.sequenceNumber < $1.sequenceNumber }
         XCTAssertEqual(sortedForkedOneTurns.count, 1)
-        XCTAssertEqual(sortedForkedOneTurns[0].userMessage.content.text, "First")
+        XCTAssertEqual(sortedForkedOneTurns[0].userMessage.displayText, "First")
         XCTAssertEqual(forkedOne.project, project)
-        sortedForkedOneTurns[0].userMessage.content = ContentItem("Changed in Fork")
-        XCTAssertNotEqual(sortedForkedOneTurns[0].userMessage.content.text, sortedOrigTurns[0].userMessage.content.text)
-        sortedForkedOneTurns[0].events.append(TurnEvent(type: .assistant, timestamp: Date(), message: MessageItem(role: "assistant", content: ContentItem("Reply"), timestamp: Date(), toolCallId: nil, toolCallsData: nil), turn: sortedForkedOneTurns[0]))
+        sortedForkedOneTurns[0].userMessage.setContentParts([MessageContentPartItem(index: 0, kind: .text, text: "Changed in Fork")])
+        XCTAssertNotEqual(sortedForkedOneTurns[0].userMessage.displayText, sortedOrigTurns[0].userMessage.displayText)
+        sortedForkedOneTurns[0].events.append(TurnEvent(type: .assistant, timestamp: Date(), message: MessageItem(role: "assistant", text: "Reply", timestamp: Date(), toolCallId: nil), turn: sortedForkedOneTurns[0]))
         XCTAssertNotEqual(sortedForkedOneTurns[0].events.count, sortedOrigTurns[0].events.count)
 
         // Fork up to second turn (inclusive)
         let forkedAll = conversation.fork(upToTurnIndex: 1)
         let sortedForkedAllTurns = forkedAll.turns.sorted { $0.sequenceNumber < $1.sequenceNumber }
         XCTAssertEqual(sortedForkedAllTurns.count, 2)
-        XCTAssertEqual(sortedForkedAllTurns[0].userMessage.content.text, "First")
-        XCTAssertEqual(sortedForkedAllTurns[1].userMessage.content.text, "Second")
+        XCTAssertEqual(sortedForkedAllTurns[0].userMessage.displayText, "First")
+        XCTAssertEqual(sortedForkedAllTurns[1].userMessage.displayText, "Second")
         XCTAssertEqual(forkedAll.project, project)
-        sortedForkedAllTurns[1].userMessage.content = ContentItem("Changed in Fork All")
-        XCTAssertNotEqual(sortedForkedAllTurns[1].userMessage.content.text, sortedOrigTurns[1].userMessage.content.text)
+        sortedForkedAllTurns[1].userMessage.setContentParts([MessageContentPartItem(index: 0, kind: .text, text: "Changed in Fork All")])
+        XCTAssertNotEqual(sortedForkedAllTurns[1].userMessage.displayText, sortedOrigTurns[1].userMessage.displayText)
     }
 }

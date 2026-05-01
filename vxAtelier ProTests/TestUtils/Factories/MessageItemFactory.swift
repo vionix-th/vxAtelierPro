@@ -11,10 +11,8 @@ final class MessageItemFactory: BaseTestFactory<MessageItem>, TestDataFactory {
     func create() -> MessageItem {
         return MessageItem(
             role: "user",
-            content: ContentItem("Test message \(uniqueIdentifier())"),
-            timestamp: recentTimestamp(),
-            toolCallId: nil,
-            toolCallsData: nil
+            text: "Test message \(uniqueIdentifier())",
+            timestamp: recentTimestamp()
         )
     }
     
@@ -30,7 +28,7 @@ final class MessageItemFactory: BaseTestFactory<MessageItem>, TestDataFactory {
         create { message in
             message.role = "user"
             if let content = content {
-                message.content = ContentItem(content)
+                message.setContentParts([MessageContentPartItem(index: 0, kind: .text, text: content)])
             }
         }
     }
@@ -39,7 +37,7 @@ final class MessageItemFactory: BaseTestFactory<MessageItem>, TestDataFactory {
         create { message in
             message.role = "assistant"
             if let content = content {
-                message.content = ContentItem(content)
+                message.setContentParts([MessageContentPartItem(index: 0, kind: .text, text: content)])
             }
         }
     }
@@ -48,28 +46,27 @@ final class MessageItemFactory: BaseTestFactory<MessageItem>, TestDataFactory {
         create { message in
             message.role = "assistant"
             message.toolCallId = uniqueIdentifier()
-            let toolCall = GenericToolCall(
-                id: uniqueIdentifier(),
-                name: "test_tool",
-                arguments: "{\"arg1\": \"value1\"}",
-                configuration: nil
-            )
-            if let data = try? JSONEncoder().encode(toolCall) {
-                message.toolCallsData = [data]
-            }
+            message.setToolCalls([
+                LLMToolCall(
+                    id: uniqueIdentifier(),
+                    index: 0,
+                    name: "test_tool",
+                    argumentsJSON: "{\"arg1\": \"value1\"}"
+                )
+            ])
         }
     }
     
     func createToolResultMessage() -> MessageItem {
         create { message in
             message.role = "tool"
-            message.content = ContentItem("Tool result \(uniqueIdentifier())")
+            message.setContentParts([MessageContentPartItem(index: 0, kind: .toolResult, text: "Tool result \(uniqueIdentifier())")])
         }
     }
     
     func createWithMarkdown() -> MessageItem {
         create { message in
-            message.content = ContentItem("# Heading\n\nTest markdown content")
+            message.setContentParts([MessageContentPartItem(index: 0, kind: .text, text: "# Heading\n\nTest markdown content")])
         }
     }
 }

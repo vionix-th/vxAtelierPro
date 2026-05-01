@@ -58,28 +58,30 @@ struct ConversationExportData: Codable {
 
 struct TurnExportData: Codable {
     private enum CodingKeys: String, CodingKey {
-        case sequenceNumber, timestamp, userMessage, events
+        case sequenceNumber, timestamp, userMessage, events, responseRuns
     }
 
     let sequenceNumber: Int
     let timestamp: Date
     let userMessage: MessageExportData
     let events: [TurnEventExportData]
+    let responseRuns: [ResponseRunExportData]
     
     init(_ turn: ConversationTurn) {
         self.sequenceNumber = turn.sequenceNumber
         self.timestamp = turn.timestamp
         self.userMessage = MessageExportData(turn.userMessage)
         self.events = turn.events.map { TurnEventExportData($0) }
+        self.responseRuns = turn.responseRuns.map { ResponseRunExportData($0) }
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         sequenceNumber = try container.decode(Int.self, forKey: .sequenceNumber)
+        timestamp = try container.decode(Date.self, forKey: .timestamp)
         userMessage = try container.decode(MessageExportData.self, forKey: .userMessage)
         events = try container.decode([TurnEventExportData].self, forKey: .events)
-        // For backward compatibility, if timestamp is missing, use the user message's timestamp.
-        timestamp = try container.decodeIfPresent(Date.self, forKey: .timestamp) ?? userMessage.timestamp
+        responseRuns = try container.decodeIfPresent([ResponseRunExportData].self, forKey: .responseRuns) ?? []
     }
     
     func toDataItem(context: ModelContext, conversation: ConversationItem) throws -> ConversationTurn {
@@ -91,6 +93,7 @@ struct TurnExportData: Codable {
             conversation: conversation
         )
         turn.events = events.map { $0.toDataItem(turn: turn) }
+        turn.responseRuns = responseRuns.map { $0.toDataItem(turn: turn) }
         return turn
     }
 }
@@ -112,3 +115,59 @@ struct TurnEventExportData: Codable {
         return TurnEvent(type: eventType, timestamp: self.timestamp, message: msg, turn: turn)
     }
 } 
+
+struct ResponseRunExportData: Codable {
+    let providerID: String
+    let endpointFamily: String
+    let requestedModelID: String
+    let actualModelID: String?
+    let requestID: String?
+    let statusRaw: String
+    let inputTokens: Int?
+    let outputTokens: Int?
+    let totalTokens: Int?
+    let statusCode: Int?
+    let retryAfter: String?
+    let responseMetadataJSON: String?
+    let errorMessage: String?
+    let startedAt: Date
+    let completedAt: Date?
+
+    init(_ item: ResponseRunItem) {
+        self.providerID = item.providerID
+        self.endpointFamily = item.endpointFamily
+        self.requestedModelID = item.requestedModelID
+        self.actualModelID = item.actualModelID
+        self.requestID = item.requestID
+        self.statusRaw = item.statusRaw
+        self.inputTokens = item.inputTokens
+        self.outputTokens = item.outputTokens
+        self.totalTokens = item.totalTokens
+        self.statusCode = item.statusCode
+        self.retryAfter = item.retryAfter
+        self.responseMetadataJSON = item.responseMetadataJSON
+        self.errorMessage = item.errorMessage
+        self.startedAt = item.startedAt
+        self.completedAt = item.completedAt
+    }
+
+    func toDataItem(turn: ConversationTurn) -> ResponseRunItem {
+        let item = ResponseRunItem(
+            providerID: LLMProviderID(rawValue: providerID) ?? .customOpenAICompatible,
+            endpointFamily: LLMEndpointFamily(rawValue: endpointFamily) ?? .chatCompletions,
+            requestedModelID: requestedModelID,
+            actualModelID: actualModelID,
+            requestID: requestID,
+            status: LLMRunStatus(rawValue: statusRaw) ?? .completed,
+            usage: LLMUsage(inputTokens: inputTokens, outputTokens: outputTokens, totalTokens: totalTokens),
+            errorMessage: errorMessage,
+            turn: turn
+        )
+        item.statusCode = statusCode
+        item.retryAfter = retryAfter
+        item.responseMetadataJSON = responseMetadataJSON
+        item.startedAt = startedAt
+        item.completedAt = completedAt
+        return item
+    }
+}

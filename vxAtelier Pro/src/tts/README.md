@@ -28,7 +28,7 @@ A robust solution for managing and playing back text-to-speech with a user-frien
 - **TTSQueue**: Core playback management
   - Uses SwiftData voice configurations for role-based voice selection
   - Supports multi-language text with automatic detection
-  - Language matching ignores region codes for better compatibility
+  - Language matching ignores region codes for better provider matching
   - Smart fallback strategy for unavailable voices
   - Comprehensive logging for debugging
   - Thread-safe operations with main thread UI updates

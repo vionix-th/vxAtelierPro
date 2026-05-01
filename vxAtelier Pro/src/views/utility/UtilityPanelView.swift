@@ -8,7 +8,7 @@ struct UtilityPanelView: View {
     @Environment(\.dismissWindow) private var dismissWindow
 
     @State private var conversationID: PersistentIdentifier?
-    @State private var streamingState = StreamingState()
+    @State private var draftStore = ConversationDraftStore()
     @State private var errorAlert: ErrorAlert?
 
     var body: some View {
@@ -16,7 +16,7 @@ struct UtilityPanelView: View {
             if let conversation {
                 MessageInputView(
                     queryManager: queryManager,
-                    streamingState: streamingState,
+                    draftStore: draftStore,
                     contextConversation: conversation,
                     focusInputOnAppear: true,
                     resolveConversation: {

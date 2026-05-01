@@ -101,35 +101,34 @@ SPM compile-time diagnostics act as the primary linter.  Add SwiftLint or swift-
 
 ## Data Flow & Persistence
 1. **SwiftUI View ➜ ViewModel / Environment**  – user interactions trigger intents.
-2. **Intent ➜ AIService / System Layer**       – asynchronous operations (network, TTS, DB).
+2. **Intent ➜ Provider / System Layer**        – asynchronous operations (AI, network, TTS, DB).
 3. **SwiftData Context**                       – persists `@Model` structs.
 4. **Combine/Observation ➜ UI Updates**        – UI layers automatically reflect model changes.
 
 ---
 
 ## Key Modules
-### AI Services
+### AI Providers
 Location: `src/ai/`
 
-The AI module is built on a provider-agnostic architecture, allowing for flexible integration of various large language models.
+The AI module is built on a provider-neutral domain. Conversation execution builds an `LLMRequest`, sends it through a provider adapter, streams or collects `LLMStreamEvent` values into a `ConversationDraftStore`, then persists stable `MessageItem`, `ToolCallItem`, and `ResponseRunItem` records.
 
-*   **Core Protocols (`AIService.swift`)**: Defines the essential protocols that form the abstraction layer for all AI interactions. This includes `AIService` (the main provider contract), `AIChatMessage`, `AIModel`, and others that ensure a consistent interface across different providers.
-*   **Common Types (`AIServiceCommon.swift`)**: Provides a set of generic, concrete implementations of the core protocols (e.g., `GenericChatMessage`, `GenericChatCompletionRequest`). These structs are used throughout the application to handle AI-related data in a provider-agnostic way, decoupling the application's logic from the specifics of any single AI service.
-*   **Concrete Providers**: The application includes concrete implementations for several providers (`OpenAIService`, `AnthropicService`, `XAIService`, `DeepSeekService`). Each implementation handles the provider-specific details of API requests, responses, and error handling. Notably, some services leverage inheritance for API compatibility (e.g., `DeepSeekService` inherits from `OpenAIService`), demonstrating a reusable architectural pattern.
-* **Provider & Capability Utilities (`ModelProviderUtils.swift`)**: A key utility that provides static methods to detect a model's provider from its name (e.g., "claude-3" -> "Anthropic") and infer its capabilities (e.g., vision, function calling). This allows the UI to adapt dynamically to the selected model.
-* **Service Factory (`AIServiceManager.swift`)**: A singleton that acts as a factory for `AIService` instances. It uses an `AIServiceProvider` enum to detect the provider from a configuration's URL and instantiate the correct service, abstracting the creation process from the rest of the app.
-*   **Network Layer (`NetworkManager.swift`)**: A singleton that centralizes all network communication for the AI services. It provides robust methods for standard and streaming POST/GET requests, featuring detailed logging and a comprehensive `NetworkError` enum for error handling. A key feature is its support for self-signed certificates via a `URLSessionDelegate`, allowing developers to connect to non-production endpoints when enabled through a whitelist.
+*   **Domain (`ai/domain/`)**: Defines `LLMRequest`, `LLMMessage`, `LLMContentPart`, `LLMTool`, `LLMToolCall`, `LLMGenerationOptions`, `LLMProviderProfile`, `LLMModelDescriptor`, `LLMStreamEvent`, `LLMUsage`, and `LLMProviderError`.
+*   **Provider Registry (`LLMProviderRegistry.swift`)**: Owns `LLMProviderID` profiles for OpenAI Platform, OpenAI Codex Subscription, OpenRouter, LM Studio, Ollama, xAI, DeepSeek, Anthropic, and custom OpenAI-compatible providers. It resolves enabled adapters from explicit provider IDs and profile capabilities.
+*   **HTTP Layer (`NetworkClient.swift`, `LLMHTTPClient.swift`)**: `NetworkClient` owns shared JSON/SSE transport, cancellation, timeouts, size caps, response metadata, and self-signed certificate handling. `LLMHTTPClient` is the AI-facing facade for provider headers, redacted diagnostics, HTTP status mapping, and normalized provider errors.
+*   **Adapters (`ai/adapters/`)**: `OpenAIResponsesAdapter`, `OpenAIChatAdapter`, and `AnthropicMessagesAdapter` map provider-specific request/stream formats into domain events. `LLMAdapterRunLoop` owns the shared streamed/non-streamed HTTP flow.
+*   **Execution (`ai/execution/`)**: `LLMConversationRequestBuilder`, `LLMRunCollector`, `LLMToolExecutionCoordinator`, `LLMPersistenceCoordinator`, and `LLMConversationExecutor` split request assembly, draft/event collection, sequential tool execution, SwiftData save boundaries, and turn orchestration.
+*   **Provider & Capability Utilities (`ModelProviderUtils.swift`)**: Provides model-name capability inference for UI filtering and badges.
 *   **Tooling Subsystem (`ai/tooling/`)**: A complete subsystem that enables the AI to call application-defined functions, architected around a set of core protocols and concrete implementations defined in `AITooling.swift`:
     *   **Core Protocols**: The system is built on a foundation of protocols that separate definition from implementation. `AITool` defines a tool's interface (name, description, parameters), while `ExecutableTool` adds the contract for execution. `AIToolCall` and `AIToolCallResult` define the data structures for communication with the AI.
     *   **Execution Handler**: The `AIToolHandler` protocol, with its `DefaultToolHandler` implementation, is responsible for orchestrating tool execution. It receives tool calls from the AI, finds the corresponding `ExecutableTool` in the `AIToolRegistry`, runs it, and formats the result.
     *   **Generic Implementations**: The file provides a full suite of generic, `Codable` structs (`GenericTool`, `GenericToolParameters`, etc.) that implement the core protocols, offering a ready-to-use, standardized way to define tools and their parameters.
     *   **Registry (`AIToolRegistry.swift`)**: A singleton that serves as the central repository for all available `AITool`s. It stores tools in a dictionary keyed by their unique name, allowing the `DefaultToolHandler` to look them up for execution. It also provides a mechanism to store and retrieve tool-specific, `Codable` configurations, enabling tools to have persistent or runtime settings.
-    *   **Concrete Implementation (`AIToolWebSearch.swift`)**: This file provides a concrete implementation of an `ExecutableTool` for performing web searches. It serves as a clear example of the architecture in practice: it uses the injected `QueryManager` to fetch the user's default search provider configuration from SwiftData, then uses the `WebSearchServiceManager` factory to get the appropriate `WebSearchService` instance to perform the search. This demonstrates a clean separation of concerns and integration between the AI layer, data persistence, and other services.
-* **Networking (`NetworkManager.swift`)**: A centralized singleton that manages all HTTP and streaming network requests for the AI services. It includes features like exponential back-off for retries and standardized decoding of API responses.
+    *   **Concrete Implementation (`AIToolWebSearch.swift`)**: This file provides a concrete implementation of an `ExecutableTool` for performing web searches. It uses the injected `QueryManager` to fetch the user's default search provider configuration from SwiftData, then uses the `WebSearchServiceManager` factory to get the appropriate `WebSearchService` instance to perform the search.
 
 ### Search (`search/`)
 
-The `search/` module provides web search capabilities to the application, primarily for use by AI tools. It follows a clean, protocol-oriented architecture similar to the AI services layer, ensuring that different search providers can be used interchangeably.
+The `search/` module provides web search capabilities to the application, primarily for use by AI tools. It follows a protocol-oriented architecture so different search providers can be used interchangeably.
 
 *   **Core Protocol (`WebSearchService.swift`)**: This file defines the foundational components for the search feature.
     *   `WebSearchService`: The core protocol that all search providers must implement. It establishes the contract for performing a search via its `search(query:numResults:)` method.
@@ -139,9 +138,9 @@ The `search/` module provides web search capabilities to the application, primar
 *   **Concrete Implementation (`GoogleCustomSearchService.swift`)**: A concrete class that implements the `WebSearchService` protocol for the Google Custom Search API. It serves as a clear example of the architecture:
     *   It defines a provider-specific `GoogleCustomSearchConfiguration` to hold the required API key and search engine ID.
     *   It uses its own internal `Codable` types to decode the unique JSON structure of the Google API response.
-    *   It leverages the shared `NetworkManager` to handle the underlying network request.
+    *   It leverages `NetworkClient` to handle the underlying network request.
     *   It correctly maps the provider-specific data into the application's standard `WebSearchResult` format, decoupling the rest of the app from the API's details.
-*   **Service Factory (`WebSearchServiceManager.swift`)**: A singleton that acts as a factory for creating `WebSearchService` instances, mirroring the design of the `AIServiceManager`. Its architecture relies on two key components:
+*   **Service Factory (`WebSearchServiceManager.swift`)**: A singleton that acts as a factory for creating `WebSearchService` instances. Its architecture relies on two key components:
     *   `WebSearchProvider`: An `enum` that lists all supported search providers. It contains the core factory logic in its `createService(with:)` method, which instantiates the appropriate concrete service (e.g., `GoogleCustomSearchService`) based on a `WebSearchConfigurationItem`.
     *   `WebSearchServiceManager`: The manager class orchestrates the process. Its `getService(with:)` method uses the enum to create a specific service instance, while its `getDefaultService(context:)` method queries SwiftData to find the user's default search configuration and returns a ready-to-use service.
 
@@ -175,15 +174,10 @@ There is no cached read model; invalidation and refresh are handled by SwiftData
 
 #### Streaming State Management
 
-These components manage the real-time state of streaming responses from AI services, which is essential for the application's interactive chat interface.
+These components manage draft state for in-flight provider responses.
 
-*   **Streaming State (`StreamingState.swift`)**: A simple `@Observable` class that encapsulates the state of a single streaming AI response. It is designed to be updated incrementally as new data arrives from the server.
-    *   **Properties**: It holds the accumulating `text`, a flag for whether the stream `isActive`, and an array of any `toolCalls` received. It also tracks if a response contains `hasToolCallsOnly`.
-    *   **Methods**: Provides methods to append content, update tool calls, and reset the state for a new stream.
-*   **Streaming Handler (`StreamingConversationHandler.swift`)**: This class is the engine that processes the real-time stream of events from an AI service. It is instantiated for each new streaming request and manages the entire lifecycle.
-    *   **Event Handling**: It provides `onChunk`, `onComplete`, and `onError` methods. As data arrives, `onChunk` updates the `StreamingState` object to provide immediate UI feedback.
-    *   **Data Persistence**: On stream completion, `onComplete` creates the final `MessageItem`, adds it to the conversation's turn history, and saves the changes to the database via the `QueryManager`.
-    *   **Tool Call Orchestration**: If the stream contains tool calls, it uses the `DefaultToolHandler` to execute them, adds the results to the conversation as a new `TurnEvent`, and saves the updated state.
+*   **Conversation Draft Store (`ConversationDraftStore.swift`)**: An `@Observable` store keyed by conversation ID. It holds accumulating text, active/run status, tool calls, and error text for the current draft.
+*   **Conversation Executor (`LLMConversationExecutor.swift`)**: Consumes `LLMStreamEvent` values, updates the draft store, persists final assistant/tool messages at stable boundaries, and records response-run status.
 
 ### Utilities
 
@@ -315,8 +309,10 @@ These are the primary entities persisted in the SwiftData store.
 *   **`ConversationItem`**: Represents a single, continuous conversation thread. It manages the conversation's title, status, and options. Its core is an ordered list of `ConversationTurn` objects.
 *   **`ConversationTurn`**: Models a single exchange within a conversation. It contains the initial `userMessage` and a subsequent list of `TurnEvent`s, which capture the AI's multi-step responses.
 *   **`TurnEvent`**: Represents a single event within a `ConversationTurn`, such as an assistant's reply, a tool call, or a tool result. This granular structure allows for modeling complex, multi-step tool interactions.
-*   **`MessageItem`**: The fundamental unit of content, representing a single message from a user, assistant, or tool. It holds the message content, role, timestamp, and other metadata.
-*   **`ContentItem`**: A simple model that holds the raw text content for a `MessageItem`, separating the data from its metadata.
+*   **`MessageItem`**: The fundamental unit of content, representing a single message from a user, assistant, or tool. It stores ordered `MessageContentPartItem` records, role, timestamp, tool result ID, and durable tool-call records.
+*   **`MessageContentPartItem`**: An ordered content part for text, media references, reasoning, or tool-result content.
+*   **`ToolCallItem`**: A persisted tool call with call ID, provider call ID, provider index, name, argument JSON, status, and assistant/result links.
+*   **`ResponseRunItem`**: A persisted provider run with provider/endpoint/model/request IDs, status, usage, error, and turn link.
 
 #### Configuration Models (SwiftData)
 These models store user-configurable settings.
@@ -332,7 +328,7 @@ These non-persisted types are critical for application logic.
 
 *   **`ItemStatus`**: An enum (`active`, `archived`, `trashed`) that defines the lifecycle state for `ProjectItem` and `ConversationItem`.
 *   **`AppearanceStyle`**: An enum (`system`, `light`, `dark`) for managing the application's color scheme.
-*   **`CompletionStreamProcessor`**: A struct containing static logic to process streaming AI responses. Its key function is to accumulate content and correctly merge tool call data that may be split across multiple stream packets.
+*   **`LLMToolCallAssembler`**: A helper that merges tool-call deltas by provider index and call ID.
 
 ### Models Module
 
@@ -350,8 +346,8 @@ This is a flexible SwiftData `@Model` that represents a single, configurable par
 
 This SwiftData `@Model` stores all the necessary information to connect to a specific AI provider's API.
 
-*   **Connection Details**: It holds the provider's `name`, `apiKey`, `baseURL`, and specific endpoint paths for chat and model listing.
-*   **Default Management**: It includes an `isDefault` flag to identify the primary configuration for the application and an optional `defaultModel` to override global settings for this specific provider.
+*   **Connection Details**: It holds the provider's `name`, provider ID, auth kind, API key, base URL, default endpoint family, default model, headers JSON, and options JSON. Endpoint paths are profile-owned except for provider profiles that intentionally expose custom OpenAI-compatible base URLs.
+*   **Default Management**: It includes an `isDefault` flag to identify the primary configuration for the application and an optional `defaultModel` to override profile defaults for this configuration.
 
 #### Bookmark (`BookmarkItem.swift`)
 
@@ -360,28 +356,27 @@ This SwiftData `@Model` allows users to save a reference to a specific point in 
 *   **Granular Targeting**: It can point to either a user's initial `MessageItem` within a turn or, more specifically, to a single `TurnEvent` (like an assistant's reply or a tool result) within that turn.
 *   **Core Relationships**: It maintains relationships to the parent `ConversationItem` and the specific `MessageItem` and optional `TurnEvent` being bookmarked.
 
-#### Content Part (`ContentItem.swift`)
+#### Message Content Part (`MessageContentPartItem.swift`)
 
-This simple SwiftData `@Model` is a fundamental building block for constructing messages. It encapsulates a single piece of text and its corresponding type.
+This SwiftData `@Model` is the ordered content-part record for a message.
 
-*   **Architectural Role**: Its primary purpose is to separate raw content from its metadata. A `MessageItem` holds a single `ContentItem`, and this design allows different types of content (e.g., plain text, source code) to be handled uniformly within the message structure.
-*   **Properties**: It contains the raw `text` and a `type` string (e.g., "Text", "Code") that guides how the content should be rendered in the UI.
+*   **Architectural Role**: A `MessageItem` can hold multiple content parts in provider order. The UI and export paths use `MessageItem.displayText` for text aggregation and the ordered parts for durable content.
+*   **Properties**: It stores provider order, content kind, optional text, MIME type, base64 payload, and source URL.
 
 #### Message (`MessageItem.swift`)
 
 This SwiftData `@Model` is the universal container for any piece of communication in a conversation.
 
-*   **Core Properties**: It stores the `role` (e.g., `user`, `assistant`, `tool`), `timestamp`, and a relationship to a single `ContentItem` that holds the message text.
-*   **Streaming-Aware Tool Handling**: It contains sophisticated logic to manage tool calls sent over a stream. The `updateToolCalls(...)` method correctly reassembles fragmented tool call arguments by finding a tool call by its ID and appending new argument chunks as they arrive.
-*   **Serialization**: It includes `getToolCalls()` and `setToolCalls()` methods to handle the serialization and deserialization of `AIToolCall` objects into a `Data` field for persistence.
+*   **Core Properties**: It stores `role`, `timestamp`, ordered content parts, optional tool result call ID, and durable `ToolCallItem` records.
+*   **Domain Mapping**: `asDomainMessage()` converts persisted message data into `LLMMessage` for provider requests.
+*   **Display Text**: `displayText` is the canonical text aggregation path for rendering, copy, TTS, token estimates, and export.
 
 #### Conversation (`ConversationItem.swift`)
 
 This is a central and sophisticated SwiftData `@Model` that represents a single conversation thread and contains the core business logic for all AI interactions.
 
 *   **Hierarchical Structure**: The dialogue is organized into an array of `ConversationTurn` objects. Each turn groups a user's message with all subsequent assistant responses and tool events, creating a structured, chronological record.
-*   **Recursive Tool Use**: It features a `handleToolCallsRecursively(...)` method that enables advanced, multi-step tool use. It processes tool calls, appends the results to the conversation, and re-queries the AI with the updated context, allowing for chained actions.
-*   **Core Logic**: The `complete(...)` method orchestrates the entire AI interaction, from preparing the message history and configuring the request to handling the streaming response and tool execution.
+*   **Execution Entry Point**: The `complete(_:draftStore:)` method delegates provider execution to `LLMConversationExecutor`.
 *   **Relationships**: It holds critical relationships to its child `ConversationTurn` and `ConversationOptions` objects (cascade delete) and an optional parent `ProjectItem` (nullify).
 *   **Features**: Includes a `fork(...)` method to create a deep copy of the conversation at any point.
 
@@ -389,7 +384,7 @@ This is a central and sophisticated SwiftData `@Model` that represents a single 
 
 This SwiftData `@Model` is a comprehensive container for all settings that govern a single `ConversationItem`.
 
-*   **Dynamic Parameter Generation**: Its `setupAiRequestArguments(...)` method dynamically populates its list of `AiRequestArgument` parameters by querying the selected `AIService` for its defaults. This allows the UI to present the correct settings for the chosen AI provider.
+*   **Parameter Generation**: Its `setupAiRequestArguments(...)` method builds typed controls from the selected `LLMProviderProfile` and configuration defaults.
 *   **Per-Conversation Tool Management**: It provides a complete system for managing tools on a per-conversation basis, storing which tools are enabled and their specific configurations as serialized JSON.
 *   **Relationships**: It holds a relationship to the `APIConfigurationItem` to be used for the conversation and a cascade-delete relationship to its list of `AiRequestArgument` parameters.
 
@@ -457,12 +452,12 @@ This `enum` defines the available UI themes for the application (`system`, `ligh
 
 *   **SwiftUI Integration**: It provides a computed `colorScheme` property that maps the enum case directly to the corresponding SwiftUI `ColorScheme`, providing a clean bridge between the application's settings and the view layer.
 
-#### Completion Stream Processor (`CompletionStreamProcessor.swift`)
+#### Tool Call Assembler (`LLMToolCallAssembler.swift`)
 
-This `struct` contains static methods that provide the core logic for handling and parsing streaming AI responses.
+This `struct` provides the core logic for reconstructing streamed tool-call deltas.
 
-*   **Stream Aggregation**: The `processStream(...)` method asynchronously iterates over response chunks, accumulates text content for real-time UI updates, and manages the assembly of the final response.
-*   **Robust Tool Call Merging**: Its `mergeToolCalls(...)` method correctly reassembles fragmented tool call arguments that are split across multiple stream packets. It finds a tool call by its ID and concatenates the argument strings, ensuring a valid JSON object is formed.
+*   **Delta Merging**: `merge(...)` reassembles fragmented tool-call arguments by provider index and call ID.
+*   **Stable Ordering**: `assembled` returns calls sorted by provider index for deterministic tool execution.
 
 #### Item Status (`ItemStatus.swift`)
 
@@ -521,16 +516,10 @@ This is a comprehensive, cross-platform `@ObservableObject` that provides a cent
 *   **`QueryManager.swift`**: A singleton-like `@Observable` class that acts as the single source of truth for all SwiftData operations. It centralizes queries, mutations, and caching. It provides filtered views of data based on user settings (via `@AppStorage`) and automatically refreshes its caches in response to data changes.
 #### Streaming Response Handling
 
-The application's real-time AI response system is architected around two key components that work in concert: `StreamingState.swift` and `StreamingConversationHandler.swift`.
+The application's in-flight provider response system is built around `ConversationDraftStore` and the execution layer.
 
-*   **Streaming State (`StreamingState.swift`)**: This is an `@Observable` class that serves as the live data model for the UI during a streaming response.
-    *   **UI Binding**: SwiftUI views directly observe an instance of this class to receive real-time updates for displaying accumulating text and tool calls.
-    *   **Robust Tool Call Merging**: Its `updateToolCalls(...)` method correctly reassembles fragmented tool call arguments that may be split across multiple stream packets, ensuring data integrity.
-
-*   **Streaming Conversation Handler (`StreamingConversationHandler.swift`)**: This class is the engine that processes the event stream for a single conversation.
-    *   **Single-Use Instance**: A new handler is instantiated for each streaming request, holding the state for that specific operation.
-    *   **Event Processing**: Its `onChunk` method receives streaming data and publishes it to the `StreamingState` object for UI updates. 
-    *   **Persistence and Orchestration**: On stream completion, its `onComplete` method persists the final, aggregated `MessageItem` to the database and orchestrates the execution of any received tool calls.SwiftData via the `QueryManager`.
+*   **Conversation Draft Store (`ConversationDraftStore.swift`)**: SwiftUI views observe draft text, tool calls, run status, and errors per conversation ID.
+*   **Conversation Executor (`LLMConversationExecutor.swift`)**: Orchestrates provider events, draft state, response-run persistence, and sequential tool execution through the execution helpers.
 *   **`PermissionManager.swift`**: An `@ObservableObject` that centralizes all logic for checking and requesting user permissions for protected system services (e.g., Photos, Microphone, Camera, Contacts). It provides a unified interface for the UI to query permission status and trigger requests.
 *   **`JsonSerializer.swift`**: A utility class containing static methods to serialize individual SwiftData models to JSON and deserialize them back into the application. It works with the DTOs in `system/export` and is a key part of the single-item import/export functionality.
 *   **`AppDefaults.swift`**: An `Observable` struct that bridges `UserDefaults` with the application's default settings, providing a clean interface for managing user preferences.
@@ -922,7 +911,7 @@ This section documents the views responsible for configuring the application's b
 * **`ApplicationSettingsView.swift`** – The main container for the settings UI. It uses a `NavigationSplitView` to present a sidebar of settings categories (defined in a `SettingsTab` enum) and displays the corresponding view for the selected category (e.g., `GeneralSettingsView`, `APISettingsView`).
 *   **`GeneralSettingsView.swift`**: Manages general application preferences. It provides controls for setting the app's `AppearanceStyle`, toggling UI elements like the status bar, and configuring default avatar settings. All settings are persisted directly via `@AppStorage`.
 *   **`APISettingsView.swift`**: The main view for managing AI service provider configurations. It lists all saved `APIConfigurationItem`s, shows which is the default, allows users to add new ones, and handles deletion. It presents the `APIConfigurationEditView` in a sheet for creating or editing a configuration.
-*   **`APIConfigurationEditView.swift`**: A detailed sheet view for creating or editing an `APIConfigurationItem`. It provides a comprehensive interface for managing all aspects of an API connection, including a name, API key (with secure entry and visibility toggle), base URL, and specific endpoints for chat and model listing. It also includes a preset system to quickly configure settings for common providers like OpenAI and Anthropic.
+*   **`APIConfigurationEditView.swift`**: A sheet view for creating or editing an `APIConfigurationItem`. It exposes provider preset, name, API key, base URL, default endpoint family, default model, and advanced headers/options JSON. Provider endpoint paths come from profiles; users do not edit fixed chat/responses/models paths in normal configuration.
 *   **`WebSearchSettingsView.swift`**: The main view for managing web search service configurations. It lists all saved `WebSearchConfigurationItem`s, allows users to add new ones, and handles deletion. It presents the `WebSearchConfigurationEditView` in a sheet for creating or editing a configuration.
 *   **`WebSearchConfigurationEditView.swift`**: A detailed sheet view for creating or editing a `WebSearchConfigurationItem`. It allows the user to select a provider (e.g., Google), enter the required credentials like an API key and a search engine ID, and set the configuration as the default for the application. It dynamically shows the required fields based on the selected provider.
 *   **`ModelsSettingsView.swift`**: The main interface for managing the AI models available to the application. It provides a primary action to fetch and update the list of models from all configured API providers. The view displays models grouped by provider and allows for the manual addition, editing, or deletion of any model. It also includes a destructive action to remove all models at once.
@@ -1015,10 +1004,12 @@ views/
 ### Core AI Layer
 | Protocol | Purpose | Key Conformers |
 |----------|---------|----------------|
-| `AIService` | Top-level provider interface for model discovery and parameter management. | `OpenAIService`, `AnthropicService`, `XAIService`, `DeepSeekService` |
-| `AIChatCompletionServiceStreamable` | Handles the actual chat completion streaming logic via `completeStream(request:)`. | Implemented within each provider's service file. |
-| `AIChatMessage` / `AIChatCompletionRequest` / `AIChatCompletionResponse` | Provider-agnostic DTOs for the chat pipeline. | Internal structs in each service folder |
-| `AIServiceConfiguration` | Base protocol for API key and endpoint configuration. | `GenericAPIConfiguration`, provider-specific configuration structs. |
+| `LLMProviderAdapter` | Top-level provider adapter interface for streaming and model fetches. | `OpenAIResponsesAdapter`, `OpenAIChatAdapter`, `AnthropicMessagesAdapter` |
+| `LLMRequest` / `LLMMessage` / `LLMStreamEvent` | Provider-neutral request, message, and streaming event domain. | Domain structs under `src/ai/domain` |
+| `LLMProviderProfile` | Provider capabilities, auth kind, endpoint families, defaults, and feature flags. | Profiles in `LLMProviderRegistry` |
+| `NetworkClient` / `LLMHTTPClient` | Shared JSON/SSE transport plus AI-specific provider headers, metadata redaction, and normalized provider errors. | Used by web search and all LLM adapters |
+| `LLMAdapterRunLoop` | Shared streamed/non-streamed adapter flow and metadata forwarding. | Used by provider adapters |
+| `LLMCapabilityValidator` | Common preflight validation for endpoint, model, parameter, content, and tool replay support. | Used by executor and adapters |
 
 ### Tooling Layer
 | Protocol | Purpose |
@@ -1083,7 +1074,7 @@ Delete rules:
 * **Logging UI:** Status bar shows filtered `LoggingService` output; log history sheet reads `messageHistory`.
 
 ## Lifecycle & Entry Points
-1. `vxAtelierPro.App` registers platform specific `AppDelegate`, initialises `ModelContainer`, `QueryManager`, `TTSQueue`, `ConversationViewModelStore`, `AIServiceManager`, and default tools.
+1. `vxAtelierPro.App` registers platform specific `AppDelegate`, initialises `ModelContainer`, `QueryManager`, `TTSQueue`, `ConversationViewModelStore`, and default tools.
 2. The `WindowGroup` hosts `AppShellView` with `.preferredColorScheme` driven by `@AppStorage("appearanceStyle")`; the `Settings` scene hosts `ApplicationSettingsView` with the same override and injected environments.
 3. On macOS, a `MenuBarExtra` supplies quick actions.
 
@@ -1111,8 +1102,9 @@ All logging routes through `vxAtelierPro.log` (`LoggingService.shared`), which w
 
 ## Extending the App
 1. **Add a new AI Provider**
-   * Create `YourProviderService.swift`, conform to `AIService`.
-   * Add model defaults, codable types, and register in `AIServiceManager`.
+   * Add an `LLMProviderProfile` in `LLMProviderRegistry`.
+   * Implement `LLMProviderAdapter` for provider streaming and model fetches.
+   * Add model decoding and fixture tests under `vxAtelier ProTests/AI`.
 2. **Add a New Feature Tab**
    * Add SwiftUI view under `views/` and wire to sidebar.
 3. **Add a New Model**

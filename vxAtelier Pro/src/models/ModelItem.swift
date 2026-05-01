@@ -29,6 +29,45 @@ final class ModelItem {
     /// Array of capabilities this model supports (text, vision, etc.)
     var capabilities: [ModelCapability]
 
+    var modelID: String
+    var displayName: String
+    var providerID: String
+    var endpointFamiliesRaw: [String]
+    var modalitiesRaw: [String]
+    var supportedParameters: [String]
+    var schemaFeaturesRaw: [String]
+    var rawMetadataJSON: String?
+
+    var descriptor: LLMModelDescriptor {
+        get {
+            LLMModelDescriptor(
+                id: modelID,
+                displayName: displayName,
+                providerID: LLMProviderID(rawValue: providerID) ?? .customOpenAICompatible,
+                contextWindow: contextSize,
+                endpointFamilies: endpointFamiliesRaw.compactMap { LLMEndpointFamily(rawValue: $0) },
+                modalities: modalitiesRaw.compactMap { LLMModality(rawValue: $0) },
+                supportedParameters: supportedParameters,
+                schemaFeatures: schemaFeaturesRaw.compactMap { LLMSchemaFeature(rawValue: $0) },
+                rawMetadataJSON: rawMetadataJSON
+            )
+        }
+        set {
+            modelID = newValue.id
+            name = newValue.id
+            displayName = newValue.displayName
+            providerID = newValue.providerID.rawValue
+            provider = newValue.providerID.displayName
+            contextSize = newValue.contextWindow ?? AppDefaults.ModelContextSizes.defaultSize
+            endpointFamiliesRaw = newValue.endpointFamilies.map(\.rawValue)
+            modalitiesRaw = newValue.modalities.map(\.rawValue)
+            supportedParameters = newValue.supportedParameters
+            schemaFeaturesRaw = newValue.schemaFeatures.map(\.rawValue)
+            rawMetadataJSON = newValue.rawMetadataJSON
+            capabilities = Self.capabilities(from: newValue)
+        }
+    }
+
     /// Creates a new model item with the specified properties.
     ///
     /// - Parameters:
@@ -39,10 +78,19 @@ final class ModelItem {
         name: String, contextSize: Int = AppDefaults.ModelContextSizes.defaultSize,
         provider: String? = nil
     ) {
+        let resolvedProvider = provider ?? ModelProviderUtils.detectProvider(from: name)
         self.name = name
+        self.modelID = name
+        self.displayName = name
         self.contextSize = contextSize
-        self.provider = provider ?? ModelProviderUtils.detectProvider(from: name)
+        self.provider = resolvedProvider
+        self.providerID = LLMProviderRegistry.providerID(fromProviderName: resolvedProvider).rawValue
         self.capabilities = []
+        self.endpointFamiliesRaw = [LLMEndpointFamily.chatCompletions.rawValue]
+        self.modalitiesRaw = [LLMModality.text.rawValue]
+        self.supportedParameters = []
+        self.schemaFeaturesRaw = [LLMSchemaFeature.streaming.rawValue]
+        self.rawMetadataJSON = nil
 
         // Use the centralized utility method instead of our own implementation
         self.capabilities = ModelProviderUtils.inferCapabilities(from: name)
@@ -55,4 +103,20 @@ final class ModelItem {
     func hasCapability(_ capability: ModelCapability) -> Bool {
         return capabilities.contains(capability)
     }
-} 
+
+    convenience init(descriptor: LLMModelDescriptor) {
+        self.init(name: descriptor.id, contextSize: descriptor.contextWindow ?? AppDefaults.ModelContextSizes.defaultSize, provider: descriptor.providerID.displayName)
+        self.descriptor = descriptor
+    }
+
+    private static func capabilities(from descriptor: LLMModelDescriptor) -> [ModelCapability] {
+        var result: [ModelCapability] = []
+        if descriptor.modalities.contains(.text) { result.append(.text) }
+        if descriptor.modalities.contains(.image) { result.append(.vision) }
+        if descriptor.modalities.contains(.audio) { result.append(.audio) }
+        if descriptor.schemaFeatures.contains(.streaming) { result.append(.streaming) }
+        if descriptor.schemaFeatures.contains(.tools) { result.append(.function) }
+        if !result.contains(.chat) { result.append(.chat) }
+        return result
+    }
+}

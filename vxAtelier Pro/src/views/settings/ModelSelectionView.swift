@@ -15,7 +15,7 @@ struct ModelSelectionView: View {
     let onModelSelected: (String) -> Void
     
     /// The current API provider to filter models by
-    let currentProvider: AIServiceProvider
+    let currentProvider: LLMProviderID
     
     /// Toggle to show all models or just those from the current provider
     @State private var showAllModels = false
@@ -32,10 +32,13 @@ struct ModelSelectionView: View {
         
         // Filter by provider if not showing all models
         if !showAllModels {
-            let currentProviderName = currentProvider.rawValue.lowercased()
+            let acceptedProviders = [
+                currentProvider.rawValue.lowercased(),
+                currentProvider.displayName.lowercased()
+            ]
             models = models.filter { model in
                 let modelProvider = model.provider.lowercased()
-                return modelProvider == currentProviderName || modelProvider == "custom"
+                return acceptedProviders.contains(modelProvider) || modelProvider == "custom"
             }
         }
         
@@ -102,7 +105,7 @@ struct ModelSelectionView: View {
                 // Capability filter chips
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(ModelCapability.allCases, id: \ .self) { capability in
+                        ForEach(ModelCapability.allCases, id: \.self) { capability in
                             CapabilityChip(
                                 capability: capability,
                                 isSelected: selectedCapabilities.contains(capability),
@@ -269,7 +272,7 @@ struct ModelRowView: View {
                             .help("Context window size")
                         }
                         // Display model capabilities as icons
-                        ForEach(modelCapabilities, id: \ .self) { capability in
+                        ForEach(modelCapabilities, id: \.self) { capability in
                             HStack(spacing: 4) {
                                 Image(systemName: capability.systemName)
                                     .foregroundColor(.blue)

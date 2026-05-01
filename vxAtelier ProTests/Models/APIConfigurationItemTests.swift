@@ -22,7 +22,7 @@ final class APIConfigurationItemTests: XCTestCase {
     }
 
     func testCRUD() throws {
-        let config = APIConfigurationItem(name: "TestAPI", apiKey: "key", baseURL: "https://api.test.com", chatCompletionsEndpoint: "/v1/chat", modelsEndpoint: "/v1/models", isDefault: true, defaultModel: "gpt-4")
+        let config = APIConfigurationItem(name: "TestAPI", apiKey: "key", baseURL: "https://api.test.com/v1", isDefault: true, defaultModel: "gpt-4")
         context.insert(config)
         try context.save()
         let fetched = try context.fetch(FetchDescriptor<APIConfigurationItem>())
@@ -39,7 +39,7 @@ final class APIConfigurationItemTests: XCTestCase {
     }
 
     func testRelationshipWithModelItem() throws {
-        let config = APIConfigurationItem(name: "TestAPI", apiKey: "key", baseURL: "https://api.test.com", chatCompletionsEndpoint: "/v1/chat", modelsEndpoint: "/v1/models")
+        let config = APIConfigurationItem(name: "TestAPI", apiKey: "key", baseURL: "https://api.test.com/v1")
         let model = ModelItem(name: "gpt-4", contextSize: 8192, provider: "OpenAI")
         config.defaultModel = model.name
         context.insert(config)
@@ -50,7 +50,7 @@ final class APIConfigurationItemTests: XCTestCase {
     }
 
     func testEdgeCases() throws {
-        let config = APIConfigurationItem(name: "", apiKey: "", baseURL: "", chatCompletionsEndpoint: "", modelsEndpoint: "")
+        let config = APIConfigurationItem(name: "", apiKey: "", baseURL: "")
         context.insert(config)
         try context.save()
         let fetched = try context.fetch(FetchDescriptor<APIConfigurationItem>()).first

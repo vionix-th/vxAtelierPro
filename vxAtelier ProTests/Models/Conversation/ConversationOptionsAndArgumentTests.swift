@@ -42,7 +42,7 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
     // MARK: - API/Model/Voice/Search Config
     func testApiConfigurationAssignment() throws {
         let options = ConversationOptions()
-        let apiConfig = APIConfigurationItem(name: "OpenAI", apiKey: "sk-test", baseURL: "https://api.openai.com", chatCompletionsEndpoint: "/v1/chat/completions", modelsEndpoint: "/v1/models")
+        let apiConfig = APIConfigurationItem(name: "OpenAI", apiKey: "sk-test", baseURL: "https://api.openai.com/v1")
         options.apiConfiguration = apiConfig
         XCTAssertEqual(options.apiConfiguration?.name, "OpenAI")
     }

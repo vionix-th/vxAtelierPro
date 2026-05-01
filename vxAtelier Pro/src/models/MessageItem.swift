@@ -2,129 +2,111 @@ import Foundation
 import SwiftData
 import SwiftUI
 
-/// Represents a message in a conversation with an AI assistant.
-///
-/// This model stores a message along with metadata including:
-/// - Role (user, assistant, system, tool)
-/// - Content of the message
-/// - Timestamp for conversation ordering
-/// - Tool calls and responses for function calling features
 @Model
 final class MessageItem {
-    /// The role of the message sender (user, assistant, system, tool)
     var role: String
 
-    /// The content of the message
-    @Relationship(deleteRule: .cascade) var content: ContentItem
+    @Relationship(deleteRule: .cascade) var contentParts: [MessageContentPartItem] = []
+    @Relationship(deleteRule: .cascade, inverse: \ToolCallItem.assistantMessage) var toolCallItems: [ToolCallItem] = []
 
-    /// When this message was created
     var timestamp: Date
 
-    /// Optional ID for tool responses linking back to tool calls
     var toolCallId: String?
 
-    /// Serialized tool call data for function calling
-    var toolCallsData: [Data]?
+    var displayText: String {
+        orderedContentParts.compactMap(\.text).joined()
+    }
 
-    /// Creates a new message item.
-    ///
-    /// - Parameters:
-    ///   - role: The role of the sender (user, assistant, system, tool)
-    ///   - content: The content of the message
-    ///   - timestamp: When this message was created, defaults to current time
-    ///   - toolCallId: Optional ID for tool responses
-    ///   - toolCallsData: Serialized tool call data
+    var orderedContentParts: [MessageContentPartItem] {
+        contentParts.sorted { $0.index < $1.index }
+    }
+
+    var orderedToolCallItems: [ToolCallItem] {
+        toolCallItems.sorted { $0.index < $1.index }
+    }
+
     init(
         role: String,
-        content: ContentItem,
+        contentParts: [MessageContentPartItem],
         timestamp: Date = Date(),
         toolCallId: String? = nil,
-        toolCallsData: [Data]? = nil
+        toolCalls: [ToolCallItem] = []
     ) {
         self.role = role
-        self.content = content
+        self.contentParts = contentParts
         self.timestamp = timestamp
         self.toolCallId = toolCallId
-        self.toolCallsData = toolCallsData
+        self.toolCallItems = toolCalls
     }
 
-    /// Stores tool calls as serialized data.
-    ///
-    /// - Parameter toolCalls: Array of tool calls to serialize and store
-    /// - Throws: EncodingError if serialization fails
-    func setToolCalls(_ toolCalls: [AIToolCall]?) {
-        if let toolCalls = toolCalls {
-            var encodedCalls: [Data] = []
-            for toolCall in toolCalls {
-                do {
-                    let data = try JSONEncoder().encode(toolCall)
-                    encodedCalls.append(data)
-                } catch {
-                    vxAtelierPro.log.error("Failed to encode tool call: \(error.localizedDescription)")
-                    // Continue with other tool calls even if one fails
-                }
-            }
-            toolCallsData = encodedCalls.isEmpty ? nil : encodedCalls
-        } else {
-            toolCallsData = nil
+    convenience init(
+        role: String,
+        text: String,
+        kind: LLMContentPart.Kind = .text,
+        timestamp: Date = Date(),
+        toolCallId: String? = nil,
+        toolCalls: [ToolCallItem] = []
+    ) {
+        self.init(
+            role: role,
+            contentParts: [MessageContentPartItem(index: 0, kind: kind, text: text)],
+            timestamp: timestamp,
+            toolCallId: toolCallId,
+            toolCalls: toolCalls
+        )
+    }
+
+    func setContentParts(_ parts: [MessageContentPartItem]) {
+        contentParts = parts.enumerated().map { offset, part in
+            part.index = offset
+            return part
         }
     }
 
-    /// Updates tool calls during streaming, preserving existing ones.
-    ///
-    /// - Parameter newToolCalls: New tool calls to add or update
-    func updateToolCalls(with newToolCalls: [AIToolCall]) {
-        // Create a dictionary of existing tool calls by ID for easy lookup
-        var existingToolCallsDict: [String: AIToolCall] = [:]
-        
-        // First, load existing tool calls
-        if let existingToolCalls = getToolCalls() {
-            for toolCall in existingToolCalls {
-                existingToolCallsDict[toolCall.id] = toolCall
-            }
-        }
+    func asDomainMessage() -> LLMMessage {
+        LLMMessage(
+            role: role,
+            content: orderedContentParts.map { $0.asDomainPart() },
+            toolCalls: orderedToolCallItems.map { $0.asDomainToolCall() },
+            toolCallID: toolCallId
+        )
+    }
 
-        // Update existing tool calls or add new ones
+    func setToolCalls(_ toolCalls: [LLMToolCall]) {
+        toolCallItems = toolCalls.enumerated().map { offset, toolCall in
+            ToolCallItem(
+                callID: toolCall.id,
+                providerCallID: toolCall.callID,
+                index: toolCall.index == 0 ? offset : toolCall.index,
+                name: toolCall.name,
+                argumentsJSON: toolCall.argumentsJSON,
+                status: .readyToExecute,
+                assistantMessage: self
+            )
+        }
+    }
+
+    func updateToolCalls(with newToolCalls: [LLMToolCall]) {
         for newToolCall in newToolCalls {
-            // Create a new dictionary for each update to ensure SwiftData tracking
-            var updatedDict = existingToolCallsDict
-            if let existingToolCall = updatedDict[newToolCall.id] {
-                // If this tool call already exists, append the arguments
-                updatedDict[newToolCall.id] = GenericToolCall(
-                    id: newToolCall.id,
-                    name: newToolCall.name,
-                    arguments: existingToolCall.arguments + newToolCall.arguments,
-                    configuration: (newToolCall as? GenericToolCall)?.configuration,
-                    context: (newToolCall as? GenericToolCall)?.context
-                )
+            if let existing = toolCallItems.first(where: { $0.callID == newToolCall.id }) {
+                if !newToolCall.name.isEmpty {
+                    existing.name = newToolCall.name
+                }
+                existing.argumentsJSON += newToolCall.argumentsJSON
             } else {
-                // Otherwise add the new tool call
-                updatedDict[newToolCall.id] = newToolCall
-            }
-            existingToolCallsDict = updatedDict
-        }
-
-        // Convert back to array and save
-        let updatedToolCalls = Array(existingToolCallsDict.values)
-        setToolCalls(updatedToolCalls)
-    }
-
-    /// Retrieves the deserialized tool calls from this message.
-    ///
-    /// - Returns: Array of tool calls, or nil if none exist
-    func getToolCalls() -> [AIToolCall]? {
-        guard let dataArray = toolCallsData else { return nil }
-        
-        var decodedCalls: [AIToolCall] = []
-        for data in dataArray {
-            do {
-                let toolCall = try JSONDecoder().decode(GenericToolCall.self, from: data)
-                decodedCalls.append(toolCall)
-            } catch {
-                vxAtelierPro.log.error("Failed to decode tool call: \(error.localizedDescription)")
-                // Continue with other tool calls even if one fails
+                let nextIndex = (toolCallItems.map(\.index).max() ?? -1) + 1
+                toolCallItems.append(
+                    ToolCallItem(
+                        callID: newToolCall.id,
+                        providerCallID: newToolCall.callID,
+                        index: nextIndex,
+                        name: newToolCall.name,
+                        argumentsJSON: newToolCall.argumentsJSON,
+                        status: .readyToExecute,
+                        assistantMessage: self
+                    )
+                )
             }
         }
-        return decodedCalls.isEmpty ? nil : decodedCalls
     }
 } 

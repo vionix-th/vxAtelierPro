@@ -73,8 +73,8 @@ struct AppDefaults {
     static let ttsAutoplay = true
     static let ttsRepeatMode = "none"  // "none", "one", or "all"
     
-    // NOTE: Speech rate and pitch settings are now managed through voice configurations.
-    // These values are kept for backward compatibility and as defaults when no voice configuration is available.
+    // NOTE: Speech rate and pitch settings are managed through voice configurations.
+    // These values apply when no voice configuration is available.
     static let ttsSpeechRate = 0.5     // Default normal rate in AVSpeechUtterance
     static let ttsPitchMultiplier = 1.0 // Default normal pitch
     
@@ -101,8 +101,8 @@ struct AppDefaults {
         static let model: String = "gpt-4.1-nano"
         static let apiKey = "YOUR API KEY"
         static let baseURL = "https://api.openai.com/v1"
-        static let chatCompletionsEndpoint = "/chat/completions"
-        static let modelsEndpoint = "/models"
+        static let chatCompletionsPath = "/chat/completions"
+        static let modelsPath = "/models"
         static let stream: Bool = false
     }
     
@@ -113,8 +113,8 @@ struct AppDefaults {
         static let model: String = "claude-3-sonnet-20240229"
         static let apiKey = "YOUR API KEY"
         static let baseURL = "https://api.anthropic.com"
-        static let chatCompletionsEndpoint = "/v1/messages"
-        static let modelsEndpoint = "/v1/models"
+        static let messagesPath = "/v1/messages"
+        static let modelsPath = "/v1/models"
         static let max_tokens: Int = 4096
         static let stream: Bool = false
     }
@@ -129,8 +129,8 @@ struct AppDefaults {
         static let model: String = "grok-2-1212"
         static let apiKey = "YOUR API KEY"
         static let baseURL = "https://api.x.ai/v1"
-        static let chatCompletionsEndpoint = "/chat/completions"
-        static let modelsEndpoint = "/models"
+        static let chatCompletionsPath = "/chat/completions"
+        static let modelsPath = "/models"
         static let stream: Bool = false
     }
 
@@ -144,8 +144,8 @@ struct AppDefaults {
         static let model: String = "deepseek-chat"
         static let apiKey = "YOUR API KEY"
         static let baseURL = "https://api.deepseek.com/v1"
-        static let chatCompletionsEndpoint = "/chat/completions"
-        static let modelsEndpoint = "/models"
+        static let chatCompletionsPath = "/chat/completions"
+        static let modelsPath = "/models"
         static let stream: Bool = false
     }
 }

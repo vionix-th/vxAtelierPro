@@ -6,7 +6,7 @@ final class MessageInputViewModel: ObservableObject {
     private let resolveConversation: @MainActor () throws -> ConversationItem
     private var sendTask: Task<Void, Never>?
 
-    let streamingState: StreamingState
+    let draftStore: ConversationDraftStore
 
     @Published var message: String = ""
     @Published var isPromptTemplatesPresented: Bool = false
@@ -18,13 +18,13 @@ final class MessageInputViewModel: ObservableObject {
 
     init(
         queryManager: QueryManager,
-        streamingState: StreamingState,
+        draftStore: ConversationDraftStore,
         focusOnAppear: Bool,
         resolveConversation: @escaping @MainActor () throws -> ConversationItem,
         didSend: ((ConversationItem) -> Void)? = nil
     ) {
         self.queryManager = queryManager
-        self.streamingState = streamingState
+        self.draftStore = draftStore
         self.resolveConversation = resolveConversation
         self.didSend = didSend
         self.isInputFocused = focusOnAppear
@@ -42,7 +42,7 @@ final class MessageInputViewModel: ObservableObject {
         }
 
         sendTask?.cancel()
-        streamingState.reset()
+        draftStore.reset()
         isTaskRunning = true
         let textToSend = message
 
@@ -52,7 +52,7 @@ final class MessageInputViewModel: ObservableObject {
                 autoNameIfNeeded(conversation: conversation, sourceText: textToSend, autoNameConversations: autoNameConversations)
 
                 let expandedMessage = expandVariables(textToSend, conversation: conversation)
-                try await conversation.complete(expandedMessage, streamingState: streamingState)
+                try await conversation.complete(expandedMessage, draftStore: draftStore)
                 try queryManager.saveContext()
 
                 message = ""
@@ -71,7 +71,7 @@ final class MessageInputViewModel: ObservableObject {
 
     func cancel() {
         sendTask?.cancel()
-        streamingState.reset()
+        draftStore.reset()
         isTaskRunning = false
     }
 
@@ -111,7 +111,7 @@ struct MessageInputView: View {
 
     init(
         queryManager: QueryManager,
-        streamingState: StreamingState,
+        draftStore: ConversationDraftStore,
         contextConversation: ConversationItem? = nil,
         focusInputOnAppear: Bool = vxAtelierPro.macOS,
         resolveConversation: @escaping @MainActor () throws -> ConversationItem,
@@ -121,7 +121,7 @@ struct MessageInputView: View {
         _viewModel = StateObject(
             wrappedValue: MessageInputViewModel(
                 queryManager: queryManager,
-                streamingState: streamingState,
+                draftStore: draftStore,
                 focusOnAppear: focusInputOnAppear,
                 resolveConversation: resolveConversation,
                 didSend: didSend

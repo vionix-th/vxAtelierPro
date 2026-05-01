@@ -29,8 +29,8 @@ final class ConversationItemEdgeCaseTests: XCTestCase {
         XCTExpectFailure("Lacking mechanism")
         
         let conversation = testEnv.createConversation()
-        let turn1 = ConversationTurn(sequenceNumber: 0, timestamp: Date(), userMessage: MessageItem(role: "user", content: ContentItem("msg1"), timestamp: Date(), toolCallId: nil, toolCallsData: nil), conversation: conversation)
-        let turn2 = ConversationTurn(sequenceNumber: 0, timestamp: Date(), userMessage: MessageItem(role: "user", content: ContentItem("msg2"), timestamp: Date(), toolCallId: nil, toolCallsData: nil), conversation: conversation)
+        let turn1 = ConversationTurn(sequenceNumber: 0, timestamp: Date(), userMessage: MessageItem(role: "user", text: "msg1", timestamp: Date(), toolCallId: nil), conversation: conversation)
+        let turn2 = ConversationTurn(sequenceNumber: 0, timestamp: Date(), userMessage: MessageItem(role: "user", text: "msg2", timestamp: Date(), toolCallId: nil), conversation: conversation)
         conversation.turns = [turn1, turn2]
         context.insert(conversation)
         XCTAssertThrowsError(try context.save(), "Duplicate sequence numbers should not be allowed")
@@ -40,7 +40,7 @@ final class ConversationItemEdgeCaseTests: XCTestCase {
         XCTExpectFailure("Lacking mechanism")
         
         let conversation = testEnv.createConversation()
-        let msg = MessageItem(role: "user", content: ContentItem(""), timestamp: Date(), toolCallId: nil, toolCallsData: nil)
+        let msg = MessageItem(role: "user", text: "", timestamp: Date(), toolCallId: nil)
         let turn = ConversationTurn(sequenceNumber: 0, timestamp: Date(), userMessage: msg, conversation: conversation)
         conversation.turns = [turn]
         context.insert(conversation)

@@ -216,8 +216,7 @@ final class QueryManagerDeletionTests: XCTestCase {
         try queryManager.insert(dialog)
         
         // Create a message and bookmark
-        let contentItem = ContentItem("Test content")
-        let messageItem = MessageItem(role: "user", content: contentItem)
+        let messageItem = MessageItem(role: "user", text: "Test content")
         let turn = ConversationTurn(sequenceNumber: 0, userMessage: messageItem, conversation: dialog)
         dialog.turns.append(turn)
         try queryManager.insert(dialog)
@@ -245,8 +244,7 @@ final class QueryManagerDeletionTests: XCTestCase {
         try queryManager.insert(dialog)
         
         // Create turn with message
-        let contentItem = ContentItem("Test content")
-        let messageItem = MessageItem(role: "user", content: contentItem)
+        let messageItem = MessageItem(role: "user", text: "Test content")
         let turn = ConversationTurn(sequenceNumber: 1, userMessage: messageItem, conversation: dialog)
         dialog.turns.append(turn)
         try testEnv.save()

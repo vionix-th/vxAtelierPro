@@ -1,315 +1,107 @@
-# AIService Framework Documentation
+# AI Provider Layer
 
-The AIService framework provides a flexible and extensible architecture for integrating various AI service providers into an application. It defines a set of protocols and base implementations that allow easy addition of new AI services while maintaining a consistent interface.
+vxAtelier Pro uses a provider-neutral AI domain. Runtime conversation execution goes through `LLMConversationExecutor`, `LLMProviderRegistry`, and provider adapters.
 
-## Key Components
+## Runtime Flow
 
-### AIService Protocol
+1. `ConversationItem.complete(_:draftStore:)` delegates to `LLMConversationExecutor`.
+2. `LLMConversationRequestBuilder` resolves provider, endpoint family, model, options, messages, and tools into `LLMRequest`.
+3. `LLMProviderRegistry` selects an `LLMProviderAdapter`.
+4. `LLMAdapterRunLoop` handles shared streamed/non-streamed HTTP flow and adapter-specific parsers emit `LLMStreamEvent` values.
+5. `LLMRunCollector` accumulates draft text/tool deltas in `ConversationDraftStore`.
+6. Stable boundaries are persisted through `LLMPersistenceCoordinator` as `MessageItem`, `ToolCallItem`, and `ResponseRunItem`.
+7. `LLMToolExecutionCoordinator` runs durable tool calls sequentially by provider index.
 
-The `AIService` protocol defines the core functionality that every AI service provider must implement. It includes methods for:
+SwiftData is not written per token or per tool-argument delta.
 
-- Fetching available models (`fetchAvailableModels()`)
-- Getting default request parameters (`getDefaultParameters()`) 
-- Applying parameters to a request (`applyParameters(to:from:)`)
-- Accessing the chat completion service (`chat` property)
+## Canonical Domain
 
-Key associated types:
-- `AIModel`: Represents a model supported by the service
-- `AIChatCompletionRequest`: Provider-specific chat request type
-- `AIChatCompletionResponse`: Provider-specific chat response type
+Domain types live in `ai/domain`:
 
-### AIChatCompletionServiceStreamable Protocol
+- `LLMRequest`, `LLMMessage`, `LLMContentPart`
+- `LLMTool`, `LLMToolCall`
+- `LLMGenerationOptions`
+- `LLMProviderProfile`, `LLMModelDescriptor`
+- `LLMStreamEvent`, `LLMUsage`, `LLMProviderError`
 
-The `AIChatCompletionServiceStreamable` protocol defines the interface for a chat completion service. It includes methods for:
+Provider identity is explicit via `LLMProviderID` and profile-backed configuration presets.
 
-- Creating messages (`createMessage(role:content:toolCalls:toolCallId:)`)
-- Creating requests (`createRequest(messages:)`)
-- Registering tools (`registerTools(_:)`)
-- Completing a chat request via the unified streaming API (`completeStream(request:)`)
+## Providers
 
-All providers must implement `completeStream`, which always returns an `AsyncThrowingStream<AIChatCompletionChunk, Error>`. This stream yields one or more chunks, depending on whether streaming is enabled for the provider and request.
+Supported profiles:
 
-### AIServiceManager
+- OpenAI Platform: Responses first, with Chat Completions endpoint support.
+- Anthropic: Messages API.
+- OpenRouter, LM Studio, Ollama, xAI, DeepSeek, custom OpenAI-compatible: Chat Completions-compatible adapter.
+- OpenAI Codex Subscription: profile exists but is disabled until supported Codex App Server auth can be embedded safely.
 
-The `AIServiceManager` class provides a simplified way to manage multiple AI services. It includes methods for:
+## Persistence
 
-- Getting a service for a specific configuration (`getService(with:)`)
-- Getting the current default service (`getCurrentService(context:)`)
+Canonical records:
 
-The manager automatically detects the provider type based on the configuration and creates the appropriate service instance.
+- `MessageItem` stores ordered `MessageContentPartItem` records and exposes `displayText`.
+- `ToolCallItem` stores durable call ID, provider call ID, provider index, name, arguments JSON, status, and result link.
+- `ResponseRunItem` stores provider, endpoint family, requested/actual model, request ID, status, usage, error, and turn link.
+- `ModelItem` persists `LLMModelDescriptor` fields.
+- `APIConfigurationItem` persists provider ID, auth kind, base URL, default endpoint family/model, endpoint overrides, headers, and options.
+- `ConversationOptions` persists typed generation fields and provider extras.
 
-### Provider Implementations
+## Adding A Provider
 
-The framework includes concrete implementations for popular AI service providers:
+1. Add or extend an `LLMProviderProfile` in `LLMProviderRegistry`.
+2. Implement `LLMProviderAdapter.stream(_:configuration:)`.
+3. Implement `fetchModels(configuration:)` returning `LLMModelDescriptor`.
+4. Map provider events into `LLMStreamEvent` without SwiftData writes.
+5. Add fixture coverage under `vxAtelier ProTests/AI/Fixtures`.
 
-- `OpenAIService`: Integration with the OpenAI API
-- `AnthropicService`: Integration with the Anthropic API
-- `XAIService`: Integration with the x.ai API
-- `DeepSeekService`: Integration with the DeepSeek API
+Tool execution remains sequential by provider index. Retry is disabled by default and, when enabled, is limited to one retry before tool execution starts.
 
-Each provider implements the `AIService` protocol and provides its own types for models, requests, and responses. The XAI and DeepSeek services extend the OpenAI service implementation, sharing much of the same structure and behavior while adding provider-specific customizations. AnthropicService now supports both streaming and non-streaming completions via the unified `completeStream` method.
+## Streaming And Non-Streaming
 
-## Usage
+Streaming is controlled by `ConversationOptions.streamMode`:
 
-To use the AIService framework:
+- `enabled`: fail preflight if the provider/model cannot stream.
+- `disabled`: request a complete response body.
+- `auto`: stream when provider/model metadata advertises streaming, otherwise use non-streaming.
 
-1. Create an `APIConfigurationItem` with the necessary credentials and endpoints for your desired AI service provider.
+Adapters support both modes where the provider endpoint supports both modes. The executor consumes the same `LLMStreamEvent` stream either way, so SwiftUI draft state and SwiftData persistence do not branch on provider wire format.
 
-2. Get an instance of the appropriate `AIService` using the `AIServiceManager`:
+## HTTP Guardrails
 
-```swift
-let config = APIConfigurationItem(...)
-let service = AIServiceManager.shared.getService(with: config)
-```
+`NetworkClient` owns shared HTTP transport, including JSON requests, SSE parsing, timeout/body-size enforcement, response metadata, and self-signed certificate handling. `LLMHTTPClient` is the AI-facing facade: it builds LLM requests, applies provider headers, redacts diagnostics metadata, and normalizes network/provider errors.
 
-3. Interact with the service using the methods defined in the `AIService` and `AIChatCompletionService` protocols:
-
-```swift
-let models = try await service.fetchAvailableModels()
-let parameters = service.getDefaultParameters()
-
-let messages = [
-    service.chat.createMessage(role: "system", content: "You are a helpful assistant.")
-]
-let request = service.chat.createRequest(messages: messages)
-let response = try await service.chat.complete(request: request)
-```
+- request timeout: `APIConfigurationItem.optionsJSON["request_timeout_seconds"]`, default `60`
+- SSE idle timeout: `APIConfigurationItem.optionsJSON["sse_idle_timeout_seconds"]`, default `120`
+- complete response body cap: `optionsJSON["max_response_body_bytes"]`, default `10485760`
+- SSE event cap: `optionsJSON["max_sse_event_bytes"]`, default `1048576`
 
-4. For completions (streaming or non-streaming), use the unified `completeStream` method, which always returns an `AsyncThrowingStream<AIChatCompletionChunk, Error>`:
+Provider response metadata stores status code, request id, retry-after, rate-limit headers, and redacted raw headers. Authentication headers and likely secret-bearing response headers are not persisted in diagnostics metadata.
 
-```swift
-let stream = service.chat.completeStream(request: request)
-for try await chunk in stream {
-    // Handle each chunk (content, tool calls, isFinal)
-}
-```
-
-The `stream` parameter in the request determines whether the provider will stream the response or return a single chunk. All providers now use this unified interface.
+API keys remain in user-managed configuration storage for this release. There is no Keychain migration or secure-storage abstraction in this pass.
 
-5. Customize the behavior by providing different configurations or by implementing additional `AIService` conformances for new providers.
-
-## Implementing New AIServices
-
-To add support for a new AI service provider, follow these steps:
-
-1. Create a new type that conforms to the `AIService` protocol. Implement the required methods and properties:
-
-```swift
-class MyAIService: AIService {
-    // Implement fetchAvailableModels()
-    func fetchAvailableModels() async throws -> [AIModel] { ... }
-    
-    // Implement getDefaultParameters()
-    func getDefaultParameters() -> [AiRequestArgument] { ... }
-    
-    // Implement applyParameters(to:from:)
-    func applyParameters(to request: Any, from parameters: [AiRequestArgument]) -> Any { ... }
-    
-    // Provide a chat completion service
-    lazy var chat: AIChatCompletionService = MyAIChatService(service: self)
-}
-```
-
-2. Define the associated types for your service:
-
-```swift
-class MyAIService: AIService {
-    typealias MyAIModel = ...
-    typealias MyAIChatCompletionRequest = ...
-    typealias MyAIChatCompletionResponse = ...
-    
-    // ...
-}
-```
-
-3. Implement a custom chat completion service that conforms to `AIChatCompletionService`:
-
-```swift
-class MyAIChatService: AIChatCompletionService {
-    // Implement createMessage(role:content:toolCalls:toolCallId:)
-    func createMessage(role: String, content: String, toolCalls: [AIToolCall]?, toolCallId: String?) -> AIChatMessage { ... }
-    
-    // Implement createRequest(messages:)
-    func createRequest(messages: [AIChatMessage]) -> AIChatCompletionRequest { ... }
-    
-    // Implement complete(request:)
-    func complete(request: AIChatCompletionRequest) async throws -> AIChatCompletionResponse { ... }
-    
-    // Implement completeStream(request:)
-    func completeStream(request: AIChatCompletionRequest) -> AsyncThrowingStream<AIChatCompletionChunk, Error> { ... }
-    
-    // Implement registerTools(_:)
-    func registerTools(_ tools: [AITool]) { ... }
-}
-```
-
-4. Handle provider-specific authentication, API calls, and response parsing within your service implementation. All providers must implement the unified `completeStream` method for chat completions.
-
-5. Register your new service with the `AIServiceManager`:
-
-```swift
-enum AIServiceProvider: String, CaseIterable {
-    // ...
-    case myAI = "MyAI"
-    
-    func createService(with config: APIConfigurationItem) -> AIService {
-        switch self {
-        // ...
-        case .myAI:
-            return MyAIService(configurationItem: config)
-        }
-    }
-    
-    static func detectProvider(from config: APIConfigurationItem) -> AIServiceProvider {
-        // Update to detect your provider based on configuration
-        // ...
-    }
-}
-```
-
-## Implementing AITools
-
-To define custom tools for your AI service:
-
-1. Create a struct representing your tool, conforming to the `Codable` protocol:
-
-```swift
-struct MyAITool: Codable {
-    let type: String
-    let function: MyAIFunction
-}
-
-struct MyAIFunction: Codable {
-    let name: String
-    let description: String
-    let parameters: MyAIParameters
-}
-
-struct MyAIParameters: Codable {
-    let type: String
-    let properties: [String: MyAIProperty]
-    let required: [String]?
-}
-
-struct MyAIProperty: Codable {
-    let type: String
-    let description: String
-    // Add any additional properties
-}
-```
-
-2. Register your tools with the chat completion service:
-
-```swift
-class MyAIChatService: AIChatCompletionService {
-    // ...
-    
-    func registerTools(_ tools: [AITool]) {
-        // Convert AITool to MyAITool and store
-        // ...
-    }
-}
-```
-
-3. Handle tool calls within your chat completion implementation:
-
-```swift
-class MyAIChatService: AIChatCompletionService {
-    // ...
-    
-    func complete(request: AIChatCompletionRequest) async throws -> AIChatCompletionResponse {
-        // ...
-        // Process tool calls and generate appropriate responses
-        // ...
-    }
-}
-```
-
-Best practices:
-- Ensure your service handles authentication securely and respects rate limits
-- Validate and sanitize input parameters to prevent security vulnerabilities
-- Provide clear error messages and handle edge cases gracefully
-- Document any provider-specific quirks or limitations
-
-By following these steps and adhering to the `AIService` and `AIChatCompletionService` protocols, you can seamlessly integrate new AI services and tools into the framework.
-
-## Provider-Specific Implementations
-
-The AIService framework includes concrete implementations for popular AI service providers. Each provider has its own set of files that define provider-specific types, request/response formats, and service implementations.
-
-For example, the OpenAI integration is implemented in the following files:
-
-- `OpenAIService.swift`: Defines the `OpenAIService` class that conforms to the `AIService` protocol and implements OpenAI-specific functionality.
-- `OpenAIModel.swift`: Implements the `AIModel` protocol for OpenAI models.
-- `OpenAICodableTypes.swift`: Contains the Codable types used for API interactions.
-- `OpenAIDefaults.swift`: Defines default parameters and configurations.
-
-Anthropic integration is implemented in:
-
-- `AnthropicService.swift`: Defines the `AnthropicService` class and its chat service. As of the latest update, Anthropic supports both streaming and non-streaming completions via the unified `completeStream` method. The `stream` parameter is now available in `getDefaultParameters` for Anthropic, allowing users to toggle streaming mode. Tool calls are not yet supported for Anthropic, but the API is ready for future support.
-
-Similar structures exist for other providers like x.ai and DeepSeek.
-
-#### Comparing Provider Implementations
-
-While the overall structure and approach is similar between different provider integrations, there are some key differences:
-
-1. **Type Definitions**: Each implementation defines provider-specific types for models, requests, responses, tools, and parameters. The field names and structures may differ to match each provider's API.
-
-2. **Inheritance vs. Independent Implementation**: Some providers (like XAI and DeepSeek) extend the OpenAI service implementation due to API similarities, while others (like Anthropic) have independent implementations.
-
-3. **API Interaction**: Each service class handles the interaction with its respective API, including authentication, request construction, and response parsing.
-
-4. **Default Parameters**: Provider-specific default parameters are defined in separate files (e.g., `OpenAIDefaults.swift`, `AnthropicDefaults.swift`).
-
-Despite these differences, the provider implementations follow a consistent pattern:
-
-1. Define provider-specific types
-2. Implement the `AIService` protocol in a provider-specific service class
-3. Create a custom chat service that conforms to `AIChatCompletionService`
-4. Handle conversion between generic and provider-specific formats
-
-## Common Types and Utilities
-
-The AIService framework provides some generic implementations and utility extensions for common use cases:
-
-- `GenericConfiguration`: A concrete implementation of the `AIServiceConfiguration` protocol for configuring AI services.
-- `GenericChatMessage`, `GenericChatCompletionRequest`, `GenericChatCompletionResponse`: Generic implementations of the core chat-related protocols.
-- Token counting utilities: Extension methods on `Array` of `AIChatMessage` for estimating token counts in conversations.
-
-These common types and utilities can be used directly or as a starting point for custom implementations.
-
-## Error Handling
-
-The framework defines an `AIServiceError` enum that covers various error conditions:
-
-- Network and connectivity issues
-- Authentication failures
-- API-specific errors
-- Context limit exceeded errors
-- Configuration problems
-
-Each error type provides localized descriptions suitable for user-facing error messages.
-
-## Application Data Model Integration
-
-The AIService framework is designed to be independent from the application's data models. In vxAtelier Pro:
-
-- `DialogItem`, `MessageItem`, etc. in `ItemModel.swift` are SwiftData models optimized for UI requirements
-- These models are completely separate from the AI service types
-- Conversion logic in `DialogItem` methods (like `createChatMessages()` and `createConfiguredRequest()`) transforms between internal models and service types
-- This separation allows the UI to work with consistent data structures regardless of which AI provider is being used
-
-When communicating with AI services:
-1. Internal models (DialogItem → MessageItem) are converted to service protocol types (AIChatMessage)
-2. Service protocol types are converted to provider-specific implementations
-3. Responses follow the reverse path back to the UI
-
-This architecture enables:
-- Switching between different AI providers without UI changes
-- Customizing the UI data model independently from API requirements
-- Handling provider-specific features like tool calls in a consistent way
-
-## Conclusion
-
-The AIService framework provides a powerful abstraction layer for integrating AI services into an application. By leveraging protocols and a modular architecture, it enables seamless addition of new providers and easy switching between different services. 
+## Validation
+
+`LLMCapabilityValidator` performs provider/model preflight before a run is persisted:
+
+- endpoint family support
+- stream mode support
+- typed parameter support
+- JSON object/schema response format support
+- image/file/audio content support
+- tool replay ordering and tool-result correlation
+
+`json_schema` response format requires `ConversationOptions.providerExtrasJSON` key `json_schema` to decode to an object. The adapter consumes that object into the provider-specific request shape and does not duplicate it at the top level.
+
+## Smoke Tests
+
+Offline adapter and executor tests use fixtures in `vxAtelier ProTests/AI/Fixtures`.
+
+Live provider smoke tests live in `LLMProviderSmokeTests` and are skipped by default. To run them, set `VX_LLM_SMOKE_TESTS=1` plus the provider-specific variables:
+
+- `VX_OPENAI_API_KEY`, optional `VX_OPENAI_MODEL`
+- `VX_ANTHROPIC_API_KEY`, optional `VX_ANTHROPIC_MODEL`
+- `VX_OPENROUTER_API_KEY`, optional `VX_OPENROUTER_MODEL`
+- `VX_LMSTUDIO_BASE_URL`, `VX_LMSTUDIO_MODEL`
+- `VX_OLLAMA_BASE_URL`, `VX_OLLAMA_MODEL`
+
+The smoke tests verify streamed and non-streamed response paths for each enabled provider profile they cover.

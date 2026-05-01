@@ -30,6 +30,19 @@ struct ConversationOptionsView: View {
             .foregroundColor(.accentColor)
     }
 
+    private var selectableEndpointFamilies: [LLMEndpointFamily] {
+        guard let config = options.apiConfiguration else { return [] }
+        let provider = LLMProviderRegistry.shared.resolveProviderID(for: config)
+        return LLMProviderRegistry.shared.profile(for: provider).supportedEndpointFamilies.filter { $0 != .models }
+    }
+
+    private var endpointSelection: Binding<String> {
+        Binding(
+            get: { options.endpointOverride ?? "" },
+            set: { options.endpointOverride = $0.isEmpty ? nil : $0 }
+        )
+    }
+
     @ViewBuilder
     private func apiConfigurationPicker() -> some View {
         HStack {
@@ -45,6 +58,22 @@ struct ConversationOptionsView: View {
         }
     }
 
+    @ViewBuilder
+    private func endpointPicker() -> some View {
+        HStack {
+            Text("API Mode")
+                .frame(width: 150, alignment: .leading)
+            Picker("", selection: endpointSelection) {
+                Text("Configuration Default").tag("")
+                ForEach(selectableEndpointFamilies) { family in
+                    Text(family.displayName).tag(family.rawValue)
+                }
+            }
+            .pickerStyle(.menu)
+            .disabled(options.apiConfiguration == nil || selectableEndpointFamilies.isEmpty)
+        }
+    }
+
     var body: some View {
         TabView(selection: $selectedTab) {
             // MARK: Parameters Tab (Tab 0)
@@ -52,6 +81,7 @@ struct ConversationOptionsView: View {
                 ScrollView {
                     VStack(spacing: AppDefaults.paddingLarge) {
                         apiConfigurationPicker()
+                        endpointPicker()
                         
                         // Use SettingsSectionView for parameters
                         SettingsSectionView(title: "Model Parameters") {
@@ -264,21 +294,15 @@ struct ConversationOptionsView: View {
                 vxAtelierPro.log.info("API configuration changed, updating parameters")
                 options.setupAiRequestArguments(for: config, modelContext: modelContext)
                 
-                // Set the default model based on the configuration or fallback
-                let provider = AIServiceProvider.detectProvider(from: config)
-                let defaultModel: String = {
-                    if let model = config.defaultModel, !model.isEmpty {
-                        return model
-                    }
-                    switch provider {
-                        case .openAI: return AppDefaults.OpenAi.model
-                        case .anthropic: return AppDefaults.Anthropic.model
-                        case .xAI: return AppDefaults.XAI.model
-                        case .deepSeek: return AppDefaults.DeepSeek.model
-                    }
-                }()
+                let provider = LLMProviderRegistry.shared.resolveProviderID(for: config)
+                let profile = LLMProviderRegistry.shared.profile(for: provider)
+                let defaultModel = config.defaultModelID ?? profile.defaultModelID ?? ""
                 options.setParameterValue(name: "model", value: defaultModel)
-                vxAtelierPro.log.info("Set default model to \(defaultModel) for provider \(provider.rawValue)")
+                if let override = options.endpointOverrideFamily,
+                   !profile.supportedEndpointFamilies.contains(override) {
+                    options.endpointOverride = nil
+                }
+                vxAtelierPro.log.info("Set default model to \(defaultModel) for provider \(provider.displayName)")
             }
         }
         .toolbar {
@@ -492,7 +516,7 @@ struct ParameterControlView: View {
                             onModelSelected: { modelId in
                                 parameter.setValue(modelId)
                             },
-                            currentProvider: AIServiceProvider.detectProvider(from: config)
+                            currentProvider: LLMProviderRegistry.shared.resolveProviderID(for: config)
                         )
                     }
                 }

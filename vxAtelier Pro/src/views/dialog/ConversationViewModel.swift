@@ -15,7 +15,7 @@ final class ConversationViewModel {
     
     var selectedMessages = Set<PersistentIdentifier>()
     var isSelectingMessages: Bool = false
-    var streamingState = StreamingState()
+    var draftStore = ConversationDraftStore()
     var errorAlert: ErrorAlert?
     var bookmarkMessage: MessageItem? = nil
     var bookmarkMessageLabel: String = ""
@@ -51,11 +51,6 @@ final class ConversationViewModel {
         self.ttsQueue = ttsQueue
     }
     
-    // Backward compatibility initializer
-    convenience init(conversation: ConversationItem, queryManager: QueryManager, ttsQueue: TTSQueue) {
-        self.init(conversationID: conversation.id, queryManager: queryManager, ttsQueue: ttsQueue)
-    }
-
     deinit {
         let id = conversationID
         Task { @MainActor in
@@ -115,7 +110,7 @@ final class ConversationViewModel {
             isSelectingMessages = true
             selectedMessages.insert(message.id)
         case .copyText:
-            ExportUtils.copyToClipboard(message.content.text)
+            ExportUtils.copyToClipboard(message.displayText)
         case .copyJSON:
             let messageData = MessageExportData(message)
             ExportUtils.copyToClipboard(messageData)
@@ -228,7 +223,7 @@ final class ConversationViewModel {
         guard let conversation = conversation else { return }
 
         let selectedMessagesList = selectedMessagesOrdered(in: conversation, messageIDs: selectedMessages)
-        let selectedText = selectedMessagesList.map { $0.content.text }.joined(separator: "\n\n")
+        let selectedText = selectedMessagesList.map(\.displayText).joined(separator: "\n\n")
         ExportUtils.copyToClipboard(selectedText)
     }
 

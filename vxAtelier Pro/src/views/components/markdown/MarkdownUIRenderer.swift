@@ -76,7 +76,7 @@ struct MarkdownUIRenderer: View {
     }
 }
 
-// Local modifier to avoid dependency on legacy modules
+// Local modifier keeps markdown rendering self-contained.
 private struct MarkdownSelectableModifier: ViewModifier {
     let enabled: Bool
     func body(content: Content) -> some View {
@@ -98,4 +98,3 @@ private func copyToClipboard(_ text: String) {
     UIPasteboard.general.string = text
     #endif
 }
-

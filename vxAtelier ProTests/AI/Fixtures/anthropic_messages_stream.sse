@@ -1,0 +1,11 @@
+data: {"type":"message_start","message":{"id":"msg_fixture","model":"claude-3-5-sonnet-latest"}}
+
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}
+
+data: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_1","name":"lookup","input":{}}}
+
+data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"q\""}}
+
+data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":":\"test\"}"}}
+
+data: {"type":"message_stop"}

@@ -117,7 +117,7 @@ struct ModelsSettingsView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
-                    ForEach(modelsByProvider.keys.sorted(), id: \ .self) { provider in
+                    ForEach(modelsByProvider.keys.sorted(), id: \.self) { provider in
                         if let providerModels = modelsByProvider[provider] {
                             Section(header: Text(provider)) {
                                 ForEach(providerModels) { model in

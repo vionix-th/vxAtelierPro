@@ -34,7 +34,7 @@ struct TTSControlView: View {
                             .foregroundColor(.secondary)
 
                         ScrollView {
-                            Text(current.message.content.text)
+                            Text(current.message.displayText)
                                 .font(.body)
                                 .padding()
                                 .frame(maxWidth: .infinity, alignment: .leading)

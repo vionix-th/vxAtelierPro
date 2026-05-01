@@ -368,20 +368,20 @@ final class QueryManager {
     }
 
     func setStreamingEnabled(_ enabled: Bool, for conversation: ConversationItem) throws {
-        guard let streamParam = conversation.options.parameters.first(where: { $0.name == "stream" }) else {
-            throw AppError.invalidOperation("Stream parameter not found")
+        conversation.options.streamMode = enabled ? .enabled : .disabled
+        if let streamParam = conversation.options.parameters.first(where: { $0.name == "stream" }) {
+            streamParam.setValue(enabled)
+            streamParam.isEnabled = enabled
         }
-        streamParam.setValue(enabled)
-        streamParam.isEnabled = enabled
         try saveContext()
         vxAtelierPro.log.info("Set streaming to \(enabled) for \(conversation.title)")
     }
 
     func setModel(_ model: String, for conversation: ConversationItem) throws {
-        guard let modelParam = conversation.options.parameters.first(where: { $0.name == "model" }) else {
-            throw AppError.invalidOperation("Model parameter not found")
+        conversation.options.modelOverride = model
+        if let modelParam = conversation.options.parameters.first(where: { $0.name == "model" }) {
+            modelParam.setValue(model)
         }
-        modelParam.setValue(model)
         try saveContext()
         vxAtelierPro.log.info("Updated model to \(model) for \(conversation.title)")
     }
@@ -449,32 +449,36 @@ final class QueryManager {
         var added = 0
 
         for config in apiConfigurations {
-            let service = AIServiceManager.shared.getService(with: config)
-            var fetchedModels: [AIModel] = []
+            let providerID = LLMProviderRegistry.shared.resolveProviderID(for: config)
+            let adapter = LLMProviderRegistry.shared.adapter(for: providerID)
+            var fetchedModels: [LLMModelDescriptor] = []
 
             do {
-                fetchedModels = try await service.fetchAvailableModels()
+                fetchedModels = try await adapter.fetchModels(configuration: config)
             } catch {
                 vxAtelierPro.log.error(
                     "Failed to fetch models from provider \(config.name): \(error.localizedDescription)")
-                fetchedModels = service.getDefaultModels()
+                fetchedModels = LLMProviderRegistry.shared.profile(for: providerID).defaultModelID.map {
+                    [LLMModelDescriptor(
+                        id: $0,
+                        providerID: providerID,
+                        contextWindow: AppDefaults.ModelContextSizes.defaultSize,
+                        endpointFamilies: [LLMProviderRegistry.shared.profile(for: providerID).defaultEndpointFamily],
+                        modalities: [.text],
+                        supportedParameters: LLMProviderRegistry.shared.profile(for: providerID).supportedParameters,
+                        schemaFeatures: LLMProviderRegistry.shared.profile(for: providerID).schemaFeatures
+                    )]
+                } ?? []
             }
 
             let existingModels = fetchModels()
             for fetchedModel in fetchedModels {
                 if let existing = existingModels.first(where: { $0.name == fetchedModel.id }) {
-                    existing.contextSize = fetchedModel.contextSize
-                    existing.provider = fetchedModel.provider
-                    existing.capabilities = fetchedModel.capabilities
+                    existing.descriptor = fetchedModel
                     updated += 1
                     vxAtelierPro.log.debug("Overwrote model: \(fetchedModel.id)")
                 } else {
-                    let modelItem = ModelItem(
-                        name: fetchedModel.id,
-                        contextSize: fetchedModel.contextSize,
-                        provider: fetchedModel.provider
-                    )
-                    modelItem.capabilities = fetchedModel.capabilities
+                    let modelItem = ModelItem(descriptor: fetchedModel)
                     modelContext.insert(modelItem)
                     added += 1
                     vxAtelierPro.log.debug("Added new model: \(fetchedModel.id)")

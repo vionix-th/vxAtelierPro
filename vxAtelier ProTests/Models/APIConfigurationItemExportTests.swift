@@ -8,7 +8,7 @@ import SwiftData
 
 final class APIConfigurationItemExportTests: XCTestCase {
     func testExportImportRoundtrip() throws {
-        let original = APIConfigurationItem(name: "TestAPI", apiKey: "key", baseURL: "https://api.test.com", chatCompletionsEndpoint: "/v1/chat", modelsEndpoint: "/v1/models", isDefault: true, defaultModel: "gpt-4")
+        let original = APIConfigurationItem(name: "TestAPI", apiKey: "key", baseURL: "https://api.test.com/v1", isDefault: true, defaultModel: "gpt-4")
         let exportData = APIConfigurationExportData(original)
         let encoded = try JSONEncoder().encode(exportData)
         let decoded = try JSONDecoder().decode(APIConfigurationExportData.self, from: encoded)
@@ -16,8 +16,6 @@ final class APIConfigurationItemExportTests: XCTestCase {
         XCTAssertEqual(restored.name, original.name)
         XCTAssertEqual(restored.apiKey, original.apiKey)
         XCTAssertEqual(restored.baseURL, original.baseURL)
-        XCTAssertEqual(restored.chatCompletionsEndpoint, original.chatCompletionsEndpoint)
-        XCTAssertEqual(restored.modelsEndpoint, original.modelsEndpoint)
         XCTAssertEqual(restored.isDefault, original.isDefault)
     }
 }

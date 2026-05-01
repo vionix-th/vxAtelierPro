@@ -32,7 +32,7 @@ final class ConversationItemScalabilityTests: XCTestCase {
                 ConversationTurn(
                     sequenceNumber: t,
                     timestamp: Date(),
-                    userMessage: MessageItem(role: "user", content: ContentItem("msg_\(t)"), timestamp: Date(), toolCallId: nil, toolCallsData: nil),
+                    userMessage: MessageItem(role: "user", text: "msg_\(t)", timestamp: Date(), toolCallId: nil),
                     conversation: conversation
                 )
             }
@@ -53,7 +53,7 @@ final class ConversationItemScalabilityTests: XCTestCase {
                 ConversationTurn(
                     sequenceNumber: t,
                     timestamp: Date(),
-                    userMessage: MessageItem(role: "user", content: ContentItem("msg_\(t)"), timestamp: Date(), toolCallId: nil, toolCallsData: nil),
+                    userMessage: MessageItem(role: "user", text: "msg_\(t)", timestamp: Date(), toolCallId: nil),
                     conversation: conversation
                 )
             }

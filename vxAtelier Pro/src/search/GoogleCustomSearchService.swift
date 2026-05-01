@@ -43,7 +43,7 @@ public struct GoogleCustomSearchConfiguration: WebSearchConfiguration {
 public class GoogleCustomSearchService: WebSearchService {
     public let configuration: WebSearchConfiguration
 
-    private let networkManager = NetworkManager.shared
+    private let networkClient = NetworkClient.shared
 
     /// Initializes the service with Google-specific configuration.
     init(configuration: GoogleCustomSearchConfiguration) {
@@ -78,7 +78,7 @@ public class GoogleCustomSearchService: WebSearchService {
 
         do {
             // Perform GET request - Google Custom Search uses GET
-            let response: GoogleApiCodableTypes.SearchResponse = try await networkManager.getRequest(
+            let response: GoogleApiCodableTypes.SearchResponse = try await networkClient.getRequest(
                 url: url.absoluteString,
                 headers: [:], // No special headers needed beyond API key in URL
                 responseType: GoogleApiCodableTypes.SearchResponse.self
@@ -108,11 +108,10 @@ public class GoogleCustomSearchService: WebSearchService {
             return results
 
         } catch let networkError as NetworkError {
-            // Handle specific network errors from NetworkManager
             await vxAtelierPro.log.error("🔴 Google Search Network Error: \(networkError.localizedDescription)")
             // Re-throw as a WebSearchError for consistency
             switch networkError {
-                case .serverError(let statusCode, let message):
+                case .serverError(let statusCode, let message, _):
                      throw WebSearchError.apiError(message: message, statusCode: statusCode)
                  default:
                      throw WebSearchError.networkError(networkError)
@@ -126,4 +125,4 @@ public class GoogleCustomSearchService: WebSearchService {
             throw WebSearchError.searchFailed(error.localizedDescription)
         }
     }
-} 
+}

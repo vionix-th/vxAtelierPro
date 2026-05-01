@@ -48,7 +48,7 @@ public protocol AIToolProperty {
     /// Possible values if this is an enumerated parameter
     var enumValues: [String]? { get }
     
-    /// Alias for enumValues for compatibility with different AI providers
+    /// Alias for providers that expect this JSON Schema key name.
     var enumerated: [String]? { get }
 }
 
@@ -96,7 +96,7 @@ public protocol AIToolHandler {
     /// - Parameters:
     ///   - toolCalls: Array of tool calls to execute
     /// - Returns: Array of tool call results
-    /// - Throws: AIServiceError for various failure cases
+    /// - Throws: Provider or tool execution errors
     func handleToolCalls(_ toolCalls: [AIToolCall]) async throws -> [AIToolCallResult]
 }
 
@@ -132,7 +132,7 @@ public class DefaultToolHandler: AIToolHandler {
         for toolCall in toolCalls {
             // Get the tool from registry
             guard let tool = registry.getTools().first(where: { $0.name == toolCall.name }) else {
-                throw AIServiceError.unsupportedOperation("Tool not found: \(toolCall.name)")
+                throw LLMProviderError.unsupportedCapability("Tool not found: \(toolCall.name)")
             }                        
             
             // Execute the tool if it supports execution

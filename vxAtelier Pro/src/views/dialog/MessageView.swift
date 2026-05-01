@@ -19,6 +19,9 @@ struct MessageView: View {
     let onAction: (MessageAction) -> Void
     let isBookmarked: Bool
     var streamingContent: String? = nil
+    var streamingToolCalls: [LLMToolCall] = []
+    var streamingRunStatus: LLMRunStatus? = nil
+    var streamingErrorMessage: String? = nil
 
     @AppStorage(AppSettings.Keys.disableAvatar) private var disableAvatar: Bool = false
     @AppStorage(AppSettings.Keys.defaultAvatarSize) private var defaultAvatarSize: Double = 40
@@ -65,11 +68,12 @@ struct MessageView: View {
             turn = conversation?.turns.first(where: { $0.id == turnID })
             message = MessageItem(
                 role: "assistant",
-                content: ContentItem(streamText),
+                contentParts: [MessageContentPartItem(index: 0, kind: .text, text: streamText.isEmpty ? streamingErrorMessage : streamText)],
                 timestamp: Date(),
                 toolCallId: nil,
-                toolCallsData: nil
+                toolCalls: []
             )
+            message?.setToolCalls(streamingToolCalls)
             isStreamingPlaceholder = true
         } else {
             // No message available
@@ -95,7 +99,7 @@ struct MessageView: View {
                     bubbleContent(message: message, conversation: conversation, isStreaming: isStreamingPlaceholder)
                 } else if message.role == "assistant" {
                     // If tool chips are disabled and the assistant text is empty (non-streaming), omit the bubble entirely
-                    let assistantTextIsEmpty = message.content.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    let assistantTextIsEmpty = message.displayText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     if showToolCallChips || isStreamingPlaceholder || !assistantTextIsEmpty {
                         HStack {
                             if !disableAvatar {
@@ -109,7 +113,7 @@ struct MessageView: View {
                         Spacer()
                     }
                 } else if message.role == "system" || message.role == "developer" {
-                    Text(message.content.text)
+                    Text(message.displayText)
                         .font(.footnote)
                         .italic()
                         .foregroundColor(.secondary)
@@ -131,12 +135,20 @@ struct MessageView: View {
         ZStack(alignment: .bottomTrailing) {
             VStack(alignment: .leading, spacing: 8) {
                 // Main content bubble
-                let assistantTextIsEmpty = message.role == "assistant" && message.content.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                let assistantTextIsEmpty = message.role == "assistant" && message.displayText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 let showMainBubble = !(message.role == "assistant" && !isStreaming && assistantTextIsEmpty)
                 if showMainBubble {
                     Group {
-                        // Show a spinner for blank streaming placeholders
-                        if isStreaming && message.content.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        if isStreaming, let errorText = streamingErrorMessage, isTerminalStreamingError {
+                            HStack(alignment: .top, spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .foregroundColor(.red)
+                                Text(errorText)
+                                    .font(.callout)
+                                    .foregroundColor(.red)
+                                    .textSelection(.enabled)
+                            }
+                        } else if isStreaming && message.displayText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                             HStack(spacing: 8) {
                                 ProgressView()
                                     .controlSize(.small)
@@ -145,15 +157,17 @@ struct MessageView: View {
                                     .foregroundColor(.secondary)
                             }
                         } else if conversation.options.isMarkdownEnabled && !(isStreaming && markdownStreamFinalizeOnly) {
-                            MarkdownUIRenderer(markdown: message.content.text)
+                            MarkdownUIRenderer(markdown: message.displayText)
                         } else {
-                            Text(message.content.text)
+                            Text(message.displayText)
                                 .font(.system(size: bubbleFontSize))
                                 .textSelection(.enabled)
                         }
                     }
                     .padding(AppDefaults.paddingMedium)
                     .background(
+                        isStreaming && isTerminalStreamingError
+                            ? Color.red.opacity(0.12) :
                         message.role == "user"
                             ? Color.secondary.opacity(0.2) : Color.blue.opacity(0.2)
                     )
@@ -161,26 +175,29 @@ struct MessageView: View {
                 }
 
                 // Tool call chips under assistant message
-                if message.role == "assistant",
-                   let toolCalls = message.getToolCalls(),
-                   !toolCalls.isEmpty,
-                   showToolCallChips {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(toolCalls, id: \.id) { toolCall in
-                            HStack(spacing: 6) {
-                                Image(systemName: "wrench.and.screwdriver")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Text(toolCall.name)
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
-                                Text(toolCall.arguments)
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
+                if message.role == "assistant", showToolCallChips {
+                    let toolCalls = message.orderedToolCallItems
+                    if !toolCalls.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(toolCalls, id: \.callID) { toolCall in
+                                HStack(spacing: 6) {
+                                    Image(systemName: "wrench.and.screwdriver")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text(toolCall.name)
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
+                                    Text(toolCall.argumentsJSON)
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                    Text(toolCall.statusRaw)
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(6)
+                                .background(Color.secondary.opacity(0.08))
+                                .cornerRadius(6)
                             }
-                            .padding(6)
-                            .background(Color.secondary.opacity(0.08))
-                            .cornerRadius(6)
                         }
                     }
                 }
@@ -189,11 +206,11 @@ struct MessageView: View {
                 if message.role == "assistant" && showToolCallChips {
                     let turn = conversation.turns.first(where: { $0.id == turnID })
                     let toolResults = turn?.events.filter { $0.type == .toolResult && $0.message.toolCallId != nil } ?? []
-                    let calls = message.getToolCalls() ?? []
-                    let callById: [String: AIToolCall] = {
-                        var dict: [String: AIToolCall] = [:]
+                    let calls = message.orderedToolCallItems
+                    let callById: [String: ToolCallItem] = {
+                        var dict: [String: ToolCallItem] = [:]
                         for c in calls {
-                            dict[c.id] = c
+                            dict[c.callID] = c
                         }
                         return dict
                     }()
@@ -205,7 +222,7 @@ struct MessageView: View {
                     }()
                     let totalResults = resultEvents.count
                     let pendingCount = calls.reduce(0) { partial, call in
-                        let id = call.id
+                        let id = call.callID
                         return partial + ((resultsCountById[id] ?? 0) == 0 ? 1 : 0)
                     }
 
@@ -228,7 +245,7 @@ struct MessageView: View {
                                     let rid = ev.id
                                     let cid = ev.message.toolCallId ?? ""
                                     let toolName = (callById[cid]?.name) ?? "Tool"
-                                    let isLong = ev.message.content.text.count > 600 || ev.message.content.text.components(separatedBy: "\n").count > 12
+                                    let isLong = ev.message.displayText.count > 600 || ev.message.displayText.components(separatedBy: "\n").count > 12
                                     let expanded = expandedResultIds.contains(rid)
                                     VStack(alignment: .leading, spacing: 6) {
                                         HStack(spacing: 6) {
@@ -250,7 +267,7 @@ struct MessageView: View {
                                             }
                                         }
                                         VStack(alignment: .leading, spacing: 4) {
-                                            Text(ev.message.content.text)
+                                            Text(ev.message.displayText)
                                                 .font(.system(size: 12, design: .monospaced))
                                                 .foregroundColor(.secondary)
                                                 .textSelection(.enabled)
@@ -258,7 +275,7 @@ struct MessageView: View {
                                             HStack(spacing: 8) {
                                                 Spacer()
                                                 Button {
-                                                    copyToClipboard(ev.message.content.text)
+                                                    copyToClipboard(ev.message.displayText)
                                                 } label: {
                                                     Label("Copy", systemImage: "doc.on.doc")
                                                         .labelStyle(.iconOnly)
@@ -307,6 +324,10 @@ struct MessageView: View {
                     .offset(x: 6, y: 4)
             }
         }
+    }
+
+    private var isTerminalStreamingError: Bool {
+        streamingRunStatus == .failed || streamingRunStatus == .cancelled
     }
 
     // Clipboard helper

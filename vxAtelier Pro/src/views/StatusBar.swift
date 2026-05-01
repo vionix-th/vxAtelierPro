@@ -416,15 +416,14 @@ struct ConversationInfoHeader: View {
     }
     
     private var isStreamingEnabled: Bool {
-        let streamParam = conversation.options.parameters.first(where: { $0.name == "stream" })
-        return streamParam?.boolValue ?? false
+        conversation.options.streamMode != .disabled
     }
     
-    private var currentProvider: AIServiceProvider {
+    private var currentProvider: LLMProviderID {
         if let config = conversation.options.apiConfiguration {
-            return AIServiceProvider.detectProvider(from: config)
+            return LLMProviderRegistry.shared.resolveProviderID(for: config)
         }
-        return .openAI // Default provider
+        return .openAIPlatform
     }
     
     var body: some View {

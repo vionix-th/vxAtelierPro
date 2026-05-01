@@ -30,7 +30,7 @@ struct ProjectView: View {
     @State private var isPromptTemplatesPresented: Bool = false
     @State private var systemPromptValue: String = ""
     @State private var didApplyInitialConversation: Bool = false
-    @State private var composerStreamingState = StreamingState()
+    @State private var composerDraftStore = ConversationDraftStore()
 
     private var pathBinding: Binding<[ProjectRoute]> {
         Binding(
@@ -294,7 +294,7 @@ struct ProjectView: View {
             if let project = self.project {
                 MessageInputView(
                     queryManager: queryManager,
-                    streamingState: composerStreamingState,
+                    draftStore: composerDraftStore,
                     resolveConversation: {
                         guard let project = self.project else {
                             throw AppError.invalidOperation("Project not found")

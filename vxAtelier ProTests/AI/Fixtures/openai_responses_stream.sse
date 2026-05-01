@@ -1,0 +1,9 @@
+data: {"type":"response.created","response":{"id":"resp_fixture","model":"gpt-4.1-mini"}}
+
+data: {"type":"response.output_text.delta","delta":"Hello"}
+
+data: {"type":"response.function_call_arguments.delta","output_index":1,"item_id":"fc_1","call_id":"call_1","name":"lookup","delta":"{\"q\""}
+
+data: {"type":"response.function_call_arguments.delta","output_index":1,"item_id":"fc_1","call_id":"call_1","delta":":\"test\"}"}
+
+data: {"type":"response.completed","response":{"id":"resp_fixture","model":"gpt-4.1-mini","usage":{"input_tokens":5,"output_tokens":7,"total_tokens":12}}}

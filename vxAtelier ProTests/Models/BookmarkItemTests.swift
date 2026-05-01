@@ -25,7 +25,7 @@ final class BookmarkItemTests: XCTestCase {
     func testBookmarkCreationForMessage() throws {
         let conversation = testEnv.createConversation(title: "Bookmarked Dialog")
         let msg = MessageItem(
-            role: "user", content: ContentItem("Important message"), timestamp: Date())
+            role: "user", text: "Important message", timestamp: Date())
         let turn = ConversationTurn(sequenceNumber: 0, userMessage: msg, conversation: conversation)
         conversation.turns.append(turn)
         context.insert(conversation)
@@ -43,7 +43,7 @@ final class BookmarkItemTests: XCTestCase {
     func testBookmarkCreationForTurnEvent() throws {
         let conversation = testEnv.createConversation(title: "Bookmarked Dialog")
         let msg = MessageItem(
-            role: "assistant", content: ContentItem("Event message"), timestamp: Date())
+            role: "assistant", text: "Event message", timestamp: Date())
         let turn = ConversationTurn(sequenceNumber: 0, userMessage: msg, conversation: conversation)
         let event = TurnEvent(type: .assistant, message: msg, turn: turn)
         turn.events.append(event)
@@ -63,7 +63,7 @@ final class BookmarkItemTests: XCTestCase {
     func testBookmarkPersistsIfTurnReferenceDangling() throws {
         let conversation = testEnv.createConversation(title: "Cascade Dialog")
         let msg = MessageItem(
-            role: "user", content: ContentItem("To be deleted"), timestamp: Date())
+            role: "user", text: "To be deleted", timestamp: Date())
         let turn = ConversationTurn(sequenceNumber: 0, userMessage: msg, conversation: conversation)
         conversation.turns.append(turn)
         context.insert(conversation)
@@ -82,7 +82,7 @@ final class BookmarkItemTests: XCTestCase {
     func testCascadeDeleteFromMessageRemovesBookmark() throws {
         let conversation = testEnv.createConversation(title: "Message Cascade")
         let msg = MessageItem(
-            role: "user", content: ContentItem("To be deleted message"), timestamp: Date())
+            role: "user", text: "To be deleted message", timestamp: Date())
         let turn = ConversationTurn(sequenceNumber: 0, userMessage: msg, conversation: conversation)
         conversation.turns.append(turn)
         context.insert(conversation)
@@ -108,11 +108,11 @@ final class BookmarkItemTests: XCTestCase {
         )
         let conversation = testEnv.createConversation(title: "Event Nullify")
         let userMsg = MessageItem(
-            role: "user", content: ContentItem("User message"), timestamp: Date())
+            role: "user", text: "User message", timestamp: Date())
         let turn = ConversationTurn(
             sequenceNumber: 0, userMessage: userMsg, conversation: conversation)
         let eventMsg = MessageItem(
-            role: "assistant", content: ContentItem("Assistant response"), timestamp: Date())
+            role: "assistant", text: "Assistant response", timestamp: Date())
         let event = TurnEvent(type: .assistant, message: eventMsg, turn: turn)
         turn.events.append(event)
         conversation.turns.append(turn)

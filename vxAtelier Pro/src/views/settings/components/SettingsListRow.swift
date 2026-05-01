@@ -54,7 +54,7 @@ struct SettingsListRow<Content: View>: View {
             
             Spacer()
             
-            ForEach(icons.indices, id: \ .self) { idx in
+            ForEach(icons.indices, id: \.self) { idx in
                 icons[idx]
                     .font(.caption)
                     .foregroundColor(.secondary)

@@ -176,8 +176,7 @@ final class QueryManagerTests: XCTestCase {
         try queryManager.insert(dialog)
         
         // Create necessary message item for the bookmark
-        let contentItem = ContentItem("Test message content")
-        let messageItem = MessageItem(role: "user", content: contentItem)
+        let messageItem = MessageItem(role: "user", text: "Test message content")
         
         // Create the turn for the message
         let turn = ConversationTurn(sequenceNumber: 0, userMessage: messageItem, conversation: dialog)

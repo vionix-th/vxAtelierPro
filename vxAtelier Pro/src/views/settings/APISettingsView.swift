@@ -43,8 +43,6 @@ struct APISettingsView: View {
             name: "New Configuration",
             apiKey: "",
             baseURL: AppDefaults.OpenAi.baseURL,
-            chatCompletionsEndpoint: AppDefaults.OpenAi.chatCompletionsEndpoint,
-            modelsEndpoint: AppDefaults.OpenAi.modelsEndpoint,
             isDefault: apiConfigurations.count < 2
         ), isNew: true)
     }

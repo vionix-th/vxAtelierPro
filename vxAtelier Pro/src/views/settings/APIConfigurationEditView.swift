@@ -26,10 +26,10 @@ struct APIConfigurationEditView: View {
     @State private var name: String
     @State private var apiKey: String
     @State private var baseURL: String
-    @State private var chatEndpoint: String
-    @State private var modelsEndpoint: String
     @State private var isDefault: Bool
     @State private var defaultModel: String
+    @State private var providerID: LLMProviderID
+    @State private var defaultEndpointFamily: LLMEndpointFamily
 
     // UI state
     @State private var isAPIKeyVisible = false
@@ -49,12 +49,20 @@ struct APIConfigurationEditView: View {
         _name = State(initialValue: configuration.name)
         _apiKey = State(initialValue: configuration.apiKey)
         _baseURL = State(initialValue: configuration.baseURL)
-        _chatEndpoint = State(initialValue: configuration.chatCompletionsEndpoint)
-        _modelsEndpoint = State(initialValue: configuration.modelsEndpoint)
         _isDefault = State(initialValue: configuration.isDefault)
+        _providerID = State(initialValue: configuration.providerIDEnum)
+        _defaultEndpointFamily = State(initialValue: configuration.defaultEndpointFamilyEnum)
         let initialDefaultModel = (configuration.defaultModel?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { !$0.isEmpty ? $0 : nil }
-            ?? APIConfigurationEditView.suggestedDefaultModel(for: configuration.baseURL)
+            ?? APIConfigurationEditView.suggestedDefaultModel(for: configuration.providerIDEnum)
         _defaultModel = State(initialValue: initialDefaultModel)
+    }
+
+    private var currentProfile: LLMProviderProfile {
+        LLMProviderRegistry.shared.profile(for: providerID)
+    }
+
+    private var selectableEndpointFamilies: [LLMEndpointFamily] {
+        currentProfile.supportedEndpointFamilies.filter { $0 != .models }
     }
 
     // MARK: - View Body
@@ -136,8 +144,7 @@ struct APIConfigurationEditView: View {
                                         defaultModel = model
                                         hasUserEditedDefaultModel = true
                                     },
-                                    currentProvider: AIServiceProvider.detectProvider(
-                                        from: configuration)
+                                    currentProvider: providerID
                                 )
                             }
                             Text(
@@ -265,28 +272,29 @@ struct APIConfigurationEditView: View {
                             }
                             .padding(.horizontal, AppDefaults.paddingSmall)
                         }
+                        VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
+                            Text("Default API Mode")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            if selectableEndpointFamilies.count > 1 {
+                                Picker("", selection: $defaultEndpointFamily) {
+                                    ForEach(selectableEndpointFamilies) { family in
+                                        Text(family.displayName).tag(family)
+                                    }
+                                }
+                                .pickerStyle(.segmented)
+                            } else {
+                                Text(selectableEndpointFamilies.first?.displayName ?? currentProfile.defaultEndpointFamily.displayName)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
                         // Base URL
                         VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
                             Text("Base URL")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                             TextField("https://api.example.com", text: $baseURL)
-                                .textFieldStyle(.roundedBorder)
-                        }
-                        // Chat Endpoint
-                        VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
-                            Text("Chat Completions Endpoint")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            TextField("/v1/chat/completions", text: $chatEndpoint)
-                                .textFieldStyle(.roundedBorder)
-                        }
-                        // Models Endpoint
-                        VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
-                            Text("Models Endpoint")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            TextField("/v1/models", text: $modelsEndpoint)
                                 .textFieldStyle(.roundedBorder)
                         }
                     }
@@ -329,9 +337,18 @@ struct APIConfigurationEditView: View {
                 }
             }
         }
-        .onChange(of: baseURL) { _, newValue in
+        .onChange(of: providerID) { _, newValue in
             if !hasUserEditedDefaultModel || defaultModel.isEmpty {
                 defaultModel = APIConfigurationEditView.suggestedDefaultModel(for: newValue)
+            }
+            let profile = LLMProviderRegistry.shared.profile(for: newValue)
+            if !profile.supportedEndpointFamilies.contains(defaultEndpointFamily) {
+                defaultEndpointFamily = profile.defaultEndpointFamily
+            }
+        }
+        .onAppear {
+            if !currentProfile.supportedEndpointFamilies.contains(defaultEndpointFamily) {
+                defaultEndpointFamily = currentProfile.defaultEndpointFamily
             }
         }
     }
@@ -361,15 +378,9 @@ struct APIConfigurationEditView: View {
         #endif
     }
 
-    /// Suggests a default model for a given baseURL/provider
-    static func suggestedDefaultModel(for baseURL: String) -> String {
-        let provider = AIServiceProvider.detectProvider(from: baseURL)
-        switch provider {
-        case .openAI: return AppDefaults.OpenAi.model
-        case .anthropic: return AppDefaults.Anthropic.model
-        case .xAI: return AppDefaults.XAI.model
-        case .deepSeek: return AppDefaults.DeepSeek.model
-        }
+    /// Suggests a default model for a provider.
+    static func suggestedDefaultModel(for providerID: LLMProviderID) -> String {
+        LLMProviderRegistry.shared.profile(for: providerID).defaultModelID ?? ""
     }
 
     // MARK: - Helper Methods
@@ -383,12 +394,6 @@ struct APIConfigurationEditView: View {
             NSPasteboard.general.setString(string, forType: .string)
         #endif
         vxAtelierPro.log.debug("🔑 Copied API key to clipboard")
-    }
-
-    /// Performs a lightweight validation against the provider (fetch models)
-    private func validateConfiguration(_ config: APIConfigurationItem) async throws {
-        let service = AIServiceManager.shared.getService(with: config)
-        _ = try await service.fetchAvailableModels()
     }
 
     /// Validates all input fields before saving
@@ -411,7 +416,7 @@ struct APIConfigurationEditView: View {
         return true
     }
 
-    /// Saves the configuration changes with validation against the provider
+    /// Saves the configuration changes without fetching models.
     private func saveConfigurationAsync() async {
         guard validateInputs() else {
             showValidationError = true
@@ -427,8 +432,10 @@ struct APIConfigurationEditView: View {
         configToSave.name = name
         configToSave.apiKey = apiKey
         configToSave.baseURL = baseURL
-        configToSave.chatCompletionsEndpoint = chatEndpoint
-        configToSave.modelsEndpoint = modelsEndpoint
+        let profile = LLMProviderRegistry.shared.profile(for: providerID)
+        configToSave.providerID = providerID.rawValue
+        configToSave.authKind = profile.authKind.rawValue
+        configToSave.defaultEndpointFamily = defaultEndpointFamily.rawValue
 
         let configsCount = apiConfigurations.count
         if configsCount == 0 {
@@ -448,22 +455,11 @@ struct APIConfigurationEditView: View {
 
         let trimmedDefaultModel = defaultModel.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmedDefaultModel.isEmpty {
-            let suggested = APIConfigurationEditView.suggestedDefaultModel(for: baseURL)
+            let suggested = APIConfigurationEditView.suggestedDefaultModel(for: providerID)
             configToSave.defaultModel = suggested
             vxAtelierPro.log.info("🔑 Set default model to computed default: \(suggested)")
         } else {
             configToSave.defaultModel = trimmedDefaultModel
-        }
-
-        do {
-            try await validateConfiguration(configToSave)
-        } catch {
-            validationErrorMessage = "Failed to validate configuration: \(error.localizedDescription)"
-            showValidationError = true
-            vxAtelierPro.log.error(
-                "🔑 Validation failed for configuration \(configToSave.name): \(error.localizedDescription)"
-            )
-            return
         }
 
         do {
@@ -497,11 +493,10 @@ struct APIConfigurationEditView: View {
         }
 
         baseURL = preset.baseURL
-        chatEndpoint = preset.chatEndpoint
-        modelsEndpoint = preset.modelsEndpoint
+        providerID = preset.providerID
+        defaultEndpointFamily = LLMProviderRegistry.shared.profile(for: preset.providerID).defaultEndpointFamily
 
-        // Always set the default model to the computed default for the selected provider
-        defaultModel = APIConfigurationEditView.suggestedDefaultModel(for: preset.baseURL)
+        defaultModel = APIConfigurationEditView.suggestedDefaultModel(for: preset.providerID)
         hasUserEditedDefaultModel = false
 
         vxAtelierPro.log.info("🔑 Applied \(preset.displayName) preset")
@@ -517,6 +512,10 @@ enum APIPreset: String, CaseIterable {
     case anthropic = "Anthropic"
     case xAI = "xAI"
     case deepSeek = "DeepSeek"
+    case openRouter = "OpenRouter"
+    case lmStudio = "LM Studio"
+    case ollama = "Ollama"
+    case customOpenAICompatible = "Custom"
 
     var displayName: String {
         rawValue
@@ -528,6 +527,10 @@ enum APIPreset: String, CaseIterable {
         case .anthropic: return "person.text.rectangle"
         case .xAI: return "bolt.fill"
         case .deepSeek: return "brain"
+        case .openRouter: return "point.3.connected.trianglepath.dotted"
+        case .lmStudio: return "desktopcomputer"
+        case .ollama: return "terminal"
+        case .customOpenAICompatible: return "slider.horizontal.3"
         }
     }
 
@@ -537,6 +540,23 @@ enum APIPreset: String, CaseIterable {
         case .anthropic: return .purple
         case .xAI: return .red
         case .deepSeek: return .blue
+        case .openRouter: return .orange
+        case .lmStudio: return .teal
+        case .ollama: return .gray
+        case .customOpenAICompatible: return .secondary
+        }
+    }
+
+    var providerID: LLMProviderID {
+        switch self {
+        case .openAI: return .openAIPlatform
+        case .anthropic: return .anthropic
+        case .xAI: return .xAI
+        case .deepSeek: return .deepSeek
+        case .openRouter: return .openRouter
+        case .lmStudio: return .lmStudio
+        case .ollama: return .ollama
+        case .customOpenAICompatible: return .customOpenAICompatible
         }
     }
 
@@ -546,26 +566,13 @@ enum APIPreset: String, CaseIterable {
         case .anthropic: return AppDefaults.Anthropic.baseURL
         case .xAI: return AppDefaults.XAI.baseURL
         case .deepSeek: return AppDefaults.DeepSeek.baseURL
+        case .openRouter: return "https://openrouter.ai/api"
+        case .lmStudio: return "http://localhost:1234"
+        case .ollama: return "http://localhost:11434"
+        case .customOpenAICompatible: return AppDefaults.OpenAi.baseURL
         }
     }
 
-    var chatEndpoint: String {
-        switch self {
-        case .openAI: return AppDefaults.OpenAi.chatCompletionsEndpoint
-        case .anthropic: return AppDefaults.Anthropic.chatCompletionsEndpoint
-        case .xAI: return AppDefaults.XAI.chatCompletionsEndpoint
-        case .deepSeek: return AppDefaults.DeepSeek.chatCompletionsEndpoint
-        }
-    }
-
-    var modelsEndpoint: String {
-        switch self {
-        case .openAI: return AppDefaults.OpenAi.modelsEndpoint
-        case .anthropic: return AppDefaults.Anthropic.modelsEndpoint
-        case .xAI: return AppDefaults.XAI.modelsEndpoint
-        case .deepSeek: return AppDefaults.DeepSeek.modelsEndpoint
-        }
-    }
 }
 
 // MARK: - Validation Error

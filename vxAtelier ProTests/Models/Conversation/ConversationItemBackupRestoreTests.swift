@@ -37,9 +37,9 @@ final class ConversationItemBackupRestoreTests: XCTestCase {
         conversation.timestamp = fixedTimestamp
 
         // Add a turn with a user message and an event, all with fixed timestamp
-        let userMessage = MessageItem(role: "user", content: ContentItem("Test message"), timestamp: fixedTimestamp, toolCallId: nil, toolCallsData: nil)
+        let userMessage = MessageItem(role: "user", text: "Test message", timestamp: fixedTimestamp, toolCallId: nil)
         let turn = ConversationTurn(sequenceNumber: 0, timestamp: fixedTimestamp, userMessage: userMessage, conversation: conversation)
-        let eventMessage = MessageItem(role: "assistant", content: ContentItem("Assistant reply"), timestamp: fixedTimestamp, toolCallId: nil, toolCallsData: nil)
+        let eventMessage = MessageItem(role: "assistant", text: "Assistant reply", timestamp: fixedTimestamp, toolCallId: nil)
         let event = TurnEvent(type: .assistant, timestamp: fixedTimestamp, message: eventMessage, turn: turn)
         turn.events.append(event)
         conversation.turns.append(turn)
@@ -69,12 +69,12 @@ final class ConversationItemBackupRestoreTests: XCTestCase {
         let sortedRestoredTurns = restored.turns.sorted { $0.sequenceNumber < $1.sequenceNumber }
         let sortedOriginalTurns = conversation.turns.sorted { $0.sequenceNumber < $1.sequenceNumber }
         XCTAssertEqual(sortedRestoredTurns.count, sortedOriginalTurns.count)
-        XCTAssertEqual(sortedRestoredTurns[0].userMessage.content.text, sortedOriginalTurns[0].userMessage.content.text)
+        XCTAssertEqual(sortedRestoredTurns[0].userMessage.displayText, sortedOriginalTurns[0].userMessage.displayText)
         // Sort events by timestamp to mirror app logic
         let sortedRestoredEvents = sortedRestoredTurns[0].events.sorted { $0.timestamp < $1.timestamp }
         let sortedOriginalEvents = sortedOriginalTurns[0].events.sorted { $0.timestamp < $1.timestamp }
         XCTAssertEqual(sortedRestoredEvents.count, sortedOriginalEvents.count)
-        XCTAssertEqual(sortedRestoredEvents[0].message.content.text, sortedOriginalEvents[0].message.content.text)
+        XCTAssertEqual(sortedRestoredEvents[0].message.displayText, sortedOriginalEvents[0].message.displayText)
         // Options and parameters: sort by name for deterministic comparison
         let sortedRestoredParams = restored.options.parameters.sorted { $0.name < $1.name }
         let sortedOriginalParams = conversation.options.parameters.sorted { $0.name < $1.name }

@@ -107,7 +107,7 @@ public struct RunShortcutTool: ExecutableTool {
               let args = try? JSONDecoder().decode([String: String].self, from: jsonData),
               let identifier = args["identifier"]
         else {
-            throw AIServiceError.invalidConfiguration
+            throw LLMProviderError.invalidConfiguration("Shortcut tool arguments must include identifier.")
         }
         
         // Extract the optional input parameter
@@ -124,4 +124,3 @@ public struct RunShortcutTool: ExecutableTool {
         return nil
     }
 }
-
