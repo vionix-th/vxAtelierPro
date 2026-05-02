@@ -22,10 +22,10 @@ struct LLMProviderRegistry {
                 isEnabled: true
             ),
             LLMProviderProfile(
-                id: .openAICodexSubscription,
-                name: "OpenAI Codex Subscription",
+                id: .openAIChatGPTSubscription,
+                name: "ChatGPT Subscription",
                 defaultBaseURL: "http://127.0.0.1",
-                authKind: .codexSubscription,
+                authKind: .chatGPTOAuth,
                 defaultEndpointFamily: .responses,
                 supportedEndpointFamilies: [.responses],
                 defaultModelID: nil,
@@ -110,7 +110,7 @@ struct LLMProviderRegistry {
         guard profile.isEnabled else {
             return DisabledLLMProviderAdapter(
                 profile: profile,
-                message: "Codex subscription auth is disabled because no supported embedded Codex App Server auth flow is configured."
+                message: "ChatGPT subscription auth is disabled because no supported embedded OAuth, device-code, or Codex-token flow is configured."
             )
         }
 
@@ -119,8 +119,8 @@ struct LLMProviderRegistry {
             return OpenAIResponsesAdapter(profile: profile)
         case .anthropic:
             return AnthropicMessagesAdapter(profile: profile)
-        case .openAICodexSubscription:
-            return DisabledLLMProviderAdapter(profile: profile, message: "Codex subscription auth is unavailable.")
+        case .openAIChatGPTSubscription:
+            return DisabledLLMProviderAdapter(profile: profile, message: "ChatGPT subscription auth is unavailable.")
         case .openRouter, .lmStudio, .ollama, .xAI, .deepSeek, .customOpenAICompatible:
             return OpenAIChatAdapter(profile: profile)
         }
@@ -138,6 +138,7 @@ struct LLMProviderRegistry {
         if probe.contains("ollama") { return .ollama }
         if probe.contains("xai") || probe.contains("x.ai") || probe.contains("grok") { return .xAI }
         if probe.contains("deepseek") { return .deepSeek }
+        if probe.contains("chatgpt") { return .openAIChatGPTSubscription }
         if probe.contains("custom") { return .customOpenAICompatible }
         if probe.contains("openai") { return .openAIPlatform }
         return .customOpenAICompatible

@@ -45,8 +45,4 @@ final class ToolCallItem {
     func asDomainToolCall() -> LLMToolCall {
         LLMToolCall(id: callID, callID: providerCallID, index: index, name: name, argumentsJSON: argumentsJSON)
     }
-
-    func asGenericToolCall(configuration: [String: Any]? = nil, context: Any? = nil) -> GenericToolCall {
-        GenericToolCall(id: callID, name: name, arguments: argumentsJSON, configuration: configuration, context: context)
-    }
 }

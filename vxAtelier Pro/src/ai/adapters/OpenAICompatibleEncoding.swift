@@ -61,7 +61,7 @@ enum OpenAICompatibleEncoding {
         return object
     }
 
-    static func chatTools(from tools: [LLMTool]) -> [JSONValue] {
+    static func chatTools(from tools: [LLMToolDefinition]) -> [JSONValue] {
         tools.map { tool in
             .object([
                 "type": .string("function"),
@@ -145,7 +145,7 @@ enum OpenAICompatibleEncoding {
         })
     }
 
-    static func responsesTools(from tools: [LLMTool]) -> [JSONValue] {
+    static func responsesTools(from tools: [LLMToolDefinition]) -> [JSONValue] {
         tools.map { tool in
             .object([
                 "type": .string("function"),

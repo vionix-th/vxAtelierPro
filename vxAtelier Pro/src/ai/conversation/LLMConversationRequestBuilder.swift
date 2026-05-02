@@ -37,7 +37,7 @@ struct LLMConversationRequestBuilder {
             modelID: modelID,
             modelDescriptor: modelDescriptor(for: modelID, providerID: providerID, conversation: conversation),
             messages: orderedMessages(in: conversation).map { $0.asDomainMessage() },
-            tools: enabledTools.map { LLMRequestEncoding.llmTool(from: $0) },
+            tools: enabledTools.map { LLMRequestEncoding.toolDefinition(from: $0) },
             options: generationOptions
         )
         let streamEnabled = try LLMCapabilityValidator.resolveStreamEnabled(for: request, profile: profile)

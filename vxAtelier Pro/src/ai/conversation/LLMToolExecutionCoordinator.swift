@@ -13,22 +13,31 @@ struct LLMToolExecutionCoordinator {
         conversation: ConversationItem,
         turn: ConversationTurn
     ) async throws {
-        let handler = DefaultToolHandler()
         for toolCall in toolCalls {
             guard conversation.options.isToolEnabled(toolCall.name) else {
-                toolCall.status = .failed
-                toolCall.errorMessage = "Tool '\(toolCall.name)' is not enabled."
-                try persistence.save(conversation)
-                throw LLMProviderError.unsupportedCapability(toolCall.errorMessage ?? "Tool is not enabled.")
+                try fail(toolCall, conversation: conversation, message: "Tool '\(toolCall.name)' is not enabled.")
+            }
+            guard let tool = AIToolRegistry.shared.getTools().first(where: { $0.name == toolCall.name }) else {
+                try fail(toolCall, conversation: conversation, message: "Tool not found: \(toolCall.name)")
+            }
+            guard let executableTool = tool as? any ExecutableTool else {
+                try fail(toolCall, conversation: conversation, message: "Tool execution not supported: \(toolCall.name)")
             }
             toolCall.status = .executing
             try persistence.save(conversation)
 
             let configuration = conversation.options.getToolConfiguration(toolCall.name)
-            let generic = toolCall.asGenericToolCall(configuration: configuration, context: conversation)
+                ?? (tool as? any ConfigurableAITool)?.defaultConfiguration()
+                ?? [:]
+            let call = ToolExecutionCall(
+                id: toolCall.callID,
+                name: toolCall.name,
+                argumentsJSON: toolCall.argumentsJSON,
+                configuration: configuration,
+                context: ToolExecutionContext(conversation: conversation, turn: turn)
+            )
             do {
-                let results = try await handler.handleToolCalls([generic])
-                let output = results.first?.output ?? ""
+                let output = try await executableTool.execute(call)
                 let resultMessage = MessageItem(
                     role: "tool",
                     contentParts: [MessageContentPartItem(index: 0, kind: .toolResult, text: output)],
@@ -51,5 +60,13 @@ struct LLMToolExecutionCoordinator {
                 throw error
             }
         }
+    }
+
+    @MainActor
+    private func fail(_ toolCall: ToolCallItem, conversation: ConversationItem, message: String) throws -> Never {
+        toolCall.status = .failed
+        toolCall.errorMessage = message
+        try persistence.save(conversation)
+        throw LLMProviderError.unsupportedCapability(message)
     }
 }

@@ -32,7 +32,8 @@ public struct WebSearchTool: ExecutableTool {
     }
 
     @MainActor // Ensure operations using QueryManager run on the main actor
-    public func execute(arguments: String, configuration: [String: Any]? = nil, context: Any? = nil) async throws -> String {
+    func execute(_ call: ToolExecutionCall) async throws -> String {
+        let arguments = call.argumentsJSON
         vxAtelierPro.log.info("🕸️ Executing web_search tool with arguments: \(arguments)")
 
         // 1. Parse Arguments
@@ -125,9 +126,5 @@ public struct WebSearchTool: ExecutableTool {
             // Re-throw unexpected errors
             throw AppError.aiServiceError("Unexpected web search error: \(error.localizedDescription)")
         }
-    }
-
-    public func getDefaultConfiguration() -> [String: Any]? {
-        return nil
     }
 }

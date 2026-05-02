@@ -174,7 +174,7 @@ struct LLMHTTPClient {
             headers["anthropic-version"] = headers["anthropic-version"] ?? "2023-06-01"
         case .none, .customHeaders:
             break
-        case .codexSubscription:
+        case .chatGPTOAuth, .chatGPTDeviceCode, .chatGPTCodexToken:
             break
         }
         let options = config.decodedOptions

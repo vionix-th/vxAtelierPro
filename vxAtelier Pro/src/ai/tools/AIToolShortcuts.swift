@@ -2,24 +2,39 @@ import Foundation
 import SwiftData
 
 /// Tool for listing all available Apple Shortcuts
-public struct ListShortcutsTool: ExecutableTool {
+public struct ListShortcutsTool: ExecutableTool, ConfigurableAITool {
     public let name = "list_shortcuts"
     public let description = "Lists all Apple Shortcuts configured in the macOS Shortcuts app, returning their unique identifiers (for use with `run_shortcut`) and human-readable names. Can optionally list only shortcuts pre-approved in settings."
     
     public var parameters: any AIToolParameters {
         GenericToolParameters(properties: [:])
     }
+
+    var configurationSchema: any AIToolParameters {
+        GenericToolParameters(
+            properties: [
+                "Restricted": GenericToolProperty(
+                    type: "boolean",
+                    description: "When true, only shortcuts listed in RestrictedList are returned."
+                ),
+                "RestrictedList": GenericToolProperty(
+                    type: "object",
+                    description: "Dictionary of allowed shortcut identifiers to display names."
+                )
+            ]
+        )
+    }
     
     public init() {
     }
     
-    public func execute(arguments: String, configuration: [String: Any]? = nil, context: Any? = nil) async throws -> String {
+    func execute(_ call: ToolExecutionCall) async throws -> String {
+        let configuration = call.configuration
         #if os(macOS)
         // Check if we should use restricted list based on configuration
-        if let config = configuration,
-           let restricted = config["Restricted"] as? Bool,
-           restricted,
-           let restrictedList = config["RestrictedList"] as? [String: String] {
+        if configuration["Restricted"]?.boolValue == true,
+           let restrictedListObject = configuration["RestrictedList"]?.objectValue {
+            let restrictedList = restrictedListObject.compactMapValues(\.stringValue)
             
             // Return only the restricted list of shortcuts
             let shortcutsList = restrictedList.map { shortcutId, shortcutName -> [String: String] in
@@ -65,14 +80,14 @@ public struct ListShortcutsTool: ExecutableTool {
         #endif
     }
     
-    public func getDefaultConfiguration() -> [String: Any]? {
-        return [
-            "Restricted": false,
-            "RestrictedList": [
-                "ID0001": "Shortcut Name A",
-                "ID0002": "Shortcut Name B",
-                "ID0003": "Shortcut Name C",
-            ]
+    func defaultConfiguration() -> [String: JSONValue] {
+        [
+            "Restricted": .boolean(false),
+            "RestrictedList": .object([
+                "ID0001": .string("Shortcut Name A"),
+                "ID0002": .string("Shortcut Name B"),
+                "ID0003": .string("Shortcut Name C")
+            ])
         ]
     }
 }
@@ -101,7 +116,8 @@ public struct RunShortcutTool: ExecutableTool {
     public init() {
     }
     
-    public func execute(arguments: String, configuration: [String: Any]? = nil, context: Any? = nil) async throws -> String {
+    func execute(_ call: ToolExecutionCall) async throws -> String {
+        let arguments = call.argumentsJSON
         #if os(macOS)
         guard let jsonData = arguments.data(using: .utf8),
               let args = try? JSONDecoder().decode([String: String].self, from: jsonData),
@@ -118,9 +134,5 @@ public struct RunShortcutTool: ExecutableTool {
         #else
         return "This feature is only available on macOS"
         #endif
-    }
-    
-    public func getDefaultConfiguration() -> [String: Any]? {
-        return nil
     }
 }

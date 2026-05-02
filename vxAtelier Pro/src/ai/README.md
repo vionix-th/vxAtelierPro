@@ -14,12 +14,12 @@ vxAtelier Pro uses a provider-neutral AI domain. Runtime conversation execution 
 
 SwiftData is not written per token or per tool-argument delta.
 
-## Canonical Domain
+## Core LLM Types
 
-Domain types live in `ai/domain`:
+Core provider-neutral request and event types live in `ai/llm`:
 
 - `LLMRequest`, `LLMMessage`, `LLMContentPart`
-- `LLMTool`, `LLMToolCall`
+- `LLMToolDefinition`, `LLMToolCall`
 - `LLMGenerationOptions`
 - `LLMProviderProfile`, `LLMModelDescriptor`
 - `LLMStreamEvent`, `LLMUsage`, `LLMProviderError`
@@ -33,7 +33,7 @@ Supported profiles:
 - OpenAI Platform: Responses first, with Chat Completions endpoint support.
 - Anthropic: Messages API.
 - OpenRouter, LM Studio, Ollama, xAI, DeepSeek, custom OpenAI-compatible: Chat Completions-compatible adapter.
-- OpenAI Codex Subscription: profile exists but is disabled until supported Codex App Server auth can be embedded safely.
+- ChatGPT Subscription: profile exists but is disabled until supported OAuth, device-code, or Codex-token auth can be embedded safely.
 
 ## Persistence
 

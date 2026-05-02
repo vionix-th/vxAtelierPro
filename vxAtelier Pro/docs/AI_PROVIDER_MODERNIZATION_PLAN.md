@@ -57,7 +57,7 @@ The domain layer defines provider-neutral types:
 - `LLMRequest`
 - `LLMMessage`
 - `LLMContentPart`
-- `LLMTool`
+- `LLMToolDefinition`
 - `LLMToolCall`
 - `LLMGenerationOptions`
 - `LLMProviderProfile`
@@ -252,7 +252,7 @@ These are target shapes. Names may be adjusted to fit local style, but responsib
 ```swift
 struct LLMRequest {
     var messages: [LLMMessage]
-    var tools: [LLMTool]
+    var tools: [LLMToolDefinition]
     var options: LLMGenerationOptions
     var model: LLMModelDescriptor
     var provider: LLMProviderProfile
@@ -583,7 +583,7 @@ Primary files:
 - `MessageItem.swift`
 - `ConversationItem.swift`
 - `CompletionStreamProcessor.swift`
-- `vxAtelier Pro/src/ai/tooling`
+- `vxAtelier Pro/src/ai/tools`
 - `MessageView.swift`
 - `vxAtelier Pro/src/system/export`
 - `Package.swift`

@@ -27,7 +27,8 @@ public struct RenameConversationTool: ExecutableTool {
         self.modelContext = modelContext
     }
     
-    public func execute(arguments: String, configuration: [String: Any]? = nil, context: Any? = nil) async throws -> String {
+    func execute(_ call: ToolExecutionCall) async throws -> String {
+        let arguments = call.argumentsJSON
         guard let jsonData = arguments.data(using: .utf8) else {
             throw AppError.invalidArguments("Failed to encode arguments as UTF-8 data")
         }
@@ -74,10 +75,6 @@ public struct RenameConversationTool: ExecutableTool {
             throw error
         }
     }
-    
-    public func getDefaultConfiguration() -> [String: Any]? {
-        return nil
-    }
 }
 
 /// Tool for listing all conversations with their IDs and titles
@@ -94,7 +91,7 @@ public struct ListConversationsTool: ExecutableTool {
         self.modelContext = modelContext
     }
     
-    public func execute(arguments: String, configuration: [String: Any]? = nil, context: Any? = nil) async throws -> String {
+    func execute(_ call: ToolExecutionCall) async throws -> String {
         // Fetch all conversations
         let descriptor = FetchDescriptor<ConversationItem>()
         do {
@@ -127,10 +124,6 @@ public struct ListConversationsTool: ExecutableTool {
             throw AppError.aiServiceError(error.localizedDescription)
         }
     }
-    
-    public func getDefaultConfiguration() -> [String: Any]? {
-        return nil
-    }
 }
 
 /// Tool for finding a conversation by its title
@@ -155,7 +148,8 @@ public struct FindConversationTool: ExecutableTool {
         self.modelContext = modelContext
     }
     
-    public func execute(arguments: String, configuration: [String: Any]? = nil, context: Any? = nil) async throws -> String {
+    func execute(_ call: ToolExecutionCall) async throws -> String {
+        let arguments = call.argumentsJSON
         guard let jsonData = arguments.data(using: .utf8) else {
             throw AppError.invalidArguments("Failed to encode arguments as UTF-8 data")
         }
@@ -197,10 +191,6 @@ public struct FindConversationTool: ExecutableTool {
             throw AppError.aiServiceError(error.localizedDescription)
         }
     }
-    
-    public func getDefaultConfiguration() -> [String: Any]? {
-        return nil
-    }
 }
 
 /// Tool for getting the current conversation's ID
@@ -215,11 +205,8 @@ public struct CurrentConversationTool: ExecutableTool {
     public init() {
     }
     
-    public func execute(arguments: String, configuration: [String: Any]? = nil, context: Any? = nil) async throws -> String {
-        // Get the current conversation ID from configuration
-        guard let conversationItem = context as? ConversationItem else {
-            return "No current conversation information available in context"
-        }
+    func execute(_ call: ToolExecutionCall) async throws -> String {
+        let conversationItem = call.context.conversation
         
         // Create a response object with conversation info
         let response: [String: String] = [
@@ -242,9 +229,5 @@ public struct CurrentConversationTool: ExecutableTool {
             await vxAtelierPro.log.error("Unexpected error: \(error.localizedDescription)")
             throw AppError.aiServiceError(error.localizedDescription)
         }
-    }
-    
-    public func getDefaultConfiguration() -> [String: Any]? {
-        return nil
     }
 }

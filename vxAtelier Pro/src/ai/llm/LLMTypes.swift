@@ -2,7 +2,7 @@ import Foundation
 
 enum LLMProviderID: String, Codable, CaseIterable, Identifiable {
     case openAIPlatform
-    case openAICodexSubscription
+    case openAIChatGPTSubscription
     case openRouter
     case lmStudio
     case ollama
@@ -16,7 +16,7 @@ enum LLMProviderID: String, Codable, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .openAIPlatform: return "OpenAI Platform"
-        case .openAICodexSubscription: return "OpenAI Codex Subscription"
+        case .openAIChatGPTSubscription: return "ChatGPT Subscription"
         case .openRouter: return "OpenRouter"
         case .lmStudio: return "LM Studio"
         case .ollama: return "Ollama"
@@ -51,7 +51,9 @@ enum LLMAuthKind: String, Codable, CaseIterable {
     case bearerToken
     case xAPIKey
     case customHeaders
-    case codexSubscription
+    case chatGPTOAuth
+    case chatGPTDeviceCode
+    case chatGPTCodexToken
 }
 
 enum LLMModality: String, Codable, CaseIterable {
@@ -177,7 +179,7 @@ struct LLMMessage: Codable, Equatable, Identifiable {
     }
 }
 
-struct LLMTool: Codable, Equatable, Identifiable {
+struct LLMToolDefinition: Codable, Equatable, Identifiable {
     var id: String { name }
     var name: String
     var description: String
@@ -352,7 +354,7 @@ struct LLMRequest: Codable, Equatable {
     var modelID: String
     var modelDescriptor: LLMModelDescriptor?
     var messages: [LLMMessage]
-    var tools: [LLMTool]
+    var tools: [LLMToolDefinition]
     var options: LLMGenerationOptions
 
     init(
@@ -361,7 +363,7 @@ struct LLMRequest: Codable, Equatable {
         modelID: String,
         modelDescriptor: LLMModelDescriptor? = nil,
         messages: [LLMMessage],
-        tools: [LLMTool] = [],
+        tools: [LLMToolDefinition] = [],
         options: LLMGenerationOptions = LLMGenerationOptions()
     ) {
         self.providerID = providerID

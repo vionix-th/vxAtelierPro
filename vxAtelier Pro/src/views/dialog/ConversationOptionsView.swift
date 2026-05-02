@@ -174,12 +174,12 @@ struct ConversationOptionsView: View {
                                             .padding(.vertical, 8)
                                             
                                             if options.isToolEnabled(tool.name) {
-                                                if let configValues = tool.getDefaultConfiguration(), !configValues.isEmpty {
+                                                if let configurableTool = tool as? any ConfigurableAITool {
                                                     ToolConfigurationView(
-                                                        tool: tool, 
+                                                        tool: configurableTool,
                                                         configuration: Binding(
                                                             get: { 
-                                                                options.getToolConfiguration(tool.name) ?? tool.getDefaultConfiguration() ?? [:] 
+                                                                options.getToolConfiguration(tool.name) ?? configurableTool.defaultConfiguration()
                                                             },
                                                             set: { 
                                                                 options.setToolConfiguration(tool.name, configuration: $0) 
@@ -706,15 +706,17 @@ struct ParameterControlView: View {
 private struct ToolConfigurationView: View {
     @State private var isConfigurationPresented: Bool = false
     @State private var configText: String = "{}"
-    let tool: AITool
-    @Binding var configuration: [String: Any]
+    let tool: any ConfigurableAITool
+    @Binding var configuration: [String: JSONValue]
 
     var body: some View {
         HStack {
             Button {
                 vxAtelierPro.log.debug("Opening configuration editor")
                 // Convert configuration to JSON for editing
-                if let jsonData = try? JSONSerialization.data(withJSONObject: configuration, options: .prettyPrinted),
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                if let jsonData = try? encoder.encode(JSONValue.object(configuration)),
                    let jsonString = String(data: jsonData, encoding: .utf8) {
                     configText = jsonString
                 } else {
@@ -741,8 +743,9 @@ private struct ToolConfigurationView: View {
                     
                     Button {
                         vxAtelierPro.log.notice("Reset configuration")
-                        if let defaultConfig = tool.getDefaultConfiguration(),
-                           let jsonData = try? JSONSerialization.data(withJSONObject: defaultConfig, options: .prettyPrinted),
+                        let encoder = JSONEncoder()
+                        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                        if let jsonData = try? encoder.encode(JSONValue.object(tool.defaultConfiguration())),
                            let jsonString = String(data: jsonData, encoding: .utf8) {
                             configText = jsonString
                         } else {
@@ -774,7 +777,7 @@ private struct ToolConfigurationView: View {
                     Button("Save") {
                         // Try to parse the JSON text back to a dictionary
                         if let jsonData = configText.data(using: .utf8),
-                           let parsedConfig = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
+                           let parsedConfig = try? JSONDecoder().decode(JSONValue.self, from: jsonData).objectValue {
                             configuration = parsedConfig
                             vxAtelierPro.log.notice("Configuration saved")
                         } else {

@@ -113,13 +113,13 @@ Location: `src/ai/`
 
 The AI module is built on a provider-neutral domain. Conversation execution builds an `LLMRequest`, sends it through a provider adapter, streams or collects `LLMStreamEvent` values into a `ConversationDraftStore`, then persists stable `MessageItem`, `ToolCallItem`, and `ResponseRunItem` records.
 
-*   **Domain (`ai/domain/`)**: Defines `LLMRequest`, `LLMMessage`, `LLMContentPart`, `LLMTool`, `LLMToolCall`, `LLMGenerationOptions`, `LLMProviderProfile`, `LLMModelDescriptor`, `LLMStreamEvent`, `LLMUsage`, and `LLMProviderError`.
-*   **Provider Registry (`LLMProviderRegistry.swift`)**: Owns `LLMProviderID` profiles for OpenAI Platform, OpenAI Codex Subscription, OpenRouter, LM Studio, Ollama, xAI, DeepSeek, Anthropic, and custom OpenAI-compatible providers. It resolves enabled adapters from explicit provider IDs and profile capabilities.
-*   **HTTP Layer (`NetworkClient.swift`, `LLMHTTPClient.swift`)**: `NetworkClient` owns shared JSON/SSE transport, cancellation, timeouts, size caps, response metadata, and self-signed certificate handling. `LLMHTTPClient` is the AI-facing facade for provider headers, redacted diagnostics, HTTP status mapping, and normalized provider errors.
+*   **Core LLM Types (`ai/llm/`)**: Defines `LLMRequest`, `LLMMessage`, `LLMContentPart`, `LLMToolDefinition`, `LLMToolCall`, `LLMGenerationOptions`, `LLMStreamEvent`, `LLMUsage`, and `LLMProviderError`.
+*   **Providers (`ai/providers/`)**: Owns `LLMProviderID` profiles for OpenAI Platform, ChatGPT Subscription, OpenRouter, LM Studio, Ollama, xAI, DeepSeek, Anthropic, and custom OpenAI-compatible providers. It resolves enabled adapters from explicit provider IDs and profile capabilities.
+*   **Transport (`NetworkClient.swift`, `ai/transport/`)**: `NetworkClient` owns shared JSON/SSE transport, cancellation, timeouts, size caps, response metadata, and self-signed certificate handling. `LLMHTTPClient` is the AI-facing facade for provider headers, redacted diagnostics, HTTP status mapping, and normalized provider errors.
 *   **Adapters (`ai/adapters/`)**: `OpenAIResponsesAdapter`, `OpenAIChatAdapter`, and `AnthropicMessagesAdapter` map provider-specific request/stream formats into domain events. `LLMAdapterRunLoop` owns the shared streamed/non-streamed HTTP flow.
-*   **Execution (`ai/execution/`)**: `LLMConversationRequestBuilder`, `LLMRunCollector`, `LLMToolExecutionCoordinator`, `LLMPersistenceCoordinator`, and `LLMConversationExecutor` split request assembly, draft/event collection, sequential tool execution, SwiftData save boundaries, and turn orchestration.
+*   **Conversation Runs (`ai/conversation/`)**: `LLMConversationRequestBuilder`, `LLMRunCollector`, `LLMToolExecutionCoordinator`, `LLMPersistenceCoordinator`, and `LLMConversationExecutor` split request assembly, draft/event collection, sequential tool execution, SwiftData save boundaries, and turn orchestration.
 *   **Provider & Capability Utilities (`ModelProviderUtils.swift`)**: Provides model-name capability inference for UI filtering and badges.
-*   **Tooling Subsystem (`ai/tooling/`)**: A complete subsystem that enables the AI to call application-defined functions, architected around a set of core protocols and concrete implementations defined in `AITooling.swift`:
+*   **Tools (`ai/tools/`)**: A complete subsystem that enables the AI to call application-defined functions, architected around a set of core protocols and concrete implementations defined in `AITooling.swift`:
     *   **Core Protocols**: The system is built on a foundation of protocols that separate definition from implementation. `AITool` defines a tool's interface (name, description, parameters), while `ExecutableTool` adds the contract for execution. `AIToolCall` and `AIToolCallResult` define the data structures for communication with the AI.
     *   **Execution Handler**: The `AIToolHandler` protocol, with its `DefaultToolHandler` implementation, is responsible for orchestrating tool execution. It receives tool calls from the AI, finds the corresponding `ExecutableTool` in the `AIToolRegistry`, runs it, and formats the result.
     *   **Generic Implementations**: The file provides a full suite of generic, `Codable` structs (`GenericTool`, `GenericToolParameters`, etc.) that implement the core protocols, offering a ready-to-use, standardized way to define tools and their parameters.
@@ -1005,7 +1005,7 @@ views/
 | Protocol | Purpose | Key Conformers |
 |----------|---------|----------------|
 | `LLMProviderAdapter` | Top-level provider adapter interface for streaming and model fetches. | `OpenAIResponsesAdapter`, `OpenAIChatAdapter`, `AnthropicMessagesAdapter` |
-| `LLMRequest` / `LLMMessage` / `LLMStreamEvent` | Provider-neutral request, message, and streaming event domain. | Domain structs under `src/ai/domain` |
+| `LLMRequest` / `LLMMessage` / `LLMStreamEvent` | Provider-neutral request, message, and streaming event types. | Core LLM structs under `src/ai/llm` |
 | `LLMProviderProfile` | Provider capabilities, auth kind, endpoint families, defaults, and feature flags. | Profiles in `LLMProviderRegistry` |
 | `NetworkClient` / `LLMHTTPClient` | Shared JSON/SSE transport plus AI-specific provider headers, metadata redaction, and normalized provider errors. | Used by web search and all LLM adapters |
 | `LLMAdapterRunLoop` | Shared streamed/non-streamed adapter flow and metadata forwarding. | Used by provider adapters |
@@ -1021,7 +1021,7 @@ views/
 | `AIToolHandler` | Processes tool calls. The `DefaultToolHandler` implementation uses the registry to find and execute tools. |
 
 Implementation notes:
-* Tools live under `src/ai/tooling/` (e.g. `ListDialogsTool`, `WebSearchTool`).
+* Tools live under `src/ai/tools/` (e.g. `ListDialogsTool`, `WebSearchTool`).
 * Each tool defines a `parameters` JSON schema so providers like OpenAI can validate the call.
 * The App’s `registerDefaultTools()` in `vxAtelierPro.App` registers core dialog, settings, search, and shortcut tools during launch.
 

@@ -26,7 +26,7 @@ enum LLMRequestEncoding {
         return .object(schema)
     }
 
-    static func llmTool(from tool: AITool) -> LLMTool {
-        LLMTool(name: tool.name, description: tool.description, parameters: toolSchema(from: tool))
+    static func toolDefinition(from tool: AITool) -> LLMToolDefinition {
+        LLMToolDefinition(name: tool.name, description: tool.description, parameters: toolSchema(from: tool))
     }
 }

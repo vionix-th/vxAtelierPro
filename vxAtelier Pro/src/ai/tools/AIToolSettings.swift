@@ -54,7 +54,7 @@ public struct ListSettingsTool: ExecutableTool {
 
     public init() {}
 
-    public func execute(arguments: String, configuration: [String: Any]? = nil, context: Any? = nil) async throws -> String {
+    func execute(_ call: ToolExecutionCall) async throws -> String {
         var listDescription = "Available UserDefaults Settings (including current values):\n"
         let userDefaults = UserDefaults.standard // Get UserDefaults instance
 
@@ -89,10 +89,6 @@ public struct ListSettingsTool: ExecutableTool {
         listDescription += "\nNote: Some numeric settings have specific ranges (e.g., 'ConversationTextEdit.buttonSize': 12-48)."
         return listDescription
     }
-
-    public func getDefaultConfiguration() -> [String: Any]? {
-        return nil
-    }
 }
 
 // MARK: - Read Setting Tool
@@ -116,7 +112,8 @@ public struct ReadSettingTool: ExecutableTool {
 
     public init() {}
 
-    public func execute(arguments: String, configuration: [String: Any]? = nil, context: Any? = nil) async throws -> String {
+    func execute(_ call: ToolExecutionCall) async throws -> String {
+        let arguments = call.argumentsJSON
         guard let jsonData = arguments.data(using: .utf8),
               let args = try? JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any]
         else {
@@ -153,10 +150,6 @@ public struct ReadSettingTool: ExecutableTool {
         } else {
             return "Setting '\(settingKey)' not found or has no value."
         }
-    }
-
-    public func getDefaultConfiguration() -> [String: Any]? {
-        return nil
     }
 }
 
@@ -197,7 +190,8 @@ public struct WriteSettingTool: ExecutableTool {
 
     public init() {}
 
-    public func execute(arguments: String, configuration: [String: Any]? = nil, context: Any? = nil) async throws -> String {
+    func execute(_ call: ToolExecutionCall) async throws -> String {
+        let arguments = call.argumentsJSON
         guard let jsonData = arguments.data(using: .utf8),
               let args = try? JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any]
         else {
@@ -277,9 +271,5 @@ public struct WriteSettingTool: ExecutableTool {
         userDefaults.set(finalValue, forKey: settingKey)
         await vxAtelierPro.log.info("Setting '\(settingKey)' updated via AI tool to '\(String(describing: finalValue))'.")
         return "Successfully updated setting '\(settingKey)' to '\(finalValue)' (Type: \(expectedType))."
-    }
-
-    public func getDefaultConfiguration() -> [String: Any]? {
-        return nil
     }
 }

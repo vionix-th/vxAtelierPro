@@ -27,7 +27,8 @@ public struct ReadWebsiteTool: ExecutableTool {
 
     public init() {}
 
-    public func execute(arguments: String, configuration: [String: Any]? = nil, context: Any? = nil) async throws -> String {
+    func execute(_ call: ToolExecutionCall) async throws -> String {
+        let arguments = call.argumentsJSON
         guard let jsonData = arguments.data(using: .utf8),
               let args = try? JSONSerialization.jsonObject(with: jsonData) as? [String: String],
               let urlString = args["url"]
@@ -119,9 +120,5 @@ public struct ReadWebsiteTool: ExecutableTool {
         // Collapse multiple whitespaces/newlines into single spaces and trim
         processed = processed.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
         return processed.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    public func getDefaultConfiguration() -> [String: Any]? {
-        return nil // No default configuration needed
     }
 } 

@@ -89,11 +89,15 @@ final class ConversationOptions: Equatable {
     ///
     /// - Parameter toolName: Name of the tool
     /// - Returns: Tool configuration dictionary, or nil if not configured
-    func getToolConfiguration(_ toolName: String) -> [String: Any]? {
+    func getToolConfiguration(_ toolName: String) -> [String: JSONValue]? {
         guard let jsonString = toolConfigurations[toolName] else {
             return nil
         }
-        return JSONUtils.jsonStringToDictionary(jsonString)
+        guard let data = jsonString.data(using: .utf8),
+              let value = try? JSONDecoder().decode(JSONValue.self, from: data) else {
+            return nil
+        }
+        return value.objectValue
     }
 
     /// Sets the configuration for a specific tool.
@@ -101,11 +105,12 @@ final class ConversationOptions: Equatable {
     /// - Parameters:
     ///   - toolName: Name of the tool to configure
     ///   - configuration: Configuration data, or nil to remove configuration
-    func setToolConfiguration(_ toolName: String, configuration: [String: Any]?) {
+    func setToolConfiguration(_ toolName: String, configuration: [String: JSONValue]?) {
         // Create a new dictionary to ensure SwiftData tracks the change
         var updatedConfigs = toolConfigurations
         if let config = configuration {
-            if let jsonString = JSONUtils.dictionaryToJsonString(config) {
+            if let data = try? JSONEncoder().encode(JSONValue.object(config)),
+               let jsonString = String(data: data, encoding: .utf8) {
                 updatedConfigs[toolName] = jsonString
             }
         } else {
