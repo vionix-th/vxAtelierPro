@@ -94,6 +94,11 @@ final class QueryManager {
         fetch(ModelItem.self, sort: modelSort)
     }
 
+    func models(for apiConfiguration: APIConfigurationItem?) -> [ModelItem] {
+        guard let apiConfiguration else { return [] }
+        return fetchModels().filter { $0.apiConfiguration?.id == apiConfiguration.id }
+    }
+
     // MARK: - Defaults
     var defaultApiConfiguration: APIConfigurationItem? {
         if let explicit = fetchApiConfigurations().first(where: { $0.isDefault }) {
@@ -471,18 +476,18 @@ final class QueryManager {
                 } ?? []
             }
 
-            let existingModels = fetchModels()
+            let existingModels = models(for: config)
             for fetchedModel in fetchedModels {
                 if let existing = existingModels.first(where: {
                     $0.modelID == fetchedModel.id
-                        && (LLMProviderID(rawValue: $0.providerID) ?? .customOpenAICompatible) == fetchedModel.providerID
                 }) {
                     existing.descriptor = fetchedModel
+                    existing.apiConfiguration = config
                     LLMParameterMappingCatalog.materializeDefaults(on: existing, preserveCustomized: true)
                     updated += 1
                     vxAtelierPro.log.debug("Overwrote model: \(fetchedModel.id)")
                 } else {
-                    let modelItem = ModelItem(descriptor: fetchedModel)
+                    let modelItem = ModelItem(descriptor: fetchedModel, apiConfiguration: config)
                     LLMParameterMappingCatalog.materializeDefaults(on: modelItem, preserveCustomized: true)
                     modelContext.insert(modelItem)
                     added += 1

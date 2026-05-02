@@ -277,6 +277,7 @@ final class ConversationOptions: Equatable {
         )
 
         let mappings = resolvedParameterMappings(
+            apiConfiguration: config,
             providerID: providerID,
             endpointFamily: endpoint,
             modelID: modelID,
@@ -491,6 +492,7 @@ final class ConversationOptions: Equatable {
     }
 
     private func resolvedParameterMappings(
+        apiConfiguration: APIConfigurationItem,
         providerID: LLMProviderID,
         endpointFamily: LLMEndpointFamily,
         modelID: String,
@@ -501,7 +503,7 @@ final class ConversationOptions: Equatable {
            let models = try? modelContext.fetch(FetchDescriptor<ModelItem>()),
            let model = models.first(where: {
                $0.modelID == modelID
-                   && (LLMProviderID(rawValue: $0.providerID) ?? .customOpenAICompatible) == providerID
+                   && $0.apiConfiguration?.id == apiConfiguration.id
            }) {
             LLMParameterMappingCatalog.materializeDefaults(on: model, preserveCustomized: true)
             descriptor = model.descriptor

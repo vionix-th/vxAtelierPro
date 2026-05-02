@@ -93,10 +93,16 @@ class JsonSerializer {
         return try encoder.encode(exportData)
     }
     
-    static func importModel(from data: Data) throws -> ModelItem {
+    static func importModel(from data: Data, context: ModelContext? = nil) throws -> ModelItem {
         let decoder = JSONDecoder()
         let importData = try decoder.decode(ModelExportData.self, from: data)
-        return importData.toDataItem()
+        let apiConfigurations: [APIConfigurationItem]
+        if let context {
+            apiConfigurations = try context.fetch(FetchDescriptor<APIConfigurationItem>())
+        } else {
+            apiConfigurations = []
+        }
+        return importData.toDataItem(apiConfigurations: apiConfigurations)
     }
     
     static func importData(from data: Data, context: ModelContext) async throws -> Any {
@@ -116,7 +122,7 @@ class JsonSerializer {
         }
         
         // Try model
-        if let model = try? importModel(from: data) {
+        if let model = try? importModel(from: data, context: context) {
             return model
         }
         

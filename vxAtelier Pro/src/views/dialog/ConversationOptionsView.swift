@@ -543,7 +543,7 @@ struct ParameterControlView: View {
                                 parameter.setValue(modelId)
                                 onModelChanged(modelId)
                             },
-                            currentProvider: LLMProviderRegistry.shared.resolveProviderID(for: config)
+                            apiConfiguration: config
                         )
                     }
                 }

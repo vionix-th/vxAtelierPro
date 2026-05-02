@@ -5,7 +5,6 @@ import SwiftUI
 /// Designed to be reused across the application where model selection is needed.
 struct ModelSelectionView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(QueryManager.self) private var queryManager
     @Query(sort: [SortDescriptor(\ModelItem.name)]) private var allModels: [ModelItem]
     
     /// The currently selected model (used for display purposes)
@@ -14,8 +13,8 @@ struct ModelSelectionView: View {
     /// Callback that will be invoked when a model is selected
     let onModelSelected: (String) -> Void
     
-    /// The current API provider to filter models by
-    let currentProvider: LLMProviderID
+    /// The current API configuration to filter models by
+    let apiConfiguration: APIConfigurationItem?
     
     /// Toggle to show all models or just those from the current provider
     @State private var showAllModels = false
@@ -30,16 +29,12 @@ struct ModelSelectionView: View {
     private var filteredModels: [ModelItem] {
         var models = allModels
         
-        // Filter by provider if not showing all models
-        if !showAllModels {
-            let acceptedProviders = [
-                currentProvider.rawValue.lowercased(),
-                currentProvider.displayName.lowercased()
-            ]
-            models = models.filter { model in
-                let modelProvider = model.provider.lowercased()
-                return acceptedProviders.contains(modelProvider) || modelProvider == "custom"
+        if let apiConfiguration {
+            if !showAllModels {
+                models = models.filter { $0.apiConfiguration?.id == apiConfiguration.id }
             }
+        } else if !showAllModels {
+            models = models.filter { $0.apiConfiguration == nil }
         }
         
         // Filter by selected capabilities (must have all selected)
@@ -65,7 +60,10 @@ struct ModelSelectionView: View {
     /// Group models by provider for better organization
     private var groupedModels: [String: [ModelItem]] {
         Dictionary(grouping: filteredModels) { model in
-            model.provider.capitalized
+            if let config = model.apiConfiguration {
+                return config.name
+            }
+            return "\(model.provider.capitalized) (Unassigned)"
         }
     }
     

@@ -40,13 +40,14 @@ final class APIConfigurationItemTests: XCTestCase {
 
     func testRelationshipWithModelItem() throws {
         let config = APIConfigurationItem(name: "TestAPI", apiKey: "key", baseURL: "https://api.test.com/v1")
-        let model = ModelItem(name: "gpt-4", contextSize: 8192, provider: "OpenAI")
+        let model = ModelItem(name: "gpt-4", contextSize: 8192, provider: "OpenAI", apiConfiguration: config)
         config.defaultModel = model.name
         context.insert(config)
         context.insert(model)
         try context.save()
         let fetched = try context.fetch(FetchDescriptor<APIConfigurationItem>()).first
         XCTAssertEqual(fetched?.defaultModel, "gpt-4")
+        XCTAssertEqual(fetched?.models.first?.name, "gpt-4")
     }
 
     func testEdgeCases() throws {

@@ -27,6 +27,7 @@ final class APIConfigurationItem {
 
     /// The default model for this API configuration (overrides global defaults if set)
     var defaultModel: String?
+    @Relationship(deleteRule: .cascade, inverse: \ModelItem.apiConfiguration) var models: [ModelItem] = []
 
     var defaultEndpointFamily: String
     var headersJSON: String

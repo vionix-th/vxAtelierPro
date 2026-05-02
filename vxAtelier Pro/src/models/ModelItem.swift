@@ -32,6 +32,7 @@ final class ModelItem {
     var modelID: String
     var displayName: String
     var providerID: String
+    var apiConfiguration: APIConfigurationItem?
     var endpointFamiliesRaw: [String]
     var modalitiesRaw: [String]
     var supportedParameters: [String]
@@ -79,15 +80,19 @@ final class ModelItem {
     ///   - provider: The provider name, auto-detected from model name if nil
     init(
         name: String, contextSize: Int = AppDefaults.ModelContextSizes.defaultSize,
-        provider: String? = nil
+        provider: String? = nil,
+        apiConfiguration: APIConfigurationItem? = nil
     ) {
-        let resolvedProvider = provider ?? ModelProviderUtils.detectProvider(from: name)
+        let resolvedProvider = apiConfiguration?.providerIDEnum.displayName
+            ?? provider
+            ?? ModelProviderUtils.detectProvider(from: name)
         self.name = name
         self.modelID = name
         self.displayName = name
         self.contextSize = contextSize
         self.provider = resolvedProvider
-        self.providerID = LLMProviderRegistry.providerID(fromProviderName: resolvedProvider).rawValue
+        self.providerID = apiConfiguration?.providerID ?? LLMProviderRegistry.providerID(fromProviderName: resolvedProvider).rawValue
+        self.apiConfiguration = apiConfiguration
         self.capabilities = []
         self.endpointFamiliesRaw = [LLMEndpointFamily.chatCompletions.rawValue]
         self.modalitiesRaw = [LLMModality.text.rawValue]
@@ -109,8 +114,13 @@ final class ModelItem {
         return capabilities.contains(capability)
     }
 
-    convenience init(descriptor: LLMModelDescriptor) {
-        self.init(name: descriptor.id, contextSize: descriptor.contextWindow ?? AppDefaults.ModelContextSizes.defaultSize, provider: descriptor.providerID.displayName)
+    convenience init(descriptor: LLMModelDescriptor, apiConfiguration: APIConfigurationItem? = nil) {
+        self.init(
+            name: descriptor.id,
+            contextSize: descriptor.contextWindow ?? AppDefaults.ModelContextSizes.defaultSize,
+            provider: descriptor.providerID.displayName,
+            apiConfiguration: apiConfiguration
+        )
         self.descriptor = descriptor
     }
 

@@ -49,6 +49,24 @@ final class ModelItemTests: XCTestCase {
         XCTAssertFalse(fetched?.hasCapability(.audio) ?? true)
     }
 
+    func testConfigurationOwnership() throws {
+        let config = APIConfigurationItem(
+            name: "Scoped OpenAI",
+            apiKey: "key",
+            baseURL: "https://api.test.com/v1",
+            providerID: .openAIPlatform
+        )
+        let model = ModelItem(name: "gpt-4", contextSize: 8192, apiConfiguration: config)
+        context.insert(config)
+        context.insert(model)
+        try context.save()
+
+        let fetched = try XCTUnwrap(try context.fetch(FetchDescriptor<ModelItem>()).first)
+        XCTAssertEqual(fetched.apiConfiguration?.name, "Scoped OpenAI")
+        XCTAssertEqual(fetched.providerID, LLMProviderID.openAIPlatform.rawValue)
+        XCTAssertEqual(fetched.provider, LLMProviderID.openAIPlatform.displayName)
+    }
+
     func testEdgeCases() throws {
         let model = ModelItem(name: "", contextSize: 0, provider: "")
         context.insert(model)

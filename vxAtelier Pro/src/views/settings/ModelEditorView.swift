@@ -6,10 +6,11 @@ struct ModelEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(QueryManager.self) private var queryManager
+    @Query(sort: [SortDescriptor(\APIConfigurationItem.name)]) private var apiConfigurations: [APIConfigurationItem]
     
     let model: ModelItem
     @State private var name: String
-    @State private var provider: String
+    @State private var selectedConfigurationID: PersistentIdentifier?
     @State private var contextSize: Int
     @State private var capabilities: [ModelCapability]
     @State private var selectedEndpointFamilyRaw: String
@@ -17,7 +18,7 @@ struct ModelEditorView: View {
     init(model: ModelItem) {
         self.model = model
         _name = State(initialValue: model.name)
-        _provider = State(initialValue: model.provider)
+        _selectedConfigurationID = State(initialValue: model.apiConfiguration?.persistentModelID)
         _contextSize = State(initialValue: model.contextSize)
         _capabilities = State(initialValue: model.capabilities)
         _selectedEndpointFamilyRaw = State(
@@ -40,6 +41,10 @@ struct ModelEditorView: View {
             .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
     }
 
+    private var selectedConfiguration: APIConfigurationItem? {
+        apiConfigurations.first { $0.persistentModelID == selectedConfigurationID }
+    }
+
     private var addableParameterIDs: [LLMApplicationParameterID] {
         let existing = Set(selectedEndpointMappings.map(\.semanticParameterIDEnum))
         return LLMApplicationParameterID.allCases
@@ -53,24 +58,25 @@ struct ModelEditorView: View {
                     TextField("Model Name", text: $name)
                         .textFieldStyle(.roundedBorder)
                         .font(.system(.body, design: .rounded))
-                    
-                    Picker("Provider", selection: $provider) {
-                        ForEach([
-                            ModelProviderUtils.Provider.openAI.rawValue,
-                            ModelProviderUtils.Provider.anthropic.rawValue,
-                            ModelProviderUtils.Provider.google.rawValue,
-                            ModelProviderUtils.Provider.meta.rawValue,
-                            ModelProviderUtils.Provider.mistral.rawValue,
-                            ModelProviderUtils.Provider.xAI.rawValue,
-                            ModelProviderUtils.Provider.deepSeek.rawValue,
-                            ModelProviderUtils.Provider.custom.rawValue
-                        ], id: \.self) { provider in
-                            Text(provider)
+
+                    Picker("API Configuration", selection: $selectedConfigurationID) {
+                        ForEach(apiConfigurations) { config in
+                            Text(config.name)
                                 .font(.system(.body, design: .rounded))
-                                .tag(provider)
+                                .tag(config.persistentModelID as PersistentIdentifier?)
                         }
                     }
                     .pickerStyle(.menu)
+
+                    if let selectedConfiguration {
+                        Text("Provider: \(selectedConfiguration.providerIDEnum.displayName)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("No API configuration selected")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 } header: {
                     Text("Model Information")
                         .font(.system(.headline, design: .rounded))
@@ -233,10 +239,13 @@ struct ModelEditorView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
                         .font(.system(.body, design: .rounded))
-                        .disabled(name.isEmpty)
+                        .disabled(name.isEmpty || selectedConfiguration == nil)
                 }
             }
             .onAppear {
+                if selectedConfigurationID == nil {
+                    selectedConfigurationID = model.apiConfiguration?.persistentModelID ?? apiConfigurations.first?.persistentModelID
+                }
                 LLMParameterMappingCatalog.materializeDefaults(on: model, preserveCustomized: true)
                 if !endpointFamilies.contains(where: { $0.rawValue == selectedEndpointFamilyRaw }) {
                     selectedEndpointFamilyRaw = endpointFamilies.first?.rawValue ?? LLMEndpointFamily.chatCompletions.rawValue
@@ -246,11 +255,13 @@ struct ModelEditorView: View {
     }
     
     private func save() {
+        guard let selectedConfiguration else { return }
         model.name = name
         model.modelID = name
         model.displayName = name
-        model.provider = provider
-        model.providerID = LLMProviderRegistry.providerID(fromProviderName: provider).rawValue
+        model.apiConfiguration = selectedConfiguration
+        model.provider = selectedConfiguration.providerIDEnum.displayName
+        model.providerID = selectedConfiguration.providerID
         model.contextSize = contextSize
         model.capabilities = capabilities
         LLMParameterMappingCatalog.materializeDefaults(on: model, preserveCustomized: true)

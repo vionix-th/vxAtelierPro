@@ -144,7 +144,7 @@ struct APIConfigurationEditView: View {
                                         defaultModel = model
                                         hasUserEditedDefaultModel = true
                                     },
-                                    currentProvider: providerID
+                                    apiConfiguration: configuration
                                 )
                             }
                             Text(

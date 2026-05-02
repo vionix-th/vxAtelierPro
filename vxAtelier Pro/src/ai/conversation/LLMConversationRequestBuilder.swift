@@ -36,7 +36,12 @@ struct LLMConversationRequestBuilder {
             providerID: providerID,
             endpointFamily: endpoint,
             modelID: modelID,
-            modelDescriptor: modelDescriptor(for: modelID, providerID: providerID, conversation: conversation),
+            modelDescriptor: modelDescriptor(
+                for: modelID,
+                apiConfiguration: apiConfig,
+                providerID: providerID,
+                conversation: conversation
+            ),
             messages: orderedMessages(in: conversation).map { $0.asDomainMessage() },
             tools: enabledTools.map { LLMRequestEncoding.toolDefinition(from: $0) },
             options: generationOptions
@@ -64,6 +69,7 @@ struct LLMConversationRequestBuilder {
 
     private func modelDescriptor(
         for modelID: String,
+        apiConfiguration: APIConfigurationItem,
         providerID: LLMProviderID,
         conversation: ConversationItem
     ) -> LLMModelDescriptor? {
@@ -73,6 +79,7 @@ struct LLMConversationRequestBuilder {
         }
         let model = models.first { model in
             (model.modelID == modelID || model.name == modelID)
+                && model.apiConfiguration?.id == apiConfiguration.id
                 && (LLMProviderID(rawValue: model.providerID) ?? .customOpenAICompatible) == providerID
         }
         if let model {

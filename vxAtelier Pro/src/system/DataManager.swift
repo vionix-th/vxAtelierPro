@@ -178,8 +178,9 @@ class DataManager {
                 context.insert(voiceConfig)
             }
             
+            let restoredApiConfigurations = try context.fetch(FetchDescriptor<APIConfigurationItem>())
             for modelData in backup.models {
-                let model = modelData.toDataItem()
+                let model = modelData.toDataItem(apiConfigurations: restoredApiConfigurations)
                 context.insert(model)
             }
             

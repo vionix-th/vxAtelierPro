@@ -22,6 +22,13 @@ struct ModelsSettingsView: View {
         var isNew: Bool
     }
 
+    struct ScopedModelsSection: Identifiable {
+        let config: APIConfigurationItem
+        let models: [ModelItem]
+
+        var id: PersistentIdentifier { config.persistentModelID }
+    }
+
     private func showCompletion(message: String) {
         completionMessage = message
         showCompletionAlert = true
@@ -45,11 +52,11 @@ struct ModelsSettingsView: View {
         }
     }
 
-    private var modelsByProvider: [String: [ModelItem]] {
-        models.reduce(into: [String: [ModelItem]]()) { result, model in
-            var updatedProviderModels = result[model.provider] ?? []
-            updatedProviderModels.append(model)
-            result[model.provider] = updatedProviderModels
+    private var modelsByConfiguration: [ScopedModelsSection] {
+        apiConfigurations.compactMap { config in
+            let scopedModels = models.filter { $0.apiConfiguration?.id == config.id }
+            guard !scopedModels.isEmpty else { return nil }
+            return ScopedModelsSection(config: config, models: scopedModels)
         }
     }
 
@@ -85,7 +92,8 @@ struct ModelsSettingsView: View {
                         model: ModelItem(
                             name: "New Model",
                             contextSize: AppDefaults.ModelContextSizes.defaultSize,
-                            provider: "Custom"
+                            provider: apiConfigurations.first?.providerIDEnum.displayName ?? "Custom",
+                            apiConfiguration: apiConfigurations.first
                         ),
                         isNew: true
                     )
@@ -117,42 +125,40 @@ struct ModelsSettingsView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
-                    ForEach(modelsByProvider.keys.sorted(), id: \.self) { provider in
-                        if let providerModels = modelsByProvider[provider] {
-                            Section(header: Text(provider)) {
-                                ForEach(providerModels) { model in
-                                    SettingsListRow(
-                                        title: model.name,
-                                        subtitle: model.provider,
-                                        icons: model.capabilities.map { Image(systemName: $0.systemName) },
-                                        onEdit: {
-                                            editingModel = EditingModel(model: model, isNew: false)
-                                        },
-                                        onDelete: {
-                                            do {
-                                                try queryManager.delete(model)
-                                            } catch {
-                                                showCompletion(message: "Failed to delete model: \(error.localizedDescription)")
-                                            }
+                    ForEach(modelsByConfiguration) { entry in
+                        Section(header: Text(entry.config.name)) {
+                            ForEach(entry.models) { model in
+                                SettingsListRow(
+                                    title: model.name,
+                                    subtitle: model.apiConfiguration?.providerIDEnum.displayName ?? model.provider,
+                                    icons: model.capabilities.map { Image(systemName: $0.systemName) },
+                                    onEdit: {
+                                        editingModel = EditingModel(model: model, isNew: false)
+                                    },
+                                    onDelete: {
+                                        do {
+                                            try queryManager.delete(model)
+                                        } catch {
+                                            showCompletion(message: "Failed to delete model: \(error.localizedDescription)")
                                         }
-                                    ) {
-                                        Text("Context size: \(model.contextSize)")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
                                     }
-                                    .settingsRowActions(
-                                        onEdit: {
-                                            editingModel = EditingModel(model: model, isNew: false)
-                                        },
-                                        onDelete: {
-                                            do {
-                                                try queryManager.delete(model)
-                                            } catch {
-                                                showCompletion(message: "Failed to delete model: \(error.localizedDescription)")
-                                            }
-                                        }
-                                    )
+                                ) {
+                                    Text("Context size: \(model.contextSize)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
                                 }
+                                .settingsRowActions(
+                                    onEdit: {
+                                        editingModel = EditingModel(model: model, isNew: false)
+                                    },
+                                    onDelete: {
+                                        do {
+                                            try queryManager.delete(model)
+                                        } catch {
+                                            showCompletion(message: "Failed to delete model: \(error.localizedDescription)")
+                                        }
+                                    }
+                                )
                             }
                         }
                     }

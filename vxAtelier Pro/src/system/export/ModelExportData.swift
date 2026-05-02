@@ -17,6 +17,9 @@ struct ModelExportData: Codable {
     let schemaFeatures: [String]?
     let rawMetadataJSON: String?
     let parameterMappings: [ModelParameterMappingExportData]?
+    let apiConfigurationName: String?
+    let apiConfigurationProviderID: String?
+    let apiConfigurationBaseURL: String?
     
     init(_ model: ModelItem) {
         self.name = model.name
@@ -32,10 +35,23 @@ struct ModelExportData: Codable {
         self.schemaFeatures = model.schemaFeaturesRaw
         self.rawMetadataJSON = model.rawMetadataJSON
         self.parameterMappings = model.parameterMappings.map { ModelParameterMappingExportData($0) }
+        self.apiConfigurationName = model.apiConfiguration?.name
+        self.apiConfigurationProviderID = model.apiConfiguration?.providerID
+        self.apiConfigurationBaseURL = model.apiConfiguration?.baseURL
     }
     
-    func toDataItem() -> ModelItem {
-        let model = ModelItem(name: name, contextSize: contextSize, provider: provider)
+    func toDataItem(apiConfigurations: [APIConfigurationItem] = []) -> ModelItem {
+        let apiConfiguration = apiConfigurations.first {
+            $0.name == apiConfigurationName
+                && $0.providerID == apiConfigurationProviderID
+                && $0.baseURL == apiConfigurationBaseURL
+        }
+        let model = ModelItem(
+            name: name,
+            contextSize: contextSize,
+            provider: provider,
+            apiConfiguration: apiConfiguration
+        )
         model.capabilities = capabilities.compactMap { ModelCapability(rawValue: $0) }
         model.modelID = modelID ?? name
         model.displayName = displayName ?? name

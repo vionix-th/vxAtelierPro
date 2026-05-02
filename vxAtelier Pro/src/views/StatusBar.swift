@@ -471,7 +471,7 @@ struct ConversationInfoHeader: View {
                                                 vxAtelierPro.log.error("Failed to set model \(newModel): \(error.localizedDescription)")
                                             }
                                         },
-                                        currentProvider: currentProvider
+                                        apiConfiguration: conversation.options.apiConfiguration
                                     )
                                 }
                 }
