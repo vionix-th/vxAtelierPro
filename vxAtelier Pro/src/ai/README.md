@@ -98,6 +98,6 @@ Offline adapter and executor tests use fixtures in `vxAtelier ProTests/AI/Fixtur
 
 Live provider smoke tests live in `LLMProviderLiveSmokeTests` and are skipped by default. To run them, copy `vxAtelier ProTests/AI/LiveLLMProviders.template.json` to `vxAtelier ProTests/AI/LiveLLMProviders.local.json`, set the top-level `enabled` flag to `true`, and enable only the provider entries that should run locally.
 
-The local config file supplies base URLs, API keys, models, endpoint families, optional headers, and HTTP timeout options. It is ignored by Git because it may contain secrets.
+The local config file supplies base URLs, API keys, model lists, endpoint families, optional headers, and HTTP timeout options. It is ignored by Git because it may contain secrets.
 
-The smoke tests verify model-list availability plus streamed and non-streamed text-only turns for OpenAI Responses, OpenAI Chat Completions, Anthropic Messages, and OpenAI-compatible chat providers. Connection-level unavailability and transient availability responses skip the affected test; authentication, invalid model, decoding, and adapter errors fail.
+The smoke tests verify provider model-list availability plus streamed and non-streamed text-only turns for every configured model on OpenAI Responses, OpenAI Chat Completions, Anthropic Messages, and OpenAI-compatible chat providers. Connection-level unavailability and transient availability responses skip the affected test; authentication, invalid model, decoding, and adapter errors fail.

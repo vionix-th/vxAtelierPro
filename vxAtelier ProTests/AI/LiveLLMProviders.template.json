@@ -9,7 +9,7 @@
       "enabled": false,
       "baseURL": "https://api.openai.com/v1",
       "apiKey": "replace-with-openai-api-key",
-      "model": "replace-with-openai-model",
+      "models": ["replace-with-openai-model"],
       "endpointFamilies": ["responses", "chatCompletions"],
       "checkModels": true
     },
@@ -19,7 +19,7 @@
       "enabled": false,
       "baseURL": "https://api.anthropic.com",
       "apiKey": "replace-with-anthropic-api-key",
-      "model": "replace-with-anthropic-model",
+      "models": ["replace-with-anthropic-model"],
       "endpointFamilies": ["anthropicMessages"],
       "checkModels": true
     },
@@ -29,7 +29,7 @@
       "enabled": false,
       "baseURL": "https://openrouter.ai/api",
       "apiKey": "replace-with-openrouter-api-key",
-      "model": "replace-with-openrouter-model",
+      "models": ["replace-with-openrouter-model"],
       "endpointFamilies": ["chatCompletions"],
       "checkModels": true
     },
@@ -39,7 +39,7 @@
       "enabled": false,
       "baseURL": "http://localhost:1234",
       "apiKey": "",
-      "model": "replace-with-loaded-lmstudio-model",
+      "models": ["replace-with-loaded-lmstudio-model"],
       "endpointFamilies": ["chatCompletions"],
       "checkModels": true
     },
@@ -49,7 +49,7 @@
       "enabled": false,
       "baseURL": "http://localhost:11434",
       "apiKey": "",
-      "model": "replace-with-loaded-ollama-model",
+      "models": ["replace-with-loaded-ollama-model"],
       "endpointFamilies": ["chatCompletions"],
       "checkModels": true
     },
@@ -59,7 +59,7 @@
       "enabled": false,
       "baseURL": "https://api.x.ai/v1",
       "apiKey": "replace-with-xai-api-key",
-      "model": "replace-with-xai-model",
+      "models": ["replace-with-xai-model"],
       "endpointFamilies": ["chatCompletions"],
       "checkModels": true
     },
@@ -69,7 +69,7 @@
       "enabled": false,
       "baseURL": "https://api.deepseek.com/v1",
       "apiKey": "replace-with-deepseek-api-key",
-      "model": "replace-with-deepseek-model",
+      "models": ["replace-with-deepseek-model"],
       "endpointFamilies": ["chatCompletions"],
       "checkModels": true
     },
@@ -79,7 +79,7 @@
       "enabled": false,
       "baseURL": "https://example.test/v1",
       "apiKey": "replace-with-api-key-or-empty-string",
-      "model": "replace-with-model",
+      "models": ["replace-with-model"],
       "endpointFamilies": ["chatCompletions"],
       "authKind": "bearerToken",
       "checkModels": true,
