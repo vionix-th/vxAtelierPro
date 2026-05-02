@@ -67,30 +67,41 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         let configuration = makeConfiguration(for: provider, suite: suite, endpointFamily: endpointFamily)
 
         if provider.checkModels ?? true {
-            try await skipUnavailable(provider: provider, endpointFamily: endpointFamily, operation: "models") {
+            _ = try await runProviderOperation(provider: provider, endpointFamily: endpointFamily, operation: "models") {
                 _ = try await adapter.fetchModels(configuration: configuration)
+                return true
             }
         }
 
         for model in models {
-            try await skipUnavailable(provider: provider, endpointFamily: endpointFamily, model: model, operation: "non-streaming turn") {
+            let nonStreamingActivity = activityName(provider: provider, endpointFamily: endpointFamily, model: model, streamMode: .disabled)
+            recordActivity(named: nonStreamingActivity)
+            let nonStreamingPassed = try await runProviderOperation(provider: provider, endpointFamily: endpointFamily, model: model, operation: "non-streaming turn") {
                 let events = try await collectEvents(
                     adapter.stream(
                         makeRequest(providerID: providerID, endpointFamily: endpointFamily, model: model, streamMode: .disabled),
                         configuration: configuration
                     )
                 )
-                assertCompletedTextTurn(events, provider: provider, endpointFamily: endpointFamily, model: model, streamMode: .disabled)
+                return assertCompletedTextTurn(events, provider: provider, endpointFamily: endpointFamily, model: model, streamMode: .disabled)
+            }
+            if nonStreamingPassed {
+                recordActivity(named: "\(nonStreamingActivity) passed")
             }
 
-            try await skipUnavailable(provider: provider, endpointFamily: endpointFamily, model: model, operation: "streaming turn") {
+            let streamingActivity = activityName(provider: provider, endpointFamily: endpointFamily, model: model, streamMode: .enabled)
+            recordActivity(named: streamingActivity)
+            let streamingPassed = try await runProviderOperation(provider: provider, endpointFamily: endpointFamily, model: model, operation: "streaming turn") {
                 let events = try await collectEvents(
                     adapter.stream(
                         makeRequest(providerID: providerID, endpointFamily: endpointFamily, model: model, streamMode: .enabled),
                         configuration: configuration
                     )
                 )
-                assertCompletedTextTurn(events, provider: provider, endpointFamily: endpointFamily, model: model, streamMode: .enabled)
+                return assertCompletedTextTurn(events, provider: provider, endpointFamily: endpointFamily, model: model, streamMode: .enabled)
+            }
+            if streamingPassed {
+                recordActivity(named: "\(streamingActivity) passed")
             }
         }
     }
@@ -131,6 +142,23 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         return options
     }
 
+    private func activityName(
+        provider: LiveSmokeProvider,
+        endpointFamily: LLMEndpointFamily,
+        model: String,
+        streamMode: LLMGenerationOptions.StreamMode
+    ) -> String {
+        "\(provider.name ?? provider.id.rawValue) / \(endpointFamily.rawValue) / \(model) / \(streamMode.rawValue)"
+    }
+
+    private func recordActivity(named name: String) {
+        XCTContext.runActivity(named: name) { activity in
+            let attachment = XCTAttachment(string: name)
+            attachment.lifetime = .keepAlways
+            activity.add(attachment)
+        }
+    }
+
     private func makeRequest(
         providerID: LLMProviderID,
         endpointFamily: LLMEndpointFamily,
@@ -154,7 +182,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         endpointFamily: LLMEndpointFamily,
         model: String,
         streamMode: LLMGenerationOptions.StreamMode
-    ) {
+    ) -> Bool {
         let text = events.compactMap { event -> String? in
             if case .textDelta(let value) = event { return value }
             return nil
@@ -167,31 +195,34 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
             return false
         }
 
-        XCTAssertFalse(
-            text.isEmpty,
-            "\(provider.name ?? provider.id.rawValue) \(endpointFamily.rawValue) \(model) \(streamMode.rawValue) produced no text."
-        )
-        XCTAssertTrue(
-            completed,
-            "\(provider.name ?? provider.id.rawValue) \(endpointFamily.rawValue) \(model) \(streamMode.rawValue) did not complete."
-        )
+        var passed = true
+        if text.isEmpty {
+            XCTFail("\(provider.name ?? provider.id.rawValue) \(endpointFamily.rawValue) \(model) \(streamMode.rawValue) produced no text.")
+            passed = false
+        }
+        if !completed {
+            XCTFail("\(provider.name ?? provider.id.rawValue) \(endpointFamily.rawValue) \(model) \(streamMode.rawValue) did not complete.")
+            passed = false
+        }
+        return passed
     }
 
-    private func skipUnavailable(
+    private func runProviderOperation(
         provider: LiveSmokeProvider,
         endpointFamily: LLMEndpointFamily,
         model: String? = nil,
         operation: String,
-        _ work: () async throws -> Void
-    ) async throws {
+        _ work: () async throws -> Bool
+    ) async throws -> Bool {
         do {
-            try await work()
+            return try await work()
         } catch {
             let modelSuffix = model.map { " \($0)" } ?? ""
             if let reason = unavailableReason(from: error) {
                 throw XCTSkip("\(provider.name ?? provider.id.rawValue) \(endpointFamily.rawValue)\(modelSuffix) \(operation) unavailable: \(reason)")
             }
             XCTFail("\(provider.name ?? provider.id.rawValue) \(endpointFamily.rawValue)\(modelSuffix) \(operation) failed: \(error)")
+            return false
         }
     }
 
