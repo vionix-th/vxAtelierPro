@@ -58,6 +58,14 @@
 			);
 			target = 74516F522D33EA1300731EDB /* vxAtelier Pro */;
 		};
+		74D79F692D6FAE49006A061F /* Exceptions for "vxAtelier ProTests" folder in "vxAtelier ProTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				AI/LiveLLMProviders.json,
+				AI/LiveLLMProviders.local.json,
+			);
+			target = 74516F652D33EA1500731EDB /* vxAtelier ProTests */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -71,6 +79,9 @@
 		};
 		74516F692D33EA1500731EDB /* vxAtelier ProTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				74D79F692D6FAE49006A061F /* Exceptions for "vxAtelier ProTests" folder in "vxAtelier ProTests" target */,
+			);
 			path = "vxAtelier ProTests";
 			sourceTree = "<group>";
 		};
