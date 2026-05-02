@@ -159,3 +159,36 @@ extension XCTestCase {
         }
     }
 }
+
+extension LLMRequest {
+    static func runtimeEquivalent(
+        providerID: LLMProviderID,
+        endpointFamily: LLMEndpointFamily,
+        modelID: String,
+        messages: [LLMMessage],
+        tools: [LLMToolDefinition] = [],
+        options: LLMGenerationOptions = LLMGenerationOptions()
+    ) -> LLMRequest {
+        let profile = LLMProviderRegistry.shared.profile(for: providerID)
+        return LLMRequest(
+            providerID: providerID,
+            endpointFamily: endpointFamily,
+            modelID: modelID,
+            modelDescriptor: LLMModelDescriptor(
+                id: modelID,
+                providerID: providerID,
+                endpointFamilies: [endpointFamily],
+                supportedParameters: profile.supportedParameters,
+                parameterMappings: LLMParameterMappingCatalog.defaults(
+                    providerID: providerID,
+                    endpointFamily: endpointFamily,
+                    modelID: modelID
+                ),
+                schemaFeatures: profile.schemaFeatures
+            ),
+            messages: messages,
+            tools: tools,
+            options: options
+        )
+    }
+}

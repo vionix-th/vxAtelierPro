@@ -165,7 +165,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         model: String,
         streamMode: LLMGenerationOptions.StreamMode
     ) -> LLMRequest {
-        LLMRequest(
+        LLMRequest.runtimeEquivalent(
             providerID: providerID,
             endpointFamily: endpointFamily,
             modelID: model,

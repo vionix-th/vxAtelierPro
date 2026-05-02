@@ -1148,7 +1148,7 @@ final class LLMModernizationTests: XCTestCase {
         }
 
         let adapter = OpenAIChatAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
-        let request = LLMRequest(
+        let request = LLMRequest.runtimeEquivalent(
             providerID: .openAIPlatform,
             endpointFamily: .chatCompletions,
             modelID: "gpt-test",
@@ -1182,7 +1182,7 @@ final class LLMModernizationTests: XCTestCase {
         }
 
         let adapter = OpenAIResponsesAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
-        let request = LLMRequest(
+        let request = LLMRequest.runtimeEquivalent(
             providerID: .openAIPlatform,
             endpointFamily: .responses,
             modelID: "gpt-test",
@@ -1246,7 +1246,7 @@ final class LLMModernizationTests: XCTestCase {
         }
 
         let adapter = AnthropicMessagesAdapter(profile: LLMProviderRegistry.shared.profile(for: .anthropic))
-        let request = LLMRequest(
+        let request = LLMRequest.runtimeEquivalent(
             providerID: .anthropic,
             endpointFamily: .anthropicMessages,
             modelID: "claude-test",
