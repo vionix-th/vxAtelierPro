@@ -158,6 +158,21 @@ public final class AiRequestArgument: ObservableObject {
         }
     }
 
+    var jsonValue: JSONValue? {
+        guard isEnabled else { return nil }
+        let type = AiArgumentValueType(rawValue: self.valueType) ?? .string
+        switch type {
+        case .string:
+            return stringValue.map { .string($0) }
+        case .integer:
+            return intValue.map { .integer($0) }
+        case .float:
+            return floatValue.map { .number($0) }
+        case .boolean:
+            return boolValue.map { .boolean($0) }
+        }
+    }
+
     /// Sets the parameter value with appropriate type conversion.
     ///
     /// This method intelligently converts the provided value to the
@@ -192,6 +207,25 @@ public final class AiRequestArgument: ObservableObject {
             }
         } catch {
             vxAtelierPro.log.error("Failed to encode \(type.rawValue) value: \(error.localizedDescription)")
+        }
+    }
+
+    func setJSONValue(_ value: JSONValue?) {
+        guard let value else {
+            setValue(nil)
+            return
+        }
+
+        let type = AiArgumentValueType(rawValue: self.valueType) ?? .string
+        switch type {
+        case .string:
+            setValue(value.stringValue ?? "")
+        case .integer:
+            setValue(value.integerValue ?? 0)
+        case .float:
+            setValue(value.doubleValue ?? 0)
+        case .boolean:
+            setValue(value.boolValue ?? false)
         }
     }
 
@@ -248,4 +282,4 @@ public final class AiRequestArgument: ObservableObject {
             isEnabled.toggle()
         }
     }
-} 
+}

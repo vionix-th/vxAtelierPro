@@ -37,6 +37,7 @@ final class ModelItem {
     var supportedParameters: [String]
     var schemaFeaturesRaw: [String]
     var rawMetadataJSON: String?
+    @Relationship(deleteRule: .cascade) var parameterMappings: [ModelParameterMappingItem] = []
 
     var descriptor: LLMModelDescriptor {
         get {
@@ -48,6 +49,7 @@ final class ModelItem {
                 endpointFamilies: endpointFamiliesRaw.compactMap { LLMEndpointFamily(rawValue: $0) },
                 modalities: modalitiesRaw.compactMap { LLMModality(rawValue: $0) },
                 supportedParameters: supportedParameters,
+                parameterMappings: parameterMappings.map(\.descriptor),
                 schemaFeatures: schemaFeaturesRaw.compactMap { LLMSchemaFeature(rawValue: $0) },
                 rawMetadataJSON: rawMetadataJSON
             )
@@ -65,6 +67,7 @@ final class ModelItem {
             schemaFeaturesRaw = newValue.schemaFeatures.map(\.rawValue)
             rawMetadataJSON = newValue.rawMetadataJSON
             capabilities = Self.capabilities(from: newValue)
+            LLMParameterMappingCatalog.materializeDefaults(on: self, preserveCustomized: true)
         }
     }
 
@@ -91,9 +94,11 @@ final class ModelItem {
         self.supportedParameters = []
         self.schemaFeaturesRaw = [LLMSchemaFeature.streaming.rawValue]
         self.rawMetadataJSON = nil
+        self.parameterMappings = []
 
         // Use the centralized utility method instead of our own implementation
         self.capabilities = ModelProviderUtils.inferCapabilities(from: name)
+        LLMParameterMappingCatalog.materializeDefaults(on: self, preserveCustomized: true)
     }
 
     /// Checks if the model has a specific capability.

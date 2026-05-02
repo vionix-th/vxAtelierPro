@@ -36,9 +36,9 @@ final class ConversationOptionsFactory: BaseTestFactory<ConversationOptions>, Te
         )
         
         let maxTokens = AiRequestArgument(
-            name: "max_tokens",
-            displayName: "Max Tokens",
-            description: "Maximum tokens in response",
+            name: "max_output_tokens",
+            displayName: "Max Output Tokens",
+            description: "Maximum output tokens in response",
             required: true,
             valueType: .integer,
             controlType: .stepper,
@@ -79,7 +79,7 @@ final class ConversationOptionsFactory: BaseTestFactory<ConversationOptions>, Te
     
     func createWithMaxTokens(_ tokens: Int) -> ConversationOptions {
         create { options in
-            options.setParameterValue(name: "max_tokens", value: tokens)
+            options.setParameterValue(name: "max_output_tokens", value: tokens)
         }
     }
     

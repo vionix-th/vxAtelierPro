@@ -58,12 +58,16 @@ struct OpenAIChatAdapter: LLMProviderAdapter {
             "messages": .array(try openAIMessages(from: request)),
             "stream": .boolean(stream)
         ]
-        try OpenAICompatibleEncoding.applyOptions(
+        let mappings = LLMParameterMappingResolver.resolve(
+            providerID: request.providerID,
+            endpointFamily: request.endpointFamily,
+            modelID: request.modelID,
+            modelDescriptor: request.modelDescriptor
+        )
+        try OpenAICompatibleEncoding.applyMappedOptions(
             request.options,
             to: &body,
-            maxTokenKey: "max_tokens",
-            responseFormatTarget: .chatCompletions,
-            includeStop: true
+            mappings: mappings
         )
         if !request.tools.isEmpty {
             body["tools"] = .array(OpenAICompatibleEncoding.chatTools(from: request.tools))

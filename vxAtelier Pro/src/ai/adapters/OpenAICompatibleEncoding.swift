@@ -53,6 +53,76 @@ enum OpenAICompatibleEncoding {
         }
     }
 
+    static func applyMappedOptions(
+        _ options: LLMGenerationOptions,
+        to body: inout [String: JSONValue],
+        mappings: [LLMApplicationParameterID: LLMParameterMappingDescriptor]
+    ) throws {
+        var providerExtras = options.providerExtras
+        for mapping in mappings.values where mapping.isEnabled {
+            guard let value = options.jsonValue(for: mapping.semanticParameterID) ?? mapping.defaultValue else {
+                if mapping.isRequired {
+                    throw LLMProviderError.unsupportedParameter("\(mapping.semanticParameterID.displayName) is required.")
+                }
+                continue
+            }
+
+            switch mapping.encodingKind {
+            case .scalarKey:
+                guard !mapping.wireKey.isEmpty else {
+                    throw LLMProviderError.unsupportedParameter("\(mapping.semanticParameterID.displayName) has no wire key.")
+                }
+                body[mapping.wireKey] = value
+            case .structuredPreset:
+                try applyStructuredPreset(mapping.structuredPreset, value: value, providerExtras: &providerExtras, to: &body)
+            case .disabled:
+                continue
+            }
+        }
+
+        for (key, value) in providerExtras {
+            body[key] = value
+        }
+    }
+
+    private static func applyStructuredPreset(
+        _ preset: ModelParameterStructuredPreset?,
+        value: JSONValue,
+        providerExtras: inout [String: JSONValue],
+        to body: inout [String: JSONValue]
+    ) throws {
+        guard let preset else { return }
+        switch preset {
+        case .openAIChatResponseFormat:
+            switch value.stringValue {
+            case "json_object", "jsonObject":
+                body["response_format"] = .object(["type": .string("json_object")])
+            case "json_schema", "jsonSchema":
+                body["response_format"] = .object([
+                    "type": .string("json_schema"),
+                    "json_schema": .object(try jsonSchemaPayload(from: &providerExtras))
+                ])
+            default:
+                break
+            }
+        case .openAIResponsesTextFormat:
+            switch value.stringValue {
+            case "json_object", "jsonObject":
+                body["text"] = .object(["format": .object(["type": .string("json_object")])])
+            case "json_schema", "jsonSchema":
+                var format = try jsonSchemaPayload(from: &providerExtras)
+                format["type"] = .string("json_schema")
+                body["text"] = .object(["format": .object(format)])
+            default:
+                break
+            }
+        case .openAIResponsesReasoning:
+            if let effort = value.stringValue, !effort.isEmpty {
+                body["reasoning"] = .object(["effort": .string(effort)])
+            }
+        }
+    }
+
     private static func jsonSchemaPayload(from providerExtras: inout [String: JSONValue]) throws -> [String: JSONValue] {
         guard let value = providerExtras.removeValue(forKey: "json_schema"),
               let object = value.objectValue else {

@@ -232,8 +232,15 @@ final class ConversationOptions: Equatable {
     ///   - config: The API configuration to use
     ///   - modelContext: Optional model context for deleting existing parameters
     func setupAiRequestArguments(
-        for config: APIConfigurationItem, modelContext: ModelContext?
+        for config: APIConfigurationItem,
+        modelContext: ModelContext?,
+        requestedModelID: String? = nil
     ) {
+        var existingValues: [String: (value: JSONValue?, isEnabled: Bool)] = [:]
+        for parameter in parameters {
+            existingValues[parameter.name] = (parameter.jsonValue, parameter.isEnabled)
+        }
+
         let parametersToDelete = parameters
         parameters.removeAll()
 
@@ -246,109 +253,76 @@ final class ConversationOptions: Equatable {
         let registry = LLMProviderRegistry.shared
         let providerID = registry.resolveProviderID(for: config)
         let profile = registry.profile(for: providerID)
-        let supported = Set(profile.supportedParameters)
-        let schemaFeatures = Set(profile.schemaFeatures)
-        let modelID = config.defaultModelID ?? profile.defaultModelID ?? ""
+        let modelID = requestedModelID
+            ?? existingStringValue(for: .model, existingValues: existingValues)
+            ?? modelOverride
+            ?? config.defaultModelID
+            ?? profile.defaultModelID
+            ?? ""
+        let endpoint = endpointOverrideFamily ?? config.defaultEndpointFamilyEnum
         modelOverride = modelID.isEmpty ? nil : modelID
-        endpointOverride = config.defaultEndpointFamily
+        endpointOverride = endpoint.rawValue
 
-        appendParameter(
-            name: "model",
-            displayName: "Model",
-            description: "Model identifier used for this conversation",
+        appendSemanticParameter(
+            .model,
             required: true,
-            valueType: .string,
-            controlType: .textField,
-            value: modelID
+            value: .string(modelID),
+            existingValues: existingValues
         )
-        appendParameter(
-            name: "system_prompt",
-            displayName: "System Prompt",
-            description: "Instructions for the assistant",
+        appendSemanticParameter(
+            .systemPrompt,
             required: true,
-            valueType: .string,
-            controlType: .textField,
-            value: systemPrompt
+            value: existingValue(for: .systemPrompt, existingValues: existingValues) ?? .string(systemPrompt),
+            existingValues: existingValues
         )
-        if supported.contains("temperature") {
-            appendParameter(
-                name: "temperature",
-                displayName: "Temperature",
-                description: "Sampling temperature",
-                valueType: .float,
-                controlType: .slider,
-                minValue: 0,
-                maxValue: 2,
-                step: 0.1,
-                value: temperature
-            )
-        }
-        if supported.contains("top_p") {
-            appendParameter(
-                name: "top_p",
-                displayName: "Top P",
-                description: "Nucleus sampling probability",
-                valueType: .float,
-                controlType: .slider,
-                minValue: 0,
-                maxValue: 1,
-                step: 0.05,
-                value: topP
-            )
-        }
-        let maxTokenName = supported.contains("max_output_tokens") ? "max_output_tokens" : (supported.contains("max_tokens") ? "max_tokens" : nil)
-        if let maxTokenName {
-            appendParameter(
-                name: maxTokenName,
-                displayName: "Max Output Tokens",
-                description: "Maximum number of generated tokens",
-                valueType: .integer,
-                controlType: .stepper,
-                minValue: 1,
-                maxValue: 200_000,
-                step: 1,
-                value: maxOutputTokens
-            )
-        }
-        if supported.contains("response_format") {
-            var formats = ["text"]
-            if schemaFeatures.contains(.jsonObject) {
-                formats.append("json_object")
-            }
-            if schemaFeatures.contains(.jsonSchema) {
-                formats.append("json_schema")
-            }
-            appendParameter(
-                name: "response_format",
-                displayName: "Response Format",
-                description: "Generated response format",
-                valueType: .string,
-                controlType: .picker,
-                options: formats,
-                value: responseFormatRaw
-            )
-        }
-        if supported.contains("reasoning") {
-            appendParameter(
-                name: "reasoning",
-                displayName: "Reasoning",
-                description: "Provider reasoning control",
-                valueType: .string,
-                controlType: .textField,
-                value: reasoning
-            )
-        }
-        if supported.contains("service_tier") {
-            appendParameter(
-                name: "service_tier",
-                displayName: "Service Tier",
-                description: "Provider service tier",
-                valueType: .string,
-                controlType: .textField,
-                value: serviceTier
+
+        let mappings = resolvedParameterMappings(
+            providerID: providerID,
+            endpointFamily: endpoint,
+            modelID: modelID,
+            modelContext: modelContext
+        )
+        for mapping in mappings.values.sorted(by: { $0.semanticParameterID.displayName < $1.semanticParameterID.displayName }) {
+            guard mapping.isEnabled, mapping.semanticParameterID.isEditableMappingParameter else { continue }
+            let value = existingValue(for: mapping.semanticParameterID, existingValues: existingValues)
+                ?? fallbackJSONValue(for: mapping.semanticParameterID)
+                ?? mapping.defaultValue
+            appendSemanticParameter(
+                mapping.semanticParameterID,
+                required: mapping.isRequired,
+                value: value,
+                existingValues: existingValues
             )
         }
         syncTypedFieldsFromParameters()
+    }
+
+    private func appendSemanticParameter(
+        _ parameterID: LLMApplicationParameterID,
+        required: Bool = false,
+        value: JSONValue?,
+        existingValues: [String: (value: JSONValue?, isEnabled: Bool)]
+    ) {
+        let parameter = AiRequestArgument(
+            name: parameterID.rawValue,
+            displayName: parameterID.displayName,
+            description: parameterID.parameterDescription,
+            required: required,
+            valueType: parameterID.valueType,
+            controlType: parameterID.controlType,
+            minValue: parameterID.minValue,
+            maxValue: parameterID.maxValue,
+            step: parameterID.step,
+            options: parameterID.options
+        )
+        let existing = existingValues[parameterID.rawValue]
+        if let existing {
+            parameter.isEnabled = required || existing.isEnabled
+        } else {
+            parameter.isEnabled = required || value != nil
+        }
+        parameter.setJSONValue(value)
+        parameters.append(parameter)
     }
 
     private func appendParameter(
@@ -386,16 +360,16 @@ final class ConversationOptions: Equatable {
     func generationOptions(resolvedModelID: String?, resolvedEndpointFamily: LLMEndpointFamily?) -> LLMGenerationOptions {
         syncTypedFieldsFromParameters()
         return LLMGenerationOptions(
-            systemPrompt: systemPrompt,
-            modelID: modelOverride ?? resolvedModelID,
+            systemPrompt: stringParameterValue(.systemPrompt) ?? systemPrompt,
+            modelID: stringParameterValue(.model) ?? modelOverride ?? resolvedModelID,
             endpointFamily: endpointOverrideFamily ?? resolvedEndpointFamily,
-            temperature: temperature,
-            topP: topP,
-            maxOutputTokens: maxOutputTokens,
-            stop: stopSequences,
-            responseFormat: responseFormat,
-            reasoning: reasoning,
-            serviceTier: serviceTier,
+            temperature: doubleParameterValue(.temperature, fallback: temperature),
+            topP: doubleParameterValue(.topP, fallback: topP),
+            maxOutputTokens: integerParameterValue(.maxOutputTokens, fallback: maxOutputTokens),
+            stop: stopSequenceParameterValue(fallback: stopSequences),
+            responseFormat: responseFormatParameterValue(fallback: responseFormat),
+            reasoning: stringParameterValue(.reasoningEffort) ?? reasoning,
+            serviceTier: stringParameterValue(.serviceTier) ?? serviceTier,
             streamMode: streamMode,
             retryPolicy: retryPolicy,
             providerExtras: decodedProviderExtras
@@ -421,37 +395,125 @@ final class ConversationOptions: Equatable {
     }
 
     func syncTypedFieldsFromParameters() {
-        if let value = getParameterValue(name: "system_prompt") as? String {
+        if let value = stringParameterValue(.systemPrompt) {
             systemPrompt = value
         }
-        if let value = getParameterValue(name: "model") as? String, !value.isEmpty {
+        if let value = stringParameterValue(.model), !value.isEmpty {
             modelOverride = value
         }
-        if let value = getParameterValue(name: "temperature") as? Double {
-            temperature = value
+        if parameterExists(.temperature) { temperature = doubleParameterValue(.temperature, fallback: nil) }
+        if parameterExists(.topP) { topP = doubleParameterValue(.topP, fallback: nil) }
+        if parameterExists(.maxOutputTokens) { maxOutputTokens = integerParameterValue(.maxOutputTokens, fallback: nil) }
+        if parameterExists(.stopSequences) { stopSequences = stopSequenceParameterValue(fallback: []) }
+        if parameterExists(.responseFormat) { responseFormat = responseFormatParameterValue(fallback: .text) }
+        if parameterExists(.reasoningEffort) { reasoning = stringParameterValue(.reasoningEffort) }
+        if parameterExists(.serviceTier) { serviceTier = stringParameterValue(.serviceTier) }
+    }
+
+    private func parameter(_ parameterID: LLMApplicationParameterID) -> AiRequestArgument? {
+        parameters.first { $0.name == parameterID.rawValue }
+    }
+
+    private func parameterExists(_ parameterID: LLMApplicationParameterID) -> Bool {
+        parameter(parameterID) != nil
+    }
+
+    private func stringParameterValue(_ parameterID: LLMApplicationParameterID) -> String? {
+        guard let parameter = parameter(parameterID) else { return nil }
+        return parameter.stringValue
+    }
+
+    private func integerParameterValue(_ parameterID: LLMApplicationParameterID, fallback: Int?) -> Int? {
+        guard let parameter = parameter(parameterID) else { return fallback }
+        return parameter.intValue
+    }
+
+    private func doubleParameterValue(_ parameterID: LLMApplicationParameterID, fallback: Double?) -> Double? {
+        guard let parameter = parameter(parameterID) else { return fallback }
+        return parameter.floatValue
+    }
+
+    private func stopSequenceParameterValue(fallback: [String]) -> [String] {
+        guard let parameter = parameter(.stopSequences) else { return fallback }
+        guard let value = parameter.stringValue else { return [] }
+        return value
+            .split(whereSeparator: \.isNewline)
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    private func responseFormatParameterValue(
+        fallback: LLMGenerationOptions.ResponseFormat
+    ) -> LLMGenerationOptions.ResponseFormat {
+        guard let parameter = parameter(.responseFormat),
+              let value = parameter.stringValue else {
+            return fallback
         }
-        if let value = getParameterValue(name: "top_p") as? Double {
-            topP = value
+        return .fromSemanticRawValue(value)
+    }
+
+    private func existingValue(
+        for parameterID: LLMApplicationParameterID,
+        existingValues: [String: (value: JSONValue?, isEnabled: Bool)]
+    ) -> JSONValue? {
+        guard let existing = existingValues[parameterID.rawValue] else { return nil }
+        return existing.isEnabled ? existing.value : nil
+    }
+
+    private func existingStringValue(
+        for parameterID: LLMApplicationParameterID,
+        existingValues: [String: (value: JSONValue?, isEnabled: Bool)]
+    ) -> String? {
+        existingValue(for: parameterID, existingValues: existingValues)?.stringValue
+    }
+
+    private func fallbackJSONValue(for parameterID: LLMApplicationParameterID) -> JSONValue? {
+        switch parameterID {
+        case .model:
+            return modelOverride.map { .string($0) }
+        case .systemPrompt:
+            return systemPrompt.isEmpty ? nil : .string(systemPrompt)
+        case .maxOutputTokens:
+            return maxOutputTokens.map { .integer($0) }
+        case .temperature:
+            return temperature.map { .number($0) }
+        case .topP:
+            return topP.map { .number($0) }
+        case .stopSequences:
+            return stopSequences.isEmpty ? nil : .string(stopSequences.joined(separator: "\n"))
+        case .responseFormat:
+            return .string(responseFormat.semanticRawValue)
+        case .reasoningEffort:
+            return reasoning.flatMap { $0.isEmpty ? nil : .string($0) }
+        case .serviceTier:
+            return serviceTier.flatMap { $0.isEmpty ? nil : .string($0) }
         }
-        if let value = getParameterValue(name: "max_tokens") as? Int {
-            maxOutputTokens = value
+    }
+
+    private func resolvedParameterMappings(
+        providerID: LLMProviderID,
+        endpointFamily: LLMEndpointFamily,
+        modelID: String,
+        modelContext: ModelContext?
+    ) -> [LLMApplicationParameterID: LLMParameterMappingDescriptor] {
+        let descriptor: LLMModelDescriptor?
+        if let modelContext,
+           let models = try? modelContext.fetch(FetchDescriptor<ModelItem>()),
+           let model = models.first(where: {
+               $0.modelID == modelID
+                   && (LLMProviderID(rawValue: $0.providerID) ?? .customOpenAICompatible) == providerID
+           }) {
+            LLMParameterMappingCatalog.materializeDefaults(on: model, preserveCustomized: true)
+            descriptor = model.descriptor
+        } else {
+            descriptor = nil
         }
-        if let value = getParameterValue(name: "max_output_tokens") as? Int {
-            maxOutputTokens = value
-        }
-        if let value = getParameterValue(name: "response_format") as? String {
-            switch value {
-            case "json_object": responseFormat = .jsonObject
-            case "json_schema": responseFormat = .jsonSchema
-            default: responseFormat = .text
-            }
-        }
-        if let value = getParameterValue(name: "reasoning") as? String, !value.isEmpty {
-            reasoning = value
-        }
-        if let value = getParameterValue(name: "service_tier") as? String, !value.isEmpty {
-            serviceTier = value
-        }
+        return LLMParameterMappingResolver.resolve(
+            providerID: providerID,
+            endpointFamily: endpointFamily,
+            modelID: modelID,
+            modelDescriptor: descriptor
+        )
     }
 
     /// Creates a copy of this conversation options instance.

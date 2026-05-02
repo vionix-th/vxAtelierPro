@@ -33,6 +33,7 @@ let package = Package(
                       "tts/README.md"],
             sources: [
                 "ai/llm/LLMTypes.swift",
+                "ai/llm/LLMParameterMapping.swift",
                 "ai/llm/LLMCapabilityValidator.swift",
                 "ai/llm/LLMToolCallAssembler.swift",
                 "ai/llm/LLMRequestEncoding.swift",
@@ -76,6 +77,7 @@ let package = Package(
                 "models/ToolCallItem.swift",
                 "models/ResponseRunItem.swift",
                 "models/ModelItem.swift",
+                "models/ModelParameterMappingItem.swift",
                 "models/ProjectItem.swift",
                 "models/PromptTemplate.swift",
                 "models/VoiceConfigurationItem.swift",

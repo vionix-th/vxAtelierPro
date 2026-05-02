@@ -93,6 +93,7 @@ struct vxAtelierPro: App {
                     VoiceConfigurationItem.self,
                     APIConfigurationItem.self,
                     ModelItem.self,
+                    ModelParameterMappingItem.self,
                     MessageItem.self,
                     MessageContentPartItem.self,
                     ToolCallItem.self,
@@ -111,6 +112,7 @@ struct vxAtelierPro: App {
         let schema = Schema([
             APIConfigurationItem.self,
             ModelItem.self,
+            ModelParameterMappingItem.self,
             ConversationOptions.self,
             MessageItem.self,
             MessageContentPartItem.self,

@@ -16,6 +16,7 @@ struct ModelExportData: Codable {
     let supportedParameters: [String]?
     let schemaFeatures: [String]?
     let rawMetadataJSON: String?
+    let parameterMappings: [ModelParameterMappingExportData]?
     
     init(_ model: ModelItem) {
         self.name = model.name
@@ -30,6 +31,7 @@ struct ModelExportData: Codable {
         self.supportedParameters = model.supportedParameters
         self.schemaFeatures = model.schemaFeaturesRaw
         self.rawMetadataJSON = model.rawMetadataJSON
+        self.parameterMappings = model.parameterMappings.map { ModelParameterMappingExportData($0) }
     }
     
     func toDataItem() -> ModelItem {
@@ -43,6 +45,71 @@ struct ModelExportData: Codable {
         model.supportedParameters = supportedParameters ?? []
         model.schemaFeaturesRaw = schemaFeatures ?? []
         model.rawMetadataJSON = rawMetadataJSON
+        model.parameterMappings = parameterMappings?.map { $0.toDataItem() } ?? []
+        LLMParameterMappingCatalog.materializeDefaults(on: model, preserveCustomized: true)
         return model
+    }
+}
+
+struct ModelParameterMappingExportData: Codable {
+    let endpointFamilyRaw: String
+    let semanticParameterID: String
+    let isEnabled: Bool
+    let isRequired: Bool
+    let encodingKindRaw: String
+    let wireKey: String
+    let structuredPresetRaw: String?
+    let displayName: String
+    let paramDescription: String
+    let valueType: String
+    let controlType: String
+    let minValue: Double?
+    let maxValue: Double?
+    let step: Double?
+    let options: [String]?
+    let defaultValueData: Data?
+    let isCustomized: Bool
+
+    init(_ mapping: ModelParameterMappingItem) {
+        endpointFamilyRaw = mapping.endpointFamilyRaw
+        semanticParameterID = mapping.semanticParameterID
+        isEnabled = mapping.isEnabled
+        isRequired = mapping.isRequired
+        encodingKindRaw = mapping.encodingKindRaw
+        wireKey = mapping.wireKey
+        structuredPresetRaw = mapping.structuredPresetRaw
+        displayName = mapping.displayName
+        paramDescription = mapping.paramDescription
+        valueType = mapping.valueType
+        controlType = mapping.controlType
+        minValue = mapping.minValue
+        maxValue = mapping.maxValue
+        step = mapping.step
+        options = mapping.options
+        defaultValueData = mapping.defaultValueData
+        isCustomized = mapping.isCustomized
+    }
+
+    func toDataItem() -> ModelParameterMappingItem {
+        let mapping = ModelParameterMappingItem(
+            endpointFamily: LLMEndpointFamily(rawValue: endpointFamilyRaw) ?? .chatCompletions,
+            semanticParameterID: LLMApplicationParameterID(rawValue: semanticParameterID) ?? .maxOutputTokens,
+            isEnabled: isEnabled,
+            isRequired: isRequired,
+            encodingKind: ModelParameterEncodingKind(rawValue: encodingKindRaw) ?? .scalarKey,
+            wireKey: wireKey,
+            structuredPreset: structuredPresetRaw.flatMap(ModelParameterStructuredPreset.init(rawValue:)),
+            isCustomized: isCustomized
+        )
+        mapping.displayName = displayName
+        mapping.paramDescription = paramDescription
+        mapping.valueType = valueType
+        mapping.controlType = controlType
+        mapping.minValue = minValue
+        mapping.maxValue = maxValue
+        mapping.step = step
+        mapping.options = options
+        mapping.defaultValueData = defaultValueData
+        return mapping
     }
 }

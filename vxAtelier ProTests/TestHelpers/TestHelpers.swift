@@ -29,6 +29,7 @@ final class TestEnvironment {
             PromptTemplate.self,
             VoiceConfigurationItem.self,
             ModelItem.self,
+            ModelParameterMappingItem.self,
             WebSearchConfigurationItem.self
         ])
         

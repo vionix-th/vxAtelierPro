@@ -326,6 +326,86 @@ final class LLMModernizationTests: XCTestCase {
         }
     }
 
+    func testOpenAIChatMapsGPT5MaxOutputTokensToMaxCompletionTokens() throws {
+        let adapter = OpenAIChatAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
+        let request = LLMRequest(
+            providerID: .openAIPlatform,
+            endpointFamily: .chatCompletions,
+            modelID: "gpt-5.4-nano",
+            messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])],
+            options: LLMGenerationOptions(maxOutputTokens: 16)
+        )
+
+        let body = try adapter.makeBody(for: request, stream: false)
+        XCTAssertEqual(body["max_completion_tokens"], .integer(16))
+        XCTAssertNil(body["max_tokens"])
+    }
+
+    func testOpenAIChatMapsGPT41MaxOutputTokensToMaxTokens() throws {
+        let adapter = OpenAIChatAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
+        let request = LLMRequest(
+            providerID: .openAIPlatform,
+            endpointFamily: .chatCompletions,
+            modelID: "gpt-4.1-nano",
+            messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])],
+            options: LLMGenerationOptions(maxOutputTokens: 16)
+        )
+
+        let body = try adapter.makeBody(for: request, stream: false)
+        XCTAssertEqual(body["max_tokens"], .integer(16))
+        XCTAssertNil(body["max_completion_tokens"])
+    }
+
+    func testAnthropicMessagesUsesRequiredDefaultMaxTokens() throws {
+        let adapter = AnthropicMessagesAdapter(profile: LLMProviderRegistry.shared.profile(for: .anthropic))
+        let request = LLMRequest(
+            providerID: .anthropic,
+            endpointFamily: .anthropicMessages,
+            modelID: "claude-test",
+            messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])]
+        )
+
+        let body = try adapter.makeBody(for: request, stream: false)
+        XCTAssertEqual(body["max_tokens"], .integer(AppDefaults.Anthropic.max_tokens))
+    }
+
+    func testCustomizedModelMappingSurvivesDefaultMaterialization() {
+        let model = ModelItem(descriptor: LLMModelDescriptor(
+            id: "gpt-5.4-nano",
+            providerID: .openAIPlatform,
+            endpointFamilies: [.chatCompletions],
+            modalities: [.text],
+            schemaFeatures: [.streaming]
+        ))
+        let mapping = model.parameterMappings.first {
+            $0.endpointFamilyEnum == .chatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
+        }
+        mapping?.wireKey = "custom_max_tokens"
+        mapping?.markCustomized()
+
+        LLMParameterMappingCatalog.materializeDefaults(on: model, preserveCustomized: true)
+
+        XCTAssertEqual(mapping?.wireKey, "custom_max_tokens")
+    }
+
+    func testDisabledOptionalParameterDoesNotReachGenerationOptions() {
+        let options = ConversationOptions(shouldSetupParameters: false)
+        options.temperature = 0.9
+        let temperature = AiRequestArgument(
+            name: LLMApplicationParameterID.temperature.rawValue,
+            displayName: LLMApplicationParameterID.temperature.displayName,
+            valueType: .float,
+            controlType: .slider,
+            defaultValue: 0.9
+        )
+        temperature.isEnabled = false
+        options.parameters = [temperature]
+
+        let generationOptions = options.generationOptions(resolvedModelID: "model", resolvedEndpointFamily: .chatCompletions)
+
+        XCTAssertNil(generationOptions.temperature)
+    }
+
     func testStreamModeAutoUsesNonStreamingWhenModelDoesNotSupportStreaming() async throws {
         URLProtocol.registerClass(MockLLMURLProtocol.self)
         defer {

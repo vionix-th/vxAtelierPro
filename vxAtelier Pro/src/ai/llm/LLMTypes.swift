@@ -307,6 +307,7 @@ struct LLMModelDescriptor: Codable, Equatable, Identifiable {
     var endpointFamilies: [LLMEndpointFamily]
     var modalities: [LLMModality]
     var supportedParameters: [String]
+    var parameterMappings: [LLMParameterMappingDescriptor]
     var schemaFeatures: [LLMSchemaFeature]
     var rawMetadataJSON: String?
 
@@ -318,6 +319,7 @@ struct LLMModelDescriptor: Codable, Equatable, Identifiable {
         endpointFamilies: [LLMEndpointFamily],
         modalities: [LLMModality] = [.text],
         supportedParameters: [String] = [],
+        parameterMappings: [LLMParameterMappingDescriptor] = [],
         schemaFeatures: [LLMSchemaFeature] = [],
         rawMetadataJSON: String? = nil
     ) {
@@ -328,6 +330,7 @@ struct LLMModelDescriptor: Codable, Equatable, Identifiable {
         self.endpointFamilies = endpointFamilies
         self.modalities = modalities
         self.supportedParameters = supportedParameters
+        self.parameterMappings = parameterMappings
         self.schemaFeatures = schemaFeatures
         self.rawMetadataJSON = rawMetadataJSON
     }

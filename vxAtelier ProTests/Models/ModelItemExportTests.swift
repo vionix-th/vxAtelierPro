@@ -18,5 +18,9 @@ final class ModelItemExportTests: XCTestCase {
         XCTAssertEqual(restored.contextSize, original.contextSize)
         XCTAssertEqual(restored.provider, original.provider)
         XCTAssertEqual(Set(restored.capabilities), Set(original.capabilities))
+        let restoredMaxTokens = restored.parameterMappings.first {
+            $0.endpointFamilyEnum == .chatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
+        }
+        XCTAssertEqual(restoredMaxTokens?.wireKey, "max_tokens")
     }
 }

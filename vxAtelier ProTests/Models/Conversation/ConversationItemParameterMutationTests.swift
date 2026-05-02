@@ -34,7 +34,7 @@ final class ConversationItemParameterMutationTests: XCTestCase {
         if let param = conversation.options.parameters.first(where: { $0.name == "temperature" }) {
             param.setValue(newTemperature)
         }
-        if let param = conversation.options.parameters.first(where: { $0.name == "max_tokens" }) {
+        if let param = conversation.options.parameters.first(where: { $0.name == "max_output_tokens" }) {
             param.setValue(newMaxTokens)
         }
         if let param = conversation.options.parameters.first(where: { $0.name == "model" }) {
@@ -42,7 +42,7 @@ final class ConversationItemParameterMutationTests: XCTestCase {
         }
         XCTAssertEqual(conversation.options.getParameterValue(name: "system_prompt", defaultValue: ""), newSystemPrompt)
         XCTAssertEqual(conversation.options.getParameterValue(name: "temperature", defaultValue: 0.0), newTemperature)
-        XCTAssertEqual(conversation.options.getParameterValue(name: "max_tokens", defaultValue: 0), newMaxTokens)
+        XCTAssertEqual(conversation.options.getParameterValue(name: "max_output_tokens", defaultValue: 0), newMaxTokens)
         XCTAssertEqual(conversation.options.getParameterValue(name: "model", defaultValue: ""), newModel)
     }
     

@@ -12,6 +12,7 @@ struct LLMConversationRequestBuilder {
     func makeRequest(conversation: ConversationItem, apiConfig: APIConfigurationItem) throws -> LLMRequest {
         let providerID = registry.resolveProviderID(for: apiConfig)
         let profile = registry.profile(for: providerID)
+        conversation.options.syncTypedFieldsFromParameters()
         let endpoint = resolveEndpointFamily(options: conversation.options, config: apiConfig)
         guard profile.supportedEndpointFamilies.contains(endpoint) else {
             throw LLMProviderError.unsupportedCapability("\(profile.name) does not support \(endpoint.rawValue).")
@@ -70,9 +71,13 @@ struct LLMConversationRequestBuilder {
               let models = try? context.fetch(FetchDescriptor<ModelItem>()) else {
             return nil
         }
-        return models.first { model in
+        let model = models.first { model in
             (model.modelID == modelID || model.name == modelID)
                 && (LLMProviderID(rawValue: model.providerID) ?? .customOpenAICompatible) == providerID
-        }?.descriptor
+        }
+        if let model {
+            LLMParameterMappingCatalog.materializeDefaults(on: model, preserveCustomized: true)
+        }
+        return model?.descriptor
     }
 }

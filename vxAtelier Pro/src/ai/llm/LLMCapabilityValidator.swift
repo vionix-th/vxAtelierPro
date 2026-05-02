@@ -39,31 +39,33 @@ struct LLMCapabilityValidator {
 
     private static func validateParameters(_ request: LLMRequest, profile: LLMProviderProfile) throws {
         let options = request.options
-        if options.temperature != nil { try requireParameter("temperature", request: request, profile: profile) }
-        if options.topP != nil { try requireParameter("top_p", request: request, profile: profile) }
-        if options.maxOutputTokens != nil {
-            guard supportsParameter("max_output_tokens", request: request, profile: profile)
-                    || supportsParameter("max_tokens", request: request, profile: profile) else {
-                throw LLMProviderError.unsupportedParameter("\(profile.name) does not support max output tokens for \(request.modelID).")
-            }
-        }
-        if !options.stop.isEmpty { try requireParameter("stop", request: request, profile: profile) }
+        let mappings = LLMParameterMappingResolver.resolve(
+            providerID: request.providerID,
+            endpointFamily: request.endpointFamily,
+            modelID: request.modelID,
+            modelDescriptor: request.modelDescriptor
+        )
+        if options.temperature != nil { try requireMapping(.temperature, mappings: mappings, request: request, profile: profile) }
+        if options.topP != nil { try requireMapping(.topP, mappings: mappings, request: request, profile: profile) }
+        if options.maxOutputTokens != nil { try requireMapping(.maxOutputTokens, mappings: mappings, request: request, profile: profile) }
+        if !options.stop.isEmpty { try requireMapping(.stopSequences, mappings: mappings, request: request, profile: profile) }
         if options.reasoning != nil {
+            try requireMapping(.reasoningEffort, mappings: mappings, request: request, profile: profile)
             guard hasSchemaFeature(.reasoning, request: request, profile: profile) else {
                 throw LLMProviderError.unsupportedParameter("\(profile.name) does not support reasoning for \(request.modelID).")
             }
         }
-        if options.serviceTier != nil { try requireParameter("service_tier", request: request, profile: profile) }
+        if options.serviceTier != nil { try requireMapping(.serviceTier, mappings: mappings, request: request, profile: profile) }
         switch options.responseFormat {
         case .text:
             break
         case .jsonObject:
-            try requireParameter("response_format", request: request, profile: profile)
+            try requireMapping(.responseFormat, mappings: mappings, request: request, profile: profile)
             guard hasSchemaFeature(.jsonObject, request: request, profile: profile) else {
                 throw LLMProviderError.unsupportedParameter("\(profile.name) does not support JSON object response format for \(request.modelID).")
             }
         case .jsonSchema:
-            try requireParameter("response_format", request: request, profile: profile)
+            try requireMapping(.responseFormat, mappings: mappings, request: request, profile: profile)
             guard hasSchemaFeature(.jsonSchema, request: request, profile: profile) else {
                 throw LLMProviderError.unsupportedParameter("\(profile.name) does not support JSON schema response format for \(request.modelID).")
             }
@@ -74,6 +76,11 @@ struct LLMCapabilityValidator {
         if !request.tools.isEmpty {
             guard hasSchemaFeature(.tools, request: request, profile: profile) else {
                 throw LLMProviderError.unsupportedCapability("\(profile.name) does not support tools for \(request.modelID).")
+            }
+        }
+        for mapping in mappings.values where mapping.isEnabled && mapping.isRequired {
+            if request.options.jsonValue(for: mapping.semanticParameterID) == nil && mapping.defaultValue == nil {
+                throw LLMProviderError.unsupportedParameter("\(mapping.semanticParameterID.displayName) is required for \(request.modelID).")
             }
         }
     }
@@ -148,6 +155,17 @@ struct LLMCapabilityValidator {
     private static func requireParameter(_ parameter: String, request: LLMRequest, profile: LLMProviderProfile) throws {
         guard supportsParameter(parameter, request: request, profile: profile) else {
             throw LLMProviderError.unsupportedParameter("\(profile.name) does not support \(parameter) for \(request.modelID).")
+        }
+    }
+
+    private static func requireMapping(
+        _ parameterID: LLMApplicationParameterID,
+        mappings: [LLMApplicationParameterID: LLMParameterMappingDescriptor],
+        request: LLMRequest,
+        profile: LLMProviderProfile
+    ) throws {
+        guard let mapping = mappings[parameterID], mapping.isEnabled, mapping.encodingKind != .disabled else {
+            throw LLMProviderError.unsupportedParameter("\(profile.name) does not support \(parameterID.displayName) for \(request.modelID).")
         }
     }
 

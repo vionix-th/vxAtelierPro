@@ -39,7 +39,12 @@ struct ConversationOptionsView: View {
     private var endpointSelection: Binding<String> {
         Binding(
             get: { options.endpointOverride ?? "" },
-            set: { options.endpointOverride = $0.isEmpty ? nil : $0 }
+            set: { value in
+                options.endpointOverride = value.isEmpty ? nil : value
+                if let config = options.apiConfiguration {
+                    options.setupAiRequestArguments(for: config, modelContext: modelContext)
+                }
+            }
         )
     }
 
@@ -98,7 +103,19 @@ struct ConversationOptionsView: View {
                                             return p1.displayName.localizedCaseInsensitiveCompare(p2.displayName) == .orderedAscending
                                         }, id: \.id
                                     ) { param in
-                                        ParameterControlView(parameter: param, apiConfiguration: options.apiConfiguration)
+                                        ParameterControlView(
+                                            parameter: param,
+                                            apiConfiguration: options.apiConfiguration,
+                                            onModelChanged: { modelID in
+                                                if let config = options.apiConfiguration {
+                                                    options.setupAiRequestArguments(
+                                                        for: config,
+                                                        modelContext: modelContext,
+                                                        requestedModelID: modelID
+                                                    )
+                                                }
+                                            }
+                                        )
                                     }
                                 } else {
                                     Text("No parameters configured")
@@ -428,10 +445,16 @@ struct ParameterControlView: View {
     @ObservedObject var parameter: AiRequestArgument
     @State private var isModelPickerPresented: Bool = false
     let apiConfiguration: APIConfigurationItem?
+    let onModelChanged: (String) -> Void
     
-    init(parameter: AiRequestArgument, apiConfiguration: APIConfigurationItem?) {
+    init(
+        parameter: AiRequestArgument,
+        apiConfiguration: APIConfigurationItem?,
+        onModelChanged: @escaping (String) -> Void = { _ in }
+    ) {
         self.parameter = parameter
         self.apiConfiguration = apiConfiguration
+        self.onModelChanged = onModelChanged
     }
 
     var body: some View {
@@ -496,6 +519,9 @@ struct ParameterControlView: View {
                         set: { parameter.setValue($0) }
                     ))
                     .textFieldStyle(.roundedBorder)
+                    .onSubmit {
+                        onModelChanged(parameter.stringValue ?? "")
+                    }
 
                     Button {
                         vxAtelierPro.log.debug("Opening model picker")
@@ -515,6 +541,7 @@ struct ParameterControlView: View {
                             selectedModel: parameter.stringValue ?? "",
                             onModelSelected: { modelId in
                                 parameter.setValue(modelId)
+                                onModelChanged(modelId)
                             },
                             currentProvider: LLMProviderRegistry.shared.resolveProviderID(for: config)
                         )

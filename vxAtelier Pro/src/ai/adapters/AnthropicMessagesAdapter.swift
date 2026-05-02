@@ -42,15 +42,18 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
         var body: [String: JSONValue] = [
             "model": .string(request.modelID),
             "messages": .array(try anthropicMessages(from: request)),
-            "max_tokens": .integer(request.options.maxOutputTokens ?? 4096),
             "stream": .boolean(stream)
         ]
         if !request.options.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             body["system"] = .string(request.options.systemPrompt)
         }
-        if let temperature = request.options.temperature { body["temperature"] = .number(temperature) }
-        if let topP = request.options.topP { body["top_p"] = .number(topP) }
-        if !request.options.stop.isEmpty { body["stop_sequences"] = .array(request.options.stop.map { .string($0) }) }
+        let mappings = LLMParameterMappingResolver.resolve(
+            providerID: request.providerID,
+            endpointFamily: request.endpointFamily,
+            modelID: request.modelID,
+            modelDescriptor: request.modelDescriptor
+        )
+        try LLMParameterRequestEncoder.applyScalarOptions(request.options, to: &body, mappings: mappings)
         if !request.tools.isEmpty {
             body["tools"] = .array(request.tools.map { tool in
                 .object([

@@ -473,12 +473,17 @@ final class QueryManager {
 
             let existingModels = fetchModels()
             for fetchedModel in fetchedModels {
-                if let existing = existingModels.first(where: { $0.name == fetchedModel.id }) {
+                if let existing = existingModels.first(where: {
+                    $0.modelID == fetchedModel.id
+                        && (LLMProviderID(rawValue: $0.providerID) ?? .customOpenAICompatible) == fetchedModel.providerID
+                }) {
                     existing.descriptor = fetchedModel
+                    LLMParameterMappingCatalog.materializeDefaults(on: existing, preserveCustomized: true)
                     updated += 1
                     vxAtelierPro.log.debug("Overwrote model: \(fetchedModel.id)")
                 } else {
                     let modelItem = ModelItem(descriptor: fetchedModel)
+                    LLMParameterMappingCatalog.materializeDefaults(on: modelItem, preserveCustomized: true)
                     modelContext.insert(modelItem)
                     added += 1
                     vxAtelierPro.log.debug("Added new model: \(fetchedModel.id)")

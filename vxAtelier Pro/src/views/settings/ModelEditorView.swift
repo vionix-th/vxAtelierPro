@@ -12,6 +12,7 @@ struct ModelEditorView: View {
     @State private var provider: String
     @State private var contextSize: Int
     @State private var capabilities: [ModelCapability]
+    @State private var selectedEndpointFamilyRaw: String
     
     init(model: ModelItem) {
         self.model = model
@@ -19,6 +20,30 @@ struct ModelEditorView: View {
         _provider = State(initialValue: model.provider)
         _contextSize = State(initialValue: model.contextSize)
         _capabilities = State(initialValue: model.capabilities)
+        _selectedEndpointFamilyRaw = State(
+            initialValue: model.endpointFamiliesRaw.first ?? LLMEndpointFamily.chatCompletions.rawValue
+        )
+    }
+
+    private var endpointFamilies: [LLMEndpointFamily] {
+        let families = model.endpointFamiliesRaw.compactMap { LLMEndpointFamily(rawValue: $0) }.filter { $0 != .models }
+        return families.isEmpty ? [.chatCompletions] : families
+    }
+
+    private var selectedEndpointFamily: LLMEndpointFamily {
+        LLMEndpointFamily(rawValue: selectedEndpointFamilyRaw) ?? endpointFamilies.first ?? .chatCompletions
+    }
+
+    private var selectedEndpointMappings: [ModelParameterMappingItem] {
+        model.parameterMappings
+            .filter { $0.endpointFamilyEnum == selectedEndpointFamily }
+            .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+    }
+
+    private var addableParameterIDs: [LLMApplicationParameterID] {
+        let existing = Set(selectedEndpointMappings.map(\.semanticParameterIDEnum))
+        return LLMApplicationParameterID.allCases
+            .filter { $0.isEditableMappingParameter && !existing.contains($0) }
     }
     
     var body: some View {
@@ -128,6 +153,58 @@ struct ModelEditorView: View {
                         .foregroundColor(.primary)
                         .textCase(nil)
                 }
+
+                Section {
+                    VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
+                        Picker("Endpoint", selection: $selectedEndpointFamilyRaw) {
+                            ForEach(endpointFamilies) { family in
+                                Text(family.displayName).tag(family.rawValue)
+                            }
+                        }
+                        .pickerStyle(.menu)
+
+                        HStack {
+                            Button {
+                                LLMParameterMappingCatalog.resetDefaults(on: model, endpointFamily: selectedEndpointFamily)
+                            } label: {
+                                Label("Reset Endpoint Defaults", systemImage: "arrow.counterclockwise")
+                            }
+                            .buttonStyle(.bordered)
+
+                            Menu {
+                                ForEach(addableParameterIDs) { parameterID in
+                                    Button(parameterID.displayName) {
+                                        addMapping(parameterID)
+                                    }
+                                }
+                            } label: {
+                                Label("Add Parameter", systemImage: "plus")
+                            }
+                            .disabled(addableParameterIDs.isEmpty)
+                        }
+
+                        if selectedEndpointMappings.isEmpty {
+                            Text("No parameters configured for this endpoint.")
+                                .foregroundColor(.secondary)
+                                .italic()
+                        } else {
+                            VStack(spacing: AppDefaults.paddingSmall) {
+                                ForEach(selectedEndpointMappings) { mapping in
+                                    ModelParameterMappingRow(mapping: mapping)
+                                    if mapping.id != selectedEndpointMappings.last?.id {
+                                        Divider()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(.vertical, AppDefaults.paddingSmall)
+                } header: {
+                    Text("Parameter Translation")
+                        .font(.system(.headline, design: .rounded))
+                        .foregroundColor(.primary)
+                        .textCase(nil)
+                }
                 
                 if model.modelContext != nil {
                     Section {
@@ -159,14 +236,24 @@ struct ModelEditorView: View {
                         .disabled(name.isEmpty)
                 }
             }
+            .onAppear {
+                LLMParameterMappingCatalog.materializeDefaults(on: model, preserveCustomized: true)
+                if !endpointFamilies.contains(where: { $0.rawValue == selectedEndpointFamilyRaw }) {
+                    selectedEndpointFamilyRaw = endpointFamilies.first?.rawValue ?? LLMEndpointFamily.chatCompletions.rawValue
+                }
+            }
         }
     }
     
     private func save() {
         model.name = name
+        model.modelID = name
+        model.displayName = name
         model.provider = provider
+        model.providerID = LLMProviderRegistry.providerID(fromProviderName: provider).rawValue
         model.contextSize = contextSize
         model.capabilities = capabilities
+        LLMParameterMappingCatalog.materializeDefaults(on: model, preserveCustomized: true)
         
         do {
             if model.modelContext == nil {
@@ -194,4 +281,120 @@ struct ModelEditorView: View {
             // Optionally show an alert to the user here
         }
     }
-} 
+
+    private func addMapping(_ parameterID: LLMApplicationParameterID) {
+        let mapping = ModelParameterMappingItem(
+            endpointFamily: selectedEndpointFamily,
+            semanticParameterID: parameterID,
+            isEnabled: true,
+            isRequired: false,
+            encodingKind: .scalarKey,
+            wireKey: parameterID.rawValue,
+            isCustomized: true
+        )
+        model.parameterMappings.append(mapping)
+    }
+}
+
+private struct ModelParameterMappingRow: View {
+    @Bindable var mapping: ModelParameterMappingItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
+            HStack(alignment: .center, spacing: AppDefaults.paddingMedium) {
+                Text(mapping.displayName)
+                    .frame(width: 150, alignment: .leading)
+                    .help(mapping.paramDescription)
+
+                Toggle("Enabled", isOn: binding(\.isEnabled))
+                    .toggleStyle(.switch)
+
+                Toggle("Required", isOn: binding(\.isRequired))
+                    .toggleStyle(.switch)
+
+                Picker("Encoding", selection: Binding(
+                    get: { mapping.encodingKind },
+                    set: {
+                        mapping.encodingKind = $0
+                        mapping.markCustomized()
+                    }
+                )) {
+                    ForEach(ModelParameterEncodingKind.allCases) { kind in
+                        Text(kind.displayName).tag(kind)
+                    }
+                }
+                .pickerStyle(.menu)
+            }
+
+            HStack(spacing: AppDefaults.paddingMedium) {
+                if mapping.encodingKind == .scalarKey {
+                    TextField("Wire Key", text: Binding(
+                        get: { mapping.wireKey },
+                        set: {
+                            mapping.wireKey = $0
+                            mapping.markCustomized()
+                        }
+                    ))
+                    .textFieldStyle(.roundedBorder)
+                } else if mapping.encodingKind == .structuredPreset {
+                    Picker("Preset", selection: Binding(
+                        get: { mapping.structuredPreset ?? .openAIChatResponseFormat },
+                        set: {
+                            mapping.structuredPreset = $0
+                            mapping.markCustomized()
+                        }
+                    )) {
+                        ForEach(ModelParameterStructuredPreset.allCases) { preset in
+                            Text(preset.displayName).tag(preset)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                } else {
+                    Text("Omitted from request")
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                TextField("Default", text: Binding(
+                    get: { defaultValueText },
+                    set: { defaultValueText = $0 }
+                ))
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 160)
+            }
+        }
+        .padding(.vertical, AppDefaults.paddingSmall)
+    }
+
+    private var defaultValueText: String {
+        get { mapping.defaultJSONValue?.stringValue ?? "" }
+        nonmutating set {
+            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                mapping.defaultJSONValue = nil
+            } else {
+                switch mapping.semanticParameterIDEnum.valueType {
+                case .integer:
+                    mapping.defaultJSONValue = .integer(Int(trimmed) ?? 0)
+                case .float:
+                    mapping.defaultJSONValue = .number(Double(trimmed) ?? 0)
+                case .boolean:
+                    mapping.defaultJSONValue = .boolean(trimmed.lowercased() == "true")
+                case .string:
+                    mapping.defaultJSONValue = .string(trimmed)
+                }
+            }
+            mapping.markCustomized()
+        }
+    }
+
+    private func binding(_ keyPath: ReferenceWritableKeyPath<ModelParameterMappingItem, Bool>) -> Binding<Bool> {
+        Binding(
+            get: { mapping[keyPath: keyPath] },
+            set: {
+                mapping[keyPath: keyPath] = $0
+                mapping.markCustomized()
+            }
+        )
+    }
+}
