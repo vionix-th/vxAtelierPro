@@ -1259,7 +1259,7 @@ final class LLMModernizationTests: XCTestCase {
 
         for name in names {
             let ext = name.contains("models") || name == "retryable_failure" ? "json" : "sse"
-            XCTAssertNotNil(Bundle.module.url(forResource: name, withExtension: ext), "Missing fixture \(name).\(ext)")
+            XCTAssertNotNil(fixtureURL(name: name, fileExtension: ext), "Missing fixture \(name).\(ext)")
         }
     }
 
@@ -1281,8 +1281,14 @@ final class LLMModernizationTests: XCTestCase {
     }
 
     private func fixtureData(name: String, fileExtension ext: String) throws -> Data {
-        let url = try XCTUnwrap(Bundle.module.url(forResource: name, withExtension: ext))
+        let url = try XCTUnwrap(fixtureURL(name: name, fileExtension: ext))
         return try Data(contentsOf: url)
+    }
+
+    private func fixtureURL(name: String, fileExtension ext: String) -> URL? {
+        let bundle = Bundle(for: LLMModernizationTests.self)
+        return bundle.url(forResource: name, withExtension: ext)
+            ?? bundle.url(forResource: name, withExtension: ext, subdirectory: "AI/Fixtures")
     }
 
     private func fixtureJSON(name: String) throws -> JSONValue {

@@ -24,9 +24,10 @@
 
 ## Build / Test
 - Do not needlessly compile or test; those are token expensive operations and they can pollute context.
-- Maintain **both** build systems: Swift Package Manager (SPM) and Xcode (`xcodebuild`).
-- Use SPM (`swift build`, `swift test`, `swift package`) for IDE indexing/linting-style workflows and fast compile/test-build checks.
-- Use `xcodebuild` for actually running/debugging, unit tests, UI tests, and release/archival builds.
+- Maintain `Package.swift` only for VS Code/SourceKit IntelliSense and SwiftPM dependency graph support.
+- Xcode / `xcodebuild` is the exclusive build and test authority for the application.
+- Do not add SwiftPM test targets, SwiftPM test resources, or project guidance that recommends `swift test`.
+- Do not run `swift test`; use `xcodebuild` for unit tests, UI tests, running/debugging, and release/archival builds.
 - Swift compiler “complexity” errors are often caused by unknown identifiers or syntax errors; verify identifiers and syntax first.
 
 ## macOS / iOS sandboxing

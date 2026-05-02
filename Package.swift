@@ -21,7 +21,7 @@ let package = Package(
         .package(url: "https://github.com/gonzalezreal/MarkdownUI.git", from: "2.1.1"),
     ],
     targets: [
-        // Targets are the basic building blocks of a package, defining a module or a test suite.
+        // Targets are the basic building blocks of a package, defining a module.
         .executableTarget(
             name: "vxAtelier-Pro",
             dependencies: [
@@ -193,15 +193,6 @@ let package = Package(
             swiftSettings: [
                 .define("DEBUG", .when(configuration: .debug)),
                 .define("RELEASE", .when(configuration: .release))
-            ]
-        ),
-        .testTarget(
-            name: "vxAtelier-ProTests",
-            dependencies: ["vxAtelier-Pro"],
-            path: "vxAtelier ProTests",
-            exclude: ["System/SwiftDataLimitations.md"],
-            resources: [
-                .process("AI/Fixtures")
             ]
         )
     ]

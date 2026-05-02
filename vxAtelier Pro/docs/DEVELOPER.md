@@ -48,9 +48,9 @@ This file defines the `vxAtelierPro` struct, which conforms to the `App` protoco
 * **Platforms:** macOS 14+, iOS 17+
 * **Language Version:** Swift 5.9+
 * **Frameworks:** SwiftUI, SwiftData, Foundation, OSLog, AVFoundation (TTS)
-* **Build System:** Swift Package Manager (SPM) + Xcode Schemes
+* **Build System:** Xcode Schemes; Swift Package Manager (SPM) manifest for dependency and editor integration
 
-The application is entirely Swift-based and uses **SwiftData** for persistence and **SwiftUI** for UI. **SPM** is used for dependency management and editor integration; **Xcode** schemes/projects are used for building app bundles and running tests.
+The application is entirely Swift-based and uses **SwiftData** for persistence and **SwiftUI** for UI. **SPM** is used for dependency management and editor integration; **Xcode** schemes/projects are authoritative for building app bundles and running tests.
 
 ---
 
@@ -91,11 +91,11 @@ src/
 ### Building
 ```bash
 xcodebuild -scheme "vxAtelier Pro"             # Full IDE build
-swift build                                   # CLI check / lint compile
+swift build                                   # Editor/indexing compile check only
 ```
 
 ### Linting & Formatting
-SPM compile-time diagnostics act as the primary linter.  Add SwiftLint or swift-format as desired.
+Xcode compile-time diagnostics are authoritative. SPM compile-time diagnostics may be used only for editor/indexing feedback. Add SwiftLint or swift-format as desired.
 
 ---
 
@@ -1086,9 +1086,9 @@ All logging routes through `vxAtelierPro.log` (`LoggingService.shared`), which w
 ---
 
 ## Testing & CI
-* **Compile-time testing** via `swift build` (no runtime unit tests yet).
-* Add XCTest targets in `Package.swift` under `testTargets` to expand coverage.
-* Suggested CI: GitHub Actions matrix – macOS latest with `swift test` + `xcodebuild`.
+* Unit and UI tests live in Xcode test targets and run through Xcode / `xcodebuild`.
+* Do not add XCTest targets or test resources to `Package.swift`.
+* Suggested CI: macOS latest with `xcodebuild` build and test actions.
 
 ---
 

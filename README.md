@@ -64,7 +64,7 @@ For a comprehensive overview of the architecture, module responsibilities, and k
 xcodebuild -scheme "vxAtelier Pro"
 ```
 
-**Lint/Test Compile:**
+**Editor Compile Check:**
 ```sh
 swift build
 ```
