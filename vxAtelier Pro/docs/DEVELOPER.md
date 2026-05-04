@@ -1,6 +1,6 @@
 # vxAtelier Pro Codebase Documentation
 
-> Last updated: 2026-01-20
+> Last updated: 2026-01-21
 
 This document provides an in-depth technical reference of the **vxAtelier Pro** source code.  Use it together with `README.md` for a complete understanding of architectural concepts and high-level features.
 
@@ -58,7 +58,12 @@ The application is entirely Swift-based and uses **SwiftData** for persistence a
 ```text
 src/
 ├─ ai/              # AI provider abstractions & implementations
-│  └─ tooling/      # AI-callable tools (e.g., search, website reader)
+│  ├─ adapters/     # Provider-specific request/stream adapters
+│  ├─ conversation/ # Request assembly, run collection, tool execution, persistence
+│  ├─ llm/          # Core provider-neutral types, validation, parameter mapping
+│  ├─ providers/    # Provider profiles, adapter registry, model metadata decoding
+│  ├─ tools/        # AI-callable tools (e.g., search, shortcuts, web)
+│  └─ transport/    # LLM HTTP client, secret redaction, provider error mapping
 ├─ models/          # Core SwiftData models
 ├─ search/          # Web search provider integration
 ├─ system/          # Persistence, defaults, logging, permissions
@@ -307,7 +312,7 @@ These are the primary entities persisted in the SwiftData store.
 
 *   **`ProjectItem`**: The top-level container for organizing conversations. A project can contain multiple `ConversationItem`s.
 *   **`ConversationItem`**: Represents a single, continuous conversation thread. It manages the conversation's title, status, and options. Its core is an ordered list of `ConversationTurn` objects.
-*   **`ConversationTurn`**: Models a single exchange within a conversation. It contains the initial `userMessage` and a subsequent list of `TurnEvent`s, which capture the AI's multi-step responses.
+*   **`ConversationTurn`**: Models a single exchange within a conversation. It contains the initial `userMessage`, a subsequent list of `TurnEvent`s (which capture the AI's multi-step responses), and `ResponseRunItem` records for provider diagnostics (status, usage, request IDs).
 *   **`TurnEvent`**: Represents a single event within a `ConversationTurn`, such as an assistant's reply, a tool call, or a tool result. This granular structure allows for modeling complex, multi-step tool interactions.
 *   **`MessageItem`**: The fundamental unit of content, representing a single message from a user, assistant, or tool. It stores ordered `MessageContentPartItem` records, role, timestamp, tool result ID, and durable tool-call records.
 *   **`MessageContentPartItem`**: An ordered content part for text, media references, reasoning, or tool-result content.
@@ -328,7 +333,6 @@ These non-persisted types are critical for application logic.
 
 *   **`ItemStatus`**: An enum (`active`, `archived`, `trashed`) that defines the lifecycle state for `ProjectItem` and `ConversationItem`.
 *   **`AppearanceStyle`**: An enum (`system`, `light`, `dark`) for managing the application's color scheme.
-*   **`LLMToolCallAssembler`**: A helper that merges tool-call deltas by provider index and call ID.
 
 ### Models Module
 
@@ -392,8 +396,9 @@ This SwiftData `@Model` is a comprehensive container for all settings that gover
 
 This SwiftData `@Model` represents a specific, selectable AI model from a provider.
 
-*   **Automated Inference**: Its `init` method uses a centralized `ModelProviderUtils` helper to automatically infer the model's provider and capabilities from its name string. This decouples the model data from provider-specific logic and simplifies adding new models.
-*   **Metadata**: It stores the model's unique `name`, `contextSize`, `provider`, and an array of its `capabilities`.
+*   **Automated Inference**: Its `init` method uses a centralized `ModelProviderUtils` helper to automatically infer the model's provider and capabilities from its name string, then materializes default parameter mappings from `LLMParameterMappingCatalog`.
+*   **Descriptor Bridge**: `descriptor` is a computed property that bridges between persisted fields (`modelID`, `providerID`, `endpointFamiliesRaw`, `modalitiesRaw`, `supportedParameters`, `schemaFeaturesRaw`, `parameterMappings`, `rawMetadataJSON`) and the domain `LLMModelDescriptor` struct used by adapters, validators, and resolvers.
+*   **API Configuration Scoping**: `apiConfiguration` links a model to a specific `APIConfigurationItem`, so two configurations with the same model name can carry different parameter mappings.
 
 #### Project (`ProjectItem.swift`)
 
@@ -430,9 +435,9 @@ This SwiftData `@Model` stores the configuration details for a web search provid
 
 This SwiftData `@Model` is the structural unit that represents a single, complete exchange within a `ConversationItem`.
 
-*   **Grouping**: Its key architectural role is to group a single user-initiated `MessageItem` with the corresponding array of `TurnEvent`s (e.g., assistant replies, tool calls) that resulted from it.
+*   **Grouping**: Its key architectural role is to group a single user-initiated `MessageItem` with the corresponding array of `TurnEvent`s (e.g., assistant replies, tool calls) that resulted from it, plus durable `ResponseRunItem` records capturing provider-level diagnostics.
 *   **Ordering**: It contains a `sequenceNumber` and `timestamp` to ensure the chronological integrity of the conversation.
-*   **Relationships**: It holds cascade-delete relationships to its child `userMessage` and `events`, and a back-reference to its parent `ConversationItem`.
+*   **Relationships**: It holds cascade-delete relationships to its child `userMessage` and `events`, and a back-reference to its parent `ConversationItem`. `responseRuns` is cascaded.
 
 #### Turn Event (`TurnEvent.swift`)
 
@@ -454,7 +459,7 @@ This `enum` defines the available UI themes for the application (`system`, `ligh
 
 #### Tool Call Assembler (`LLMToolCallAssembler.swift`)
 
-This `struct` provides the core logic for reconstructing streamed tool-call deltas.
+The `LLMToolCallAssembler` struct lives in `ai/llm/`. It provides the core logic for reconstructing streamed tool-call deltas into complete tool calls.
 
 *   **Delta Merging**: `merge(...)` reassembles fragmented tool-call arguments by provider index and call ID.
 *   **Stable Ordering**: `assembled` returns calls sorted by provider index for deterministic tool execution.
@@ -1102,8 +1107,8 @@ All logging routes through `vxAtelierPro.log` (`LoggingService.shared`), which w
 
 ## Extending the App
 1. **Add a new AI Provider**
-   * Add an `LLMProviderProfile` in `LLMProviderRegistry`.
-   * Implement `LLMProviderAdapter` for provider streaming and model fetches.
+   * Add an `LLMProviderProfile` entry in `LLMProviderRegistry` with provider ID, auth kind, endpoint families, supported parameters, schema features, and modalities.
+   * If the provider uses a non-OpenAI-compatible API, implement `LLMProviderAdapter` (`stream` + `fetchModels`) and wire it in `LLMProviderRegistry.adapter(for:)`.
    * Add model decoding and fixture tests under `vxAtelier ProTests/AI`.
 2. **Add a New Feature Tab**
    * Add SwiftUI view under `views/` and wire to sidebar.
