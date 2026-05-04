@@ -4,7 +4,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
     let profile: LLMProviderProfile
     private let httpClient = LLMHTTPClient()
 
-    func stream(_ request: LLMRequest, configuration: APIConfigurationItem) -> AsyncThrowingStream<LLMStreamEvent, Error> {
+    func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration) -> AsyncThrowingStream<LLMStreamEvent, Error> {
         let endpoint = configuration.endpointPath(for: .anthropicMessages) ?? profile.endpointPaths[.anthropicMessages] ?? "/v1/messages"
         return LLMAdapterRunLoop.stream(
             request: request,
@@ -27,11 +27,11 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
         )
     }
 
-    func fetchModels(configuration: APIConfigurationItem) async throws -> [LLMModelDescriptor] {
+    func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
         let endpoint = configuration.endpointPath(for: .models) ?? profile.endpointPaths[.models] ?? "/v1/models"
         let response: JSONValue = try await httpClient.getJSON(
             path: endpoint,
-            configuration: httpClient.makeConfiguration(for: configuration, profile: profile),
+            configuration: httpClient.makeConfiguration(for: configuration),
             responseType: JSONValue.self
         )
         guard let data = response.objectValue?.array("data") else { return [] }

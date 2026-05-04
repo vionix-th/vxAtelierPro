@@ -30,21 +30,21 @@ struct LLMStreamCompletionPolicy {
 protocol LLMProviderAdapter {
     var profile: LLMProviderProfile { get }
 
-    func stream(_ request: LLMRequest, configuration: APIConfigurationItem) -> AsyncThrowingStream<LLMStreamEvent, Error>
-    func fetchModels(configuration: APIConfigurationItem) async throws -> [LLMModelDescriptor]
+    func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration) -> AsyncThrowingStream<LLMStreamEvent, Error>
+    func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor]
 }
 
 struct DisabledLLMProviderAdapter: LLMProviderAdapter {
     let profile: LLMProviderProfile
     let message: String
 
-    func stream(_ request: LLMRequest, configuration: APIConfigurationItem) -> AsyncThrowingStream<LLMStreamEvent, Error> {
+    func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration) -> AsyncThrowingStream<LLMStreamEvent, Error> {
         AsyncThrowingStream { continuation in
             continuation.finish(throwing: LLMProviderError.authUnavailable(message))
         }
     }
 
-    func fetchModels(configuration: APIConfigurationItem) async throws -> [LLMModelDescriptor] {
+    func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
         throw LLMProviderError.authUnavailable(message)
     }
 }

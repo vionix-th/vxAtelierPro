@@ -62,10 +62,13 @@ struct LLMRunCollector {
         conversationID: PersistentIdentifier
     ) async throws -> LLMRunAccumulator {
         let adapter = registry.adapter(for: request.providerID)
+        let providerConfiguration = apiConfig.llmProviderConfiguration(
+            profile: registry.profile(for: request.providerID)
+        )
         var accumulator = LLMRunAccumulator()
         var assembler = LLMToolCallAssembler()
 
-        for try await event in adapter.stream(request, configuration: apiConfig) {
+        for try await event in adapter.stream(request, configuration: providerConfiguration) {
             switch event {
             case .runStarted(let requestID):
                 accumulator.requestID = accumulator.requestID ?? requestID

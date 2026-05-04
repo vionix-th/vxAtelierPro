@@ -4,7 +4,7 @@ struct OpenAIChatAdapter: LLMProviderAdapter {
     let profile: LLMProviderProfile
     private let httpClient = LLMHTTPClient()
 
-    func stream(_ request: LLMRequest, configuration: APIConfigurationItem) -> AsyncThrowingStream<LLMStreamEvent, Error> {
+    func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration) -> AsyncThrowingStream<LLMStreamEvent, Error> {
         do {
             let endpoint = try endpointPath(for: request.endpointFamily, configuration: configuration)
             return LLMAdapterRunLoop.stream(
@@ -33,9 +33,9 @@ struct OpenAIChatAdapter: LLMProviderAdapter {
         }
     }
 
-    func fetchModels(configuration: APIConfigurationItem) async throws -> [LLMModelDescriptor] {
+    func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
         let endpoint = configuration.endpointPath(for: .models) ?? profile.endpointPaths[.models] ?? "/v1/models"
-        let httpConfig = httpClient.makeConfiguration(for: configuration, profile: profile)
+        let httpConfig = httpClient.makeConfiguration(for: configuration)
         let response: JSONValue = try await httpClient.getJSON(path: endpoint, configuration: httpConfig, responseType: JSONValue.self)
         guard let data = response.objectValue?.array("data") else { return [] }
         return LLMModelMetadataDecoder.openAICompatibleDescriptors(
@@ -45,7 +45,7 @@ struct OpenAIChatAdapter: LLMProviderAdapter {
         )
     }
 
-    private func endpointPath(for endpointFamily: LLMEndpointFamily, configuration: APIConfigurationItem) throws -> String {
+    private func endpointPath(for endpointFamily: LLMEndpointFamily, configuration: LLMProviderConfiguration) throws -> String {
         guard let endpoint = configuration.endpointPath(for: endpointFamily) ?? profile.endpointPaths[endpointFamily] else {
             throw LLMProviderError.unsupportedCapability("\(profile.name) does not support \(endpointFamily.rawValue).")
         }

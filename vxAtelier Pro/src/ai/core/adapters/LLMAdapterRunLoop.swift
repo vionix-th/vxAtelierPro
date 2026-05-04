@@ -8,7 +8,7 @@ enum LLMAdapterRunLoop {
 
     static func stream(
         request: LLMRequest,
-        configuration: APIConfigurationItem,
+        configuration: LLMProviderConfiguration,
         profile: LLMProviderProfile,
         httpClient: LLMHTTPClient,
         endpoint: String,
@@ -23,7 +23,7 @@ enum LLMAdapterRunLoop {
                     try LLMCapabilityValidator.validate(request, profile: profile)
                     let streamEnabled = try LLMCapabilityValidator.resolveStreamEnabled(for: request, profile: profile)
                     let body = try makeBody(streamEnabled)
-                    let httpConfig = httpClient.makeConfiguration(for: configuration, profile: profile)
+                    let httpConfig = httpClient.makeConfiguration(for: configuration)
                     continuation.yield(.runStarted(requestID: nil))
 
                     if streamEnabled {

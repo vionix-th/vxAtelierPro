@@ -110,7 +110,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         for provider: LiveSmokeProvider,
         suite: LiveSmokeSuite,
         endpointFamily: LLMEndpointFamily
-    ) -> APIConfigurationItem {
+    ) -> LLMProviderConfiguration {
         let profile = LLMProviderRegistry.shared.profile(for: provider.id)
         let configuration = APIConfigurationItem(
             name: provider.name ?? "\(profile.name) Live Smoke",
@@ -125,7 +125,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         configuration.defaultEndpointFamilyEnum = endpointFamily
         configuration.decodedHeaders = provider.headers ?? [:]
         configuration.decodedOptions = mergedOptions(provider: provider, suite: suite)
-        return configuration
+        return configuration.llmProviderConfiguration(profile: profile)
     }
 
     private func mergedOptions(provider: LiveSmokeProvider, suite: LiveSmokeSuite) -> [String: String] {

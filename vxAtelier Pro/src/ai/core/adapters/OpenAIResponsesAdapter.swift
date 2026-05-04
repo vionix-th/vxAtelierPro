@@ -10,7 +10,7 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
         self.chatFallback = OpenAIChatAdapter(profile: profile)
     }
 
-    func stream(_ request: LLMRequest, configuration: APIConfigurationItem) -> AsyncThrowingStream<LLMStreamEvent, Error> {
+    func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration) -> AsyncThrowingStream<LLMStreamEvent, Error> {
         if request.endpointFamily == .chatCompletions {
             return chatFallback.stream(request, configuration: configuration)
         }
@@ -36,7 +36,7 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
         )
     }
 
-    func fetchModels(configuration: APIConfigurationItem) async throws -> [LLMModelDescriptor] {
+    func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
         try await chatFallback.fetchModels(configuration: configuration).map { descriptor in
             var copy = descriptor
             copy.endpointFamilies = [.responses, .chatCompletions]

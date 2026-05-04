@@ -160,31 +160,14 @@ struct LLMHTTPClient {
         }
     }
 
-    func makeConfiguration(for config: APIConfigurationItem, profile: LLMProviderProfile) -> Configuration {
-        var headers = config.decodedHeaders
-        switch config.authKindEnum {
-        case .bearerToken:
-            if !config.apiKey.isEmpty {
-                headers["Authorization"] = "Bearer \(config.apiKey)"
-            }
-        case .xAPIKey:
-            if !config.apiKey.isEmpty {
-                headers["x-api-key"] = config.apiKey
-            }
-            headers["anthropic-version"] = headers["anthropic-version"] ?? "2023-06-01"
-        case .none, .customHeaders:
-            break
-        case .chatGPTOAuth, .chatGPTDeviceCode, .chatGPTCodexToken:
-            break
-        }
-        let options = config.decodedOptions
+    func makeConfiguration(for configuration: LLMProviderConfiguration) -> Configuration {
         return Configuration(
-            baseURL: config.baseURL.isEmpty ? profile.defaultBaseURL : config.baseURL,
-            headers: headers,
-            requestTimeout: secondsOption("request_timeout_seconds", in: options, defaultValue: 60),
-            streamIdleTimeout: secondsOption("sse_idle_timeout_seconds", in: options, defaultValue: 120),
-            maxResponseBodyBytes: intOption("max_response_body_bytes", in: options, defaultValue: 10 * 1024 * 1024),
-            maxSSEEventBytes: intOption("max_sse_event_bytes", in: options, defaultValue: 1024 * 1024)
+            baseURL: configuration.baseURL,
+            headers: configuration.headers,
+            requestTimeout: configuration.requestTimeout,
+            streamIdleTimeout: configuration.streamIdleTimeout,
+            maxResponseBodyBytes: configuration.maxResponseBodyBytes,
+            maxSSEEventBytes: configuration.maxSSEEventBytes
         )
     }
 
@@ -298,25 +281,4 @@ struct LLMHTTPClient {
         )
     }
 
-    private func secondsOption(
-        _ key: String,
-        in options: [String: String],
-        defaultValue: TimeInterval
-    ) -> TimeInterval {
-        guard let rawValue = options[key],
-              let value = TimeInterval(rawValue),
-              value > 0 else {
-            return defaultValue
-        }
-        return value
-    }
-
-    private func intOption(_ key: String, in options: [String: String], defaultValue: Int) -> Int {
-        guard let rawValue = options[key],
-              let value = Int(rawValue),
-              value > 0 else {
-            return defaultValue
-        }
-        return value
-    }
 }

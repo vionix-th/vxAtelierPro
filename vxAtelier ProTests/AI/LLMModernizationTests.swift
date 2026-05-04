@@ -839,7 +839,9 @@ final class LLMModernizationTests: XCTestCase {
             "max_response_body_bytes": "4"
         ]
         let profile = LLMProviderRegistry.shared.profile(for: .customOpenAICompatible)
-        let config = LLMHTTPClient().makeConfiguration(for: configItem, profile: profile)
+        let config = LLMHTTPClient().makeConfiguration(
+            for: configItem.llmProviderConfiguration(profile: profile)
+        )
 
         await assertThrowsAsyncError(try await LLMHTTPClient().getJSONWithMetadata(
             path: "/v1/models",
@@ -1309,7 +1311,10 @@ final class LLMModernizationTests: XCTestCase {
             providerID: .openAIPlatform
         )
 
-        let events = try await collectEvents(adapter.stream(request, configuration: config))
+        let events = try await collectEvents(adapter.stream(
+            request,
+            configuration: config.llmProviderConfiguration(profile: adapter.profile)
+        ))
         XCTAssertTrue(events.contains(.textDelta("Hello")))
         XCTAssertTrue(events.contains(where: { event in
             if case .toolCallCompleted(let call) = event {
@@ -1343,7 +1348,10 @@ final class LLMModernizationTests: XCTestCase {
             providerID: .openAIPlatform
         )
 
-        let events = try await collectEvents(adapter.stream(request, configuration: config))
+        let events = try await collectEvents(adapter.stream(
+            request,
+            configuration: config.llmProviderConfiguration(profile: adapter.profile)
+        ))
         XCTAssertTrue(events.contains(.runStarted(requestID: "resp_fixture")))
         XCTAssertTrue(events.contains(.textDelta("Hello")))
         XCTAssertTrue(events.contains(.usage(LLMUsage(inputTokens: 5, outputTokens: 7, totalTokens: 12))))
@@ -1379,7 +1387,10 @@ final class LLMModernizationTests: XCTestCase {
             providerID: .openAIPlatform
         )
 
-        await assertThrowsAsyncError(try await collectEvents(adapter.stream(request, configuration: config))) { error in
+        await assertThrowsAsyncError(try await collectEvents(adapter.stream(
+            request,
+            configuration: config.llmProviderConfiguration(profile: adapter.profile)
+        ))) { error in
             XCTAssertEqual(error as? LLMProviderError, .decoding("Provider stream ended before completion event."))
         }
     }
@@ -1407,7 +1418,10 @@ final class LLMModernizationTests: XCTestCase {
             providerID: .anthropic
         )
 
-        let events = try await collectEvents(adapter.stream(request, configuration: config))
+        let events = try await collectEvents(adapter.stream(
+            request,
+            configuration: config.llmProviderConfiguration(profile: adapter.profile)
+        ))
         XCTAssertTrue(events.contains(.runStarted(requestID: "msg_fixture")))
         XCTAssertTrue(events.contains(.textDelta("Hello")))
         XCTAssertTrue(events.contains(.runCompleted(responseID: nil, modelID: nil)))

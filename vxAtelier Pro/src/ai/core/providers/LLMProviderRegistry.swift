@@ -126,10 +126,6 @@ struct LLMProviderRegistry {
         }
     }
 
-    func resolveProviderID(for config: APIConfigurationItem) -> LLMProviderID {
-        LLMProviderID(rawValue: config.providerID) ?? .customOpenAICompatible
-    }
-
     static func providerID(fromProviderName providerName: String) -> LLMProviderID {
         let probe = providerName.lowercased()
         if probe.contains("anthropic") || probe.contains("claude") { return .anthropic }

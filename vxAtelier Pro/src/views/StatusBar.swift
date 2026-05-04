@@ -421,7 +421,7 @@ struct ConversationInfoHeader: View {
     
     private var currentProvider: LLMProviderID {
         if let config = conversation.options.apiConfiguration {
-            return LLMProviderRegistry.shared.resolveProviderID(for: config)
+            return config.providerIDEnum
         }
         return .openAIPlatform
     }

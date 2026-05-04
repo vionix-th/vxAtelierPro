@@ -32,7 +32,7 @@ struct ConversationOptionsView: View {
 
     private var selectableEndpointFamilies: [LLMEndpointFamily] {
         guard let config = options.apiConfiguration else { return [] }
-        let provider = LLMProviderRegistry.shared.resolveProviderID(for: config)
+        let provider = config.providerIDEnum
         return LLMProviderRegistry.shared.profile(for: provider).supportedEndpointFamilies.filter { $0 != .models }
     }
 
@@ -311,7 +311,7 @@ struct ConversationOptionsView: View {
                 vxAtelierPro.log.info("API configuration changed, updating parameters")
                 options.setupAiRequestArguments(for: config, modelContext: modelContext)
                 
-                let provider = LLMProviderRegistry.shared.resolveProviderID(for: config)
+                let provider = config.providerIDEnum
                 let profile = LLMProviderRegistry.shared.profile(for: provider)
                 let defaultModel = config.defaultModelID ?? profile.defaultModelID ?? ""
                 options.setParameterValue(name: "model", value: defaultModel)

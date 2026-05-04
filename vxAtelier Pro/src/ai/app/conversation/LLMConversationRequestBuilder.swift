@@ -10,7 +10,7 @@ struct LLMConversationRequestBuilder {
 
     @MainActor
     func makeRequest(conversation: ConversationItem, apiConfig: APIConfigurationItem) throws -> LLMRequest {
-        let providerID = registry.resolveProviderID(for: apiConfig)
+        let providerID = apiConfig.providerIDEnum
         let profile = registry.profile(for: providerID)
         conversation.options.syncTypedFieldsFromParameters()
         let endpoint = resolveEndpointFamily(options: conversation.options, config: apiConfig)

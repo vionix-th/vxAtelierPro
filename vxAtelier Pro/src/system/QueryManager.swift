@@ -454,24 +454,26 @@ final class QueryManager {
         var added = 0
 
         for config in apiConfigurations {
-            let providerID = LLMProviderRegistry.shared.resolveProviderID(for: config)
+            let providerID = config.providerIDEnum
+            let profile = LLMProviderRegistry.shared.profile(for: providerID)
             let adapter = LLMProviderRegistry.shared.adapter(for: providerID)
+            let providerConfiguration = config.llmProviderConfiguration(profile: profile)
             var fetchedModels: [LLMModelDescriptor] = []
 
             do {
-                fetchedModels = try await adapter.fetchModels(configuration: config)
+                fetchedModels = try await adapter.fetchModels(configuration: providerConfiguration)
             } catch {
                 vxAtelierPro.log.error(
                     "Failed to fetch models from provider \(config.name): \(error.localizedDescription)")
-                fetchedModels = LLMProviderRegistry.shared.profile(for: providerID).defaultModelID.map {
+                fetchedModels = profile.defaultModelID.map {
                     [LLMModelDescriptor(
                         id: $0,
                         providerID: providerID,
                         contextWindow: AppDefaults.ModelContextSizes.defaultSize,
-                        endpointFamilies: [LLMProviderRegistry.shared.profile(for: providerID).defaultEndpointFamily],
+                        endpointFamilies: [profile.defaultEndpointFamily],
                         modalities: [.text],
-                        supportedParameters: LLMProviderRegistry.shared.profile(for: providerID).supportedParameters,
-                        schemaFeatures: LLMProviderRegistry.shared.profile(for: providerID).schemaFeatures
+                        supportedParameters: profile.supportedParameters,
+                        schemaFeatures: profile.schemaFeatures
                     )]
                 } ?? []
             }

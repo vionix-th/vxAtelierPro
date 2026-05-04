@@ -251,7 +251,7 @@ final class ConversationOptions: Equatable {
         }
 
         let registry = LLMProviderRegistry.shared
-        let providerID = registry.resolveProviderID(for: config)
+        let providerID = config.providerIDEnum
         let profile = registry.profile(for: providerID)
         let modelID = requestedModelID
             ?? existingStringValue(for: .model, existingValues: existingValues)

@@ -336,20 +336,3 @@ private struct CapabilityChip: View {
         .help(capability.rawValue)
     }
 }
-
-// Extension to provide display-friendly names for model capabilities
-extension ModelCapability {
-    var displayName: String {
-        switch self {
-        case .vision: return "Vision"
-        case .audio: return "Audio"
-        case .streaming: return "Stream"
-        case .function: return "Functions"
-        case .text: return "Text"
-        case .chat: return "Chat"
-        case .image: return "Image"
-        case .video: return "Video"
-        case .embedding: return "Embed"
-        }
-    }
-} 
