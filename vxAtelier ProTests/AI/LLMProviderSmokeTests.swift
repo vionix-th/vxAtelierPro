@@ -125,7 +125,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         configuration.defaultEndpointFamilyEnum = endpointFamily
         configuration.decodedHeaders = provider.headers ?? [:]
         configuration.decodedOptions = mergedOptions(provider: provider, suite: suite)
-        return configuration.llmProviderConfiguration(profile: profile)
+        return configuration.makeLLMProviderConfiguration()
     }
 
     private func mergedOptions(provider: LiveSmokeProvider, suite: LiveSmokeSuite) -> [String: String] {

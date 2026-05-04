@@ -25,6 +25,11 @@ public final class WebSearchConfigurationItem {
     /// Timestamp when the configuration was created.
     public var createdAt: Date
 
+    public var providerEnum: WebSearchProvider {
+        get { WebSearchProvider(rawValue: provider) ?? .custom }
+        set { provider = newValue.rawValue }
+    }
+
     /// Creates a new Web Search configuration.
     ///
     /// - Parameters:
@@ -49,4 +54,8 @@ public final class WebSearchConfigurationItem {
         self.isDefault = isDefault
         self.createdAt = createdAt
     }
-} 
+
+    public func makeWebSearchService() throws -> WebSearchService {
+        try providerEnum.makeService(with: self)
+    }
+}

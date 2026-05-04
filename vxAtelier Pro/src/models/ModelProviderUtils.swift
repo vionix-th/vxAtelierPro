@@ -4,9 +4,6 @@ import Foundation
 ///
 /// This utility provides functionality to:
 /// - Detect AI model providers from model names
-/// - Access standardized provider information
-/// - Get default configurations for various providers
-/// - Retrieve API-specific settings for each provider
 /// - Infer model capabilities based on model name patterns
 public enum ModelProviderUtils {
     
@@ -65,81 +62,6 @@ public enum ModelProviderUtils {
         }
         return Provider.custom.rawValue
     }
-    
-    /// Returns the default base URL for a given provider.
-    ///
-    /// These URLs are standard API endpoints for each provider's services.
-    /// Use this to configure API clients without hardcoding URLs.
-    ///
-    /// - Parameter provider: The provider to get the base URL for
-    /// - Returns: The default base URL string, or empty string if not available
-    public static func defaultBaseURL(for provider: Provider) -> String {
-        switch provider {
-        case .openAI:
-            return AppDefaults.OpenAi.baseURL
-        case .anthropic:
-            return AppDefaults.Anthropic.baseURL
-        case .xAI:
-            return AppDefaults.XAI.baseURL
-        case .deepSeek:
-            return AppDefaults.DeepSeek.baseURL
-        case .google:
-            return "https://generativelanguage.googleapis.com"
-        case .mistral:
-            return "https://api.mistral.ai/v1"
-        default:
-            return ""
-        }
-    }
-    
-    /// Returns the default model for a given provider.
-    ///
-    /// These are reasonable default models that balance capability and cost
-    /// for each provider. Use when the user hasn't specified a specific model.
-    ///
-    /// - Parameter provider: The provider to get the default model for
-    /// - Returns: The default model name, or empty string if not available
-    public static func defaultModel(for provider: Provider) -> String {
-        switch provider {
-        case .openAI:
-            return AppDefaults.OpenAi.model
-        case .anthropic:
-            return AppDefaults.Anthropic.model
-        case .xAI:
-            return AppDefaults.XAI.model
-        case .deepSeek:
-            return AppDefaults.DeepSeek.model
-        case .google:
-            return "gemini-pro"
-        case .mistral:
-            return "mistral-medium"
-        default:
-            return ""
-        }
-    }
-    
-    /// Returns default header keys for API requests to a specific provider.
-    ///
-    /// This provides the expected authorization header format for each provider.
-    /// The placeholder "API_KEY" should be replaced with the actual key.
-    ///
-    /// - Parameter provider: The provider to get header keys for
-    /// - Returns: Dictionary of header keys and their standard name format
-    public static func apiHeaderKeys(for provider: Provider) -> [String: String] {
-        switch provider {
-        case .openAI:
-            return ["Authorization": "Bearer API_KEY"]
-        case .anthropic:
-            return ["x-api-key": "API_KEY", "anthropic-version": "2023-06-01"]
-        case .google:
-            return ["x-goog-api-key": "API_KEY"]
-        case .mistral:
-            return ["Authorization": "Bearer API_KEY"]
-        default:
-            return ["Authorization": "Bearer API_KEY"]
-        }
-    }
-    
     /// Infers model capabilities based on the model name pattern.
     ///
     /// Uses common naming conventions and keywords to identify capabilities
@@ -192,26 +114,6 @@ public enum ModelProviderUtils {
         }
         
         return capabilities
-    }
-    
-    /// Returns the capabilities a model is known to have based on its provider.
-    ///
-    /// This provides a more general capability inference based on the provider
-    /// when the specific model name doesn't contain clear capability indicators.
-    ///
-    /// - Parameter provider: The model provider
-    /// - Returns: Array of common capabilities for this provider's models
-    static func commonCapabilities(for provider: String) -> [ModelCapability] {
-        switch provider {
-        case Provider.openAI.rawValue:
-            return [.text, .chat, .function, .streaming]
-        case Provider.anthropic.rawValue:
-            return [.text, .chat, .function, .vision, .streaming]
-        case Provider.google.rawValue:
-            return [.text, .chat, .function, .vision, .streaming]
-        default:
-            return [.text, .chat]
-        }
     }
 } 
 

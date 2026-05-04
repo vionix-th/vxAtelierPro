@@ -50,7 +50,6 @@ let package = Package(
                 "ai/core/adapters/OpenAIResponsesAdapter.swift",
                 "ai/core/adapters/AnthropicMessagesAdapter.swift",
                 "ai/core/tools/AIToolDefinition.swift",
-                "ai/app/configuration/APIConfigurationLLMAdapter.swift",
                 "ai/app/conversation/LLMPersistenceCoordinator.swift",
                 "ai/app/conversation/LLMConversationRequestBuilder.swift",
                 "ai/app/conversation/LLMRunCollector.swift",
@@ -83,7 +82,6 @@ let package = Package(
                 "models/ModelItem.swift",
                 "models/ModelProviderUtils.swift",
                 "models/ModelParameterMappingItem.swift",
-                "models/ModelParameterMappingMaterialization.swift",
                 "models/ProjectItem.swift",
                 "models/PromptTemplate.swift",
                 "models/VoiceConfigurationItem.swift",
@@ -91,7 +89,7 @@ let package = Package(
                 "models/WebSearchConfigurationItem.swift",
                 // Search Service
                 "search/WebSearchService.swift",
-                "search/WebSearchServiceManager.swift",
+                "search/WebSearchProvider.swift",
                 "search/GoogleCustomSearchService.swift",
                 // System
                 "system/AppDefaults.swift",

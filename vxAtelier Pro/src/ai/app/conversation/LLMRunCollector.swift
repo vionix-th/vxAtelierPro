@@ -21,7 +21,7 @@ struct LLMRunCollector {
     @MainActor
     func performRun(
         request: LLMRequest,
-        apiConfig: APIConfigurationItem,
+        providerConfiguration: LLMProviderConfiguration,
         draftStore: ConversationDraftStore,
         conversationID: PersistentIdentifier,
         retryPolicy: LLMGenerationOptions.RetryPolicy
@@ -29,7 +29,7 @@ struct LLMRunCollector {
         do {
             return try await collectRun(
                 request: request,
-                apiConfig: apiConfig,
+                providerConfiguration: providerConfiguration,
                 draftStore: draftStore,
                 conversationID: conversationID
             )
@@ -40,7 +40,7 @@ struct LLMRunCollector {
             draftStore.start(conversationID: conversationID)
             return try await collectRun(
                 request: request,
-                apiConfig: apiConfig,
+                providerConfiguration: providerConfiguration,
                 draftStore: draftStore,
                 conversationID: conversationID
             )
@@ -57,14 +57,16 @@ struct LLMRunCollector {
     @MainActor
     private func collectRun(
         request: LLMRequest,
-        apiConfig: APIConfigurationItem,
+        providerConfiguration: LLMProviderConfiguration,
         draftStore: ConversationDraftStore,
         conversationID: PersistentIdentifier
     ) async throws -> LLMRunAccumulator {
+        guard providerConfiguration.providerID == request.providerID else {
+            throw LLMProviderError.invalidConfiguration(
+                "Provider configuration \(providerConfiguration.providerID.rawValue) does not match request provider \(request.providerID.rawValue)."
+            )
+        }
         let adapter = registry.adapter(for: request.providerID)
-        let providerConfiguration = apiConfig.llmProviderConfiguration(
-            profile: registry.profile(for: request.providerID)
-        )
         var accumulator = LLMRunAccumulator()
         var assembler = LLMToolCallAssembler()
 

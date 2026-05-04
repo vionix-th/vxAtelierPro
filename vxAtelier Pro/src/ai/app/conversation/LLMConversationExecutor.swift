@@ -80,9 +80,10 @@ final class LLMConversationExecutor {
 
         let response: LLMRunAccumulator
         do {
+            let providerConfiguration = apiConfig.makeLLMProviderConfiguration()
             response = try await runCollector.performRun(
                 request: request,
-                apiConfig: apiConfig,
+                providerConfiguration: providerConfiguration,
                 draftStore: draftStore,
                 conversationID: conversation.id,
                 retryPolicy: request.options.retryPolicy

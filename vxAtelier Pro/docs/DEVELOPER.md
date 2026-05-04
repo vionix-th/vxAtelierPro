@@ -112,11 +112,11 @@ Xcode compile-time diagnostics are authoritative. SPM compile-time diagnostics m
 ### AI Providers
 Location: `src/ai/`
 
-The AI module is split into reusable core and app-integrated runtime. Conversation execution builds an `LLMRequest`, adapts `APIConfigurationItem` into pure `LLMProviderConfiguration`, sends the request through a provider adapter, streams or collects `LLMStreamEvent` values into a `ConversationDraftStore`, then persists stable `MessageItem`, `ToolCallItem`, and `ResponseRunItem` records.
+The AI module is split into reusable core and app-integrated runtime. Conversation execution builds an `LLMRequest`, materializes `APIConfigurationItem` into pure `LLMProviderConfiguration`, lets core provider transport resolve provider-specific authentication headers, sends the request through a provider adapter, streams or collects `LLMStreamEvent` values into a `ConversationDraftStore`, then persists stable `MessageItem`, `ToolCallItem`, and `ResponseRunItem` records.
 
 *   **Core LLM Types (`ai/core/llm/`)**: Defines `LLMRequest`, `LLMMessage`, `LLMContentPart`, `LLMToolDefinition`, `LLMToolCall`, `LLMGenerationOptions`, `LLMStreamEvent`, `LLMUsage`, and `LLMProviderError`.
 *   **Providers (`ai/core/providers/`)**: Owns `LLMProviderID`, `LLMProviderConfiguration`, profiles for supported providers, adapter selection, and model metadata decoding.
-*   **Transport (`NetworkClient.swift`, `ai/core/transport/`)**: `NetworkClient` owns shared JSON/SSE transport; `LLMHTTPClient` is the AI-facing facade for redacted diagnostics, HTTP status mapping, and normalized provider errors.
+*   **Transport (`NetworkClient.swift`, `ai/core/transport/`)**: `NetworkClient` owns shared JSON/SSE transport; `LLMHTTPClient` is the AI-facing facade for provider-specific header resolution, redacted diagnostics, HTTP status mapping, and normalized provider errors.
 *   **Adapters (`ai/core/adapters/`)**: `OpenAIResponsesAdapter`, `OpenAIChatAdapter`, and `AnthropicMessagesAdapter` map provider-specific request/stream formats into domain events. `LLMAdapterRunLoop` owns the shared streamed/non-streamed HTTP flow.
 *   **Conversation Runs (`ai/app/conversation/`)**: `LLMConversationRequestBuilder`, `LLMRunCollector`, `LLMToolExecutionCoordinator`, `LLMPersistenceCoordinator`, and `LLMConversationExecutor` split request assembly, draft/event collection, sequential tool execution, SwiftData save boundaries, and turn orchestration.
 *   **Provider & Capability Utilities (`models/ModelProviderUtils.swift`)**: Provides app-side model-name capability inference for persisted `ModelItem` records and UI filtering.
@@ -136,9 +136,7 @@ The `search/` module provides web search capabilities to the application, primar
     *   It uses its own internal `Codable` types to decode the unique JSON structure of the Google API response.
     *   It leverages `NetworkClient` to handle the underlying network request.
     *   It correctly maps the provider-specific data into the application's standard `WebSearchResult` format, decoupling the rest of the app from the API's details.
-*   **Service Factory (`WebSearchServiceManager.swift`)**: A singleton that acts as a factory for creating `WebSearchService` instances. Its architecture relies on two key components:
-    *   `WebSearchProvider`: An `enum` that lists all supported search providers. It contains the core factory logic in its `createService(with:)` method, which instantiates the appropriate concrete service (e.g., `GoogleCustomSearchService`) based on a `WebSearchConfigurationItem`.
-    *   `WebSearchServiceManager`: The manager class orchestrates the process. Its `getService(with:)` method uses the enum to create a specific service instance, while its `getDefaultService(context:)` method queries SwiftData to find the user's default search configuration and returns a ready-to-use service.
+*   **Provider Factory (`WebSearchProvider.swift`)**: `WebSearchProvider` lists supported search providers and contains the factory logic that instantiates the appropriate concrete service from a `WebSearchConfigurationItem`.
 
 ### System (`system/`)
 
@@ -418,7 +416,7 @@ This SwiftData `@Model` is central to the application's multi-lingual, multi-spe
 
 This SwiftData `@Model` stores the configuration details for a web search provider, such as Google Custom Search.
 
-*   **Provider Abstraction**: It stores provider-specific details like `apiKey` and `searchEngineId`. The provider type is stored as a string, decoupling the data from the concrete service implementation, which is handled by the `WebSearchServiceManager`.
+*   **Provider Ownership**: It stores provider-specific details like `apiKey` and `searchEngineId`, exposes the stored provider through `providerEnum`, and materializes the matching `WebSearchService` with `makeWebSearchService()`.
 *   **Default Configuration**: An `isDefault` flag allows the user to designate a primary search configuration that the application uses by default.
 *   **Extensibility**: The flexible schema with optional fields allows the system to easily accommodate future search providers with different configuration requirements.
 
@@ -948,9 +946,9 @@ Location: `src/tts/`
 ### Search
 Location: `src/search/`
 
-This module uses a factory pattern to provide web search capabilities.
+This module uses `WebSearchProvider` as the provider factory for web search capabilities.
 
-* **`WebSearchServiceManager.swift`** – A singleton factory that creates search service instances based on stored `WebSearchConfigurationItem`s.
+* **`WebSearchProvider.swift`** – The provider enum and factory that creates search service instances from stored `WebSearchConfigurationItem`s.
 * **`WebSearchService.swift`** – A protocol defining the standard interface for any search provider, including the `search(query:numResults:)` method and the `WebSearchResult` return type.
 * **`GoogleCustomSearchService.swift`** – The concrete implementation for the Google Custom Search API.
 
@@ -1003,7 +1001,7 @@ views/
 | `LLMProviderAdapter` | Top-level provider adapter interface for streaming and model fetches. | `OpenAIResponsesAdapter`, `OpenAIChatAdapter`, `AnthropicMessagesAdapter` |
 | `LLMRequest` / `LLMMessage` / `LLMStreamEvent` | Provider-neutral request, message, and streaming event types. | Core LLM structs under `src/ai/core/llm` |
 | `LLMProviderProfile` | Provider capabilities, auth kind, endpoint families, defaults, and feature flags. | Profiles in `LLMProviderRegistry` |
-| `NetworkClient` / `LLMHTTPClient` | Shared JSON/SSE transport plus AI-specific provider headers, metadata redaction, and normalized provider errors. | Used by web search and all LLM adapters |
+| `NetworkClient` / `LLMHTTPClient` | Shared JSON/SSE transport plus core-owned provider header resolution, metadata redaction, and normalized provider errors. | Used by web search and all LLM adapters |
 | `LLMAdapterRunLoop` | Shared streamed/non-streamed adapter flow and metadata forwarding. | Used by provider adapters |
 | `LLMCapabilityValidator` | Common preflight validation for endpoint, model, parameter, content, and tool replay support. | Used by executor and adapters |
 
@@ -1028,7 +1026,7 @@ Implementation notes:
 ### Search Layer
 * **`WebSearchService` protocol** abstracts external search APIs.
 * **`GoogleCustomSearchService`** implements the protocol with Google CSE REST, respecting API key and CX settings from `WebSearchConfigurationItem`.
-* The **`WebSearchTool`** bridges AI function calls to the `WebSearchService`, returning JSON search snippets accessible to LLMs.
+* The **`WebSearchTool`** bridges AI function calls to the service produced by `WebSearchConfigurationItem.makeWebSearchService()`, returning JSON search snippets accessible to LLMs.
 
 ### Utilities
 | Protocol | Purpose | Conformers |

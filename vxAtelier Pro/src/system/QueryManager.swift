@@ -457,7 +457,7 @@ final class QueryManager {
             let providerID = config.providerIDEnum
             let profile = LLMProviderRegistry.shared.profile(for: providerID)
             let adapter = LLMProviderRegistry.shared.adapter(for: providerID)
-            let providerConfiguration = config.llmProviderConfiguration(profile: profile)
+            let providerConfiguration = config.makeLLMProviderConfiguration()
             var fetchedModels: [LLMModelDescriptor] = []
 
             do {

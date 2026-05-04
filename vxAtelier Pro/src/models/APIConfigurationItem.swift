@@ -92,8 +92,47 @@ final class APIConfigurationItem {
         self.optionsJSON = "{}"
     }
 
+    func makeLLMProviderConfiguration() -> LLMProviderConfiguration {
+        let profile = LLMProviderRegistry.shared.profile(for: providerIDEnum)
+        let options = decodedOptions
+        return LLMProviderConfiguration(
+            providerID: providerIDEnum,
+            authKind: authKindEnum,
+            baseURL: baseURL.isEmpty ? profile.defaultBaseURL : baseURL,
+            credential: apiKey.isEmpty ? .none : .secret(apiKey),
+            customHeaders: decodedHeaders,
+            endpointPaths: profile.endpointPaths,
+            requestTimeout: Self.secondsOption("request_timeout_seconds", in: options, defaultValue: 60),
+            streamIdleTimeout: Self.secondsOption("sse_idle_timeout_seconds", in: options, defaultValue: 120),
+            maxResponseBodyBytes: Self.intOption("max_response_body_bytes", in: options, defaultValue: 10 * 1024 * 1024),
+            maxSSEEventBytes: Self.intOption("max_sse_event_bytes", in: options, defaultValue: 1024 * 1024)
+        )
+    }
+
     func endpointPath(for endpointFamily: LLMEndpointFamily) -> String? {
         LLMProviderRegistry.shared.profile(for: providerIDEnum).endpointPaths[endpointFamily]
+    }
+
+    private static func secondsOption(
+        _ key: String,
+        in options: [String: String],
+        defaultValue: TimeInterval
+    ) -> TimeInterval {
+        guard let rawValue = options[key],
+              let value = TimeInterval(rawValue),
+              value > 0 else {
+            return defaultValue
+        }
+        return value
+    }
+
+    private static func intOption(_ key: String, in options: [String: String], defaultValue: Int) -> Int {
+        guard let rawValue = options[key],
+              let value = Int(rawValue),
+              value > 0 else {
+            return defaultValue
+        }
+        return value
     }
 
     private static func decodeDictionary(_ json: String) -> [String: String] {

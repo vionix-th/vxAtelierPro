@@ -45,6 +45,27 @@ final class LLMHTTPClientTests: LLMTestCase {
         XCTAssertEqual(metadata.headers["set-cookie"], "[redacted]")
     }
 
+    func testProviderConfigurationResolvesAuthHeadersInCore() {
+        let openAI = LLMProviderConfiguration(
+            providerID: .openAIPlatform,
+            baseURL: "https://unit.test",
+            credential: .secret("sk-test"),
+            customHeaders: ["OpenAI-Organization": "org-test"]
+        )
+        let openAIHTTP = LLMHTTPClient().makeConfiguration(for: openAI)
+        XCTAssertEqual(openAIHTTP.headers["Authorization"], "Bearer sk-test")
+        XCTAssertEqual(openAIHTTP.headers["OpenAI-Organization"], "org-test")
+
+        let anthropic = LLMProviderConfiguration(
+            providerID: .anthropic,
+            baseURL: "https://unit.test",
+            credential: .secret("anthropic-key")
+        )
+        let anthropicHTTP = LLMHTTPClient().makeConfiguration(for: anthropic)
+        XCTAssertEqual(anthropicHTTP.headers["x-api-key"], "anthropic-key")
+        XCTAssertEqual(anthropicHTTP.headers["anthropic-version"], "2023-06-01")
+    }
+
     func testProviderErrorMessageIsRedactedAndLimited() async {
         URLProtocol.registerClass(MockLLMURLProtocol.self)
         defer {
@@ -106,9 +127,8 @@ final class LLMHTTPClientTests: LLMTestCase {
             "request_timeout_seconds": "7",
             "max_response_body_bytes": "4"
         ]
-        let profile = LLMProviderRegistry.shared.profile(for: .customOpenAICompatible)
         let config = LLMHTTPClient().makeConfiguration(
-            for: configItem.llmProviderConfiguration(profile: profile)
+            for: configItem.makeLLMProviderConfiguration()
         )
 
         await assertThrowsAsyncError(try await LLMHTTPClient().getJSONWithMetadata(

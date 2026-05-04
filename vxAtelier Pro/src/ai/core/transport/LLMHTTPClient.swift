@@ -163,7 +163,7 @@ struct LLMHTTPClient {
     func makeConfiguration(for configuration: LLMProviderConfiguration) -> Configuration {
         return Configuration(
             baseURL: configuration.baseURL,
-            headers: configuration.headers,
+            headers: LLMProviderHeaderResolver.headers(for: configuration),
             requestTimeout: configuration.requestTimeout,
             streamIdleTimeout: configuration.streamIdleTimeout,
             maxResponseBodyBytes: configuration.maxResponseBodyBytes,

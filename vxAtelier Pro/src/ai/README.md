@@ -9,7 +9,7 @@ vxAtelier Pro separates reusable LLM provider code from application AI runtime c
 
 1. `ConversationItem.complete(_:draftStore:)` delegates to `LLMConversationExecutor` in `ai/app/conversation`.
 2. `LLMConversationRequestBuilder` resolves app models into an `LLMRequest`.
-3. `APIConfigurationItem.llmProviderConfiguration(profile:)` converts persisted app configuration into pure `LLMProviderConfiguration`.
+3. `APIConfigurationItem.makeLLMProviderConfiguration()` converts persisted app configuration into pure `LLMProviderConfiguration`: provider identity, base URL, credential, custom headers, endpoint paths, and transport limits.
 4. `LLMProviderRegistry` selects an `LLMProviderAdapter`.
 5. `LLMAdapterRunLoop` handles shared streamed/non-streamed HTTP flow and adapter-specific parsers emit `LLMStreamEvent` values.
 6. `LLMRunCollector` accumulates draft text/tool deltas in `ConversationDraftStore`.
@@ -28,7 +28,7 @@ Core provider-neutral request and event types live in `ai/core/llm`:
 - `LLMProviderProfile`, `LLMProviderConfiguration`, `LLMModelDescriptor`
 - `LLMStreamEvent`, `LLMUsage`, `LLMProviderError`
 
-Provider identity is explicit via `LLMProviderID` and profile-backed configuration presets.
+Provider identity is explicit via `LLMProviderID` and profile-backed configuration presets. Core provider transport resolves provider-specific authentication headers from the provider profile and credential; app-layer callers do not construct `Authorization`, `x-api-key`, or equivalent protocol headers for built-in providers.
 
 ## Providers
 
@@ -47,7 +47,7 @@ Canonical app records remain outside `ai/core`:
 - `ToolCallItem` stores durable call ID, provider call ID, provider index, name, arguments JSON, status, and result link.
 - `ResponseRunItem` stores provider, endpoint family, requested/actual model, request ID, status, usage, error, and turn link.
 - `ModelItem` persists `LLMModelDescriptor` fields.
-- `APIConfigurationItem` persists provider ID, auth kind, base URL, default endpoint family/model, headers, and options.
+- `APIConfigurationItem` persists provider ID, auth kind, base URL, default endpoint family/model, custom headers, credentials, and options.
 - `ConversationOptions` persists typed generation fields and provider extras.
 
 ## Adding A Provider
@@ -72,7 +72,7 @@ Adapters support both modes where the provider endpoint supports both modes. The
 
 ## HTTP Guardrails
 
-`NetworkClient` owns shared HTTP transport, including JSON requests, SSE parsing, timeout/body-size enforcement, response metadata, and self-signed certificate handling. `LLMHTTPClient` is the AI-facing facade for redacted diagnostics, HTTP status mapping, and normalized provider errors.
+`NetworkClient` owns shared HTTP transport, including JSON requests, SSE parsing, timeout/body-size enforcement, response metadata, and self-signed certificate handling. `LLMHTTPClient` is the AI-facing facade for provider-specific header resolution, redacted diagnostics, HTTP status mapping, and normalized provider errors.
 
 - request timeout: `APIConfigurationItem.optionsJSON["request_timeout_seconds"]`, default `60`
 - SSE idle timeout: `APIConfigurationItem.optionsJSON["sse_idle_timeout_seconds"]`, default `120`

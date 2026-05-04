@@ -519,7 +519,6 @@ struct APIConfigurationEditView: View {
         isFetchingModels = true
         defer { isFetchingModels = false }
 
-        let profile = LLMProviderRegistry.shared.profile(for: providerID)
         let adapter = LLMProviderRegistry.shared.adapter(for: providerID)
         let tempConfig = APIConfigurationItem(
             name: "_temp",
@@ -528,7 +527,7 @@ struct APIConfigurationEditView: View {
             isDefault: false,
             providerID: providerID
         )
-        let providerConfig = tempConfig.llmProviderConfiguration(profile: profile)
+        let providerConfig = tempConfig.makeLLMProviderConfiguration()
 
         do {
             let descriptors = try await adapter.fetchModels(configuration: providerConfig)

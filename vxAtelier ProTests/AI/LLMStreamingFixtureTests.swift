@@ -33,7 +33,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
 
         let events = try await collectEvents(adapter.stream(
             request,
-            configuration: config.llmProviderConfiguration(profile: adapter.profile)
+            configuration: config.makeLLMProviderConfiguration()
         ))
         XCTAssertTrue(events.contains(.textDelta("Hello")))
         XCTAssertTrue(events.contains(where: { event in
@@ -70,7 +70,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
 
         let events = try await collectEvents(adapter.stream(
             request,
-            configuration: config.llmProviderConfiguration(profile: adapter.profile)
+            configuration: config.makeLLMProviderConfiguration()
         ))
         XCTAssertTrue(events.contains(.runStarted(requestID: "resp_fixture")))
         XCTAssertTrue(events.contains(.textDelta("Hello")))
@@ -109,7 +109,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
 
         await assertThrowsAsyncError(try await collectEvents(adapter.stream(
             request,
-            configuration: config.llmProviderConfiguration(profile: adapter.profile)
+            configuration: config.makeLLMProviderConfiguration()
         ))) { error in
             XCTAssertEqual(error as? LLMProviderError, .decoding("Provider stream ended before completion event."))
         }
@@ -140,7 +140,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
 
         let events = try await collectEvents(adapter.stream(
             request,
-            configuration: config.llmProviderConfiguration(profile: adapter.profile)
+            configuration: config.makeLLMProviderConfiguration()
         ))
         XCTAssertTrue(events.contains(.runStarted(requestID: "msg_fixture")))
         XCTAssertTrue(events.contains(.textDelta("Hello")))

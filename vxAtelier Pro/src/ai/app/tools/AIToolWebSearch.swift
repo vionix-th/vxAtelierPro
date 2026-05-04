@@ -64,24 +64,18 @@ public struct WebSearchTool: ExecutableTool {
             vxAtelierPro.log.warning("⚠️ \(self.name): \(errorMsg)")
             return errorMsg
         }
-        // Use 'provider' property
         vxAtelierPro.log.debug("🕸️ Found default search configuration: \(searchConfig.name) (\(searchConfig.provider))")
 
-        // 3. Get Search Service using the Configuration
         let searchService: WebSearchService
         do {
-            // Use 'with:' argument label
-            searchService = try WebSearchServiceManager.shared.getService(with: searchConfig)
-            // Use 'provider' property of the service's configuration
+            searchService = try searchConfig.makeWebSearchService()
             vxAtelierPro.log.debug("🕸️ Obtained search service: \(searchService.configuration.providerName)")
-        } catch _ as WebSearchError { // Replace 'let error' with '_'
-             let errorMsg = "Error obtaining search service for configuration '\(searchConfig.name)': \(WebSearchError.invalidResponse.localizedDescription)" // Use a specific error if possible or generic message
-             vxAtelierPro.log.error("🔴 \(self.name): \(errorMsg) - Error details: \(WebSearchError.invalidResponse.localizedDescription)") // Log the actual error type
+        } catch let error as WebSearchError {
+             let errorMsg = "Error obtaining search service for configuration '\(searchConfig.name)': \(error.localizedDescription)"
+             vxAtelierPro.log.error("🔴 \(self.name): \(errorMsg)")
              return errorMsg
         } catch {
-             // Remove 'let errorMsg =' and inline the string
              vxAtelierPro.log.error("🔴 \(self.name): Error obtaining search service for configuration '\(searchConfig.name)': An unexpected error occurred. - Underlying error: \(error)")
-            // Re-throw unexpected errors to allow higher-level handling if needed
             throw AppError.aiServiceError("Failed to get search service for config '\(searchConfig.name)': \(error.localizedDescription)")
         }
 
@@ -111,19 +105,16 @@ public struct WebSearchTool: ExecutableTool {
             }
             return jsonString
 
-        } catch _ as WebSearchError { // Replace 'let error' with '_'
-            let errorReason = "Unknown reason"
-            let searchFailedError = WebSearchError.searchFailed(errorReason)
-            let errorMsg = "Error during web search with service '\(searchConfig.provider)': \(searchFailedError.localizedDescription)" // Use specific error if possible
-            vxAtelierPro.log.error("🔴 \(self.name): \(errorMsg) - Error details: \(searchFailedError)", file: #file, function: #function, line: #line) // Log actual error type
+        } catch let error as WebSearchError {
+            let errorMsg = "Error during web search with service '\(searchConfig.provider)': \(error.localizedDescription)"
+            vxAtelierPro.log.error("🔴 \(self.name): \(errorMsg)", file: #file, function: #function, line: #line)
             return errorMsg
         } catch let error as AppError {
              let errorMsg = "Application error during web search: \(error.localizedDescription)"
              vxAtelierPro.log.error("🔴 \(self.name): \(errorMsg)", file: #file, function: #function, line: #line)
-             return errorMsg // Return the error message instead of throwing
+             return errorMsg
         } catch {
              vxAtelierPro.log.error("🔴 \(self.name): An unexpected error occurred during the web search with service '\(searchConfig.provider)'. - Underlying error: \(error)", file: #file, function: #function, line: #line)
-            // Re-throw unexpected errors
             throw AppError.aiServiceError("Unexpected web search error: \(error.localizedDescription)")
         }
     }
