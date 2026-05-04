@@ -56,7 +56,7 @@
                             }
                         } else {
                             // Fallback if the format is not as expected
-                            let id = line.stableHash()
+                            let id = StableHash.md5Hex(line)
                             shortcuts.append(ShortcutInfo(id: id, name: line))
                         }
                     }

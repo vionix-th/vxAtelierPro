@@ -330,7 +330,7 @@ private struct ModelParameterMappingRow: View {
                         mapping.markCustomized()
                     }
                 )) {
-                    ForEach(ModelParameterEncodingKind.allCases) { kind in
+                    ForEach(LLMParameterEncodingKind.allCases) { kind in
                         Text(kind.displayName).tag(kind)
                     }
                 }
@@ -355,7 +355,7 @@ private struct ModelParameterMappingRow: View {
                             mapping.markCustomized()
                         }
                     )) {
-                        ForEach(ModelParameterStructuredPreset.allCases) { preset in
+                        ForEach(LLMParameterStructuredPreset.allCases) { preset in
                             Text(preset.displayName).tag(preset)
                         }
                     }

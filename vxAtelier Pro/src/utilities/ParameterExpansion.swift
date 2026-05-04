@@ -4,7 +4,7 @@ func expandVariables(_ inString: String, conversation: ConversationItem? = nil) 
     var rval = inString
     
     let variables: [String: Any] = [
-        "$conversationid": conversation.map { "\"\(String(describing: $0.id).stableHash())\"" } ?? "[ERROR: NO CONVERSATION ID]",
+        "$conversationid": conversation.map { "\"\(StableHash.md5Hex(String(describing: $0.id)))\"" } ?? "[ERROR: NO CONVERSATION ID]",
         "$isodate": {
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd"

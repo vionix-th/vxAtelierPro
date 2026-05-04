@@ -1,0 +1,61 @@
+import Foundation
+
+struct LLMContentPart: Codable, Equatable, Identifiable {
+    enum Kind: String, Codable {
+        case text
+        case image
+        case audio
+        case file
+        case toolResult
+        case reasoning
+    }
+
+    var id: UUID
+    var kind: Kind
+    var text: String?
+    var mimeType: String?
+    var dataBase64: String?
+    var sourceURL: String?
+
+    init(
+        id: UUID = UUID(),
+        kind: Kind = .text,
+        text: String? = nil,
+        mimeType: String? = nil,
+        dataBase64: String? = nil,
+        sourceURL: String? = nil
+    ) {
+        self.id = id
+        self.kind = kind
+        self.text = text
+        self.mimeType = mimeType
+        self.dataBase64 = dataBase64
+        self.sourceURL = sourceURL
+    }
+}
+
+struct LLMMessage: Codable, Equatable, Identifiable {
+    var id: UUID
+    var role: String
+    var content: [LLMContentPart]
+    var toolCalls: [LLMToolCall]
+    var toolCallID: String?
+
+    init(
+        id: UUID = UUID(),
+        role: String,
+        content: [LLMContentPart],
+        toolCalls: [LLMToolCall] = [],
+        toolCallID: String? = nil
+    ) {
+        self.id = id
+        self.role = role
+        self.content = content
+        self.toolCalls = toolCalls
+        self.toolCallID = toolCallID
+    }
+
+    var displayText: String {
+        content.compactMap(\.text).joined()
+    }
+}

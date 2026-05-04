@@ -152,12 +152,6 @@ struct LLMCapabilityValidator {
         }
     }
 
-    private static func requireParameter(_ parameter: String, request: LLMRequest, profile: LLMProviderProfile) throws {
-        guard supportsParameter(parameter, request: request, profile: profile) else {
-            throw LLMProviderError.unsupportedParameter("\(profile.name) does not support \(parameter) for \(request.modelID).")
-        }
-    }
-
     private static func requireMapping(
         _ parameterID: LLMParameterID,
         mappings: [LLMParameterID: LLMParameterMappingDescriptor],
@@ -167,13 +161,6 @@ struct LLMCapabilityValidator {
         guard let mapping = mappings[parameterID], mapping.isEnabled, mapping.encodingKind != .disabled else {
             throw LLMProviderError.unsupportedParameter("\(profile.name) does not support \(parameterID.rawValue) for \(request.modelID).")
         }
-    }
-
-    private static func supportsParameter(_ parameter: String, request: LLMRequest, profile: LLMProviderProfile) -> Bool {
-        if let supported = request.modelDescriptor?.supportedParameters, !supported.isEmpty {
-            return supported.contains(parameter) && profile.supportedParameters.contains(parameter)
-        }
-        return profile.supportedParameters.contains(parameter)
     }
 
     private static func hasSchemaFeature(_ feature: LLMSchemaFeature, request: LLMRequest, profile: LLMProviderProfile) -> Bool {

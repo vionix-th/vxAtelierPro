@@ -112,9 +112,9 @@ struct ModelParameterMappingExportData: Codable {
             semanticParameterID: LLMParameterID(rawValue: semanticParameterID) ?? .maxOutputTokens,
             isEnabled: isEnabled,
             isRequired: isRequired,
-            encodingKind: ModelParameterEncodingKind(rawValue: encodingKindRaw) ?? .scalarKey,
+            encodingKind: LLMParameterEncodingKind(rawValue: encodingKindRaw) ?? .scalarKey,
             wireKey: wireKey,
-            structuredPreset: structuredPresetRaw.flatMap(ModelParameterStructuredPreset.init(rawValue:)),
+            structuredPreset: structuredPresetRaw.flatMap(LLMParameterStructuredPreset.init(rawValue:)),
             isCustomized: isCustomized
         )
         mapping.displayName = displayName

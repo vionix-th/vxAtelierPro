@@ -50,7 +50,7 @@ public struct RenameConversationTool: ExecutableTool {
                 throw AppError.dataFetchFailed(error.localizedDescription)
             }
 
-            guard let conversation = conversations.first(where: { String(describing: $0.id).stableHash() == conversationId }) else {
+            guard let conversation = conversations.first(where: { StableHash.md5Hex(String(describing: $0.id)) == conversationId }) else {
                 return "Conversation not found"
             }
             
@@ -104,7 +104,7 @@ public struct ListConversationsTool: ExecutableTool {
             // Create a JSON array of conversation objects with stably hashed id and title
             let conversationList = conversations.map { conversation -> [String: String] in
                 return [
-                    "id": String(describing: conversation.id).stableHash(),
+                    "id": StableHash.md5Hex(String(describing: conversation.id)),
                     "title": conversation.title,
                     "purpose": String(describing: conversation.purpose)
                 ]
@@ -167,7 +167,7 @@ public struct FindConversationTool: ExecutableTool {
             // Find the first conversation with matching title
             if let conversation = conversations.first(where: { $0.title.contains(title) }) {
                 let conversationInfo: [String: String] = [
-                    "id": String(describing: conversation.id).stableHash(),
+                    "id": StableHash.md5Hex(String(describing: conversation.id)),
                     "title": conversation.title
                 ]
                 
@@ -210,7 +210,7 @@ public struct CurrentConversationTool: ExecutableTool {
         
         // Create a response object with conversation info
         let response: [String: String] = [
-            "id": String(describing: conversationItem.id).stableHash(),
+            "id": StableHash.md5Hex(String(describing: conversationItem.id)),
             "title": conversationItem.title,
             "purpose": String(describing: conversationItem.purpose)
         ]

@@ -220,12 +220,17 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
             ]
         )
 
-        try OpenAICompatibleEncoding.applyOptions(
+        try OpenAICompatibleEncoding.applyMappedOptions(
             options,
             to: &body,
-            maxTokenKey: "max_tokens",
-            responseFormatTarget: .chatCompletions,
-            includeStop: true
+            mappings: [
+                .responseFormat: LLMParameterMappingDescriptor(
+                    endpointFamily: .chatCompletions,
+                    semanticParameterID: .responseFormat,
+                    encodingKind: .structuredPreset,
+                    structuredPreset: .openAIChatResponseFormat
+                )
+            ]
         )
 
         let responseFormat = try XCTUnwrap(body["response_format"]?.objectValue)
@@ -265,12 +270,17 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         var body: [String: JSONValue] = [:]
         let options = LLMGenerationOptions(responseFormat: .jsonSchema)
 
-        XCTAssertThrowsError(try OpenAICompatibleEncoding.applyOptions(
+        XCTAssertThrowsError(try OpenAICompatibleEncoding.applyMappedOptions(
             options,
             to: &body,
-            maxTokenKey: "max_tokens",
-            responseFormatTarget: .chatCompletions,
-            includeStop: true
+            mappings: [
+                .responseFormat: LLMParameterMappingDescriptor(
+                    endpointFamily: .chatCompletions,
+                    semanticParameterID: .responseFormat,
+                    encodingKind: .structuredPreset,
+                    structuredPreset: .openAIChatResponseFormat
+                )
+            ]
         )) { error in
             XCTAssertEqual(error as? LLMProviderError, .unsupportedParameter("response_format json_schema requires providerExtras.json_schema object."))
         }

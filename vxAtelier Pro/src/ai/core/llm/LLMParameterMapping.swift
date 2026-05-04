@@ -1,6 +1,6 @@
 import Foundation
 
-enum ModelParameterEncodingKind: String, Codable, CaseIterable, Identifiable {
+enum LLMParameterEncodingKind: String, Codable, CaseIterable, Identifiable {
     case scalarKey
     case structuredPreset
     case disabled
@@ -16,7 +16,7 @@ enum ModelParameterEncodingKind: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-enum ModelParameterStructuredPreset: String, Codable, CaseIterable, Identifiable {
+enum LLMParameterStructuredPreset: String, Codable, CaseIterable, Identifiable {
     case openAIChatResponseFormat
     case openAIResponsesTextFormat
     case openAIResponsesReasoning
@@ -38,9 +38,9 @@ struct LLMParameterMappingDescriptor: Codable, Equatable, Identifiable {
     var semanticParameterID: LLMParameterID
     var isEnabled: Bool
     var isRequired: Bool
-    var encodingKind: ModelParameterEncodingKind
+    var encodingKind: LLMParameterEncodingKind
     var wireKey: String
-    var structuredPreset: ModelParameterStructuredPreset?
+    var structuredPreset: LLMParameterStructuredPreset?
     var defaultValue: JSONValue?
 
     init(
@@ -48,9 +48,9 @@ struct LLMParameterMappingDescriptor: Codable, Equatable, Identifiable {
         semanticParameterID: LLMParameterID,
         isEnabled: Bool = true,
         isRequired: Bool = false,
-        encodingKind: ModelParameterEncodingKind = .scalarKey,
+        encodingKind: LLMParameterEncodingKind = .scalarKey,
         wireKey: String = "",
-        structuredPreset: ModelParameterStructuredPreset? = nil,
+        structuredPreset: LLMParameterStructuredPreset? = nil,
         defaultValue: JSONValue? = nil
     ) {
         self.endpointFamily = endpointFamily

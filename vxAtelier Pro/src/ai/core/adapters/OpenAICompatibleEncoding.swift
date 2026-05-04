@@ -1,58 +1,6 @@
 import Foundation
 
 enum OpenAICompatibleEncoding {
-    enum ResponseFormatTarget {
-        case chatCompletions
-        case responses
-    }
-
-    static func applyOptions(
-        _ options: LLMGenerationOptions,
-        to body: inout [String: JSONValue],
-        maxTokenKey: String,
-        responseFormatTarget: ResponseFormatTarget,
-        includeStop: Bool
-    ) throws {
-        var providerExtras = options.providerExtras
-        if let temperature = options.temperature { body["temperature"] = .number(temperature) }
-        if let topP = options.topP { body["top_p"] = .number(topP) }
-        if let maxOutputTokens = options.maxOutputTokens { body[maxTokenKey] = .integer(maxOutputTokens) }
-        if includeStop && !options.stop.isEmpty {
-            body["stop"] = .array(options.stop.map { .string($0) })
-        }
-
-        switch (responseFormatTarget, options.responseFormat) {
-        case (_, .text):
-            break
-        case (.chatCompletions, .jsonObject):
-            body["response_format"] = .object(["type": .string("json_object")])
-        case (.chatCompletions, .jsonSchema):
-            body["response_format"] = .object([
-                "type": .string("json_schema"),
-                "json_schema": .object(try jsonSchemaPayload(from: &providerExtras))
-            ])
-        case (.responses, .jsonObject):
-            body["text"] = .object(["format": .object(["type": .string("json_object")])])
-        case (.responses, .jsonSchema):
-            var format = try jsonSchemaPayload(from: &providerExtras)
-            format["type"] = .string("json_schema")
-            body["text"] = .object(["format": .object(format)])
-        }
-
-        if responseFormatTarget == .responses {
-            if let reasoning = options.reasoning {
-                body["reasoning"] = .object(["effort": .string(reasoning)])
-            }
-            if let serviceTier = options.serviceTier {
-                body["service_tier"] = .string(serviceTier)
-            }
-        }
-
-        for (key, value) in providerExtras {
-            body[key] = value
-        }
-    }
-
     static func applyMappedOptions(
         _ options: LLMGenerationOptions,
         to body: inout [String: JSONValue],
@@ -86,7 +34,7 @@ enum OpenAICompatibleEncoding {
     }
 
     private static func applyStructuredPreset(
-        _ preset: ModelParameterStructuredPreset?,
+        _ preset: LLMParameterStructuredPreset?,
         value: JSONValue,
         providerExtras: inout [String: JSONValue],
         to body: inout [String: JSONValue]

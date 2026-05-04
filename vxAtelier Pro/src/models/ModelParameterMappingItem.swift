@@ -34,13 +34,13 @@ final class ModelParameterMappingItem {
         }
     }
 
-    var encodingKind: ModelParameterEncodingKind {
-        get { ModelParameterEncodingKind(rawValue: encodingKindRaw) ?? .scalarKey }
+    var encodingKind: LLMParameterEncodingKind {
+        get { LLMParameterEncodingKind(rawValue: encodingKindRaw) ?? .scalarKey }
         set { encodingKindRaw = newValue.rawValue }
     }
 
-    var structuredPreset: ModelParameterStructuredPreset? {
-        get { structuredPresetRaw.flatMap(ModelParameterStructuredPreset.init(rawValue:)) }
+    var structuredPreset: LLMParameterStructuredPreset? {
+        get { structuredPresetRaw.flatMap(LLMParameterStructuredPreset.init(rawValue:)) }
         set { structuredPresetRaw = newValue?.rawValue }
     }
 
@@ -76,9 +76,9 @@ final class ModelParameterMappingItem {
         semanticParameterID: LLMParameterID,
         isEnabled: Bool = true,
         isRequired: Bool = false,
-        encodingKind: ModelParameterEncodingKind = .scalarKey,
+        encodingKind: LLMParameterEncodingKind = .scalarKey,
         wireKey: String = "",
-        structuredPreset: ModelParameterStructuredPreset? = nil,
+        structuredPreset: LLMParameterStructuredPreset? = nil,
         defaultValue: JSONValue? = nil,
         isCustomized: Bool = false
     ) {
