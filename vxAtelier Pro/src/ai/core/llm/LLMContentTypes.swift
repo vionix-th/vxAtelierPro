@@ -1,6 +1,8 @@
 import Foundation
 
+/// Provider-neutral content fragment carried by an LLM message.
 struct LLMContentPart: Codable, Equatable, Identifiable {
+    /// Semantic content kind before provider-specific request encoding.
     enum Kind: String, Codable {
         case text
         case image
@@ -34,6 +36,7 @@ struct LLMContentPart: Codable, Equatable, Identifiable {
     }
 }
 
+/// Provider-neutral chat message, including optional assistant tool calls or tool results.
 struct LLMMessage: Codable, Equatable, Identifiable {
     var id: UUID
     var role: String

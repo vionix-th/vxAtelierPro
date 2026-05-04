@@ -1,5 +1,6 @@
 import Foundation
 
+/// Stable identifier for a supported LLM provider profile.
 enum LLMProviderID: String, Codable, CaseIterable, Identifiable {
     case openAIPlatform
     case openAIChatGPTSubscription
@@ -28,6 +29,7 @@ enum LLMProviderID: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// Provider API family used to choose request encoding and parsing.
 enum LLMEndpointFamily: String, Codable, CaseIterable, Identifiable {
     case chatCompletions
     case responses
@@ -46,6 +48,7 @@ enum LLMEndpointFamily: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// Authentication scheme required by a provider profile or override.
 enum LLMAuthKind: String, Codable, CaseIterable {
     case none
     case bearerToken
@@ -56,6 +59,7 @@ enum LLMAuthKind: String, Codable, CaseIterable {
     case chatGPTCodexToken
 }
 
+/// Static provider capabilities and defaults used before model-specific overrides.
 struct LLMProviderProfile: Codable, Identifiable, Equatable {
     var id: LLMProviderID
     var name: String

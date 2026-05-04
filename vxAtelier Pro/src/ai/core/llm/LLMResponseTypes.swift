@@ -1,5 +1,6 @@
 import Foundation
 
+/// Lifecycle state for a persisted LLM run.
 enum LLMRunStatus: String, Codable, CaseIterable {
     case pending
     case streaming
@@ -9,6 +10,7 @@ enum LLMRunStatus: String, Codable, CaseIterable {
     case cancelled
 }
 
+/// Normalized error surface for provider configuration, transport, and decoding failures.
 enum LLMProviderError: Error, LocalizedError, Equatable {
     case invalidConfiguration(String)
     case invalidURL(String)
@@ -35,6 +37,7 @@ enum LLMProviderError: Error, LocalizedError, Equatable {
     }
 }
 
+/// Token accounting reported by a provider response.
 struct LLMUsage: Codable, Equatable {
     var inputTokens: Int?
     var outputTokens: Int?
@@ -47,6 +50,7 @@ struct LLMUsage: Codable, Equatable {
     }
 }
 
+/// Redacted HTTP/provider metadata captured with an LLM response.
 struct LLMResponseMetadata: Codable, Equatable {
     var statusCode: Int?
     var requestID: String?

@@ -1,10 +1,12 @@
 import Foundation
 
+/// Helpers for converting app tool schemas into provider-neutral LLM request values.
 enum LLMRequestEncoding {
     static func jsonObject(_ object: [String: JSONValue]) -> JSONValue {
         .object(object)
     }
 
+    /// Builds the JSON-schema-like parameter object shared by provider adapters.
     static func toolSchema(from tool: AITool) -> JSONValue {
         let properties = Dictionary(uniqueKeysWithValues: tool.parameters.properties.map { name, property in
             var body: [String: JSONValue] = [
@@ -26,6 +28,7 @@ enum LLMRequestEncoding {
         return .object(schema)
     }
 
+    /// Converts an app tool into a provider-neutral LLM tool definition.
     static func toolDefinition(from tool: AITool) -> LLMToolDefinition {
         LLMToolDefinition(name: tool.name, description: tool.description, parameters: toolSchema(from: tool))
     }

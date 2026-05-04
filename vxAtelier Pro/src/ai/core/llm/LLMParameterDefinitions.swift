@@ -1,5 +1,6 @@
 import Foundation
 
+/// Semantic generation parameter independent of provider wire keys.
 enum LLMParameterID: String, Codable, CaseIterable, Identifiable {
     case model
     case systemPrompt = "system_prompt"
@@ -24,6 +25,7 @@ enum LLMParameterID: String, Codable, CaseIterable, Identifiable {
     var isProviderMappable: Bool { definition.isProviderMappable }
 }
 
+/// Primitive value class used to render and validate parameter controls.
 public enum LLMParameterValueType: String, Codable {
     case string
     case integer
@@ -31,6 +33,7 @@ public enum LLMParameterValueType: String, Codable {
     case boolean
 }
 
+/// Metadata describing valid values for a semantic generation parameter.
 struct LLMParameterDefinition: Codable, Equatable, Identifiable {
     var id: LLMParameterID
     var valueType: LLMParameterValueType
@@ -56,6 +59,7 @@ struct LLMParameterDefinition: Codable, Equatable, Identifiable {
     }
 }
 
+/// Built-in semantic parameter definitions.
 enum LLMParameterDefinitionCatalog {
     static func definition(for parameterID: LLMParameterID) -> LLMParameterDefinition {
         switch parameterID {

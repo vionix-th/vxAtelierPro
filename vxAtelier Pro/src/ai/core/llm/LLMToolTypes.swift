@@ -1,5 +1,6 @@
 import Foundation
 
+/// Durable execution state for a tool call persisted by the app layer.
 enum LLMToolCallStatus: String, Codable, CaseIterable {
     case readyToExecute
     case executing
@@ -8,6 +9,7 @@ enum LLMToolCallStatus: String, Codable, CaseIterable {
     case cancelled
 }
 
+/// Provider-neutral tool schema exposed to an LLM request.
 struct LLMToolDefinition: Codable, Equatable, Identifiable {
     var id: String { name }
     var name: String
@@ -15,6 +17,7 @@ struct LLMToolDefinition: Codable, Equatable, Identifiable {
     var parameters: JSONValue
 }
 
+/// Provider-neutral function/tool call emitted by an LLM provider.
 struct LLMToolCall: Codable, Equatable, Identifiable {
     var id: String
     var callID: String?

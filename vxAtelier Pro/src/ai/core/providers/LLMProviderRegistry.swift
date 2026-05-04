@@ -1,5 +1,6 @@
 import Foundation
 
+/// Registry of built-in provider profiles and their adapter implementations.
 struct LLMProviderRegistry {
     static let shared = LLMProviderRegistry()
 
@@ -101,10 +102,12 @@ struct LLMProviderRegistry {
         self.profiles = Dictionary(uniqueKeysWithValues: allProfiles.map { ($0.id, $0) })
     }
 
+    /// Returns the profile for a provider, falling back to the custom compatible profile.
     func profile(for id: LLMProviderID) -> LLMProviderProfile {
         profiles[id] ?? profiles[.customOpenAICompatible]!
     }
 
+    /// Creates an adapter appropriate for the provider profile.
     func adapter(for id: LLMProviderID) -> LLMProviderAdapter {
         let profile = profile(for: id)
         guard profile.isEnabled else {
@@ -126,6 +129,7 @@ struct LLMProviderRegistry {
         }
     }
 
+    /// Infers a provider identifier from user- or import-supplied provider text.
     static func providerID(fromProviderName providerName: String) -> LLMProviderID {
         let probe = providerName.lowercased()
         if probe.contains("anthropic") || probe.contains("claude") { return .anthropic }

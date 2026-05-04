@@ -1,6 +1,8 @@
 import Foundation
 
+/// Decodes provider model-list payloads into normalized model descriptors.
 enum LLMModelMetadataDecoder {
+    /// Maps OpenAI-compatible model objects using the supplied profile defaults.
     static func openAICompatibleDescriptors(
         from data: [JSONValue],
         profile: LLMProviderProfile,
@@ -22,6 +24,7 @@ enum LLMModelMetadataDecoder {
         }
     }
 
+    /// Maps Anthropic model objects using Anthropic endpoint capabilities.
     static func anthropicDescriptors(
         from data: [JSONValue],
         profile: LLMProviderProfile
@@ -42,6 +45,7 @@ enum LLMModelMetadataDecoder {
         }
     }
 
+    /// Re-encodes raw provider metadata for diagnostics and persistence.
     static func rawJSONString(from value: JSONValue) -> String? {
         guard let data = try? JSONEncoder().encode(value) else { return nil }
         return String(data: data, encoding: .utf8)

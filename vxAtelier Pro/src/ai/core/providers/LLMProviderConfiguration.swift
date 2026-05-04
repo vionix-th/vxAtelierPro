@@ -1,10 +1,12 @@
 import Foundation
 
+/// Provider credential material after app-layer configuration is resolved.
 enum LLMProviderCredential: Codable, Equatable {
     case none
     case secret(String)
 }
 
+/// Runtime provider transport settings used by adapters and HTTP clients.
 struct LLMProviderConfiguration: Codable, Equatable {
     var providerID: LLMProviderID
     var authKind: LLMAuthKind?
@@ -46,6 +48,7 @@ struct LLMProviderConfiguration: Codable, Equatable {
     }
 }
 
+/// Builds protocol headers from provider auth kind and runtime credentials.
 enum LLMProviderHeaderResolver {
     static func headers(for configuration: LLMProviderConfiguration) -> [String: String] {
         let profile = LLMProviderRegistry.shared.profile(for: configuration.providerID)

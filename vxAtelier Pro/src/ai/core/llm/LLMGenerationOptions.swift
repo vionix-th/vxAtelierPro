@@ -1,18 +1,22 @@
 import Foundation
 
+/// Provider-neutral generation controls resolved from conversation and model settings.
 struct LLMGenerationOptions: Codable, Equatable {
+    /// Requested structure for assistant text output.
     enum ResponseFormat: String, Codable, CaseIterable {
         case text
         case jsonObject
         case jsonSchema
     }
 
+    /// Caller preference for streamed versus complete responses.
     enum StreamMode: String, Codable, CaseIterable {
         case disabled
         case enabled
         case auto
     }
 
+    /// Retry behavior allowed before the run reaches tool execution.
     enum RetryPolicy: String, Codable, CaseIterable {
         case disabled
         case oneRetryBeforeTools

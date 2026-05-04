@@ -1,6 +1,8 @@
 import Foundation
 
+/// Validates a resolved LLM request against provider and model capabilities.
 struct LLMCapabilityValidator {
+    /// Performs preflight checks before a run is persisted or sent to a provider.
     static func validate(_ request: LLMRequest, profile: LLMProviderProfile) throws {
         guard profile.isEnabled else {
             throw LLMProviderError.authUnavailable("\(profile.name) is disabled.")
@@ -12,6 +14,7 @@ struct LLMCapabilityValidator {
         try validateToolReplay(request)
     }
 
+    /// Resolves `.auto` streaming behavior and rejects unsupported forced streaming.
     static func resolveStreamEnabled(for request: LLMRequest, profile: LLMProviderProfile) throws -> Bool {
         let supportsStreaming = hasSchemaFeature(.streaming, request: request, profile: profile)
         switch request.options.streamMode {

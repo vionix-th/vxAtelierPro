@@ -1,5 +1,6 @@
 import Foundation
 
+/// Input/output capability advertised by a provider or model.
 enum LLMModality: String, Codable, CaseIterable {
     case text
     case image
@@ -10,6 +11,7 @@ enum LLMModality: String, Codable, CaseIterable {
     case reasoning
 }
 
+/// Structured-output and runtime feature advertised by a provider or model.
 enum LLMSchemaFeature: String, Codable, CaseIterable {
     case tools
     case strictTools
@@ -20,6 +22,7 @@ enum LLMSchemaFeature: String, Codable, CaseIterable {
     case streaming
 }
 
+/// Provider-neutral model metadata used for validation and UI materialization.
 struct LLMModelDescriptor: Codable, Equatable, Identifiable {
     var id: String
     var displayName: String

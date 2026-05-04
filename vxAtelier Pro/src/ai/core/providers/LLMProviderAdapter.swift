@@ -1,5 +1,6 @@
 import Foundation
 
+/// Controls whether a stream may complete by EOF or needs an explicit provider event.
 struct LLMStreamCompletionPolicy {
     var requiresExplicitCompletionEvent: Bool
     var didComplete: ([String: JSONValue]) -> Bool
@@ -30,10 +31,14 @@ struct LLMStreamCompletionPolicy {
 protocol LLMProviderAdapter {
     var profile: LLMProviderProfile { get }
 
+    /// Sends a request and emits normalized events regardless of provider wire format.
     func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration) -> AsyncThrowingStream<LLMStreamEvent, Error>
+
+    /// Fetches provider model metadata and maps it into normalized descriptors.
     func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor]
 }
 
+/// Adapter used for configured providers that are intentionally unavailable.
 struct DisabledLLMProviderAdapter: LLMProviderAdapter {
     let profile: LLMProviderProfile
     let message: String

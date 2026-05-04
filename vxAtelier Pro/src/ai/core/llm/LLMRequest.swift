@@ -1,5 +1,6 @@
 import Foundation
 
+/// Fully resolved provider-neutral request ready for validation and adapter encoding.
 struct LLMRequest: Codable, Equatable {
     var providerID: LLMProviderID
     var endpointFamily: LLMEndpointFamily
@@ -28,6 +29,7 @@ struct LLMRequest: Codable, Equatable {
     }
 }
 
+/// Provider-neutral events emitted by adapters for streamed and complete responses.
 enum LLMStreamEvent: Equatable {
     case runStarted(requestID: String?)
     case responseMetadata(LLMResponseMetadata)

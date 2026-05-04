@@ -1,5 +1,6 @@
 import Foundation
 
+/// Encoding strategy for a semantic parameter in a provider request body.
 enum LLMParameterEncodingKind: String, Codable, CaseIterable, Identifiable {
     case scalarKey
     case structuredPreset
@@ -16,6 +17,7 @@ enum LLMParameterEncodingKind: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// Known structured encodings that cannot be represented by a scalar wire key.
 enum LLMParameterStructuredPreset: String, Codable, CaseIterable, Identifiable {
     case openAIChatResponseFormat
     case openAIResponsesTextFormat
@@ -32,6 +34,7 @@ enum LLMParameterStructuredPreset: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// Mapping from one semantic parameter to one provider endpoint encoding.
 struct LLMParameterMappingDescriptor: Codable, Equatable, Identifiable {
     var id: String { "\(endpointFamily.rawValue):\(semanticParameterID.rawValue)" }
     var endpointFamily: LLMEndpointFamily
@@ -64,7 +67,9 @@ struct LLMParameterMappingDescriptor: Codable, Equatable, Identifiable {
     }
 }
 
+/// Built-in parameter mappings for supported provider endpoint families.
 enum LLMParameterMappingCatalog {
+    /// Returns default mappings for a provider, endpoint family, and model.
     static func defaults(
         providerID: LLMProviderID,
         endpointFamily: LLMEndpointFamily,
@@ -156,7 +161,9 @@ enum LLMParameterMappingCatalog {
     }
 }
 
+/// Resolves model-specific mappings with built-in defaults as the fallback.
 struct LLMParameterMappingResolver {
+    /// Returns active mappings keyed by semantic parameter.
     static func resolve(
         providerID: LLMProviderID,
         endpointFamily: LLMEndpointFamily,
@@ -171,7 +178,9 @@ struct LLMParameterMappingResolver {
     }
 }
 
+/// Encodes scalar semantic parameters into a provider request body.
 enum LLMParameterRequestEncoder {
+    /// Applies only scalar-key mappings; structured presets are adapter-specific.
     static func applyScalarOptions(
         _ options: LLMGenerationOptions,
         to body: inout [String: JSONValue],

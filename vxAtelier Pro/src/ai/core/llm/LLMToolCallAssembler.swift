@@ -1,9 +1,11 @@
 import Foundation
 
+/// Merges streaming tool-call fragments into stable calls by provider index.
 struct LLMToolCallAssembler {
     private var callsByIndex: [Int: LLMToolCall] = [:]
     private var indexByID: [String: Int] = [:]
 
+    /// Incorporates a provider delta and returns the current assembled call.
     mutating func merge(_ delta: LLMToolCall) -> LLMToolCall {
         let resolvedIndex: Int
         if let existingIndex = indexByID[delta.id] {
