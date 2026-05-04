@@ -145,6 +145,7 @@ class LoggingService: ObservableObject {
     
     func clearHistory() {
         messageHistory = []
+        log("History cleaned", type: .notice)
     }
     
     enum LogType: String {

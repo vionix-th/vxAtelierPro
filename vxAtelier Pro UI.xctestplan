@@ -1,8 +1,8 @@
 {
   "configurations" : [
     {
-      "id" : "BE9F2F3A-F661-4BE6-B642-AABEC779D894",
-      "name" : "Test Scheme Action",
+      "id" : "4F2A26D2-E369-49D1-B1D9-63AA9FF6733E",
+      "name" : "UI",
       "options" : {
         "uiTestingScreenshotsLifetime" : "deleteOnSuccess"
       }
@@ -17,11 +17,11 @@
   },
   "testTargets" : [
     {
-      "parallelizable" : true,
+      "parallelizable" : false,
       "target" : {
         "containerPath" : "container:vxAtelier Pro.xcodeproj",
-        "identifier" : "74516F652D33EA1500731EDB",
-        "name" : "vxAtelier ProTests"
+        "identifier" : "74516F6F2D33EA1500731EDB",
+        "name" : "vxAtelier ProUITests"
       }
     }
   ],

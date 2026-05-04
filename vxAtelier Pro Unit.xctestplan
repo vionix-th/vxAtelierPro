@@ -1,0 +1,42 @@
+{
+  "configurations" : [
+    {
+      "id" : "BE9F2F3A-F661-4BE6-B642-AABEC779D894",
+      "name" : "Unit",
+      "options" : {
+        "uiTestingScreenshotsLifetime" : "deleteOnSuccess"
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:vxAtelier Pro.xcodeproj",
+      "identifier" : "74516F522D33EA1300731EDB",
+      "name" : "vxAtelier Pro"
+    }
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "skippedTests" : [
+        "ConversationItemScaleIntegrationTests/testFetchDescriptorLimitAndSortHandlesLargeConversationSet",
+        "ConversationItemScaleIntegrationTests/testPersistsLargeConversationSetWithTurns",
+        "LLMProviderLiveSmokeTests/testAnthropicMessagesLiveSmoke",
+        "LLMProviderLiveSmokeTests/testCustomOpenAICompatibleChatCompletionsLiveSmoke",
+        "LLMProviderLiveSmokeTests/testDeepSeekChatCompletionsLiveSmoke",
+        "LLMProviderLiveSmokeTests/testLMStudioChatCompletionsLiveSmoke",
+        "LLMProviderLiveSmokeTests/testOllamaChatCompletionsLiveSmoke",
+        "LLMProviderLiveSmokeTests/testOpenAIChatCompletionsLiveSmoke",
+        "LLMProviderLiveSmokeTests/testOpenAIResponsesLiveSmoke",
+        "LLMProviderLiveSmokeTests/testOpenRouterChatCompletionsLiveSmoke",
+        "LLMProviderLiveSmokeTests/testXAIChatCompletionsLiveSmoke"
+      ],
+      "target" : {
+        "containerPath" : "container:vxAtelier Pro.xcodeproj",
+        "identifier" : "74516F652D33EA1500731EDB",
+        "name" : "vxAtelier ProTests"
+      }
+    }
+  ],
+  "version" : 1
+}

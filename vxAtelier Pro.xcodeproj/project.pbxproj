@@ -42,7 +42,10 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		742675CA2E3995090084FBF2 /* vxAtelier Pro.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = "vxAtelier Pro.xctestplan"; sourceTree = "<group>"; };
+		742675CA2E3995090084FBF2 /* vxAtelier Pro Unit.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = "vxAtelier Pro Unit.xctestplan"; sourceTree = "<group>"; };
+		742675CB2E3995090084FBF2 /* vxAtelier Pro Integration.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = "vxAtelier Pro Integration.xctestplan"; sourceTree = "<group>"; };
+		742675CC2E3995090084FBF2 /* vxAtelier Pro LiveProviders.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = "vxAtelier Pro LiveProviders.xctestplan"; sourceTree = "<group>"; };
+		742675CD2E3995090084FBF2 /* vxAtelier Pro UI.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = "vxAtelier Pro UI.xctestplan"; sourceTree = "<group>"; };
 		742F1A712E4D4D49001A10CC /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk/System/Library/Frameworks/AVFoundation.framework; sourceTree = DEVELOPER_DIR; };
 		74516F532D33EA1300731EDB /* vxAtelier Pro-debug.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "vxAtelier Pro-debug.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		74516F662D33EA1500731EDB /* vxAtelier ProTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "vxAtelier ProTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -130,7 +133,10 @@
 		74516F4A2D33EA1300731EDB = {
 			isa = PBXGroup;
 			children = (
-				742675CA2E3995090084FBF2 /* vxAtelier Pro.xctestplan */,
+				742675CA2E3995090084FBF2 /* vxAtelier Pro Unit.xctestplan */,
+				742675CB2E3995090084FBF2 /* vxAtelier Pro Integration.xctestplan */,
+				742675CC2E3995090084FBF2 /* vxAtelier Pro LiveProviders.xctestplan */,
+				742675CD2E3995090084FBF2 /* vxAtelier Pro UI.xctestplan */,
 				745A79502D5DDBEE00E0921D /* .gitignore */,
 				74516F552D33EA1300731EDB /* vxAtelier Pro */,
 				74516F692D33EA1500731EDB /* vxAtelier ProTests */,

@@ -30,8 +30,17 @@
       shouldUseLaunchSchemeArgsEnv = "YES">
       <TestPlans>
          <TestPlanReference
-            reference = "container:vxAtelier Pro.xctestplan"
+            reference = "container:vxAtelier Pro Unit.xctestplan"
             default = "YES">
+         </TestPlanReference>
+         <TestPlanReference
+            reference = "container:vxAtelier Pro Integration.xctestplan">
+         </TestPlanReference>
+         <TestPlanReference
+            reference = "container:vxAtelier Pro LiveProviders.xctestplan">
+         </TestPlanReference>
+         <TestPlanReference
+            reference = "container:vxAtelier Pro UI.xctestplan">
          </TestPlanReference>
       </TestPlans>
       <Testables>
