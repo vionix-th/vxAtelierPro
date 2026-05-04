@@ -15,6 +15,8 @@ struct ModelSelectionView: View {
     
     /// The current API configuration to filter models by
     let apiConfiguration: APIConfigurationItem?
+
+    var fallbackModels: [ModelItem]? = nil
     
     /// Toggle to show all models or just those from the current provider
     @State private var showAllModels = false
@@ -28,10 +30,13 @@ struct ModelSelectionView: View {
     /// Filtered models based on current provider, showAllModels setting, and search text
     private var filteredModels: [ModelItem] {
         var models = allModels
-        
+
         if let apiConfiguration {
             if !showAllModels {
                 models = models.filter { $0.apiConfiguration?.id == apiConfiguration.id }
+                if models.isEmpty, let fallback = fallbackModels {
+                    models = fallback
+                }
             }
         } else if !showAllModels {
             models = models.filter { $0.apiConfiguration == nil }

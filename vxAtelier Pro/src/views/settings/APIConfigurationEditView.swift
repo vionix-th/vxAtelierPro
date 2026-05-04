@@ -40,6 +40,9 @@ struct APIConfigurationEditView: View {
     @State private var isModelPickerPresented = false
     @State private var hasUserEditedDefaultModel = false
     @State private var isValidating = false
+    @State private var isFetchingModels = false
+    @State private var modelFetchError: String?
+    @State private var fetchedFallbackModels: [ModelItem]?
 
     // MARK: - Initialization
 
@@ -127,11 +130,18 @@ struct APIConfigurationEditView: View {
                                         hasUserEditedDefaultModel = true
                                     }
                                 Button {
-                                    isModelPickerPresented = true
+                                    Task { await fetchModelsAndOpenPicker() }
                                 } label: {
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.secondary)
+                                    if isFetchingModels {
+                                        ProgressView()
+                                            .scaleEffect(0.8)
+                                            .frame(width: 20, height: 20)
+                                    } else {
+                                        Image(systemName: "chevron.right")
+                                            .foregroundColor(.secondary)
+                                    }
                                 }
+                                .disabled(isFetchingModels)
                             }
                             .padding(.vertical, 8)
                             .padding(.horizontal, 12)
@@ -144,7 +154,8 @@ struct APIConfigurationEditView: View {
                                         defaultModel = model
                                         hasUserEditedDefaultModel = true
                                     },
-                                    apiConfiguration: configuration
+                                    apiConfiguration: configuration,
+                                    fallbackModels: fetchedFallbackModels
                                 )
                             }
                             Text(
@@ -316,6 +327,16 @@ struct APIConfigurationEditView: View {
         } message: {
             Text(validationErrorMessage)
         }
+        .alert("Model Fetch Error", isPresented: .init(
+            get: { modelFetchError != nil },
+            set: { if !$0 { modelFetchError = nil } }
+        )) {
+            Button("OK") { modelFetchError = nil }
+        } message: {
+            if let error = modelFetchError {
+                Text(error)
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button {
@@ -345,6 +366,8 @@ struct APIConfigurationEditView: View {
             if !profile.supportedEndpointFamilies.contains(defaultEndpointFamily) {
                 defaultEndpointFamily = profile.defaultEndpointFamily
             }
+            fetchedFallbackModels = nil
+            modelFetchError = nil
         }
         .onAppear {
             if !currentProfile.supportedEndpointFamilies.contains(defaultEndpointFamily) {
@@ -478,6 +501,48 @@ struct APIConfigurationEditView: View {
             vxAtelierPro.log.error(
                 "🔑 Failed to save configuration \(configToSave.name): \(error.localizedDescription)"
             )
+        }
+    }
+
+    private func fetchModelsAndOpenPicker() async {
+        guard !baseURL.isEmpty, baseURL.hasPrefix("http") else {
+            isModelPickerPresented = true
+            return
+        }
+
+        let existingModels = queryManager.models(for: configuration)
+        if !existingModels.isEmpty {
+            isModelPickerPresented = true
+            return
+        }
+
+        isFetchingModels = true
+        defer { isFetchingModels = false }
+
+        let profile = LLMProviderRegistry.shared.profile(for: providerID)
+        let adapter = LLMProviderRegistry.shared.adapter(for: providerID)
+        let tempConfig = APIConfigurationItem(
+            name: "_temp",
+            apiKey: apiKey,
+            baseURL: baseURL,
+            isDefault: false,
+            providerID: providerID
+        )
+        let providerConfig = tempConfig.llmProviderConfiguration(profile: profile)
+
+        do {
+            let descriptors = try await adapter.fetchModels(configuration: providerConfig)
+            if descriptors.isEmpty {
+                fetchedFallbackModels = []
+            } else {
+                fetchedFallbackModels = descriptors.map {
+                    ModelItem(descriptor: $0, apiConfiguration: configuration)
+                }
+            }
+            isModelPickerPresented = true
+        } catch {
+            modelFetchError = "Failed to fetch models: \(error.localizedDescription)"
+            vxAtelierPro.log.error("🔑 Model fetch failed for '\(name)': \(error.localizedDescription)")
         }
     }
 
