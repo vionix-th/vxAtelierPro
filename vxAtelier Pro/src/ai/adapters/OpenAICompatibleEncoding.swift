@@ -56,13 +56,13 @@ enum OpenAICompatibleEncoding {
     static func applyMappedOptions(
         _ options: LLMGenerationOptions,
         to body: inout [String: JSONValue],
-        mappings: [LLMApplicationParameterID: LLMParameterMappingDescriptor]
+        mappings: [LLMParameterID: LLMParameterMappingDescriptor]
     ) throws {
         var providerExtras = options.providerExtras
         for mapping in mappings.values where mapping.isEnabled {
             guard let value = options.jsonValue(for: mapping.semanticParameterID) ?? mapping.defaultValue else {
                 if mapping.isRequired {
-                    throw LLMProviderError.unsupportedParameter("\(mapping.semanticParameterID.displayName) is required.")
+                    throw LLMProviderError.unsupportedParameter("\(mapping.semanticParameterID.rawValue) is required.")
                 }
                 continue
             }
@@ -70,7 +70,7 @@ enum OpenAICompatibleEncoding {
             switch mapping.encodingKind {
             case .scalarKey:
                 guard !mapping.wireKey.isEmpty else {
-                    throw LLMProviderError.unsupportedParameter("\(mapping.semanticParameterID.displayName) has no wire key.")
+                    throw LLMProviderError.unsupportedParameter("\(mapping.semanticParameterID.rawValue) has no wire key.")
                 }
                 body[mapping.wireKey] = value
             case .structuredPreset:

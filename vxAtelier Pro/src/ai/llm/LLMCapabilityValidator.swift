@@ -80,7 +80,7 @@ struct LLMCapabilityValidator {
         }
         for mapping in mappings.values where mapping.isEnabled && mapping.isRequired {
             if request.options.jsonValue(for: mapping.semanticParameterID) == nil && mapping.defaultValue == nil {
-                throw LLMProviderError.unsupportedParameter("\(mapping.semanticParameterID.displayName) is required for \(request.modelID).")
+                throw LLMProviderError.unsupportedParameter("\(mapping.semanticParameterID.rawValue) is required for \(request.modelID).")
             }
         }
     }
@@ -159,13 +159,13 @@ struct LLMCapabilityValidator {
     }
 
     private static func requireMapping(
-        _ parameterID: LLMApplicationParameterID,
-        mappings: [LLMApplicationParameterID: LLMParameterMappingDescriptor],
+        _ parameterID: LLMParameterID,
+        mappings: [LLMParameterID: LLMParameterMappingDescriptor],
         request: LLMRequest,
         profile: LLMProviderProfile
     ) throws {
         guard let mapping = mappings[parameterID], mapping.isEnabled, mapping.encodingKind != .disabled else {
-            throw LLMProviderError.unsupportedParameter("\(profile.name) does not support \(parameterID.displayName) for \(request.modelID).")
+            throw LLMProviderError.unsupportedParameter("\(profile.name) does not support \(parameterID.rawValue) for \(request.modelID).")
         }
     }
 

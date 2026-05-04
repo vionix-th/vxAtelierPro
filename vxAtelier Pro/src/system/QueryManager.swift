@@ -483,12 +483,12 @@ final class QueryManager {
                 }) {
                     existing.descriptor = fetchedModel
                     existing.apiConfiguration = config
-                    LLMParameterMappingCatalog.materializeDefaults(on: existing, preserveCustomized: true)
+                    existing.materializeDefaultParameterMappings(preserveCustomized: true)
                     updated += 1
                     vxAtelierPro.log.debug("Overwrote model: \(fetchedModel.id)")
                 } else {
                     let modelItem = ModelItem(descriptor: fetchedModel, apiConfiguration: config)
-                    LLMParameterMappingCatalog.materializeDefaults(on: modelItem, preserveCustomized: true)
+                    modelItem.materializeDefaultParameterMappings(preserveCustomized: true)
                     modelContext.insert(modelItem)
                     added += 1
                     vxAtelierPro.log.debug("Added new model: \(fetchedModel.id)")

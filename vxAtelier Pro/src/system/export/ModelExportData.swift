@@ -62,7 +62,7 @@ struct ModelExportData: Codable {
         model.schemaFeaturesRaw = schemaFeatures ?? []
         model.rawMetadataJSON = rawMetadataJSON
         model.parameterMappings = parameterMappings?.map { $0.toDataItem() } ?? []
-        LLMParameterMappingCatalog.materializeDefaults(on: model, preserveCustomized: true)
+        model.materializeDefaultParameterMappings(preserveCustomized: true)
         return model
     }
 }
@@ -109,7 +109,7 @@ struct ModelParameterMappingExportData: Codable {
     func toDataItem() -> ModelParameterMappingItem {
         let mapping = ModelParameterMappingItem(
             endpointFamily: LLMEndpointFamily(rawValue: endpointFamilyRaw) ?? .chatCompletions,
-            semanticParameterID: LLMApplicationParameterID(rawValue: semanticParameterID) ?? .maxOutputTokens,
+            semanticParameterID: LLMParameterID(rawValue: semanticParameterID) ?? .maxOutputTokens,
             isEnabled: isEnabled,
             isRequired: isRequired,
             encodingKind: ModelParameterEncodingKind(rawValue: encodingKindRaw) ?? .scalarKey,

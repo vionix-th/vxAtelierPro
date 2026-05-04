@@ -40,7 +40,7 @@ struct ParameterValueExportData: Codable {
     }
     
     func toParameter() -> AiRequestArgument {
-        let valueType = AiArgumentValueType(rawValue: self.valueType) ?? .string
+        let valueType = LLMParameterValueType(rawValue: self.valueType) ?? .string
         let controlType = AiArgumentControlType(rawValue: self.controlType) ?? .textField
         
         let param = AiRequestArgument(

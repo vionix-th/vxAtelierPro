@@ -3,23 +3,6 @@ import SwiftData
 import SwiftUI
 import Observation
 
-/// Represents the possible types of argument values for AI request parameters
-public enum AiArgumentValueType: String, Codable {
-    case string
-    case integer
-    case float
-    case boolean
-}
-
-/// Defines the possible UI control types for editing parameters
-public enum AiArgumentControlType: String, Codable {
-    case textField
-    case stepper
-    case slider
-    case toggle
-    case picker
-}
-
 /// Represents a parameter for AI service requests with its metadata.
 ///
 /// This model provides a flexible way to define, validate, and store parameters
@@ -84,7 +67,7 @@ public final class AiRequestArgument: ObservableObject {
         displayName: String,
         description: String = "",
         required: Bool = false,
-        valueType: AiArgumentValueType,
+        valueType: LLMParameterValueType,
         controlType: AiArgumentControlType,
         minValue: Double? = nil,
         maxValue: Double? = nil,
@@ -129,7 +112,7 @@ public final class AiRequestArgument: ObservableObject {
     public var value: Any? {
         guard isEnabled, let valueData = valueData else { return nil }
 
-        let type = AiArgumentValueType(rawValue: self.valueType) ?? .string
+        let type = LLMParameterValueType(rawValue: self.valueType) ?? .string
 
         switch type {
         case .string:
@@ -160,7 +143,7 @@ public final class AiRequestArgument: ObservableObject {
 
     var jsonValue: JSONValue? {
         guard isEnabled else { return nil }
-        let type = AiArgumentValueType(rawValue: self.valueType) ?? .string
+        let type = LLMParameterValueType(rawValue: self.valueType) ?? .string
         switch type {
         case .string:
             return stringValue.map { .string($0) }
@@ -188,7 +171,7 @@ public final class AiRequestArgument: ObservableObject {
             return
         }
 
-        let type = AiArgumentValueType(rawValue: self.valueType) ?? .string
+        let type = LLMParameterValueType(rawValue: self.valueType) ?? .string
 
         do {
             switch type {
@@ -216,7 +199,7 @@ public final class AiRequestArgument: ObservableObject {
             return
         }
 
-        let type = AiArgumentValueType(rawValue: self.valueType) ?? .string
+        let type = LLMParameterValueType(rawValue: self.valueType) ?? .string
         switch type {
         case .string:
             setValue(value.stringValue ?? "")
@@ -260,7 +243,7 @@ public final class AiRequestArgument: ObservableObject {
             displayName: self.displayName,
             description: self.paramDescription,
             required: self.required,
-            valueType: AiArgumentValueType(rawValue: self.valueType) ?? .string,
+            valueType: LLMParameterValueType(rawValue: self.valueType) ?? .string,
             controlType: AiArgumentControlType(rawValue: self.controlType) ?? .textField,
             minValue: self.minValue,
             maxValue: self.maxValue,

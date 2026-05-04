@@ -45,10 +45,10 @@ struct ModelEditorView: View {
         apiConfigurations.first { $0.persistentModelID == selectedConfigurationID }
     }
 
-    private var addableParameterIDs: [LLMApplicationParameterID] {
+    private var addableParameterIDs: [LLMParameterID] {
         let existing = Set(selectedEndpointMappings.map(\.semanticParameterIDEnum))
-        return LLMApplicationParameterID.allCases
-            .filter { $0.isEditableMappingParameter && !existing.contains($0) }
+        return LLMParameterID.allCases
+            .filter { $0.isProviderMappable && !existing.contains($0) }
     }
     
     var body: some View {
@@ -171,7 +171,7 @@ struct ModelEditorView: View {
 
                         HStack {
                             Button {
-                                LLMParameterMappingCatalog.resetDefaults(on: model, endpointFamily: selectedEndpointFamily)
+                                model.resetDefaultParameterMappings(endpointFamily: selectedEndpointFamily)
                             } label: {
                                 Label("Reset Endpoint Defaults", systemImage: "arrow.counterclockwise")
                             }
@@ -179,7 +179,7 @@ struct ModelEditorView: View {
 
                             Menu {
                                 ForEach(addableParameterIDs) { parameterID in
-                                    Button(parameterID.displayName) {
+                                    Button(AiParameterPresentationCatalog.displayName(for: parameterID)) {
                                         addMapping(parameterID)
                                     }
                                 }
@@ -246,7 +246,7 @@ struct ModelEditorView: View {
                 if selectedConfigurationID == nil {
                     selectedConfigurationID = model.apiConfiguration?.persistentModelID ?? apiConfigurations.first?.persistentModelID
                 }
-                LLMParameterMappingCatalog.materializeDefaults(on: model, preserveCustomized: true)
+                model.materializeDefaultParameterMappings(preserveCustomized: true)
                 if !endpointFamilies.contains(where: { $0.rawValue == selectedEndpointFamilyRaw }) {
                     selectedEndpointFamilyRaw = endpointFamilies.first?.rawValue ?? LLMEndpointFamily.chatCompletions.rawValue
                 }
@@ -264,7 +264,7 @@ struct ModelEditorView: View {
         model.providerID = selectedConfiguration.providerID
         model.contextSize = contextSize
         model.capabilities = capabilities
-        LLMParameterMappingCatalog.materializeDefaults(on: model, preserveCustomized: true)
+        model.materializeDefaultParameterMappings(preserveCustomized: true)
         
         do {
             if model.modelContext == nil {
@@ -293,7 +293,7 @@ struct ModelEditorView: View {
         }
     }
 
-    private func addMapping(_ parameterID: LLMApplicationParameterID) {
+    private func addMapping(_ parameterID: LLMParameterID) {
         let mapping = ModelParameterMappingItem(
             endpointFamily: selectedEndpointFamily,
             semanticParameterID: parameterID,

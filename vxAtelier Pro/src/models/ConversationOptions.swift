@@ -283,8 +283,11 @@ final class ConversationOptions: Equatable {
             modelID: modelID,
             modelContext: modelContext
         )
-        for mapping in mappings.values.sorted(by: { $0.semanticParameterID.displayName < $1.semanticParameterID.displayName }) {
-            guard mapping.isEnabled, mapping.semanticParameterID.isEditableMappingParameter else { continue }
+        for mapping in mappings.values.sorted(by: {
+            AiParameterPresentationCatalog.displayName(for: $0.semanticParameterID)
+                < AiParameterPresentationCatalog.displayName(for: $1.semanticParameterID)
+        }) {
+            guard mapping.isEnabled, mapping.semanticParameterID.isProviderMappable else { continue }
             let value = existingValue(for: mapping.semanticParameterID, existingValues: existingValues)
                 ?? fallbackJSONValue(for: mapping.semanticParameterID)
                 ?? mapping.defaultValue
@@ -299,21 +302,22 @@ final class ConversationOptions: Equatable {
     }
 
     private func appendSemanticParameter(
-        _ parameterID: LLMApplicationParameterID,
+        _ parameterID: LLMParameterID,
         required: Bool = false,
         value: JSONValue?,
         existingValues: [String: (value: JSONValue?, isEnabled: Bool)]
     ) {
+        let presentation = AiParameterPresentationCatalog.presentation(for: parameterID)
         let parameter = AiRequestArgument(
             name: parameterID.rawValue,
-            displayName: parameterID.displayName,
-            description: parameterID.parameterDescription,
+            displayName: presentation.displayName,
+            description: presentation.description,
             required: required,
             valueType: parameterID.valueType,
-            controlType: parameterID.controlType,
+            controlType: presentation.controlType,
             minValue: parameterID.minValue,
             maxValue: parameterID.maxValue,
-            step: parameterID.step,
+            step: presentation.step,
             options: parameterID.options
         )
         let existing = existingValues[parameterID.rawValue]
@@ -331,7 +335,7 @@ final class ConversationOptions: Equatable {
         displayName: String,
         description: String,
         required: Bool = false,
-        valueType: AiArgumentValueType,
+        valueType: LLMParameterValueType,
         controlType: AiArgumentControlType,
         minValue: Double? = nil,
         maxValue: Double? = nil,
@@ -411,25 +415,25 @@ final class ConversationOptions: Equatable {
         if parameterExists(.serviceTier) { serviceTier = stringParameterValue(.serviceTier) }
     }
 
-    private func parameter(_ parameterID: LLMApplicationParameterID) -> AiRequestArgument? {
+    private func parameter(_ parameterID: LLMParameterID) -> AiRequestArgument? {
         parameters.first { $0.name == parameterID.rawValue }
     }
 
-    private func parameterExists(_ parameterID: LLMApplicationParameterID) -> Bool {
+    private func parameterExists(_ parameterID: LLMParameterID) -> Bool {
         parameter(parameterID) != nil
     }
 
-    private func stringParameterValue(_ parameterID: LLMApplicationParameterID) -> String? {
+    private func stringParameterValue(_ parameterID: LLMParameterID) -> String? {
         guard let parameter = parameter(parameterID) else { return nil }
         return parameter.stringValue
     }
 
-    private func integerParameterValue(_ parameterID: LLMApplicationParameterID, fallback: Int?) -> Int? {
+    private func integerParameterValue(_ parameterID: LLMParameterID, fallback: Int?) -> Int? {
         guard let parameter = parameter(parameterID) else { return fallback }
         return parameter.intValue
     }
 
-    private func doubleParameterValue(_ parameterID: LLMApplicationParameterID, fallback: Double?) -> Double? {
+    private func doubleParameterValue(_ parameterID: LLMParameterID, fallback: Double?) -> Double? {
         guard let parameter = parameter(parameterID) else { return fallback }
         return parameter.floatValue
     }
@@ -454,7 +458,7 @@ final class ConversationOptions: Equatable {
     }
 
     private func existingValue(
-        for parameterID: LLMApplicationParameterID,
+        for parameterID: LLMParameterID,
         existingValues: [String: (value: JSONValue?, isEnabled: Bool)]
     ) -> JSONValue? {
         guard let existing = existingValues[parameterID.rawValue] else { return nil }
@@ -462,13 +466,13 @@ final class ConversationOptions: Equatable {
     }
 
     private func existingStringValue(
-        for parameterID: LLMApplicationParameterID,
+        for parameterID: LLMParameterID,
         existingValues: [String: (value: JSONValue?, isEnabled: Bool)]
     ) -> String? {
         existingValue(for: parameterID, existingValues: existingValues)?.stringValue
     }
 
-    private func fallbackJSONValue(for parameterID: LLMApplicationParameterID) -> JSONValue? {
+    private func fallbackJSONValue(for parameterID: LLMParameterID) -> JSONValue? {
         switch parameterID {
         case .model:
             return modelOverride.map { .string($0) }
@@ -497,7 +501,7 @@ final class ConversationOptions: Equatable {
         endpointFamily: LLMEndpointFamily,
         modelID: String,
         modelContext: ModelContext?
-    ) -> [LLMApplicationParameterID: LLMParameterMappingDescriptor] {
+    ) -> [LLMParameterID: LLMParameterMappingDescriptor] {
         let descriptor: LLMModelDescriptor?
         if let modelContext,
            let models = try? modelContext.fetch(FetchDescriptor<ModelItem>()),
@@ -505,7 +509,7 @@ final class ConversationOptions: Equatable {
                $0.modelID == modelID
                    && $0.apiConfiguration?.id == apiConfiguration.id
            }) {
-            LLMParameterMappingCatalog.materializeDefaults(on: model, preserveCustomized: true)
+            model.materializeDefaultParameterMappings(preserveCustomized: true)
             descriptor = model.descriptor
         } else {
             descriptor = nil
@@ -531,7 +535,7 @@ final class ConversationOptions: Equatable {
             if l.name != r.name { return false }
             
             // Compare values based on parameter type
-            let type = AiArgumentValueType(rawValue: l.valueType) ?? .string
+            let type = LLMParameterValueType(rawValue: l.valueType) ?? .string
             switch type {
             case .string:
                 if l.stringValue != r.stringValue { return false }

@@ -54,6 +54,7 @@
 		74D79F682D6FAE49006A061F /* Exceptions for "vxAtelier Pro" folder in "vxAtelier Pro" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				src/ai/AGENTS.md,
 				src/ai/README.md,
 			);
 			target = 74516F522D33EA1300731EDB /* vxAtelier Pro */;

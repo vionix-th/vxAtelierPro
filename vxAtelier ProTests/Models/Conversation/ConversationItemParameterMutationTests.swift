@@ -85,7 +85,7 @@ final class ConversationItemParameterMutationTests: XCTestCase {
         XCTAssertEqual(boolParam.boolValue, boolValue)
         let boolParam2 = conversation.options.parameters.first { $0.name == boolParamName }!
         XCTAssertEqual(boolParam2.boolValue, boolValue)
-        XCTAssertEqual(stringParam.valueType, AiArgumentValueType.string.rawValue)
+        XCTAssertEqual(stringParam.valueType, LLMParameterValueType.string.rawValue)
         XCTAssertEqual(stringParam.controlType, AiArgumentControlType.textField.rawValue)
         XCTAssertEqual(stringParam.displayName, "Test String")
         XCTAssertEqual(stringParam.paramDescription, "A test string parameter")

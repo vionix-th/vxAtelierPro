@@ -1,115 +1,5 @@
 import Foundation
 
-enum LLMApplicationParameterID: String, Codable, CaseIterable, Identifiable {
-    case model
-    case systemPrompt = "system_prompt"
-    case maxOutputTokens = "max_output_tokens"
-    case temperature
-    case topP = "top_p"
-    case stopSequences = "stop_sequences"
-    case responseFormat = "response_format"
-    case reasoningEffort = "reasoning_effort"
-    case serviceTier = "service_tier"
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .model: return "Model"
-        case .systemPrompt: return "System Prompt"
-        case .maxOutputTokens: return "Max Output Tokens"
-        case .temperature: return "Temperature"
-        case .topP: return "Top P"
-        case .stopSequences: return "Stop Sequences"
-        case .responseFormat: return "Response Format"
-        case .reasoningEffort: return "Reasoning Effort"
-        case .serviceTier: return "Service Tier"
-        }
-    }
-
-    var parameterDescription: String {
-        switch self {
-        case .model: return "Model identifier used for this conversation"
-        case .systemPrompt: return "Instructions for the assistant"
-        case .maxOutputTokens: return "Maximum number of generated tokens"
-        case .temperature: return "Sampling temperature"
-        case .topP: return "Nucleus sampling probability"
-        case .stopSequences: return "Stop sequences, one per line"
-        case .responseFormat: return "Generated response format"
-        case .reasoningEffort: return "Reasoning effort control"
-        case .serviceTier: return "Provider service tier"
-        }
-    }
-
-    var valueType: AiArgumentValueType {
-        switch self {
-        case .maxOutputTokens:
-            return .integer
-        case .temperature, .topP:
-            return .float
-        case .model, .systemPrompt, .stopSequences, .responseFormat, .reasoningEffort, .serviceTier:
-            return .string
-        }
-    }
-
-    var controlType: AiArgumentControlType {
-        switch self {
-        case .maxOutputTokens:
-            return .stepper
-        case .temperature, .topP:
-            return .slider
-        case .responseFormat:
-            return .picker
-        case .model, .systemPrompt, .stopSequences, .reasoningEffort, .serviceTier:
-            return .textField
-        }
-    }
-
-    var minValue: Double? {
-        switch self {
-        case .maxOutputTokens: return 1
-        case .temperature, .topP: return 0
-        default: return nil
-        }
-    }
-
-    var maxValue: Double? {
-        switch self {
-        case .maxOutputTokens: return 200_000
-        case .temperature: return 2
-        case .topP: return 1
-        default: return nil
-        }
-    }
-
-    var step: Double? {
-        switch self {
-        case .maxOutputTokens: return 1
-        case .temperature: return 0.1
-        case .topP: return 0.05
-        default: return nil
-        }
-    }
-
-    var options: [String]? {
-        switch self {
-        case .responseFormat:
-            return ["text", "json_object", "json_schema"]
-        default:
-            return nil
-        }
-    }
-
-    var isEditableMappingParameter: Bool {
-        switch self {
-        case .model, .systemPrompt:
-            return false
-        default:
-            return true
-        }
-    }
-}
-
 enum ModelParameterEncodingKind: String, Codable, CaseIterable, Identifiable {
     case scalarKey
     case structuredPreset
@@ -145,7 +35,7 @@ enum ModelParameterStructuredPreset: String, Codable, CaseIterable, Identifiable
 struct LLMParameterMappingDescriptor: Codable, Equatable, Identifiable {
     var id: String { "\(endpointFamily.rawValue):\(semanticParameterID.rawValue)" }
     var endpointFamily: LLMEndpointFamily
-    var semanticParameterID: LLMApplicationParameterID
+    var semanticParameterID: LLMParameterID
     var isEnabled: Bool
     var isRequired: Bool
     var encodingKind: ModelParameterEncodingKind
@@ -155,7 +45,7 @@ struct LLMParameterMappingDescriptor: Codable, Equatable, Identifiable {
 
     init(
         endpointFamily: LLMEndpointFamily,
-        semanticParameterID: LLMApplicationParameterID,
+        semanticParameterID: LLMParameterID,
         isEnabled: Bool = true,
         isRequired: Bool = false,
         encodingKind: ModelParameterEncodingKind = .scalarKey,
@@ -197,47 +87,6 @@ enum LLMParameterMappingCatalog {
             return anthropicMessagesDefaults()
         case .models:
             return []
-        }
-    }
-
-    static func materializeDefaults(on model: ModelItem, preserveCustomized: Bool = true) {
-        let providerID = LLMProviderID(rawValue: model.providerID) ?? .customOpenAICompatible
-        let endpointFamilies = model.endpointFamiliesRaw.compactMap { LLMEndpointFamily(rawValue: $0) }.filter { $0 != .models }
-        for endpointFamily in endpointFamilies {
-            materializeDefaults(on: model, endpointFamily: endpointFamily, providerID: providerID, preserveCustomized: preserveCustomized)
-        }
-    }
-
-    static func resetDefaults(on model: ModelItem, endpointFamily: LLMEndpointFamily) {
-        let providerID = LLMProviderID(rawValue: model.providerID) ?? .customOpenAICompatible
-        materializeDefaults(on: model, endpointFamily: endpointFamily, providerID: providerID, preserveCustomized: false)
-    }
-
-    private static func materializeDefaults(
-        on model: ModelItem,
-        endpointFamily: LLMEndpointFamily,
-        providerID: LLMProviderID,
-        preserveCustomized: Bool
-    ) {
-        let defaults = defaults(providerID: providerID, endpointFamily: endpointFamily, modelID: model.modelID)
-        for descriptor in defaults {
-            if let existing = model.parameterMappings.first(where: {
-                $0.endpointFamilyEnum == endpointFamily && $0.semanticParameterIDEnum == descriptor.semanticParameterID
-            }) {
-                if preserveCustomized && existing.isCustomized {
-                    continue
-                }
-                existing.apply(descriptor, markCustomized: false)
-            } else {
-                model.parameterMappings.append(ModelParameterMappingItem(descriptor: descriptor))
-            }
-        }
-
-        if !preserveCustomized {
-            let defaultIDs = Set(defaults.map(\.semanticParameterID))
-            model.parameterMappings.removeAll { mapping in
-                mapping.endpointFamilyEnum == endpointFamily && !defaultIDs.contains(mapping.semanticParameterIDEnum)
-            }
         }
     }
 
@@ -313,7 +162,7 @@ struct LLMParameterMappingResolver {
         endpointFamily: LLMEndpointFamily,
         modelID: String,
         modelDescriptor: LLMModelDescriptor?
-    ) -> [LLMApplicationParameterID: LLMParameterMappingDescriptor] {
+    ) -> [LLMParameterID: LLMParameterMappingDescriptor] {
         let persisted = modelDescriptor?.parameterMappings.filter { $0.endpointFamily == endpointFamily } ?? []
         let source = persisted.isEmpty
             ? LLMParameterMappingCatalog.defaults(providerID: providerID, endpointFamily: endpointFamily, modelID: modelID)
@@ -326,18 +175,18 @@ enum LLMParameterRequestEncoder {
     static func applyScalarOptions(
         _ options: LLMGenerationOptions,
         to body: inout [String: JSONValue],
-        mappings: [LLMApplicationParameterID: LLMParameterMappingDescriptor]
+        mappings: [LLMParameterID: LLMParameterMappingDescriptor]
     ) throws {
         for mapping in mappings.values where mapping.isEnabled {
             guard mapping.encodingKind == .scalarKey else { continue }
             guard let value = options.jsonValue(for: mapping.semanticParameterID) ?? mapping.defaultValue else {
                 if mapping.isRequired {
-                    throw LLMProviderError.unsupportedParameter("\(mapping.semanticParameterID.displayName) is required.")
+                    throw LLMProviderError.unsupportedParameter("\(mapping.semanticParameterID.rawValue) is required.")
                 }
                 continue
             }
             guard !mapping.wireKey.isEmpty else {
-                throw LLMProviderError.unsupportedParameter("\(mapping.semanticParameterID.displayName) has no wire key.")
+                throw LLMProviderError.unsupportedParameter("\(mapping.semanticParameterID.rawValue) has no wire key.")
             }
             body[mapping.wireKey] = value
         }
@@ -345,7 +194,7 @@ enum LLMParameterRequestEncoder {
 }
 
 extension LLMGenerationOptions {
-    func jsonValue(for parameterID: LLMApplicationParameterID) -> JSONValue? {
+    func jsonValue(for parameterID: LLMParameterID) -> JSONValue? {
         switch parameterID {
         case .model:
             return modelID.map { .string($0) }

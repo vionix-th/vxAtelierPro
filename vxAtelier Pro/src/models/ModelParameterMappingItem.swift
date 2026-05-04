@@ -26,8 +26,8 @@ final class ModelParameterMappingItem {
         set { endpointFamilyRaw = newValue.rawValue }
     }
 
-    var semanticParameterIDEnum: LLMApplicationParameterID {
-        get { LLMApplicationParameterID(rawValue: semanticParameterID) ?? .maxOutputTokens }
+    var semanticParameterIDEnum: LLMParameterID {
+        get { LLMParameterID(rawValue: semanticParameterID) ?? .maxOutputTokens }
         set {
             semanticParameterID = newValue.rawValue
             applyMetadata(from: newValue)
@@ -73,7 +73,7 @@ final class ModelParameterMappingItem {
 
     init(
         endpointFamily: LLMEndpointFamily,
-        semanticParameterID: LLMApplicationParameterID,
+        semanticParameterID: LLMParameterID,
         isEnabled: Bool = true,
         isRequired: Bool = false,
         encodingKind: ModelParameterEncodingKind = .scalarKey,
@@ -89,13 +89,14 @@ final class ModelParameterMappingItem {
         self.encodingKindRaw = encodingKind.rawValue
         self.wireKey = wireKey
         self.structuredPresetRaw = structuredPreset?.rawValue
-        self.displayName = semanticParameterID.displayName
-        self.paramDescription = semanticParameterID.parameterDescription
+        let presentation = AiParameterPresentationCatalog.presentation(for: semanticParameterID)
+        self.displayName = presentation.displayName
+        self.paramDescription = presentation.description
         self.valueType = semanticParameterID.valueType.rawValue
-        self.controlType = semanticParameterID.controlType.rawValue
+        self.controlType = presentation.controlType.rawValue
         self.minValue = semanticParameterID.minValue
         self.maxValue = semanticParameterID.maxValue
-        self.step = semanticParameterID.step
+        self.step = presentation.step
         self.options = semanticParameterID.options
         if let defaultValue {
             self.defaultValueData = try? JSONEncoder().encode(defaultValue)
@@ -135,14 +136,15 @@ final class ModelParameterMappingItem {
         isCustomized = true
     }
 
-    private func applyMetadata(from parameterID: LLMApplicationParameterID) {
-        displayName = parameterID.displayName
-        paramDescription = parameterID.parameterDescription
+    private func applyMetadata(from parameterID: LLMParameterID) {
+        let presentation = AiParameterPresentationCatalog.presentation(for: parameterID)
+        displayName = presentation.displayName
+        paramDescription = presentation.description
         valueType = parameterID.valueType.rawValue
-        controlType = parameterID.controlType.rawValue
+        controlType = presentation.controlType.rawValue
         minValue = parameterID.minValue
         maxValue = parameterID.maxValue
-        step = parameterID.step
+        step = presentation.step
         options = parameterID.options
     }
 }

@@ -82,9 +82,6 @@ struct LLMConversationRequestBuilder {
                 && model.apiConfiguration?.id == apiConfiguration.id
                 && (LLMProviderID(rawValue: model.providerID) ?? .customOpenAICompatible) == providerID
         }
-        if let model {
-            LLMParameterMappingCatalog.materializeDefaults(on: model, preserveCustomized: true)
-        }
         return model?.descriptor
     }
 }

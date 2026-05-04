@@ -459,7 +459,7 @@ struct ParameterControlView: View {
 
     var body: some View {
         let controlType = AiArgumentControlType(rawValue: parameter.controlType) ?? .textField
-        let valueType = AiArgumentValueType(rawValue: parameter.valueType) ?? .string
+        let valueType = LLMParameterValueType(rawValue: parameter.valueType) ?? .string
 
         HStack(spacing: AppDefaults.paddingMedium) {
             Text(parameter.displayName)
@@ -509,7 +509,7 @@ struct ParameterControlView: View {
     // MARK: - Control Builders
     
     @ViewBuilder
-    private func textFieldControl(for valueType: AiArgumentValueType) -> some View {
+    private func textFieldControl(for valueType: LLMParameterValueType) -> some View {
         switch valueType {
         case .string:
             if parameter.name == "model" {
@@ -580,7 +580,7 @@ struct ParameterControlView: View {
     }
 
     @ViewBuilder
-    private func stepperControl(for valueType: AiArgumentValueType) -> some View {
+    private func stepperControl(for valueType: LLMParameterValueType) -> some View {
         switch valueType {
         case .integer:
             let minVal = Double(parameter.minValue ?? 0)
@@ -621,7 +621,7 @@ struct ParameterControlView: View {
     }
 
     @ViewBuilder
-    private func sliderControl(for valueType: AiArgumentValueType) -> some View {
+    private func sliderControl(for valueType: LLMParameterValueType) -> some View {
         switch valueType {
         case .integer:
             let minVal = Double(parameter.minValue ?? 0)
@@ -673,7 +673,7 @@ struct ParameterControlView: View {
     }
 
     @ViewBuilder
-    private func pickerControl(for valueType: AiArgumentValueType) -> some View {
+    private func pickerControl(for valueType: LLMParameterValueType) -> some View {
         if let options = parameter.options, !options.isEmpty {
             switch valueType {
             case .string:

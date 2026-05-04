@@ -33,6 +33,7 @@ let package = Package(
                       "tts/README.md"],
             sources: [
                 "ai/llm/LLMTypes.swift",
+                "ai/llm/LLMParameterDefinitions.swift",
                 "ai/llm/LLMParameterMapping.swift",
                 "ai/llm/LLMCapabilityValidator.swift",
                 "ai/llm/LLMToolCallAssembler.swift",
@@ -65,6 +66,7 @@ let package = Package(
                 "system/ConversationDraftStore.swift",
                 // Models
                 "models/AiRequestArgument.swift",
+                "models/AiParameterPresentation.swift",
                 "models/APIConfigurationItem.swift",
                 "models/BookmarkItem.swift",
                 "models/ConversationItem.swift",
@@ -78,6 +80,7 @@ let package = Package(
                 "models/ResponseRunItem.swift",
                 "models/ModelItem.swift",
                 "models/ModelParameterMappingItem.swift",
+                "models/ModelParameterMappingMaterialization.swift",
                 "models/ProjectItem.swift",
                 "models/PromptTemplate.swift",
                 "models/VoiceConfigurationItem.swift",

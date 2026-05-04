@@ -68,7 +68,7 @@ final class ModelItem {
             schemaFeaturesRaw = newValue.schemaFeatures.map(\.rawValue)
             rawMetadataJSON = newValue.rawMetadataJSON
             capabilities = Self.capabilities(from: newValue)
-            LLMParameterMappingCatalog.materializeDefaults(on: self, preserveCustomized: true)
+            self.materializeDefaultParameterMappings(preserveCustomized: true)
         }
     }
 
@@ -103,7 +103,7 @@ final class ModelItem {
 
         // Use the centralized utility method instead of our own implementation
         self.capabilities = ModelProviderUtils.inferCapabilities(from: name)
-        LLMParameterMappingCatalog.materializeDefaults(on: self, preserveCustomized: true)
+        self.materializeDefaultParameterMappings(preserveCustomized: true)
     }
 
     /// Checks if the model has a specific capability.
