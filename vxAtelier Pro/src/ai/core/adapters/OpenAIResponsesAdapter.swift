@@ -2,18 +2,13 @@ import Foundation
 
 struct OpenAIResponsesAdapter: LLMProviderAdapter {
     let profile: LLMProviderProfile
-    private let chatFallback: OpenAIChatAdapter
     private let httpClient = LLMHTTPClient()
 
     init(profile: LLMProviderProfile) {
         self.profile = profile
-        self.chatFallback = OpenAIChatAdapter(profile: profile)
     }
 
     func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration) -> AsyncThrowingStream<LLMStreamEvent, Error> {
-        if request.endpointFamily == .chatCompletions {
-            return chatFallback.stream(request, configuration: configuration)
-        }
         let endpoint = configuration.endpointPath(for: .responses) ?? profile.endpointPaths[.responses] ?? "/v1/responses"
         return LLMAdapterRunLoop.stream(
             request: request,
@@ -37,7 +32,8 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
     }
 
     func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
-        try await chatFallback.fetchModels(configuration: configuration).map { descriptor in
+        let chatFallback = OpenAIChatAdapter(profile: profile)
+        return try await chatFallback.fetchModels(configuration: configuration).map { descriptor in
             var copy = descriptor
             copy.endpointFamilies = [.responses, .chatCompletions]
             copy.schemaFeatures = profile.schemaFeatures
