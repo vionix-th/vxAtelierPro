@@ -12,7 +12,7 @@ This document provides an in-depth technical reference of the **vxAtelier Pro** 
 3. [Build Targets & Tooling](#build-targets--tooling)
 4. [Data Flow & Persistence](#data-flow--persistence)
 5. [Key Modules](#key-modules)
-   1. [AI Services (`ai/`)](#ai-services)
+   1. [LLM API And Runtime](#llm-api-and-runtime)
    2. [Models (`models/`)](#models)
    3. [System Layer (`system/`)](#system-layer)
    4. [Text-to-Speech (`tts/`)](#text-to-speech)
@@ -57,9 +57,8 @@ The application is entirely Swift-based and uses **SwiftData** for persistence a
 ## Directory Structure
 ```text
 src/
-├─ ai/              # AI core plus app-integrated AI runtime
-│  ├─ core/         # Provider-neutral LLM domain, adapters, providers, transport
-│  └─ app/          # SwiftData-aware conversation runtime and concrete tools
+├─ llm_api/         # Reusable LLM protocol, providers, adapters, transport, tool framework
+├─ llm_runtime/     # SwiftData-aware LLM run orchestration and concrete tools
 ├─ models/          # Core SwiftData models
 ├─ search/          # Web search provider integration
 ├─ system/          # Persistence, defaults, logging, permissions
@@ -109,18 +108,19 @@ Xcode compile-time diagnostics are authoritative. SPM compile-time diagnostics m
 ---
 
 ## Key Modules
-### AI Providers
-Location: `src/ai/`
+### LLM API And Runtime
+Locations: `src/llm_api/`, `src/llm_runtime/`
 
-The AI module is split into reusable core and app-integrated runtime. Conversation execution builds an `LLMRequest`, materializes `APIConfigurationItem` into pure `LLMProviderConfiguration`, lets core provider transport resolve provider-specific authentication headers, sends the request through a provider adapter, streams or collects `LLMStreamEvent` values into a `ConversationDraftStore`, then persists stable `MessageItem`, `ToolCallItem`, and `ResponseRunItem` records.
+The LLM subsystem is split by reuse boundary. `llm_api` contains the reusable provider and tool API surface. `llm_runtime` contains vxAtelier-specific run orchestration, SwiftData persistence, draft state, and concrete tools. Runtime code builds an `LLMRequest`, materializes `APIConfigurationItem` into pure `LLMProviderConfiguration`, lets provider transport resolve authentication headers, sends the request through a provider adapter, streams or collects `LLMStreamEvent` values through a draft sink, then persists stable `MessageItem`, `ToolCallItem`, and `ResponseRunItem` records.
 
-*   **Core LLM Types (`ai/core/llm/`)**: Defines `LLMRequest`, `LLMMessage`, `LLMContentPart`, `LLMToolDefinition`, `LLMToolCall`, `LLMGenerationOptions`, `LLMStreamEvent`, `LLMUsage`, and `LLMProviderError`.
-*   **Providers (`ai/core/providers/`)**: Owns `LLMProviderID`, `LLMProviderConfiguration`, profiles for supported providers, adapter selection, and model metadata decoding.
-*   **Transport (`NetworkClient.swift`, `ai/core/transport/`)**: `NetworkClient` owns shared JSON/SSE transport; `LLMHTTPClient` is the AI-facing facade for provider-specific header resolution, redacted diagnostics, HTTP status mapping, and normalized provider errors.
-*   **Adapters (`ai/core/adapters/`)**: `OpenAIResponsesAdapter`, `OpenAIChatAdapter`, and `AnthropicMessagesAdapter` map provider-specific request/stream formats into domain events. `LLMAdapterRunLoop` owns the shared streamed/non-streamed HTTP flow.
-*   **Conversation Runs (`ai/app/conversation/`)**: `LLMConversationRequestBuilder`, `LLMRunCollector`, `LLMToolExecutionCoordinator`, `LLMPersistenceCoordinator`, and `LLMConversationExecutor` split request assembly, draft/event collection, sequential tool execution, SwiftData save boundaries, and turn orchestration.
+*   **LLM Protocol Files (`llm_api/LLM*`)**: Define `LLMRequest`, `LLMMessage`, `LLMContentPart`, `LLMToolDefinition`, `LLMToolCall`, `LLMGenerationOptions`, `LLMStreamEvent`, `LLMUsage`, `LLMProviderError`, validation, request encoding, and parameter mapping.
+*   **Provider Files (`llm_api/LLMProvider*`, `llm_api/LLMModelMetadataDecoder.swift`)**: Own `LLMProviderID`, `LLMProviderConfiguration`, profiles for supported providers, adapter selection, and model metadata decoding.
+*   **Transport Files (`llm_api/LLMHTTPClient.swift`, `llm_api/LLMSecretRedactor.swift`)**: `NetworkClient` owns shared JSON/SSE transport; `LLMHTTPClient` is the LLM-facing facade for provider-specific header resolution, redacted diagnostics, HTTP status mapping, and normalized provider errors.
+*   **Adapter Files (`llm_api/OpenAI*`, `llm_api/Anthropic*`, `llm_api/LLMAdapterRunLoop.swift`)**: Map provider-specific request/stream formats into domain events. `LLMAdapterRunLoop` owns the shared streamed/non-streamed HTTP flow.
+*   **Tool Framework Files (`llm_api/LLMTool*`, `llm_api/ConfigurableLLMTool.swift`)**: Reusable tool schemas, configuration protocol, catalog interface, and registry.
+*   **Runtime Files (`llm_runtime/Conversation*`, `llm_runtime/ProviderRunExecutor.swift`, `llm_runtime/ToolBatchExecutor.swift`, `llm_runtime/LLMRequestFactory.swift`)**: Split request assembly, draft/event collection, sequential tool execution, SwiftData save boundaries, and turn orchestration.
+*   **Concrete Tool Files (`llm_runtime/*Tool.swift`, `llm_runtime/ConversationTools.swift`, `llm_runtime/ShortcutTools.swift`)**: vxAtelier-specific tools for conversations, settings, shortcuts, web search, and website reading.
 *   **Provider & Capability Utilities (`models/ModelProviderUtils.swift`)**: Provides app-side model-name capability inference for persisted `ModelItem` records and UI filtering.
-*   **Tools (`ai/core/tools/`, `ai/app/tools/`)**: Pure tool schemas live in core; executable protocols, registry, and concrete app tools live in app runtime.
 
 ### Search (`search/`)
 
@@ -171,7 +171,7 @@ There is no cached read model; invalidation and refresh are handled by SwiftData
 These components manage draft state for in-flight provider responses.
 
 *   **Conversation Draft Store (`ConversationDraftStore.swift`)**: An `@Observable` store keyed by conversation ID. It holds accumulating text, active/run status, tool calls, and error text for the current draft.
-*   **Conversation Executor (`LLMConversationExecutor.swift`)**: Consumes `LLMStreamEvent` values, updates the draft store, persists final assistant/tool messages at stable boundaries, and records response-run status.
+*   **Conversation Completion Use Case (`ConversationCompletionUseCase.swift`)**: Coordinates conversation completion phases while `ConversationRunStore` owns SwiftData mutations and `ProviderRunExecutor` consumes provider events.
 
 ### Utilities
 
@@ -366,10 +366,10 @@ This SwiftData `@Model` is the universal container for any piece of communicatio
 
 #### Conversation (`ConversationItem.swift`)
 
-This is a central and sophisticated SwiftData `@Model` that represents a single conversation thread and contains the core business logic for all AI interactions.
+This SwiftData `@Model` represents a single conversation thread and stores the persisted structure for AI interactions.
 
 *   **Hierarchical Structure**: The dialogue is organized into an array of `ConversationTurn` objects. Each turn groups a user's message with all subsequent assistant responses and tool events, creating a structured, chronological record.
-*   **Execution Entry Point**: The `complete(_:draftStore:)` method delegates provider execution to `LLMConversationExecutor`.
+*   **Execution Boundary**: Conversation completion is initiated by `ConversationCompletionUseCase`; the model does not own provider orchestration.
 *   **Relationships**: It holds critical relationships to its child `ConversationTurn` and `ConversationOptions` objects (cascade delete) and an optional parent `ProjectItem` (nullify).
 *   **Features**: Includes a `fork(...)` method to create a deep copy of the conversation at any point.
 
@@ -448,7 +448,7 @@ This `enum` defines the available UI themes for the application (`system`, `ligh
 
 #### Tool Call Assembler (`LLMToolCallAssembler.swift`)
 
-The `LLMToolCallAssembler` struct lives in `ai/core/llm/`. It provides the core logic for reconstructing streamed tool-call deltas into complete tool calls.
+The `LLMToolCallAssembler` struct lives in `llm_api/`. It provides the core logic for reconstructing streamed tool-call deltas into complete tool calls.
 
 *   **Delta Merging**: `merge(...)` reassembles fragmented tool-call arguments by provider index and call ID.
 *   **Stable Ordering**: `assembled` returns calls sorted by provider index for deterministic tool execution.
@@ -513,7 +513,7 @@ This is a comprehensive, cross-platform `@ObservableObject` that provides a cent
 The application's in-flight provider response system is built around `ConversationDraftStore` and the execution layer.
 
 *   **Conversation Draft Store (`ConversationDraftStore.swift`)**: SwiftUI views observe draft text, tool calls, run status, and errors per conversation ID.
-*   **Conversation Executor (`LLMConversationExecutor.swift`)**: Orchestrates provider events, draft state, response-run persistence, and sequential tool execution through the execution helpers.
+*   **Conversation Completion Use Case (`ConversationCompletionUseCase.swift`)**: Orchestrates provider events, draft state, response-run persistence, and sequential tool execution through application-domain helpers.
 *   **`PermissionManager.swift`**: An `@ObservableObject` that centralizes all logic for checking and requesting user permissions for protected system services (e.g., Photos, Microphone, Camera, Contacts). It provides a unified interface for the UI to query permission status and trigger requests.
 *   **`JsonSerializer.swift`**: A utility class containing static methods to serialize individual SwiftData models to JSON and deserialize them back into the application. It works with the DTOs in `system/export` and is a key part of the single-item import/export functionality.
 *   **`AppDefaults.swift`**: An `Observable` struct that bridges `UserDefaults` with the application's default settings, providing a clean interface for managing user preferences.
@@ -608,8 +608,8 @@ This is a reusable SwiftUI component that renders a single message bubble in the
 
 This view is the dedicated component for composing and sending messages.
 
-*   **Message Sending Logic**: Its `sendMessage(to:)` method orchestrates the entire process of sending a message. This includes auto-naming new conversations, expanding variables, and calling the `ConversationItem.complete(...)` method to initiate the AI request.
-*   **Streaming Integration**: It passes the `streamingState` object to the model layer and disables itself while a response is actively streaming in, preventing concurrent requests.
+*   **Message Sending Logic**: Its view model orchestrates user-facing send behavior. This includes auto-naming new conversations, expanding variables, and calling `ConversationCompletionUseCase` to initiate the AI request.
+*   **Streaming Integration**: It passes `ConversationDraftStore` to the completion use case and disables itself while a response is actively streaming in, preventing concurrent requests.
 *   **Feature Integration**: It integrates key functionalities like a `PhotosPicker` for image attachments (for vision models) and a button to present a sheet of reusable prompt templates.
 
 ##### Conversation Settings (`ConversationOptionsView.swift`)
@@ -617,7 +617,7 @@ This view is the dedicated component for composing and sending messages.
 This view, typically presented as a sheet, allows the user to configure conversation-specific settings. This includes overriding the project's default system prompt and adjusting AI parameters like temperature and token limits for the current conversation only.
 
 *   **Tab-Based Organization**: It uses a `TabView` to organize settings into four distinct categories: Parameters, Tools, System Prompt, and Appearance.
-*   **Dynamic UI**: The interface is highly dynamic. The "Parameters" tab renders a specific set of controls based on the selected API configuration, and the "Tools" tab lists all tools currently available in the `AIToolRegistry`, allowing them to be enabled or disabled on a per-conversation basis.
+*   **Dynamic UI**: The interface is highly dynamic. The "Parameters" tab renders a specific set of controls based on the selected API configuration, and the "Tools" tab lists all tools currently available in the `LLMToolRegistry`, allowing them to be enabled or disabled on a per-conversation basis.
 
 ##### BookmarkSheetView (`BookmarkSheetView.swift`)
 
@@ -995,29 +995,29 @@ views/
 
 ## Deep Dive: Protocols & Contracts
 
-### Core AI Layer
+### LLM API Layer
 | Protocol | Purpose | Key Conformers |
 |----------|---------|----------------|
 | `LLMProviderAdapter` | Top-level provider adapter interface for streaming and model fetches. | `OpenAIResponsesAdapter`, `OpenAIChatAdapter`, `AnthropicMessagesAdapter` |
-| `LLMRequest` / `LLMMessage` / `LLMStreamEvent` | Provider-neutral request, message, and streaming event types. | Core LLM structs under `src/ai/core/llm` |
+| `LLMRequest` / `LLMMessage` / `LLMStreamEvent` | Provider-neutral request, message, and streaming event types. | LLM protocol structs under `src/llm_api` |
 | `LLMProviderProfile` | Provider capabilities, auth kind, endpoint families, defaults, and feature flags. | Profiles in `LLMProviderRegistry` |
 | `NetworkClient` / `LLMHTTPClient` | Shared JSON/SSE transport plus core-owned provider header resolution, metadata redaction, and normalized provider errors. | Used by web search and all LLM adapters |
 | `LLMAdapterRunLoop` | Shared streamed/non-streamed adapter flow and metadata forwarding. | Used by provider adapters |
-| `LLMCapabilityValidator` | Common preflight validation for endpoint, model, parameter, content, and tool replay support. | Used by executor and adapters |
+| `LLMCapabilityValidator` | Common preflight validation for endpoint, model, parameter, content, and tool replay support. | Used by `LLMRequestFactory` and adapters |
 
 ### Tooling Layer
 | Protocol | Purpose |
 |----------|---------|
-| `AITool` / `ExecutableTool` | Defines a tool's identity (`name`, `description`) and its executable logic. |
-| `AIToolParameters` / `AIToolProperty` | Defines the JSON-like schema for a tool's arguments. |
-| `AIToolCall` / `AIToolCallResult` | Represents the AI's request to call a tool and the subsequent result. |
-| `AIToolRegistry` | A singleton that holds a list of all registered tools and can manage tool-specific configurations. |
-| `AIToolHandler` | Processes tool calls. The `DefaultToolHandler` implementation uses the registry to find and execute tools. |
+| `LLMTool` / `ExecutableLLMTool` | Defines a tool's identity (`name`, `description`) and its executable logic. |
+| `LLMToolParameters` / `LLMToolProperty` | Defines the JSON-like schema for a tool's arguments. |
+| `LLMToolCall` / `LLMToolExecutionCall` | Represents the model's request to call a tool and the runtime execution call. |
+| `LLMToolRegistry` | A singleton that holds a list of all registered tools and can manage tool-specific configurations. |
+| `LLMToolCatalog` | Read-only lookup/listing boundary used by conversation orchestration. |
 
 Implementation notes:
-* Concrete tools live under `src/ai/app/tools/` (e.g. conversation tools, `WebSearchTool`).
+* Concrete tools live under `src/llm_runtime/` (e.g. conversation tools, `WebSearchTool`).
 * Each tool defines a `parameters` JSON schema so providers like OpenAI can validate the call.
-* The App’s `registerDefaultTools()` in `vxAtelierPro.App` registers core dialog, settings, search, and shortcut tools during launch.
+* `registerDefaultTools()` in `vxAtelierPro.App` registers dialog, settings, search, and shortcut tools during launch.
 
 ### TTS Pipeline
 * **`TTSQueue`** (`src/tts/TTSSystem.swift`) wraps `AVSpeechSynthesizer` and manages the playback queue, segmenting text and selecting voices per `VoiceConfigurationItem`.

@@ -218,7 +218,7 @@ struct vxAtelierPro: App {
 
     // MARK: - Tool Registration
     private func registerDefaultTools() {
-        let registry = AIToolRegistry.shared
+        let registry = LLMToolRegistry.shared
         let context = sharedModelContainer.mainContext
 
         // Conversation Tools

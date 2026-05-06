@@ -3,6 +3,7 @@ import SwiftUI
 @MainActor
 final class MessageInputViewModel: ObservableObject {
     private let queryManager: QueryManager
+    private let completionUseCase: ConversationCompletionUseCase
     private let resolveConversation: @MainActor () throws -> ConversationItem
     private var sendTask: Task<Void, Never>?
 
@@ -18,12 +19,14 @@ final class MessageInputViewModel: ObservableObject {
 
     init(
         queryManager: QueryManager,
+        completionUseCase: ConversationCompletionUseCase? = nil,
         draftStore: ConversationDraftStore,
         focusOnAppear: Bool,
         resolveConversation: @escaping @MainActor () throws -> ConversationItem,
         didSend: ((ConversationItem) -> Void)? = nil
     ) {
         self.queryManager = queryManager
+        self.completionUseCase = completionUseCase ?? .shared
         self.draftStore = draftStore
         self.resolveConversation = resolveConversation
         self.didSend = didSend
@@ -52,7 +55,11 @@ final class MessageInputViewModel: ObservableObject {
                 autoNameIfNeeded(conversation: conversation, sourceText: textToSend, autoNameConversations: autoNameConversations)
 
                 let expandedMessage = expandVariables(textToSend, conversation: conversation)
-                try await conversation.complete(expandedMessage, draftStore: draftStore)
+                try await completionUseCase.complete(
+                    conversation: conversation,
+                    message: expandedMessage,
+                    draftStore: draftStore
+                )
                 try queryManager.saveContext()
 
                 message = ""
@@ -111,6 +118,7 @@ struct MessageInputView: View {
 
     init(
         queryManager: QueryManager,
+        completionUseCase: ConversationCompletionUseCase? = nil,
         draftStore: ConversationDraftStore,
         contextConversation: ConversationItem? = nil,
         focusInputOnAppear: Bool = vxAtelierPro.macOS,
@@ -121,6 +129,7 @@ struct MessageInputView: View {
         _viewModel = StateObject(
             wrappedValue: MessageInputViewModel(
                 queryManager: queryManager,
+                completionUseCase: completionUseCase,
                 draftStore: draftStore,
                 focusOnAppear: focusInputOnAppear,
                 resolveConversation: resolveConversation,

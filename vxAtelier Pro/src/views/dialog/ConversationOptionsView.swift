@@ -142,7 +142,7 @@ struct ConversationOptionsView: View {
                             // Move Enable/Disable buttons inside
                             HStack {
                                 Button("Enable All Tools") {
-                                    for tool in AIToolRegistry.shared.getTools() {
+                                    for tool in LLMToolRegistry.shared.getTools() {
                                         options.setToolEnabled(tool.name, enabled: true)
                                     }
                                 }
@@ -150,7 +150,7 @@ struct ConversationOptionsView: View {
                                 .padding(.horizontal, AppDefaults.paddingSmall)
 
                                 Button("Disable All Tools") {
-                                    for tool in AIToolRegistry.shared.getTools() {
+                                    for tool in LLMToolRegistry.shared.getTools() {
                                         options.setToolEnabled(tool.name, enabled: false)
                                     }
                                 }
@@ -161,14 +161,14 @@ struct ConversationOptionsView: View {
 
                             // Existing tools list VStack
                             VStack(spacing: 0) {
-                                if AIToolRegistry.shared.getTools().isEmpty {
+                                if LLMToolRegistry.shared.getTools().isEmpty {
                                     Text("No tools available")
                                         .foregroundColor(.gray)
                                         .italic()
                                         .frame(maxWidth: .infinity, alignment: .center)
                                         .padding()
                                 } else {
-                                    ForEach(AIToolRegistry.shared.getTools(), id: \.name) { tool in
+                                    ForEach(LLMToolRegistry.shared.getTools(), id: \.name) { tool in
                                         VStack(spacing: 0) {
                                             HStack {
                                                 VStack(alignment: .leading, spacing: 4) {
@@ -191,7 +191,7 @@ struct ConversationOptionsView: View {
                                             .padding(.vertical, 8)
                                             
                                             if options.isToolEnabled(tool.name) {
-                                                if let configurableTool = tool as? any ConfigurableAITool {
+                                                if let configurableTool = tool as? any ConfigurableLLMTool {
                                                     ToolConfigurationView(
                                                         tool: configurableTool,
                                                         configuration: Binding(
@@ -208,7 +208,7 @@ struct ConversationOptionsView: View {
                                                 }
                                             }
                                             
-                                            if tool.name != AIToolRegistry.shared.getTools().last?.name {
+                                            if tool.name != LLMToolRegistry.shared.getTools().last?.name {
                                                 Divider()
                                             }
                                         }
@@ -733,7 +733,7 @@ struct ParameterControlView: View {
 private struct ToolConfigurationView: View {
     @State private var isConfigurationPresented: Bool = false
     @State private var configText: String = "{}"
-    let tool: any ConfigurableAITool
+    let tool: any ConfigurableLLMTool
     @Binding var configuration: [String: JSONValue]
 
     var body: some View {

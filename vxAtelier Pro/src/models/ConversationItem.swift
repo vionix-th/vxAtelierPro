@@ -197,22 +197,4 @@ final class ConversationItem {
         return count
     }
 
-    /// Sends a message to the AI assistant and handles the response (streaming or not).
-    /// This method:
-    /// 1. Adds the user message to the conversation
-    /// 2. Sends the request to the AI service using the unified streaming API
-    /// 3. Processes the response and any tool calls as they arrive
-    /// 4. Updates the conversation and streaming state with all results
-    ///
-    /// - Parameters:
-    ///   - message: The user message text
-    ///   - draftStore: Observable state object for real-time UI updates
-    @MainActor
-    func complete(_ message: String, draftStore: ConversationDraftStore) async throws {
-        try await LLMConversationExecutor.shared.complete(
-            conversation: self,
-            message: message,
-            draftStore: draftStore
-        )
-    }
 } 

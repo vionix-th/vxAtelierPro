@@ -70,24 +70,76 @@ class LLMTestCase: XCTestCase {
     }
 }
 
-struct UnitEchoTool: ExecutableTool {
+struct UnitEchoTool: ExecutableLLMTool {
     static let toolName = "unit_echo_tool"
 
     let name = UnitEchoTool.toolName
     let description = "Echoes typed tool execution fields for unit tests."
-    var parameters: any AIToolParameters { GenericToolParameters(properties: [:]) }
+    var parameters: any LLMToolParameters { GenericLLMToolParameters(properties: [:]) }
 
-    func execute(_ call: ToolExecutionCall) async throws -> String {
+    func execute(_ call: LLMToolExecutionCall) async throws -> String {
         "id=\(call.id) name=\(call.name) args=\(call.argumentsJSON) config=\(call.configuration.count) title=\(call.context.conversation.title) turn=\(call.context.turn.sequenceNumber)"
     }
 }
 
-struct UnitSchemaOnlyTool: AITool {
+struct UnitSchemaOnlyTool: LLMTool {
     static let toolName = "unit_schema_only_tool"
 
     let name = UnitSchemaOnlyTool.toolName
     let description = "Schema-only unit test tool."
-    var parameters: any AIToolParameters { GenericToolParameters(properties: [:]) }
+    var parameters: any LLMToolParameters { GenericLLMToolParameters(properties: [:]) }
+}
+
+struct StaticLLMToolCatalog: LLMToolCatalog {
+    private let toolsByName: [String: LLMTool]
+
+    init(_ tools: [LLMTool]) {
+        self.toolsByName = Dictionary(uniqueKeysWithValues: tools.map { ($0.name, $0) })
+    }
+
+    func allTools() -> [LLMTool] {
+        Array(toolsByName.values)
+    }
+
+    func tool(named name: String) -> LLMTool? {
+        toolsByName[name]
+    }
+}
+
+@MainActor
+final class RecordingDraftSink: ConversationDraftSink {
+    private(set) var text = ""
+    private(set) var toolCalls: [LLMToolCall] = []
+    private(set) var startCount = 0
+    private(set) var resetCount = 0
+    private(set) var completed = false
+    private(set) var failedError: Error?
+
+    func start(conversationID: PersistentIdentifier) {
+        startCount += 1
+    }
+
+    func reset(conversationID: PersistentIdentifier) {
+        resetCount += 1
+        text = ""
+        toolCalls = []
+    }
+
+    func appendContent(_ content: String, conversationID: PersistentIdentifier) {
+        text += content
+    }
+
+    func updateToolCalls(_ toolCalls: [LLMToolCall], conversationID: PersistentIdentifier) {
+        self.toolCalls = toolCalls
+    }
+
+    func complete(conversationID: PersistentIdentifier) {
+        completed = true
+    }
+
+    func fail(_ error: Error, conversationID: PersistentIdentifier) {
+        failedError = error
+    }
 }
 
 final class MockLLMURLProtocol: URLProtocol {
