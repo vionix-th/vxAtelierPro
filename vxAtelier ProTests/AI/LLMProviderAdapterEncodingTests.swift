@@ -323,12 +323,22 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
             endpointFamily: .chatCompletions,
             modelID: "gpt-5.4-nano",
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])],
-            options: LLMGenerationOptions(maxOutputTokens: 16)
+            options: LLMGenerationOptions(
+                temperature: 0.7,
+                topP: 0.9,
+                maxOutputTokens: 16,
+                stop: ["END"],
+                reasoning: "low"
+            )
         )
 
         let body = try adapter.makeBody(for: request, stream: false)
         XCTAssertEqual(body["max_completion_tokens"], .integer(16))
+        XCTAssertEqual(body["reasoning_effort"], .string("low"))
         XCTAssertNil(body["max_tokens"])
+        XCTAssertNil(body["temperature"])
+        XCTAssertNil(body["top_p"])
+        XCTAssertNil(body["stop"])
     }
 
     func testOpenAIChatMapsGPT41MaxOutputTokensToMaxTokens() throws {

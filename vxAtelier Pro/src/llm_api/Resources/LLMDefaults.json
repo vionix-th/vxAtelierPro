@@ -2,23 +2,23 @@
   "providerDefaults": [
     {
       "provider": "openAIPlatform",
-      "defaultModel": "gpt-4.1-nano"
+      "defaultModel": "gpt-5.4-nano"
     },
     {
       "provider": "anthropic",
-      "defaultModel": "claude-3-sonnet-20240229"
+      "defaultModel": "claude-sonnet-4-6"
     },
     {
       "provider": "openRouter",
-      "defaultModel": "openai/gpt-4o-mini"
+      "defaultModel": "openai/gpt-5.4-nano"
     },
     {
       "provider": "xAI",
-      "defaultModel": "grok-2-1212"
+      "defaultModel": "grok-4.3"
     },
     {
       "provider": "deepSeek",
-      "defaultModel": "deepseek-chat"
+      "defaultModel": "deepseek-v4-flash"
     }
   ],
   "rules": [
@@ -27,10 +27,49 @@
         "providerRegex": "^openAIPlatform$"
       },
       "modelDefaults": {
-        "contextWindow": 4096,
+        "contextWindow": 128000,
+        "endpointFamilies": ["responses", "chatCompletions"],
+        "modalities": ["text", "image"],
+        "supportedParameters": ["temperature", "top_p", "max_output_tokens", "max_completion_tokens", "stop", "response_format", "structured_outputs", "tools", "tool_choice", "service_tier"],
+        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "usage", "streaming"]
+      }
+    },
+    {
+      "match": {
+        "providerRegex": "^openAIPlatform$",
+        "modelRegex": "^gpt-4\\.1(-.*)?$"
+      },
+      "modelDefaults": {
+        "contextWindow": 1047576,
         "endpointFamilies": ["responses", "chatCompletions"],
         "modalities": ["text", "image", "file"],
-        "supportedParameters": ["temperature", "top_p", "max_output_tokens", "max_tokens", "stop", "response_format", "reasoning", "service_tier"],
+        "supportedParameters": ["temperature", "top_p", "max_output_tokens", "max_completion_tokens", "response_format", "structured_outputs", "tools", "tool_choice", "service_tier"],
+        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "usage", "streaming"]
+      }
+    },
+    {
+      "match": {
+        "providerRegex": "^openAIPlatform$",
+        "modelRegex": "^gpt-5(\\.[0-3])?(-mini|-nano)?$|^gpt-5\\.4-(mini|nano)$"
+      },
+      "modelDefaults": {
+        "contextWindow": 400000,
+        "endpointFamilies": ["responses", "chatCompletions"],
+        "modalities": ["text", "image", "file"],
+        "supportedParameters": ["max_output_tokens", "max_completion_tokens", "reasoning", "response_format", "structured_outputs", "tools", "tool_choice", "service_tier"],
+        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "reasoning", "usage", "streaming"]
+      }
+    },
+    {
+      "match": {
+        "providerRegex": "^openAIPlatform$",
+        "modelRegex": "^gpt-5\\.(4|5)(-pro)?$|^gpt-5\\.5$"
+      },
+      "modelDefaults": {
+        "contextWindow": 1050000,
+        "endpointFamilies": ["responses", "chatCompletions"],
+        "modalities": ["text", "image", "file"],
+        "supportedParameters": ["max_output_tokens", "max_completion_tokens", "reasoning", "response_format", "structured_outputs", "tools", "tool_choice", "service_tier"],
         "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "reasoning", "usage", "streaming"]
       }
     },
@@ -39,9 +78,9 @@
         "providerRegex": "^openAIChatGPTSubscription$"
       },
       "modelDefaults": {
-        "contextWindow": 4096,
+        "contextWindow": 128000,
         "endpointFamilies": ["responses"],
-        "modalities": ["text"],
+        "modalities": ["text", "image"],
         "supportedParameters": [],
         "schemaFeatures": ["tools", "reasoning", "streaming"]
       }
@@ -51,23 +90,176 @@
         "providerRegex": "^anthropic$"
       },
       "modelDefaults": {
-        "contextWindow": 4096,
+        "contextWindow": 200000,
         "endpointFamilies": ["anthropicMessages"],
         "modalities": ["text", "image"],
-        "supportedParameters": ["temperature", "top_p", "max_output_tokens", "stop", "thinking"],
+        "supportedParameters": ["max_tokens", "temperature", "top_p", "stop_sequences", "thinking", "tools", "tool_choice"],
         "schemaFeatures": ["tools", "reasoning", "usage", "streaming"]
       }
     },
     {
       "match": {
-        "providerRegex": "^(openRouter|lmStudio|ollama|xAI|deepSeek|customOpenAICompatible)$"
+        "providerRegex": "^anthropic$",
+        "modelRegex": "^claude-(opus-4-7|sonnet-4-6)$"
+      },
+      "modelDefaults": {
+        "contextWindow": 1000000,
+        "endpointFamilies": ["anthropicMessages"],
+        "modalities": ["text", "image"],
+        "supportedParameters": ["max_tokens", "temperature", "top_p", "stop_sequences", "thinking", "tools", "tool_choice"],
+        "schemaFeatures": ["tools", "reasoning", "usage", "streaming"]
+      }
+    },
+    {
+      "match": {
+        "providerRegex": "^openRouter$"
+      },
+      "modelDefaults": {
+        "contextWindow": 128000,
+        "endpointFamilies": ["chatCompletions"],
+        "modalities": ["text"],
+        "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "response_format", "tools", "tool_choice"],
+        "schemaFeatures": ["tools", "jsonObject", "usage", "streaming"]
+      }
+    },
+    {
+      "match": {
+        "providerRegex": "^openRouter$",
+        "modelRegex": "^openai/gpt-4\\.1(-.*)?$"
+      },
+      "modelDefaults": {
+        "contextWindow": 1047576,
+        "endpointFamilies": ["chatCompletions"],
+        "modalities": ["text", "image", "file"],
+        "supportedParameters": ["max_completion_tokens", "max_tokens", "response_format", "structured_outputs", "temperature", "tools", "tool_choice", "top_p"],
+        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "usage", "streaming"]
+      }
+    },
+    {
+      "match": {
+        "providerRegex": "^openRouter$",
+        "modelRegex": "^openai/gpt-5(\\.[0-3])?(-mini|-nano)?$|^openai/gpt-5\\.4-(mini|nano)$"
+      },
+      "modelDefaults": {
+        "contextWindow": 400000,
+        "endpointFamilies": ["chatCompletions"],
+        "modalities": ["text", "image", "file"],
+        "supportedParameters": ["max_completion_tokens", "max_tokens", "reasoning", "response_format", "structured_outputs", "tools", "tool_choice"],
+        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "reasoning", "usage", "streaming"]
+      }
+    },
+    {
+      "match": {
+        "providerRegex": "^openRouter$",
+        "modelRegex": "^openai/gpt-5\\.(4|5)(-pro)?$|^openai/gpt-5\\.5$"
+      },
+      "modelDefaults": {
+        "contextWindow": 1050000,
+        "endpointFamilies": ["chatCompletions"],
+        "modalities": ["text", "image", "file"],
+        "supportedParameters": ["max_completion_tokens", "max_tokens", "reasoning", "response_format", "structured_outputs", "tools", "tool_choice"],
+        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "reasoning", "usage", "streaming"]
+      }
+    },
+    {
+      "match": {
+        "providerRegex": "^openRouter$",
+        "modelRegex": "^anthropic/claude-(opus-4-7|sonnet-4-6)$"
+      },
+      "modelDefaults": {
+        "contextWindow": 1000000,
+        "endpointFamilies": ["chatCompletions"],
+        "modalities": ["text", "image"],
+        "supportedParameters": ["max_tokens", "reasoning", "response_format", "stop", "structured_outputs", "temperature", "tools", "tool_choice", "top_p"],
+        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "reasoning", "usage", "streaming"]
+      }
+    },
+    {
+      "match": {
+        "providerRegex": "^openRouter$",
+        "modelRegex": "^x-ai/grok-4\\.(3|20)"
+      },
+      "modelDefaults": {
+        "contextWindow": 1000000,
+        "endpointFamilies": ["chatCompletions"],
+        "modalities": ["text", "image", "file"],
+        "supportedParameters": ["max_tokens", "reasoning", "response_format", "structured_outputs", "temperature", "tools", "tool_choice", "top_p"],
+        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "reasoning", "usage", "streaming"]
+      }
+    },
+    {
+      "match": {
+        "providerRegex": "^openRouter$",
+        "modelRegex": "^x-ai/grok-4\\.20"
+      },
+      "modelDefaults": {
+        "contextWindow": 2000000,
+        "endpointFamilies": ["chatCompletions"],
+        "modalities": ["text", "image", "file"],
+        "supportedParameters": ["max_tokens", "reasoning", "response_format", "structured_outputs", "temperature", "tools", "tool_choice", "top_p"],
+        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "reasoning", "usage", "streaming"]
+      }
+    },
+    {
+      "match": {
+        "providerRegex": "^(lmStudio|ollama|customOpenAICompatible)$"
       },
       "modelDefaults": {
         "contextWindow": 4096,
         "endpointFamilies": ["chatCompletions"],
         "modalities": ["text"],
-        "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "response_format"],
+        "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "response_format", "tools", "tool_choice"],
         "schemaFeatures": ["tools", "jsonObject", "usage", "streaming"]
+      }
+    },
+    {
+      "match": {
+        "providerRegex": "^xAI$"
+      },
+      "modelDefaults": {
+        "contextWindow": 1000000,
+        "endpointFamilies": ["chatCompletions"],
+        "modalities": ["text", "image"],
+        "supportedParameters": ["temperature", "top_p", "max_tokens", "response_format", "reasoning", "tools", "tool_choice"],
+        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "reasoning", "usage", "streaming"]
+      }
+    },
+    {
+      "match": {
+        "providerRegex": "^xAI$",
+        "modelRegex": "^grok-4\\.20"
+      },
+      "modelDefaults": {
+        "contextWindow": 2000000,
+        "endpointFamilies": ["chatCompletions"],
+        "modalities": ["text", "image", "file"],
+        "supportedParameters": ["temperature", "top_p", "max_tokens", "response_format", "reasoning", "tools", "tool_choice"],
+        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "reasoning", "usage", "streaming"]
+      }
+    },
+    {
+      "match": {
+        "providerRegex": "^deepSeek$"
+      },
+      "modelDefaults": {
+        "contextWindow": 1000000,
+        "endpointFamilies": ["chatCompletions"],
+        "modalities": ["text"],
+        "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "response_format", "tools", "tool_choice"],
+        "schemaFeatures": ["tools", "jsonObject", "usage", "streaming"]
+      }
+    },
+    {
+      "match": {
+        "providerRegex": "^deepSeek$",
+        "modelRegex": "^deepseek-(reasoner|v4-pro)$"
+      },
+      "modelDefaults": {
+        "contextWindow": 1000000,
+        "endpointFamilies": ["chatCompletions"],
+        "modalities": ["text", "reasoning"],
+        "supportedParameters": ["max_tokens", "response_format", "thinking", "tools", "tool_choice"],
+        "schemaFeatures": ["tools", "jsonObject", "reasoning", "usage", "streaming"]
       }
     },
     {
@@ -110,6 +302,23 @@
     },
     {
       "match": {
+        "providerRegex": "^openAIPlatform$",
+        "modelRegex": "^gpt-5(\\.|-|$)",
+        "endpointFamily": "responses"
+      },
+      "parameterMappings": [
+        {
+          "parameter": "temperature",
+          "enabled": false
+        },
+        {
+          "parameter": "top_p",
+          "enabled": false
+        }
+      ]
+    },
+    {
+      "match": {
         "endpointFamily": "chatCompletions"
       },
       "parameterMappings": [
@@ -142,7 +351,7 @@
     },
     {
       "match": {
-        "modelRegex": "(^|.*/)gpt-5([-.].*)?$",
+        "modelRegex": "(^|.*/)gpt-5(\\.|-|$)",
         "endpointFamily": "chatCompletions"
       },
       "parameterMappings": [
@@ -150,6 +359,82 @@
           "parameter": "max_output_tokens",
           "encoding": "scalarKey",
           "wireKey": "max_completion_tokens"
+        },
+        {
+          "parameter": "temperature",
+          "enabled": false
+        },
+        {
+          "parameter": "top_p",
+          "enabled": false
+        },
+        {
+          "parameter": "stop_sequences",
+          "enabled": false
+        }
+      ]
+    },
+    {
+      "match": {
+        "providerRegex": "^openAIPlatform$",
+        "modelRegex": "^gpt-5(\\.|-|$)",
+        "endpointFamily": "chatCompletions"
+      },
+      "parameterMappings": [
+        {
+          "parameter": "reasoning_effort",
+          "encoding": "scalarKey",
+          "wireKey": "reasoning_effort"
+        }
+      ]
+    },
+    {
+      "match": {
+        "providerRegex": "^deepSeek$",
+        "endpointFamily": "chatCompletions"
+      },
+      "parameterMappings": [
+        {
+          "parameter": "max_output_tokens",
+          "encoding": "scalarKey",
+          "wireKey": "max_tokens"
+        },
+        {
+          "parameter": "temperature",
+          "encoding": "scalarKey",
+          "wireKey": "temperature"
+        },
+        {
+          "parameter": "top_p",
+          "encoding": "scalarKey",
+          "wireKey": "top_p"
+        },
+        {
+          "parameter": "stop_sequences",
+          "encoding": "scalarKey",
+          "wireKey": "stop"
+        },
+        {
+          "parameter": "response_format",
+          "encoding": "structuredPreset",
+          "preset": "openAIChatResponseFormat"
+        }
+      ]
+    },
+    {
+      "match": {
+        "providerRegex": "^deepSeek$",
+        "modelRegex": "^deepseek-(reasoner|v4-pro)$",
+        "endpointFamily": "chatCompletions"
+      },
+      "parameterMappings": [
+        {
+          "parameter": "temperature",
+          "enabled": false
+        },
+        {
+          "parameter": "top_p",
+          "enabled": false
         }
       ]
     },

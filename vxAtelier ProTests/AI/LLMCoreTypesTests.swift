@@ -21,9 +21,34 @@ final class LLMCoreTypesTests: XCTestCase {
     func testBundledDefaultsProvideProviderDefaultModels() {
         let defaults = LLMDefaultsCatalog.bundled
 
-        XCTAssertEqual(defaults.defaultModelID(for: .openAIPlatform), "gpt-4.1-nano")
-        XCTAssertEqual(defaults.defaultModelID(for: .openRouter), "openai/gpt-4o-mini")
+        XCTAssertEqual(defaults.defaultModelID(for: .openAIPlatform), "gpt-5.4-nano")
+        XCTAssertEqual(defaults.defaultModelID(for: .anthropic), "claude-sonnet-4-6")
+        XCTAssertEqual(defaults.defaultModelID(for: .openRouter), "openai/gpt-5.4-nano")
+        XCTAssertEqual(defaults.defaultModelID(for: .xAI), "grok-4.3")
+        XCTAssertEqual(defaults.defaultModelID(for: .deepSeek), "deepseek-v4-flash")
         XCTAssertNil(defaults.defaultModelID(for: .customOpenAICompatible))
+    }
+
+    func testBundledDefaultsProvideCurrentModelCapabilities() {
+        let defaults = LLMDefaultsCatalog.bundled
+
+        let openAI = defaults.modelDefaults(providerID: .openAIPlatform, modelID: "gpt-5.4-nano")
+        XCTAssertEqual(openAI?.contextWindow, 400000)
+        XCTAssertEqual(openAI?.modalities, [.text, .image, .file])
+        XCTAssertFalse(openAI?.supportedParameters?.contains("temperature") ?? true)
+        XCTAssertTrue(openAI?.schemaFeatures?.contains(.reasoning) ?? false)
+
+        let anthropic = defaults.modelDefaults(providerID: .anthropic, modelID: "claude-sonnet-4-6")
+        XCTAssertEqual(anthropic?.contextWindow, 1000000)
+        XCTAssertEqual(anthropic?.modalities, [.text, .image])
+
+        let xAI = defaults.modelDefaults(providerID: .xAI, modelID: "grok-4.3")
+        XCTAssertEqual(xAI?.contextWindow, 1000000)
+        XCTAssertTrue(xAI?.schemaFeatures?.contains(.jsonSchema) ?? false)
+
+        let deepSeek = defaults.modelDefaults(providerID: .deepSeek, modelID: "deepseek-v4-flash")
+        XCTAssertEqual(deepSeek?.contextWindow, 1000000)
+        XCTAssertTrue(deepSeek?.supportedParameters?.contains("tools") ?? false)
     }
 
     func testDefaultsCatalogDecodesValidJSON() throws {
@@ -237,7 +262,7 @@ final class LLMCoreTypesTests: XCTestCase {
             endpointFamilies: [.chatCompletions]
         )
 
-        XCTAssertEqual(models.first?.contextWindow, 4096)
+        XCTAssertEqual(models.first?.contextWindow, 128000)
         XCTAssertEqual(models.first?.modalities, [.text])
         XCTAssertTrue(models.first?.schemaFeatures.contains(.streaming) ?? false)
     }

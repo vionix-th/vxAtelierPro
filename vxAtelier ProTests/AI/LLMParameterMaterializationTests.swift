@@ -72,9 +72,11 @@ final class LLMParameterMaterializationTests: XCTestCase {
         }
         XCTAssertEqual(resetMaxTokens?.wireKey, "max_completion_tokens")
         XCTAssertFalse(resetMaxTokens?.isCustomized ?? true)
-        XCTAssertFalse(model.parameterMappings.contains {
+        let reasoningEffort = model.parameterMappings.first {
             $0.endpointFamilyEnum == .chatCompletions && $0.semanticParameterIDEnum == .reasoningEffort
-        })
+        }
+        XCTAssertEqual(reasoningEffort?.wireKey, "reasoning_effort")
+        XCTAssertFalse(reasoningEffort?.isCustomized ?? true)
     }
 
     func testConversationArgumentSetupUsesSemanticDefinitionsAndPresentation() {
