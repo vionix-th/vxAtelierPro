@@ -1,12 +1,15 @@
 import Foundation
 
+/// Validates and executes one persisted tool call against the registered tool catalog.
 struct ToolBatchExecutor {
     let toolCatalog: LLMToolCatalog
 
+    /// Creates an executor with an injectable tool catalog.
     init(toolCatalog: LLMToolCatalog = LLMToolRegistry.shared) {
         self.toolCatalog = toolCatalog
     }
 
+    /// Executes a tool call using conversation-specific enablement and configuration.
     @MainActor
     func execute(
         _ toolCall: ToolCallItem,

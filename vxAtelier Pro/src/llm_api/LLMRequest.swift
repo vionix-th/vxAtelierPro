@@ -10,6 +10,7 @@ struct LLMRequest: Codable, Equatable {
     var tools: [LLMToolDefinition]
     var options: LLMGenerationOptions
 
+    /// Creates a resolved request after runtime configuration has selected provider, endpoint, and model.
     init(
         providerID: LLMProviderID,
         endpointFamily: LLMEndpointFamily,

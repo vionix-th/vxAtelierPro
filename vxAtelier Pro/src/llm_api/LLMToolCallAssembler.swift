@@ -37,6 +37,7 @@ struct LLMToolCallAssembler {
         return existing
     }
 
+    /// Returns the current calls in provider emission order.
     var assembled: [LLMToolCall] {
         callsByIndex.values.sorted { $0.index < $1.index }
     }

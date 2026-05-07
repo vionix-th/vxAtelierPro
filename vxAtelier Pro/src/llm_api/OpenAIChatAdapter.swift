@@ -1,9 +1,11 @@
 import Foundation
 
+/// Adapter for OpenAI-compatible Chat Completions providers.
 struct OpenAIChatAdapter: LLMProviderAdapter {
     let profile: LLMProviderProfile
     private let httpClient = LLMHTTPClient()
 
+    /// Executes a Chat Completions request through the shared adapter run loop.
     func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration) -> AsyncThrowingStream<LLMStreamEvent, Error> {
         do {
             let endpoint = try endpointPath(for: request.endpointFamily, configuration: configuration)
@@ -33,6 +35,7 @@ struct OpenAIChatAdapter: LLMProviderAdapter {
         }
     }
 
+    /// Fetches OpenAI-compatible model metadata and marks descriptors as chat-capable.
     func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
         let endpoint = configuration.endpointPath(for: .models) ?? profile.endpointPaths[.models] ?? "/v1/models"
         let httpConfig = httpClient.makeConfiguration(for: configuration)
@@ -45,6 +48,7 @@ struct OpenAIChatAdapter: LLMProviderAdapter {
         )
     }
 
+    /// Resolves a configured or profile endpoint path for a request family.
     private func endpointPath(for endpointFamily: LLMEndpointFamily, configuration: LLMProviderConfiguration) throws -> String {
         guard let endpoint = configuration.endpointPath(for: endpointFamily) ?? profile.endpointPaths[endpointFamily] else {
             throw LLMProviderError.unsupportedCapability("\(profile.name) does not support \(endpointFamily.rawValue).")
@@ -52,6 +56,7 @@ struct OpenAIChatAdapter: LLMProviderAdapter {
         return endpoint
     }
 
+    /// Encodes a provider-neutral request into a Chat Completions JSON body.
     func makeBody(for request: LLMRequest, stream: Bool) throws -> [String: JSONValue] {
         var body: [String: JSONValue] = [
             "model": .string(request.modelID),
@@ -77,6 +82,7 @@ struct OpenAIChatAdapter: LLMProviderAdapter {
         return body
     }
 
+    /// Converts provider-neutral messages into Chat Completions message objects.
     private func openAIMessages(from request: LLMRequest) throws -> [JSONValue] {
         var messages: [JSONValue] = []
         if !request.options.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -107,6 +113,7 @@ struct OpenAIChatAdapter: LLMProviderAdapter {
         return messages
     }
 
+    /// Converts one Chat Completions SSE payload into normalized stream events.
     private func handleStreamEvent(_ event: [String: JSONValue], assembler: inout LLMToolCallAssembler) -> [LLMStreamEvent] {
         guard let choices = event.array("choices"),
               let choice = choices.first?.objectValue,
@@ -141,6 +148,7 @@ struct OpenAIChatAdapter: LLMProviderAdapter {
         return events
     }
 
+    /// Emits normalized events from a complete Chat Completions JSON response.
     private func emitNonStreamingResponse(
         _ response: JSONValue,
         continuation: AsyncThrowingStream<LLMStreamEvent, Error>.Continuation

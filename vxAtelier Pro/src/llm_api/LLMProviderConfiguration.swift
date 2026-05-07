@@ -19,6 +19,7 @@ struct LLMProviderConfiguration: Codable, Equatable {
     var maxResponseBodyBytes: Int
     var maxSSEEventBytes: Int
 
+    /// Creates runtime transport settings after persisted configuration has been resolved.
     init(
         providerID: LLMProviderID,
         authKind: LLMAuthKind? = nil,
@@ -43,6 +44,7 @@ struct LLMProviderConfiguration: Codable, Equatable {
         self.maxSSEEventBytes = maxSSEEventBytes
     }
 
+    /// Returns a runtime endpoint override for a provider endpoint family.
     func endpointPath(for endpointFamily: LLMEndpointFamily) -> String? {
         endpointPaths[endpointFamily]
     }
@@ -50,6 +52,7 @@ struct LLMProviderConfiguration: Codable, Equatable {
 
 /// Builds protocol headers from provider auth kind and runtime credentials.
 enum LLMProviderHeaderResolver {
+    /// Merges custom headers with the auth header required by the resolved provider.
     static func headers(for configuration: LLMProviderConfiguration) -> [String: String] {
         let profile = LLMProviderRegistry.shared.profile(for: configuration.providerID)
         let authKind = configuration.authKind ?? profile.authKind

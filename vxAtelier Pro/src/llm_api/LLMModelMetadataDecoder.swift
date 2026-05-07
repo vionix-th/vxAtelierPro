@@ -51,6 +51,7 @@ enum LLMModelMetadataDecoder {
         return String(data: data, encoding: .utf8)
     }
 
+    /// Reads known context-window fields from provider metadata.
     private static func contextWindow(from object: [String: JSONValue]) -> Int? {
         object.int("context_length")
             ?? object.int("context_window")
@@ -58,6 +59,7 @@ enum LLMModelMetadataDecoder {
             ?? object.int("max_context_window")
     }
 
+    /// Combines provider-advertised parameter names with profile defaults.
     private static func supportedParameters(
         from object: [String: JSONValue],
         fallback: [String]
@@ -67,6 +69,7 @@ enum LLMModelMetadataDecoder {
         return direct.isEmpty ? fallback : Array(Set(direct + fallback)).sorted()
     }
 
+    /// Infers schema/runtime features from provider-advertised metadata and profile defaults.
     private static func schemaFeatures(
         from object: [String: JSONValue],
         fallback: [LLMSchemaFeature]
@@ -91,6 +94,7 @@ enum LLMModelMetadataDecoder {
         return Array(features).sorted { $0.rawValue < $1.rawValue }
     }
 
+    /// Infers supported modalities from provider metadata and profile defaults.
     private static func modalities(
         from object: [String: JSONValue],
         fallback: [LLMModality]
@@ -116,6 +120,7 @@ enum LLMModelMetadataDecoder {
             : Array(modalities).sorted { $0.rawValue < $1.rawValue }
     }
 
+    /// Adds modalities detected in a provider text field.
     private static func appendModalities(from text: String?, to modalities: inout Set<LLMModality>) {
         guard let text else { return }
         let lowercased = text.lowercased()
@@ -126,6 +131,7 @@ enum LLMModelMetadataDecoder {
         if lowercased.contains("video") { modalities.insert(.video) }
     }
 
+    /// Reads a provider metadata field that may be either one string or an array of strings.
     private static func stringArray(_ value: JSONValue?) -> [String] {
         guard let value else { return [] }
         switch value {

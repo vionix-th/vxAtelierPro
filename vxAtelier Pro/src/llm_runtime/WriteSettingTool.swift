@@ -1,10 +1,11 @@
 import Foundation
 
-/// Tool for writing a specific UserDefaults setting managed by AppStorage.
+/// Executable tool that writes one allowlisted UserDefaults/AppStorage setting.
 public struct WriteSettingTool: ExecutableLLMTool {
     public let name = "write_setting"
     public let description = "Writes a new value to a specific, writable application setting in UserDefaults. Requires the setting key (from 'list_settings') and the new value matching the setting's type (e.g., 'new_string_value' for String). Use 'list_settings' first to check key, type, and writability."
 
+    /// Requires the setting key and the type-specific replacement value.
     public var parameters: any LLMToolParameters {
         GenericLLMToolParameters(
             properties: [
@@ -33,8 +34,10 @@ public struct WriteSettingTool: ExecutableLLMTool {
         )
     }
 
+    /// Creates a setting writer tool.
     public init() {}
 
+    /// Validates key, writability, value type, and range before updating UserDefaults.
     func execute(_ call: LLMToolExecutionCall) async throws -> String {
         let arguments = call.argumentsJSON
         guard let jsonData = arguments.data(using: .utf8),

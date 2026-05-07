@@ -12,8 +12,10 @@ enum LLMProviderID: String, Codable, CaseIterable, Identifiable {
     case anthropic
     case customOpenAICompatible
 
+    /// Exposes the raw provider key as the SwiftUI identity.
     var id: String { rawValue }
 
+    /// Human-facing provider name for settings and diagnostics.
     var displayName: String {
         switch self {
         case .openAIPlatform: return "OpenAI Platform"
@@ -36,8 +38,10 @@ enum LLMEndpointFamily: String, Codable, CaseIterable, Identifiable {
     case anthropicMessages
     case models
 
+    /// Exposes the raw endpoint family key as the SwiftUI identity.
     var id: String { rawValue }
 
+    /// Human-facing endpoint family name for settings and diagnostics.
     var displayName: String {
         switch self {
         case .chatCompletions: return "Chat Completions"

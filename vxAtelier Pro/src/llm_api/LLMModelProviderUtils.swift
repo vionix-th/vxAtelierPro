@@ -1,16 +1,9 @@
 import Foundation
 
-/// Utility for LLM model provider detection and management.
-///
-/// This utility provides functionality to:
-/// - Detect LLM providers from model names
-/// - Infer model capabilities based on model name patterns
+/// Heuristics for provider and capability detection when persisted model metadata is unavailable.
 public enum LLMModelProviderUtils {
     
-    /// Known AI model providers with standardized naming.
-    ///
-    /// This enum ensures consistent provider naming throughout the application
-    /// and provides a centralized definition of supported AI services.
+    /// Provider names inferred from common model naming conventions.
     public enum Provider: String {
         case openAI = "OpenAI"
         case anthropic = "Anthropic"
@@ -21,22 +14,13 @@ public enum LLMModelProviderUtils {
         case mistral = "Mistral"
         case custom = "Custom"
         
-        /// The display name for the provider.
+        /// Human-facing provider name.
         public var displayName: String {
             return self.rawValue
         }
     }
     
-    /// Detects the AI provider based on model name patterns.
-    ///
-    /// Uses common naming conventions and prefixes to identify the most likely provider
-    /// for a given model name. For example:
-    /// - "gpt-4" → OpenAI
-    /// - "claude-3" → Anthropic
-    /// - "gemini-pro" → Google
-    ///
-    /// - Parameter modelName: The name of the model to analyze
-    /// - Returns: The detected provider name as a string
+    /// Infers the most likely provider from a model identifier or display name.
     public static func detectProvider(from modelName: String) -> String {
         if modelName.starts(with: "gpt-") || 
            (modelName.hasPrefix("o") && modelName.contains("-")) || 
@@ -62,53 +46,39 @@ public enum LLMModelProviderUtils {
         }
         return Provider.custom.rawValue
     }
-    /// Infers model capabilities based on the model name pattern.
-    ///
-    /// Uses common naming conventions and keywords to identify capabilities
-    /// that a model is likely to support. This is useful when a ModelItem
-    /// is not available in the database.
-    ///
-    /// - Parameter modelName: The name of the model to analyze
-    /// - Returns: Array of ModelCapability enum values
+
+    /// Infers likely model capabilities from common model-name tokens.
     static func inferCapabilities(from modelName: String) -> [ModelCapability] {
         var capabilities: [ModelCapability] = []
         
-        // Basic capabilities for all models
         capabilities.append(.text)
         capabilities.append(.chat)
         
-        // Vision capability
         if modelName.contains("vision") || modelName.hasSuffix("-v") {
             capabilities.append(.vision)
         }
         
-        // Function capability for GPT and Claude models
         if modelName.contains("gpt-4") || modelName.contains("gpt-3.5") 
             || modelName.contains("claude") 
             || modelName.contains("deepseek") 
             || modelName.contains("grok") 
         {
             capabilities.append(.function)
-            // Most modern GPT and Claude models support streaming
             capabilities.append(.streaming)
         }
         
-        // Image capability
         if modelName.contains("image") || modelName.contains("dall-e") || modelName.contains("grok") {
             capabilities.append(.image)
         }
         
-        // Audio capability
         if modelName.contains("audio") || modelName.contains("speech") || modelName.contains("whisper") {
             capabilities.append(.audio)
         }
         
-        // Video capability
         if modelName.contains("video") {
             capabilities.append(.video)
         }
         
-        // Embedding capability
         if modelName.contains("embedding") {
             capabilities.append(.embedding)
         }
@@ -117,36 +87,33 @@ public enum LLMModelProviderUtils {
     }
 } 
 
-/// Represents different capabilities that AI models can support.
-///
-/// Each capability represents a distinct function the model can perform,
-/// such as generating text, processing images, or handling audio data.
+/// Legacy display capabilities inferred for imported or ad hoc models.
 public enum ModelCapability: String, Codable, CaseIterable {
-    /// Ability to generate text content (articles, stories, etc.)
+    /// Text generation support.
     case text = "Text Generation"
     
-    /// Ability to participate in conversational exchanges
+    /// Chat-style message exchange support.
     case chat = "Chat Completion"
     
-    /// Ability to generate images from text descriptions
+    /// Image generation support.
     case image = "Image Generation"
     
-    /// Ability to process or generate audio content
+    /// Audio processing support.
     case audio = "Audio Processing"
     
-    /// Ability to process or generate video content
+    /// Video processing support.
     case video = "Video Processing"
     
-    /// Ability to call functions or tools
+    /// Function or tool calling support.
     case function = "Function Calling"
     
-    /// Ability to generate text embeddings for semantic search
+    /// Text embedding support.
     case embedding = "Text Embedding"
     
-    /// Ability to analyze and understand images
+    /// Image understanding support.
     case vision = "Vision/Image Analysis"
     
-    /// Ability to stream responses token by token
+    /// Incremental response streaming support.
     case streaming = "Response Streaming"
     
 } 

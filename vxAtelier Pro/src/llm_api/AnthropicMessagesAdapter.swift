@@ -1,9 +1,11 @@
 import Foundation
 
+/// Adapter for Anthropic Messages requests and events.
 struct AnthropicMessagesAdapter: LLMProviderAdapter {
     let profile: LLMProviderProfile
     private let httpClient = LLMHTTPClient()
 
+    /// Executes a Messages request through the shared adapter run loop.
     func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration) -> AsyncThrowingStream<LLMStreamEvent, Error> {
         let endpoint = configuration.endpointPath(for: .anthropicMessages) ?? profile.endpointPaths[.anthropicMessages] ?? "/v1/messages"
         return LLMAdapterRunLoop.stream(
@@ -27,6 +29,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
         )
     }
 
+    /// Fetches Anthropic model metadata and maps descriptors to Messages support.
     func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
         let endpoint = configuration.endpointPath(for: .models) ?? profile.endpointPaths[.models] ?? "/v1/models"
         let response: JSONValue = try await httpClient.getJSON(
@@ -38,6 +41,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
         return LLMModelMetadataDecoder.anthropicDescriptors(from: data, profile: profile)
     }
 
+    /// Encodes a provider-neutral request into an Anthropic Messages JSON body.
     func makeBody(for request: LLMRequest, stream: Bool) throws -> [String: JSONValue] {
         var body: [String: JSONValue] = [
             "model": .string(request.modelID),
@@ -67,6 +71,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
         return body
     }
 
+    /// Converts conversation history into Anthropic message objects and tool-result groups.
     func anthropicMessages(from request: LLMRequest) throws -> [JSONValue] {
         var messages: [JSONValue] = []
         var index = request.messages.startIndex
@@ -122,6 +127,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
         return messages
     }
 
+    /// Converts one provider-neutral message into Anthropic content blocks.
     private func anthropicContent(from message: LLMMessage) throws -> [JSONValue] {
         try message.content.compactMap { part in
             switch part.kind {
@@ -158,6 +164,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
         }
     }
 
+    /// Validates and normalizes the media type used for Anthropic base64 images.
     private func anthropicImageMediaType(_ mimeType: String?) throws -> String {
         let mediaType = mimeType ?? "image/png"
         let supported = ["image/jpeg", "image/png", "image/gif", "image/webp"]
@@ -167,6 +174,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
         return mediaType
     }
 
+    /// Converts one Anthropic SSE payload into normalized stream events.
     private func handleStreamEvent(
         _ event: [String: JSONValue],
         assembler: inout LLMToolCallAssembler,
@@ -209,6 +217,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
         }
     }
 
+    /// Emits normalized events from a complete Anthropic Messages JSON response.
     private func emitResponse(
         _ response: JSONValue,
         continuation: AsyncThrowingStream<LLMStreamEvent, Error>.Continuation
@@ -236,6 +245,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
         continuation.yield(.runCompleted(responseID: object.string("id"), modelID: object.string("model")))
     }
 
+    /// Parses assistant tool-call arguments into the JSON object required by Anthropic.
     private func jsonFromString(_ string: String) throws -> JSONValue {
         guard let data = string.data(using: .utf8) else {
             throw LLMProviderError.decoding("Anthropic tool_use arguments must be valid UTF-8 JSON.")

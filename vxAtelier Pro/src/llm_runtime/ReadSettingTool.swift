@@ -1,10 +1,11 @@
 import Foundation
 
-/// Tool for reading a specific UserDefaults setting managed by AppStorage.
+/// Executable tool that reads one allowlisted UserDefaults/AppStorage setting.
 public struct ReadSettingTool: ExecutableLLMTool {
     public let name = "read_setting"
     public let description = "Reads the current value of a specific application setting stored in UserDefaults, identified by its key (obtained from 'list_settings')."
 
+    /// Requires the allowlisted setting key to read.
     public var parameters: any LLMToolParameters {
         GenericLLMToolParameters(
             properties: [
@@ -17,8 +18,10 @@ public struct ReadSettingTool: ExecutableLLMTool {
         )
     }
 
+    /// Creates a setting reader tool.
     public init() {}
 
+    /// Returns the current setting value or a typed absence/mismatch message.
     func execute(_ call: LLMToolExecutionCall) async throws -> String {
         let arguments = call.argumentsJSON
         guard let jsonData = arguments.data(using: .utf8),

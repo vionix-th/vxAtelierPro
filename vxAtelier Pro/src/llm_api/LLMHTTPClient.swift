@@ -1,6 +1,8 @@
 import Foundation
 
+/// HTTP and SSE transport wrapper for provider adapters.
 struct LLMHTTPClient {
+    /// Resolved HTTP settings for one provider request.
     struct Configuration {
         var baseURL: String
         var headers: [String: String]
@@ -10,11 +12,13 @@ struct LLMHTTPClient {
         var maxSSEEventBytes: Int = 1024 * 1024
     }
 
+    /// Decoded response value paired with redacted provider metadata.
     struct Result<T> {
         var value: T
         var metadata: LLMResponseMetadata
     }
 
+    /// Event stream item carrying either response metadata or one decoded SSE payload.
     enum StreamEvent {
         case metadata(LLMResponseMetadata)
         case event([String: JSONValue])
@@ -22,10 +26,12 @@ struct LLMHTTPClient {
 
     let networkClient: NetworkClient
 
+    /// Creates a transport wrapper around the shared network client by default.
     init(networkClient: NetworkClient = .shared) {
         self.networkClient = networkClient
     }
 
+    /// Sends a JSON POST and returns only the decoded body.
     func jsonRequest<T: Decodable, Body: Encodable>(
         path: String,
         configuration: Configuration,
@@ -40,6 +46,7 @@ struct LLMHTTPClient {
         ).value
     }
 
+    /// Sends a JSON POST and returns the decoded body plus redacted response metadata.
     func jsonRequestWithMetadata<T: Decodable, Body: Encodable>(
         path: String,
         configuration: Configuration,
@@ -66,6 +73,7 @@ struct LLMHTTPClient {
         }
     }
 
+    /// Sends a JSON GET and returns only the decoded body.
     func getJSON<T: Decodable>(
         path: String,
         configuration: Configuration,
@@ -74,6 +82,7 @@ struct LLMHTTPClient {
         try await getJSONWithMetadata(path: path, configuration: configuration, responseType: responseType).value
     }
 
+    /// Sends a JSON GET and returns the decoded body plus redacted response metadata.
     func getJSONWithMetadata<T: Decodable>(
         path: String,
         configuration: Configuration,
@@ -97,6 +106,7 @@ struct LLMHTTPClient {
         }
     }
 
+    /// Streams decoded SSE JSON objects while dropping response metadata events.
     func streamSSE<Body: Encodable>(
         path: String,
         configuration: Configuration,
@@ -119,6 +129,7 @@ struct LLMHTTPClient {
         }
     }
 
+    /// Streams SSE metadata and decoded JSON objects from a provider POST request.
     func streamSSEWithMetadata<Body: Encodable>(
         path: String,
         configuration: Configuration,
@@ -160,6 +171,7 @@ struct LLMHTTPClient {
         }
     }
 
+    /// Adapts provider runtime configuration into concrete transport settings and headers.
     func makeConfiguration(for configuration: LLMProviderConfiguration) -> Configuration {
         return Configuration(
             baseURL: configuration.baseURL,
@@ -171,6 +183,7 @@ struct LLMHTTPClient {
         )
     }
 
+    /// Builds an absolute URL request from a provider base URL and endpoint path.
     private func makeRequest(
         path: String,
         configuration: Configuration,
@@ -196,6 +209,7 @@ struct LLMHTTPClient {
         return request
     }
 
+    /// Decodes an SSE payload into a provider JSON object for legacy callers.
     private func emitSSEPayload(_ payload: String, continuation: AsyncThrowingStream<[String: JSONValue], Error>.Continuation) throws {
         if payload == "[DONE]" { return }
         guard let data = payload.data(using: .utf8) else { return }
@@ -205,6 +219,7 @@ struct LLMHTTPClient {
         }
     }
 
+    /// Decodes an SSE payload into a stream event while preserving metadata support.
     private func emitSSEPayload(_ payload: String, continuation: AsyncThrowingStream<StreamEvent, Error>.Continuation) throws {
         if payload == "[DONE]" { return }
         guard let data = payload.data(using: .utf8) else { return }
@@ -214,10 +229,12 @@ struct LLMHTTPClient {
         }
     }
 
+    /// Converts URL response metadata into the provider-neutral redacted shape.
     func metadata(from response: URLResponse) -> LLMResponseMetadata {
         metadata(from: networkClient.metadata(from: response))
     }
 
+    /// Converts network metadata into the provider-neutral redacted shape.
     func metadata(from networkMetadata: NetworkResponseMetadata) -> LLMResponseMetadata {
         let headers = networkMetadata.headers
         let redactedHeaders = LLMSecretRedactor.redactedHeaders(headers)
@@ -235,6 +252,7 @@ struct LLMHTTPClient {
         )
     }
 
+    /// Maps lower-level transport failures onto provider-domain errors.
     private func normalize(_ error: Error) -> Error {
         if let providerError = error as? LLMProviderError { return providerError }
         if let networkError = error as? NetworkError {
@@ -272,6 +290,7 @@ struct LLMHTTPClient {
         return error
     }
 
+    /// Applies provider-specific body and SSE size limits to the shared network client.
     private func networkOptions(from configuration: Configuration) -> NetworkRequestOptions {
         NetworkRequestOptions(
             requestTimeout: configuration.requestTimeout,

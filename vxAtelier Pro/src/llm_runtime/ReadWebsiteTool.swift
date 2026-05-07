@@ -1,13 +1,14 @@
 import Foundation
 
-/// Tool for retrieving the textual content or raw HTML of a website URL.
+/// Executable tool that fetches text summary or raw HTML from an HTTP(S) URL.
 public struct ReadWebsiteTool: ExecutableLLMTool {
     public let name = "read_website"
     public let description = "Fetches the content of a given web URL (http or https). Can return either a plain text summary (stripping HTML, scripts, styles, default behavior, truncated if long) or the full raw HTML content."
 
-    // Limit the returned content size for summary to avoid overly large responses
+    /// Maximum plain-text summary length returned to the model.
     private let maxSummaryLength = 5000
 
+    /// Requires a URL and accepts `summary` or `full_html` return format.
     public var parameters: any LLMToolParameters {
         GenericLLMToolParameters(
             properties: [
@@ -21,12 +22,14 @@ public struct ReadWebsiteTool: ExecutableLLMTool {
                     enumValues: ["summary", "full_html"]
                 )
             ],
-            required: ["url"] // return_format is optional, defaults to 'summary'
+            required: ["url"]
         )
     }
 
+    /// Creates a website reader tool.
     public init() {}
 
+    /// Fetches the URL and returns either raw HTML or stripped, truncated text.
     func execute(_ call: LLMToolExecutionCall) async throws -> String {
         let arguments = call.argumentsJSON
         guard let jsonData = arguments.data(using: .utf8),
@@ -36,7 +39,6 @@ public struct ReadWebsiteTool: ExecutableLLMTool {
             throw LLMToolExecutionError.invalidArguments("Invalid argument format. Expected a JSON object with 'url' and optionally 'return_format'.")
         }
 
-        // Determine the return format, defaulting to 'summary'
         let returnFormat = args["return_format"] ?? "summary"
         guard ["summary", "full_html"].contains(returnFormat) else {
             throw LLMToolExecutionError.invalidArguments("Invalid 'return_format'. Must be 'summary' or 'full_html'.")
@@ -46,13 +48,11 @@ public struct ReadWebsiteTool: ExecutableLLMTool {
             throw LLMToolExecutionError.invalidArguments("Invalid URL format provided: \(urlString)")
         }
 
-        // Basic check for http/https scheme
         guard let scheme = url.scheme, ["http", "https"].contains(scheme.lowercased()) else {
             throw LLMToolExecutionError.invalidArguments("URL must use http or https scheme.")
         }
 
         do {
-            // Perform network request
             let (data, response) = try await URLSession.shared.data(from: url)
 
             guard let httpResponse = response as? HTTPURLResponse else {
@@ -63,24 +63,19 @@ public struct ReadWebsiteTool: ExecutableLLMTool {
                 throw LLMToolExecutionError.executionFailed("Website request failed with status code \(httpResponse.statusCode).")
             }
 
-            // Decode data as UTF-8 string
             guard let rawContent = String(data: data, encoding: .utf8) else {
                 throw LLMToolExecutionError.executionFailed("Failed to decode website content as UTF-8 text.")
             }
 
-            // Return based on requested format
             if returnFormat == "full_html" {
                  await vxAtelierPro.log.debug("ReadWebsiteTool: Returning full HTML for URL \(urlString)")
-                 // Note: Returning full HTML without truncation. Be mindful of potential size.
                  return rawContent
             } else {
-                // Check content type for summary - attempt to process text/html or text/plain
                 if let contentType = httpResponse.mimeType,
                    !(contentType.lowercased().contains("text/html") || contentType.lowercased().contains("text/plain")) {
                      await vxAtelierPro.log.warning("ReadWebsiteTool (Summary): Received non-text content type '\(contentType)' from \(urlString). Attempting to parse anyway.")
                 }
 
-                // Summary format: Strip HTML and truncate
                 let textContent = stripHTML(from: rawContent)
 
                 if textContent.count > maxSummaryLength {
@@ -105,21 +100,17 @@ public struct ReadWebsiteTool: ExecutableLLMTool {
         }
     }
 
-    /// Basic HTML tag stripping function.
+    /// Removes scripts, styles, tags, common entities, and excess whitespace from HTML.
     private func stripHTML(from string: String) -> String {
-        // Remove <script> and <style> blocks entirely first
         var processed = string.replacingOccurrences(of: "<script[^>]*>[\\s\\S]*?<\\/script>", with: "", options: .regularExpression)
         processed = processed.replacingOccurrences(of: "<style[^>]*>[\\s\\S]*?<\\/style>", with: "", options: .regularExpression)
-        // Remove remaining HTML tags
         processed = processed.replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
-        // Replace common HTML entities
         processed = processed.replacingOccurrences(of: "&nbsp;", with: " ")
         processed = processed.replacingOccurrences(of: "&amp;", with: "&")
         processed = processed.replacingOccurrences(of: "&lt;", with: "<")
         processed = processed.replacingOccurrences(of: "&gt;", with: ">")
         processed = processed.replacingOccurrences(of: "&quot;", with: "\"")
         processed = processed.replacingOccurrences(of: "&apos;", with: "'")
-        // Collapse multiple whitespaces/newlines into single spaces and trim
         processed = processed.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
         return processed.trimmingCharacters(in: .whitespacesAndNewlines)
     }

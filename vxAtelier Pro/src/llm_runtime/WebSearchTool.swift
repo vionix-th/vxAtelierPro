@@ -2,13 +2,14 @@ import Foundation
 import SwiftData
 import Observation
 
-/// Tool for performing web searches using the configured default provider.
+/// Executable tool that runs a web search through the configured default provider.
 public struct WebSearchTool: ExecutableLLMTool {
     public let name = "web_search"
     public let description = "Performs a web search. Takes a search query and the number of results desired (max 10)."
 
     private let queryManager: QueryManager
 
+    /// Requires a query and accepts an optional bounded result count.
     public var parameters: any LLMToolParameters {
         GenericLLMToolParameters(
             properties: [
@@ -21,14 +22,16 @@ public struct WebSearchTool: ExecutableLLMTool {
                     description: "The desired number of search results."
                 )
             ],
-            required: ["query"] // Only query is strictly required
+            required: ["query"]
         )
     }
 
+    /// Creates a web-search tool backed by the app query manager.
     init(queryManager: QueryManager) {
         self.queryManager = queryManager
     }
 
+    /// Executes the search and returns simplified results as pretty-printed JSON.
     @MainActor
     func execute(_ call: LLMToolExecutionCall) async throws -> String {
         let arguments = call.argumentsJSON

@@ -1,10 +1,12 @@
 import Foundation
 import SwiftData
 
+/// Resolves persisted conversation and API configuration into provider-neutral run context.
 struct ConversationRunContextResolver {
     let registry: LLMProviderRegistry
     let toolCatalog: LLMToolCatalog
 
+    /// Creates a resolver with injectable provider and tool registries.
     init(
         registry: LLMProviderRegistry = .shared,
         toolCatalog: LLMToolCatalog = LLMToolRegistry.shared
@@ -13,6 +15,7 @@ struct ConversationRunContextResolver {
         self.toolCatalog = toolCatalog
     }
 
+    /// Resolves model, endpoint, tools, options, and message history for one run.
     @MainActor
     func resolve(
         conversation: ConversationItem,
@@ -60,6 +63,7 @@ struct ConversationRunContextResolver {
         )
     }
 
+    /// Returns conversation messages in provider replay order.
     @MainActor
     private func orderedMessages(in conversation: ConversationItem) -> [MessageItem] {
         conversation.turns
@@ -69,6 +73,7 @@ struct ConversationRunContextResolver {
             }
     }
 
+    /// Fetches stored model metadata for the selected API configuration when available.
     @MainActor
     private func modelDescriptor(
         for modelID: String,
@@ -100,7 +105,9 @@ struct ConversationRunContextResolver {
     }
 }
 
+/// Builds and validates provider-neutral `LLMRequest` values from resolved run context.
 struct LLMRequestFactory {
+    /// Creates a request with concrete streaming mode resolved before final validation.
     func makeRequest(from context: ConversationRunContext) throws -> LLMRequest {
         var request = LLMRequest(
             providerID: context.providerID,

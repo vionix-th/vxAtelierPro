@@ -10,6 +10,7 @@ struct LLMStreamCompletionPolicy {
         didComplete: { _ in false }
     )
 
+    /// Requires the stream to emit an event that satisfies the completion detector.
     static func requireExplicitEvent(
         _ detector: @escaping ([String: JSONValue]) -> Bool
     ) -> LLMStreamCompletionPolicy {
@@ -43,12 +44,14 @@ struct DisabledLLMProviderAdapter: LLMProviderAdapter {
     let profile: LLMProviderProfile
     let message: String
 
+    /// Fails immediately with the configured unavailability reason.
     func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration) -> AsyncThrowingStream<LLMStreamEvent, Error> {
         AsyncThrowingStream { continuation in
             continuation.finish(throwing: LLMProviderError.authUnavailable(message))
         }
     }
 
+    /// Fails immediately because this provider cannot list models in the current build.
     func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
         throw LLMProviderError.authUnavailable(message)
     }

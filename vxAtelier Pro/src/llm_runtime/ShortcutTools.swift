@@ -1,15 +1,17 @@
 import Foundation
 import SwiftData
 
-/// Tool for listing all available Apple Shortcuts
+/// Executable tool that lists available Apple Shortcuts, optionally restricted by configuration.
 public struct ListShortcutsTool: ExecutableLLMTool, ConfigurableLLMTool {
     public let name = "list_shortcuts"
     public let description = "Lists all Apple Shortcuts configured in the macOS Shortcuts app, returning their unique identifiers (for use with `run_shortcut`) and human-readable names. Can optionally list only shortcuts pre-approved in settings."
     
+    /// Accepts no call-time arguments.
     public var parameters: any LLMToolParameters {
         GenericLLMToolParameters(properties: [:])
     }
 
+    /// Allows settings to restrict the visible shortcut list.
     var configurationSchema: any LLMToolParameters {
         GenericLLMToolParameters(
             properties: [
@@ -25,18 +27,18 @@ public struct ListShortcutsTool: ExecutableLLMTool, ConfigurableLLMTool {
         )
     }
     
+    /// Creates a shortcut-listing tool.
     public init() {
     }
     
+    /// Returns configured or discovered shortcuts as JSON.
     func execute(_ call: LLMToolExecutionCall) async throws -> String {
         let configuration = call.configuration
         #if os(macOS)
-        // Check if we should use restricted list based on configuration
         if configuration["Restricted"]?.boolValue == true,
            let restrictedListObject = configuration["RestrictedList"]?.objectValue {
             let restrictedList = restrictedListObject.compactMapValues(\.stringValue)
             
-            // Return only the restricted list of shortcuts
             let shortcutsList = restrictedList.map { shortcutId, shortcutName -> [String: String] in
                 return [
                     "id": shortcutId,
@@ -44,7 +46,6 @@ public struct ListShortcutsTool: ExecutableLLMTool, ConfigurableLLMTool {
                 ]
             }
             
-            // Convert to JSON string
             if let jsonData = try? JSONEncoder().encode(shortcutsList),
                let jsonString = String(data: jsonData, encoding: .utf8) {
                 return jsonString
@@ -53,14 +54,12 @@ public struct ListShortcutsTool: ExecutableLLMTool, ConfigurableLLMTool {
             }
         }
         
-        // If not restricted, get all shortcuts from Shortcuts.app
         let shortcuts = await ShortcutsManager.shared.getAllShortcuts()
         
         if shortcuts.isEmpty {
             return "No shortcuts found. Use the 'Add Shortcut' button in settings to add shortcuts."
         }
         
-        // Create a JSON array with shortcut info
         let shortcutsList = shortcuts.map { shortcut -> [String: String] in
             return [
                 "id": shortcut.id,
@@ -68,7 +67,6 @@ public struct ListShortcutsTool: ExecutableLLMTool, ConfigurableLLMTool {
             ]
         }
         
-        // Convert to JSON string
         if let jsonData = try? JSONEncoder().encode(shortcutsList),
            let jsonString = String(data: jsonData, encoding: .utf8) {
             return jsonString
@@ -80,6 +78,7 @@ public struct ListShortcutsTool: ExecutableLLMTool, ConfigurableLLMTool {
         #endif
     }
     
+    /// Provides a disabled restriction baseline with example values for settings UI materialization.
     func defaultConfiguration() -> [String: JSONValue] {
         [
             "Restricted": .boolean(false),
@@ -92,11 +91,12 @@ public struct ListShortcutsTool: ExecutableLLMTool, ConfigurableLLMTool {
     }
 }
 
-/// Tool for running a specific Apple Shortcut
+/// Executable tool that runs an Apple Shortcut by identifier or exact name.
 public struct RunShortcutTool: ExecutableLLMTool {
     public let name = "run_shortcut"
     public let description = "Executes a specific Apple Shortcut on macOS using either its unique identifier (obtained from `list_shortcuts`) or its exact name. Can optionally pass a string as input to the shortcut."
     
+    /// Requires a shortcut identifier and accepts optional string input.
     public var parameters: any LLMToolParameters {
         GenericLLMToolParameters(
             properties: [
@@ -113,9 +113,11 @@ public struct RunShortcutTool: ExecutableLLMTool {
         )
     }
     
+    /// Creates a shortcut execution tool.
     public init() {
     }
     
+    /// Runs the selected shortcut and returns the Shortcuts manager output.
     func execute(_ call: LLMToolExecutionCall) async throws -> String {
         let arguments = call.argumentsJSON
         #if os(macOS)
@@ -126,10 +128,8 @@ public struct RunShortcutTool: ExecutableLLMTool {
             throw LLMProviderError.invalidConfiguration("Shortcut tool arguments must include identifier.")
         }
         
-        // Extract the optional input parameter
         let input = args["input"]
         
-        // Pass both identifier and input to the ShortcutsManager
         return await ShortcutsManager.shared.runShortcut(name: identifier, input: input)
         #else
         throw LLMToolExecutionError.unavailable("This feature is only available on macOS.")

@@ -1,7 +1,9 @@
 import Foundation
 import SwiftData
 
+/// Persists conversation turns, provider runs, assistant messages, and tool results.
 struct ConversationRunStore {
+    /// Creates and saves the user turn that starts a completion run.
     @MainActor
     func startTurn(message: String, in conversation: ConversationItem) throws -> ConversationTurn {
         let userMessage = MessageItem(
@@ -22,6 +24,7 @@ struct ConversationRunStore {
         return turn
     }
 
+    /// Removes an unsent turn after run setup fails before any provider run is recorded.
     @MainActor
     func rollbackTurn(_ turn: ConversationTurn, from conversation: ConversationItem) throws {
         if let index = conversation.turns.firstIndex(where: { $0.id == turn.id }) {
@@ -31,12 +34,14 @@ struct ConversationRunStore {
         try save(conversation)
     }
 
+    /// Refreshes conversation token counts and saves final run state.
     @MainActor
     func finishConversation(_ conversation: ConversationItem) throws {
         conversation.forceUpdateTokenCount(updateContextCount: true, updateTotalCount: true)
         try save(conversation)
     }
 
+    /// Creates a persisted provider run and transitions it into streaming state.
     @MainActor
     func createResponseRun(
         for request: LLMRequest,
@@ -56,6 +61,7 @@ struct ConversationRunStore {
         return run
     }
 
+    /// Applies provider output to the run and creates an assistant message when content exists.
     @MainActor
     func applyProviderResult(
         _ result: ProviderRunResult,
@@ -98,6 +104,7 @@ struct ConversationRunStore {
         return message
     }
 
+    /// Records a terminal failed or cancelled state and returns the normalized error.
     @MainActor
     func markRunFailed(
         _ run: ResponseRunItem,
@@ -116,6 +123,7 @@ struct ConversationRunStore {
         return normalizedError
     }
 
+    /// Marks a run completed after all requested tool calls have produced results.
     @MainActor
     func completeRunAfterTools(_ run: ResponseRunItem, conversation: ConversationItem) throws {
         try run.transition(to: .completed)
@@ -123,12 +131,14 @@ struct ConversationRunStore {
         try save(conversation)
     }
 
+    /// Marks a persisted tool call as currently executing.
     @MainActor
     func markToolExecuting(_ toolCall: ToolCallItem, conversation: ConversationItem) throws {
         toolCall.status = .executing
         try save(conversation)
     }
 
+    /// Stores tool output as a tool-result message and marks the call completed.
     @MainActor
     func completeToolCall(
         _ toolCall: ToolCallItem,
@@ -149,6 +159,7 @@ struct ConversationRunStore {
         try save(conversation)
     }
 
+    /// Stores a tool failure message on the tool-call record.
     @MainActor
     func failToolCall(_ toolCall: ToolCallItem, error: Error, conversation: ConversationItem) throws {
         toolCall.status = .failed
@@ -156,12 +167,14 @@ struct ConversationRunStore {
         try save(conversation)
     }
 
+    /// Marks a tool call as cancelled without creating a result message.
     @MainActor
     func cancelToolCall(_ toolCall: ToolCallItem, conversation: ConversationItem) throws {
         toolCall.status = .cancelled
         try save(conversation)
     }
 
+    /// Saves through the conversation's SwiftData model context.
     @MainActor
     func save(_ conversation: ConversationItem) throws {
         try conversation.modelContext?.save()

@@ -1,5 +1,6 @@
 import Foundation
 
+/// Coordinates a full conversation completion, including provider/tool loops and persistence.
 @MainActor
 final class ConversationCompletionUseCase {
     static let shared = ConversationCompletionUseCase()
@@ -11,6 +12,7 @@ final class ConversationCompletionUseCase {
     private let runStore: ConversationRunStore
     private let maxToolDepth: Int
 
+    /// Creates the completion coordinator with injectable collaborators for orchestration tests.
     init(
         contextResolver: ConversationRunContextResolver? = nil,
         requestFactory: LLMRequestFactory = LLMRequestFactory(),
@@ -32,6 +34,7 @@ final class ConversationCompletionUseCase {
         self.maxToolDepth = maxToolDepth
     }
 
+    /// Appends a user message and runs the conversation until no tool calls remain.
     func complete(
         conversation: ConversationItem,
         message: String,
@@ -64,6 +67,7 @@ final class ConversationCompletionUseCase {
         }
     }
 
+    /// Repeats provider calls and tool execution until the assistant response is stable.
     private func runUntilStable(
         conversation: ConversationItem,
         turn: ConversationTurn,
@@ -123,6 +127,7 @@ final class ConversationCompletionUseCase {
         throw LLMProviderError.unsupportedCapability("Max tool recursion depth exceeded.")
     }
 
+    /// Executes tool calls sequentially so persisted tool results preserve provider order.
     private func executeToolCalls(
         _ toolCalls: [ToolCallItem],
         conversation: ConversationItem,

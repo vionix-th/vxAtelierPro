@@ -30,6 +30,7 @@ struct LLMCapabilityValidator {
         }
     }
 
+    /// Confirms that both provider profile and model metadata allow the selected endpoint.
     private static func validateEndpoint(_ request: LLMRequest, profile: LLMProviderProfile) throws {
         guard profile.supportedEndpointFamilies.contains(request.endpointFamily) else {
             throw LLMProviderError.unsupportedCapability("\(profile.name) does not support \(request.endpointFamily.rawValue).")
@@ -40,6 +41,7 @@ struct LLMCapabilityValidator {
         }
     }
 
+    /// Confirms requested generation options are mapped and supported by the provider/model pair.
     private static func validateParameters(_ request: LLMRequest, profile: LLMProviderProfile) throws {
         let options = request.options
         let mappings = LLMParameterMappingResolver.resolve(
@@ -88,6 +90,7 @@ struct LLMCapabilityValidator {
         }
     }
 
+    /// Confirms message content modalities are supported by the provider/model pair.
     private static func validateContent(_ request: LLMRequest, profile: LLMProviderProfile) throws {
         for message in request.messages {
             for part in message.content {
@@ -110,6 +113,7 @@ struct LLMCapabilityValidator {
         }
     }
 
+    /// Confirms assistant tool calls and tool results form a valid provider replay sequence.
     private static func validateToolReplay(_ request: LLMRequest) throws {
         var knownToolIDs = Set<String>()
         var answeredToolIDs = Set<String>()
@@ -158,6 +162,7 @@ struct LLMCapabilityValidator {
         }
     }
 
+    /// Returns the provider-specific error for an interrupted tool-result sequence.
     private static func pendingToolResultError(for request: LLMRequest) -> LLMProviderError {
         if request.endpointFamily == .anthropicMessages {
             return .unsupportedParameter("Anthropic tool_result must immediately follow its assistant tool_use.")
@@ -165,6 +170,7 @@ struct LLMCapabilityValidator {
         return .unsupportedParameter("Tool result must immediately follow assistant tool call.")
     }
 
+    /// Requires an active provider mapping before a semantic option is encoded.
     private static func requireMapping(
         _ parameterID: LLMParameterID,
         mappings: [LLMParameterID: LLMParameterMappingDescriptor],
@@ -176,6 +182,7 @@ struct LLMCapabilityValidator {
         }
     }
 
+    /// Resolves a schema feature against model metadata when present, otherwise profile defaults.
     private static func hasSchemaFeature(_ feature: LLMSchemaFeature, request: LLMRequest, profile: LLMProviderProfile) -> Bool {
         if let features = request.modelDescriptor?.schemaFeatures, !features.isEmpty {
             return features.contains(feature) && profile.schemaFeatures.contains(feature)
@@ -183,6 +190,7 @@ struct LLMCapabilityValidator {
         return profile.schemaFeatures.contains(feature)
     }
 
+    /// Resolves a modality against model metadata when present, otherwise profile defaults.
     private static func supportsModality(_ modality: LLMModality, request: LLMRequest, profile: LLMProviderProfile) -> Bool {
         if let modalities = request.modelDescriptor?.modalities, !modalities.isEmpty {
             return modalities.contains(modality) && profile.modalities.contains(modality)

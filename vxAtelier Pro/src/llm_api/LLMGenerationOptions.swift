@@ -36,6 +36,7 @@ struct LLMGenerationOptions: Codable, Equatable {
     var retryPolicy: RetryPolicy
     var providerExtras: [String: JSONValue]
 
+    /// Creates provider-neutral generation options with conservative defaults.
     init(
         systemPrompt: String = "",
         modelID: String? = nil,

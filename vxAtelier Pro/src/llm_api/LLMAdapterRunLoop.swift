@@ -1,11 +1,13 @@
 import Foundation
 
+/// Shared adapter loop that validates requests and normalizes streaming/non-streaming HTTP execution.
 enum LLMAdapterRunLoop {
     typealias Continuation = AsyncThrowingStream<LLMStreamEvent, Error>.Continuation
     typealias BodyBuilder = (Bool) throws -> [String: JSONValue]
     typealias NonStreamingEmitter = (JSONValue, Continuation) -> Void
     typealias StreamingEventHandler = ([String: JSONValue], inout LLMToolCallAssembler, Continuation) -> Void
 
+    /// Executes one provider request and delegates provider-specific encoding and event interpretation to closures.
     static func stream(
         request: LLMRequest,
         configuration: LLMProviderConfiguration,
@@ -55,6 +57,7 @@ enum LLMAdapterRunLoop {
         }
     }
 
+    /// Collects SSE events, emits completed tool calls, and enforces provider completion semantics.
     private static func collectStream(
         endpoint: String,
         httpConfig: LLMHTTPClient.Configuration,

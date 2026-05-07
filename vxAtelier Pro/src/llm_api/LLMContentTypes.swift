@@ -19,6 +19,7 @@ struct LLMContentPart: Codable, Equatable, Identifiable {
     var dataBase64: String?
     var sourceURL: String?
 
+    /// Creates a content part with only the fields needed by its semantic kind.
     init(
         id: UUID = UUID(),
         kind: Kind = .text,
@@ -44,6 +45,7 @@ struct LLMMessage: Codable, Equatable, Identifiable {
     var toolCalls: [LLMToolCall]
     var toolCallID: String?
 
+    /// Creates a provider-neutral message, including any assistant calls or tool-call result ID.
     init(
         id: UUID = UUID(),
         role: String,
@@ -58,6 +60,7 @@ struct LLMMessage: Codable, Equatable, Identifiable {
         self.toolCallID = toolCallID
     }
 
+    /// Concatenates text-bearing content parts for display and tool-result transport.
     var displayText: String {
         content.compactMap(\.text).joined()
     }

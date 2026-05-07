@@ -1,16 +1,19 @@
 import Foundation
 
-/// Tool for listing specific UserDefaults settings managed by AppStorage.
+/// Executable tool that lists the allowlisted UserDefaults/AppStorage settings.
 public struct ListSettingsTool: ExecutableLLMTool {
     public let name = "list_settings"
     public let description = "Lists available application settings managed via UserDefaults/AppStorage, showing their keys (for use with read/write tools), data types, current values, writability status, and allowed values for enumerated types."
 
+    /// Accepts no arguments.
     public var parameters: any LLMToolParameters {
         GenericLLMToolParameters(properties: [:])
     }
 
+    /// Creates a settings listing tool.
     public init() {}
 
+    /// Returns setting keys, types, writability, allowed values, and current values as text.
     func execute(_ call: LLMToolExecutionCall) async throws -> String {
         var listDescription = "Available UserDefaults Settings (including current values):\n"
         let userDefaults = UserDefaults.standard

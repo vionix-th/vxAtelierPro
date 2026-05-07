@@ -2,6 +2,7 @@ import Foundation
 
 /// Helpers for converting tool schemas into provider-neutral LLM request values.
 enum LLMRequestEncoding {
+    /// Wraps an object literal as a `JSONValue` without exposing call sites to enum case syntax.
     static func jsonObject(_ object: [String: JSONValue]) -> JSONValue {
         .object(object)
     }

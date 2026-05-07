@@ -22,6 +22,7 @@ enum LLMProviderError: Error, LocalizedError, Equatable {
     case decoding(String)
     case cancelled
 
+    /// Presents the stored provider or validation failure as user-facing text.
     var errorDescription: String? {
         switch self {
         case .invalidConfiguration(let message): return message
@@ -43,6 +44,7 @@ struct LLMUsage: Codable, Equatable {
     var outputTokens: Int?
     var totalTokens: Int?
 
+    /// Creates token accounting from whichever counters the provider returned.
     init(inputTokens: Int? = nil, outputTokens: Int? = nil, totalTokens: Int? = nil) {
         self.inputTokens = inputTokens
         self.outputTokens = outputTokens
@@ -58,6 +60,7 @@ struct LLMResponseMetadata: Codable, Equatable {
     var rateLimitHeaders: [String: String]
     var headers: [String: String]
 
+    /// Creates redacted response metadata suitable for persistence and diagnostics.
     init(
         statusCode: Int? = nil,
         requestID: String? = nil,

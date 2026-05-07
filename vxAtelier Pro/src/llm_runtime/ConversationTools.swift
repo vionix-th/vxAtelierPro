@@ -1,12 +1,13 @@
 import Foundation
 import SwiftData
 
-/// Tool for renaming a ConversationItem
+/// Executable tool that renames a conversation selected by stable hashed ID.
 public struct RenameConversationTool: ExecutableLLMTool {
     public let name = "rename_conversation"
     public let description = "Renames a specific chat conversation. Requires the conversation's unique hashed ID (obtainable from 'list_conversations' or 'get_current_conversation') and the desired new title."
     private let modelContext: ModelContext
     
+    /// Requires the target conversation hash and replacement title.
     public var parameters: any LLMToolParameters {
         GenericLLMToolParameters(
             properties: [
@@ -23,10 +24,12 @@ public struct RenameConversationTool: ExecutableLLMTool {
         )
     }
     
+    /// Creates a rename tool bound to the supplied SwiftData context.
     public init(modelContext: ModelContext) {
         self.modelContext = modelContext
     }
     
+    /// Renames the matching conversation and returns a short status message.
     func execute(_ call: LLMToolExecutionCall) async throws -> String {
         let arguments = call.argumentsJSON
         guard let jsonData = arguments.data(using: .utf8) else {
@@ -40,7 +43,6 @@ public struct RenameConversationTool: ExecutableLLMTool {
                 throw AppError.invalidArguments("Missing required arguments: conversation_id or new_title")
             }
             
-            // Fetch the conversation using the stably hashed ID string
             let descriptor = FetchDescriptor<ConversationItem>()
             let conversations: [ConversationItem]
             do {
@@ -54,12 +56,9 @@ public struct RenameConversationTool: ExecutableLLMTool {
                 return "Conversation not found"
             }
             
-            // Store the conversation ID instead of capturing the conversation instance
             let targetConversationId = conversation.id
             
-            // Update the conversation title on the main thread since it's a UI operation
             await MainActor.run {
-                // Fetch the conversation again on the main actor
                 let descriptor = FetchDescriptor<ConversationItem>()
                 if let conversation = try? modelContext.fetch(descriptor).first(where: { $0.id == targetConversationId }) {
                     conversation.title = newTitle
@@ -77,22 +76,24 @@ public struct RenameConversationTool: ExecutableLLMTool {
     }
 }
 
-/// Tool for listing all conversations with their IDs and titles
+/// Executable tool that lists conversations with stable hashed IDs.
 public struct ListConversationsTool: ExecutableLLMTool {
     public let name = "list_conversations"
     public let description = "Returns a JSON list of all existing chat conversations, including their unique hashed ID (for use with other conversation tools), title, and purpose."
     private let modelContext: ModelContext
     
+    /// Accepts no arguments.
     public var parameters: any LLMToolParameters {
         GenericLLMToolParameters(properties: [:])
     }
     
+    /// Creates a listing tool bound to the supplied SwiftData context.
     public init(modelContext: ModelContext) {
         self.modelContext = modelContext
     }
     
+    /// Returns all conversations as JSON with hashed IDs, titles, and purposes.
     func execute(_ call: LLMToolExecutionCall) async throws -> String {
-        // Fetch all conversations
         let descriptor = FetchDescriptor<ConversationItem>()
         do {
             let conversations = try modelContext.fetch(descriptor)
@@ -101,7 +102,6 @@ public struct ListConversationsTool: ExecutableLLMTool {
                 return "No conversations found"
             }
             
-            // Create a JSON array of conversation objects with stably hashed id and title
             let conversationList = conversations.map { conversation -> [String: String] in
                 return [
                     "id": StableHash.md5Hex(String(describing: conversation.id)),
@@ -110,7 +110,6 @@ public struct ListConversationsTool: ExecutableLLMTool {
                 ]
             }
             
-            // Convert to JSON string
             let jsonData = try JSONEncoder().encode(conversationList)
             guard let jsonString = String(data: jsonData, encoding: .utf8) else {
                 throw AppError.encodingFailed("Failed to encode conversation list as UTF-8 string")
@@ -126,12 +125,13 @@ public struct ListConversationsTool: ExecutableLLMTool {
     }
 }
 
-/// Tool for finding a conversation by its title
+/// Executable tool that finds the first conversation whose title contains a query string.
 public struct FindConversationTool: ExecutableLLMTool {
     public let name = "find_conversation"
     public let description = "Finds the first chat conversation whose title contains the provided search string. Returns a JSON object with the conversation's hashed ID and full title if found, otherwise a 'not found' message."
     private let modelContext: ModelContext
     
+    /// Requires the title fragment to search for.
     public var parameters: any LLMToolParameters {
         GenericLLMToolParameters(
             properties: [
@@ -144,10 +144,12 @@ public struct FindConversationTool: ExecutableLLMTool {
         )
     }
     
+    /// Creates a search tool bound to the supplied SwiftData context.
     public init(modelContext: ModelContext) {
         self.modelContext = modelContext
     }
     
+    /// Returns the first matching conversation as JSON, or a not-found message.
     func execute(_ call: LLMToolExecutionCall) async throws -> String {
         let arguments = call.argumentsJSON
         guard let jsonData = arguments.data(using: .utf8) else {
@@ -160,18 +162,15 @@ public struct FindConversationTool: ExecutableLLMTool {
                 throw AppError.invalidArguments("Missing required argument: title")
             }
             
-            // Fetch all conversations
             let descriptor = FetchDescriptor<ConversationItem>()
             let conversations = try modelContext.fetch(descriptor)
             
-            // Find the first conversation with matching title
             if let conversation = conversations.first(where: { $0.title.contains(title) }) {
                 let conversationInfo: [String: String] = [
                     "id": StableHash.md5Hex(String(describing: conversation.id)),
                     "title": conversation.title
                 ]
                 
-                // Convert to JSON string
                 let jsonData = try JSONEncoder().encode(conversationInfo)
                 guard let jsonString = String(data: jsonData, encoding: .utf8) else {
                     throw AppError.encodingFailed("Failed to encode conversation information as UTF-8 string")
@@ -193,29 +192,30 @@ public struct FindConversationTool: ExecutableLLMTool {
     }
 }
 
-/// Tool for getting the current conversation's ID
+/// Executable tool that reports the current conversation identity and purpose.
 public struct CurrentConversationTool: ExecutableLLMTool {
     public let name = "get_current_conversation"
     public let description = "Returns a JSON object containing the unique hashed ID, title, and purpose of the chat conversation currently active in the application context."
     
+    /// Accepts no arguments.
     public var parameters: any LLMToolParameters {
         GenericLLMToolParameters(properties: [:])
     }
     
+    /// Creates a current-conversation tool.
     public init() {
     }
     
+    /// Returns the active conversation as JSON with a stable hashed ID.
     func execute(_ call: LLMToolExecutionCall) async throws -> String {
         let conversationItem = call.context.conversation
         
-        // Create a response object with conversation info
         let response: [String: String] = [
             "id": StableHash.md5Hex(String(describing: conversationItem.id)),
             "title": conversationItem.title,
             "purpose": String(describing: conversationItem.purpose)
         ]
         
-        // Convert to JSON string
         do {
             let jsonData = try JSONEncoder().encode(response)
             guard let jsonString = String(data: jsonData, encoding: .utf8) else {

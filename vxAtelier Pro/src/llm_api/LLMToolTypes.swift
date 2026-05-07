@@ -11,6 +11,7 @@ enum LLMToolCallStatus: String, Codable, CaseIterable {
 
 /// Provider-neutral tool schema exposed to an LLM request.
 struct LLMToolDefinition: Codable, Equatable, Identifiable {
+    /// Uses the provider-visible tool name as the stable identity.
     var id: String { name }
     var name: String
     var description: String
@@ -25,6 +26,7 @@ struct LLMToolCall: Codable, Equatable, Identifiable {
     var name: String
     var argumentsJSON: String
 
+    /// Creates a normalized call, preserving both local and provider call identifiers when present.
     init(id: String, callID: String? = nil, index: Int = 0, name: String, argumentsJSON: String) {
         self.id = id
         self.callID = callID

@@ -6,8 +6,10 @@ enum LLMParameterEncodingKind: String, Codable, CaseIterable, Identifiable {
     case structuredPreset
     case disabled
 
+    /// Exposes the raw encoding key as the SwiftUI identity.
     var id: String { rawValue }
 
+    /// Human-facing encoding name for model mapping controls.
     var displayName: String {
         switch self {
         case .scalarKey: return "Scalar Key"
@@ -23,8 +25,10 @@ enum LLMParameterStructuredPreset: String, Codable, CaseIterable, Identifiable {
     case openAIResponsesTextFormat
     case openAIResponsesReasoning
 
+    /// Exposes the raw preset key as the SwiftUI identity.
     var id: String { rawValue }
 
+    /// Human-facing preset name for model mapping controls.
     var displayName: String {
         switch self {
         case .openAIChatResponseFormat: return "OpenAI Chat Response Format"
@@ -36,6 +40,7 @@ enum LLMParameterStructuredPreset: String, Codable, CaseIterable, Identifiable {
 
 /// Mapping from one semantic parameter to one provider endpoint encoding.
 struct LLMParameterMappingDescriptor: Codable, Equatable, Identifiable {
+    /// Combines endpoint and semantic parameter so one model can store per-endpoint mappings.
     var id: String { "\(endpointFamily.rawValue):\(semanticParameterID.rawValue)" }
     var endpointFamily: LLMEndpointFamily
     var semanticParameterID: LLMParameterID
@@ -46,6 +51,7 @@ struct LLMParameterMappingDescriptor: Codable, Equatable, Identifiable {
     var structuredPreset: LLMParameterStructuredPreset?
     var defaultValue: JSONValue?
 
+    /// Creates a provider mapping for a semantic parameter at one endpoint.
     init(
         endpointFamily: LLMEndpointFamily,
         semanticParameterID: LLMParameterID,
@@ -95,6 +101,7 @@ enum LLMParameterMappingCatalog {
         }
     }
 
+    /// Selects the OpenAI chat token-limit key for the requested model generation.
     private static func openAIChatDefaults(modelID: String) -> [LLMParameterMappingDescriptor] {
         let maxTokenWireKey = modelID.lowercased().hasPrefix("gpt-5")
             ? "max_completion_tokens"
@@ -102,10 +109,12 @@ enum LLMParameterMappingCatalog {
         return commonChatDefaults(endpointFamily: .chatCompletions, maxTokenWireKey: maxTokenWireKey)
     }
 
+    /// Defaults for OpenAI-compatible chat APIs that follow the legacy token-limit key.
     private static func openAICompatibleChatDefaults() -> [LLMParameterMappingDescriptor] {
         commonChatDefaults(endpointFamily: .chatCompletions, maxTokenWireKey: "max_tokens")
     }
 
+    /// Builds mappings shared by OpenAI-compatible chat endpoints.
     private static func commonChatDefaults(
         endpointFamily: LLMEndpointFamily,
         maxTokenWireKey: String
@@ -124,6 +133,7 @@ enum LLMParameterMappingCatalog {
         ]
     }
 
+    /// Defaults for OpenAI Responses endpoint structured and scalar parameters.
     private static func openAIResponsesDefaults() -> [LLMParameterMappingDescriptor] {
         [
             .init(endpointFamily: .responses, semanticParameterID: .maxOutputTokens, wireKey: "max_output_tokens"),
@@ -145,6 +155,7 @@ enum LLMParameterMappingCatalog {
         ]
     }
 
+    /// Defaults required by Anthropic Messages, including the fallback max-token value.
     private static func anthropicMessagesDefaults() -> [LLMParameterMappingDescriptor] {
         [
             .init(
@@ -202,7 +213,9 @@ enum LLMParameterRequestEncoder {
     }
 }
 
+/// Semantic parameter extraction for provider request encoding.
 extension LLMGenerationOptions {
+    /// Returns the JSON value for a semantic parameter when the option is set.
     func jsonValue(for parameterID: LLMParameterID) -> JSONValue? {
         switch parameterID {
         case .model:
@@ -227,7 +240,9 @@ extension LLMGenerationOptions {
     }
 }
 
+/// Response-format normalization for persisted and provider-neutral values.
 extension LLMGenerationOptions.ResponseFormat {
+    /// Normalized value used by semantic parameter mappings.
     var semanticRawValue: String {
         switch self {
         case .text: return "text"
@@ -236,6 +251,7 @@ extension LLMGenerationOptions.ResponseFormat {
         }
     }
 
+    /// Parses persisted legacy and semantic response-format values.
     static func fromSemanticRawValue(_ value: String) -> Self {
         switch value {
         case "json_object", "jsonObject":

@@ -1,10 +1,12 @@
 import Foundation
 
+/// Metadata for one app setting exposed to LLM setting tools.
 struct LLMToolSettingInfo {
     let type: Any.Type
     let allowedValues: [String]?
     let isWritable: Bool
 
+    /// Creates type, enum, and write-policy metadata for a setting key.
     init(type: Any.Type, allowedValues: [String]? = nil, isWritable: Bool = true) {
         self.type = type
         self.allowedValues = allowedValues
@@ -12,6 +14,7 @@ struct LLMToolSettingInfo {
     }
 }
 
+/// Allowlist of UserDefaults/AppStorage keys exposed through LLM tools.
 enum LLMToolSettingsRegistry {
     static let knownSettings: [String: LLMToolSettingInfo] = [
         "defaultModel": .init(type: String.self),

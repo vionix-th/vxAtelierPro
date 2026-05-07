@@ -6,6 +6,7 @@ struct LLMProviderRegistry {
 
     let profiles: [LLMProviderID: LLMProviderProfile]
 
+    /// Builds the built-in provider profiles used by configuration and adapter selection.
     init() {
         let allProfiles = [
             LLMProviderProfile(
@@ -145,7 +146,9 @@ struct LLMProviderRegistry {
     }
 }
 
+/// Factories for reusable provider profile shapes.
 extension LLMProviderProfile {
+    /// Builds a profile for providers that implement the OpenAI Chat Completions shape.
     static func openAICompatible(
         id: LLMProviderID,
         name: String,

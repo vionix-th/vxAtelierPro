@@ -1,13 +1,16 @@
 import Foundation
 
+/// Adapter for OpenAI Responses requests and events.
 struct OpenAIResponsesAdapter: LLMProviderAdapter {
     let profile: LLMProviderProfile
     private let httpClient = LLMHTTPClient()
 
+    /// Creates an adapter for a provider profile that supports Responses.
     init(profile: LLMProviderProfile) {
         self.profile = profile
     }
 
+    /// Executes a Responses request through the shared adapter run loop.
     func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration) -> AsyncThrowingStream<LLMStreamEvent, Error> {
         let endpoint = configuration.endpointPath(for: .responses) ?? profile.endpointPaths[.responses] ?? "/v1/responses"
         return LLMAdapterRunLoop.stream(
@@ -31,6 +34,7 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
         )
     }
 
+    /// Reuses Chat Completions model listing and broadens descriptors to Responses support.
     func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
         let chatFallback = OpenAIChatAdapter(profile: profile)
         return try await chatFallback.fetchModels(configuration: configuration).map { descriptor in
@@ -41,6 +45,7 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
         }
     }
 
+    /// Encodes a provider-neutral request into a Responses JSON body.
     func makeBody(for request: LLMRequest, stream: Bool) throws -> [String: JSONValue] {
         var body: [String: JSONValue] = [
             "model": .string(request.modelID),
@@ -68,6 +73,7 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
         return body
     }
 
+    /// Converts conversation messages into Responses input items, including tool replay.
     func responsesInput(from request: LLMRequest) throws -> [JSONValue] {
         try request.messages.flatMap { message -> [JSONValue] in
             if message.role == "tool", let toolCallID = message.toolCallID {
@@ -100,6 +106,7 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
         }
     }
 
+    /// Returns whether a message has content that should become a Responses input message.
     private func hasProviderContent(_ message: LLMMessage) -> Bool {
         if !message.displayText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return true
@@ -114,6 +121,7 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
         }
     }
 
+    /// Converts one Responses SSE payload into normalized stream events.
     private func handleResponsesStreamEvent(
         _ event: [String: JSONValue],
         assembler: inout LLMToolCallAssembler,
@@ -160,6 +168,7 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
         }
     }
 
+    /// Emits normalized events from a complete Responses JSON response.
     private func emitNonStreamingResponse(
         _ response: JSONValue,
         continuation: AsyncThrowingStream<LLMStreamEvent, Error>.Continuation

@@ -35,6 +35,7 @@ struct LLMModelDescriptor: Codable, Equatable, Identifiable {
     var schemaFeatures: [LLMSchemaFeature]
     var rawMetadataJSON: String?
 
+    /// Creates normalized model metadata from provider defaults plus optional model-list details.
     init(
         id: String,
         displayName: String? = nil,

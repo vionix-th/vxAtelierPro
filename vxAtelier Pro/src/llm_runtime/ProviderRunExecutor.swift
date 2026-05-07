@@ -1,13 +1,16 @@
 import Foundation
 import SwiftData
 
+/// Executes provider adapters and accumulates normalized run output.
 struct ProviderRunExecutor {
     let registry: LLMProviderRegistry
 
+    /// Creates an executor with an injectable provider registry.
     init(registry: LLMProviderRegistry = .shared) {
         self.registry = registry
     }
 
+    /// Performs one provider run, retrying once for retryable failures when requested.
     @MainActor
     func performRun(
         request: LLMRequest,
@@ -37,6 +40,7 @@ struct ProviderRunExecutor {
         }
     }
 
+    /// Extracts response metadata carried by a provider-domain error.
     func responseMetadata(from error: Error) -> LLMResponseMetadata? {
         guard case .provider(_, _, let metadata) = error as? LLMProviderError else {
             return nil
@@ -44,6 +48,7 @@ struct ProviderRunExecutor {
         return metadata
     }
 
+    /// Collects adapter stream events into persisted-result data and transient draft updates.
     @MainActor
     private func collectRun(
         request: LLMRequest,
@@ -88,6 +93,7 @@ struct ProviderRunExecutor {
         return result
     }
 
+    /// Inserts or replaces a streamed tool call using provider order and identifiers.
     private func upsert(_ call: LLMToolCall, into calls: inout [LLMToolCall]) {
         if let existingIndex = calls.firstIndex(where: { existing in
             existing.index == call.index || existing.id == call.id || (call.callID != nil && existing.callID == call.callID)
@@ -99,6 +105,7 @@ struct ProviderRunExecutor {
         }
     }
 
+    /// Returns true for transient network and provider status failures.
     private func isRetryable(_ error: Error) -> Bool {
         guard let providerError = error as? LLMProviderError else { return false }
         switch providerError {
@@ -111,6 +118,7 @@ struct ProviderRunExecutor {
         }
     }
 
+    /// Honors a bounded Retry-After value before retrying a provider request.
     private func sleepBeforeRetry(for error: Error) async throws {
         let fallbackNanoseconds: UInt64 = 100_000_000
         guard let retryAfter = responseMetadata(from: error)?.retryAfter,

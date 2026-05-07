@@ -12,16 +12,23 @@ enum LLMParameterID: String, Codable, CaseIterable, Identifiable {
     case reasoningEffort = "reasoning_effort"
     case serviceTier = "service_tier"
 
+    /// Exposes the semantic parameter key as the SwiftUI identity.
     var id: String { rawValue }
 
+    /// Built-in metadata for validation and settings controls.
     var definition: LLMParameterDefinition {
         LLMParameterDefinitionCatalog.definition(for: self)
     }
 
+    /// Expected primitive value class for this parameter.
     var valueType: LLMParameterValueType { definition.valueType }
+    /// Inclusive lower bound for numeric parameters.
     var minValue: Double? { definition.minValue }
+    /// Inclusive upper bound for numeric parameters.
     var maxValue: Double? { definition.maxValue }
+    /// Allowed values for enumerated string parameters.
     var options: [String]? { definition.options }
+    /// Indicates whether provider adapters may map this parameter onto a wire field.
     var isProviderMappable: Bool { definition.isProviderMappable }
 }
 
@@ -42,6 +49,7 @@ struct LLMParameterDefinition: Codable, Equatable, Identifiable {
     var options: [String]?
     var isProviderMappable: Bool
 
+    /// Creates semantic parameter metadata used by validation and UI controls.
     init(
         id: LLMParameterID,
         valueType: LLMParameterValueType,
@@ -61,6 +69,7 @@ struct LLMParameterDefinition: Codable, Equatable, Identifiable {
 
 /// Built-in semantic parameter definitions.
 enum LLMParameterDefinitionCatalog {
+    /// Returns validation metadata for a semantic generation parameter.
     static func definition(for parameterID: LLMParameterID) -> LLMParameterDefinition {
         switch parameterID {
         case .model:
