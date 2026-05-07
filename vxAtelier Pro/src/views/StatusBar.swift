@@ -412,7 +412,7 @@ struct ConversationInfoHeader: View {
     }
     
     private var modelCapabilities: [ModelCapability] {
-        ModelProviderUtils.inferCapabilities(from: modelName)
+        LLMModelProviderUtils.inferCapabilities(from: modelName)
     }
     
     private var isStreamingEnabled: Bool {

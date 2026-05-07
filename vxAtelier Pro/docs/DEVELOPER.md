@@ -13,7 +13,7 @@ This document provides an in-depth technical reference of the **vxAtelier Pro** 
 4. [Data Flow & Persistence](#data-flow--persistence)
 5. [Key Modules](#key-modules)
    1. [LLM API And Runtime](#llm-api-and-runtime)
-   2. [Models (`models/`)](#models)
+   2. [Persistence (`persistence/`)](#persistence)
    3. [System Layer (`system/`)](#system-layer)
    4. [Text-to-Speech (`tts/`)](#text-to-speech)
    5. [Search (`search/`)](#search)
@@ -59,9 +59,9 @@ The application is entirely Swift-based and uses **SwiftData** for persistence a
 src/
 ├─ llm_api/         # Reusable LLM protocol, providers, adapters, transport, tool framework
 ├─ llm_runtime/     # SwiftData-aware LLM run orchestration and concrete tools
-├─ models/          # Core SwiftData models
+├─ persistence/     # SwiftData schema and persistence-adjacent support types
 ├─ search/          # Web search provider integration
-├─ system/          # Persistence, defaults, logging, permissions
+├─ system/          # App services, defaults, settings, logging, permissions
 │  └─ export/       # Codable models and utilities for data backup
 ├─ tts/             # Text-to-speech pipeline & voice config
 ├─ utilities/       # General helpers & extensions
@@ -120,7 +120,7 @@ The LLM subsystem is split by reuse boundary. `llm_api` contains the reusable pr
 *   **Tool Framework Files (`llm_api/LLMTool*`, `llm_api/ConfigurableLLMTool.swift`)**: Reusable tool schemas, configuration protocol, catalog interface, and registry.
 *   **Runtime Files (`llm_runtime/Conversation*`, `llm_runtime/ProviderRunExecutor.swift`, `llm_runtime/ToolBatchExecutor.swift`, `llm_runtime/LLMRequestFactory.swift`)**: Split request assembly, draft/event collection, sequential tool execution, SwiftData save boundaries, and turn orchestration.
 *   **Concrete Tool Files (`llm_runtime/*Tool.swift`, `llm_runtime/ConversationTools.swift`, `llm_runtime/ShortcutTools.swift`)**: vxAtelier-specific tools for conversations, settings, shortcuts, web search, and website reading.
-*   **Provider & Capability Utilities (`models/ModelProviderUtils.swift`)**: Provides app-side model-name capability inference for persisted `ModelItem` records and UI filtering.
+*   **Provider & Capability Utilities (`llm_api/LLMModelProviderUtils.swift`)**: Provides provider/model-name capability inference for persisted `ModelItem` records and UI filtering.
 
 ### Search (`search/`)
 
@@ -291,8 +291,8 @@ This submodule manages the export and backup of all user data. It is designed to
     *   **Export**: An `init(Model)` initializer takes a live SwiftData object and recursively maps its data into a serializable format.
     *   **Import/Restore**: A `toDataItem(context:)` method takes the deserialized data and converts it back into a new, fully-formed SwiftData object, ready for insertion into the database.
 
-### Models
-Location: `src/models/`
+### Persistence
+Location: `src/persistence/`
 
 The application's data layer is composed of SwiftData `@Model` classes for persistence and various supporting `structs` and `enums` for state management, configuration, and data handling.
 
@@ -321,9 +321,7 @@ These models store user-configurable settings.
 These non-persisted types are critical for application logic.
 
 *   **`ItemStatus`**: An enum (`active`, `archived`, `trashed`) that defines the lifecycle state for `ProjectItem` and `ConversationItem`.
-*   **`AppearanceStyle`**: An enum (`system`, `light`, `dark`) for managing the application's color scheme.
-
-### Models Module
+### Persistence Module
 
 This module contains the core SwiftData models and supporting data structures that define the application's persistence layer and state.
 
@@ -385,7 +383,7 @@ This SwiftData `@Model` is a comprehensive container for all settings that gover
 
 This SwiftData `@Model` represents a specific, selectable AI model from a provider.
 
-*   **Automated Inference**: Its `init` method uses a centralized `ModelProviderUtils` helper to automatically infer the model's provider and capabilities from its name string, then materializes default parameter mappings from `LLMParameterMappingCatalog`.
+*   **Automated Inference**: Its `init` method uses a centralized `LLMModelProviderUtils` helper to automatically infer the model's provider and capabilities from its name string, then materializes default parameter mappings from `LLMParameterMappingCatalog`.
 *   **Descriptor Bridge**: `descriptor` is a computed property that bridges between persisted fields (`modelID`, `providerID`, `endpointFamiliesRaw`, `modalitiesRaw`, `supportedParameters`, `schemaFeaturesRaw`, `parameterMappings`, `rawMetadataJSON`) and the domain `LLMModelDescriptor` struct used by adapters, validators, and resolvers.
 *   **API Configuration Scoping**: `apiConfiguration` links a model to a specific `APIConfigurationItem`, so two configurations with the same model name can carry different parameter mappings.
 
@@ -438,13 +436,7 @@ This SwiftData `@Model` represents a single event generated by the assistant wit
 
 ### Supporting Enums and Structs
 
-This section covers smaller, non-`@Model` data structures that support the core models and application logic.
-
-#### Appearance Style (`AppearanceStyle.swift`)
-
-This `enum` defines the available UI themes for the application (`system`, `light`, `dark`).
-
-*   **SwiftUI Integration**: It provides a computed `colorScheme` property that maps the enum case directly to the corresponding SwiftUI `ColorScheme`, providing a clean bridge between the application's settings and the view layer.
+This section covers smaller, non-`@Model` data structures that support persisted entities and LLM request assembly.
 
 #### Tool Call Assembler (`LLMToolCallAssembler.swift`)
 
@@ -492,6 +484,10 @@ This `struct` acts as a centralized namespace for all static default values and 
 *   **Centralized Configuration**: It provides a single source of truth for UI constants (fonts, padding), default names, application behavior toggles, and, most importantly, default parameters for all supported AI service providers (OpenAI, Anthropic, etc.).
 *   **Extensible Provider Defaults**: Default settings for each AI provider, including model names, API endpoints, and request parameters, are organized into nested structs. This makes it trivial to add or update provider configurations without altering other parts of the codebase.
 *   **User Settings Management**: It defines the initial state for settings that are managed via `UserDefaults` (`@AppStorage`). It also includes a `resetUserDefaults()` function to programmatically revert all user-customized settings back to these defined defaults.
+
+#### Appearance Style (`AppearanceStyle.swift`)
+
+This `enum` defines the available UI themes for the application (`system`, `light`, `dark`) and maps the selected setting to SwiftUI `ColorScheme`. It belongs in `system/` because it is app-setting state, not persisted SwiftData schema.
 
 #### Menu Item Style (`MenuItemStyle.swift`)
 
@@ -1101,8 +1097,8 @@ All logging routes through `vxAtelierPro.log` (`LoggingService.shared`), which w
    * Add model decoding and fixture tests under `vxAtelier ProTests/AI`.
 2. **Add a New Feature Tab**
    * Add SwiftUI view under `views/` and wire to sidebar.
-3. **Add a New Model**
-   * Add `@Model` struct in `models/`.
+3. **Add a New SwiftData Type**
+   * Add `@Model` type in `persistence/`.
    * Supply migrations only if schema changes are breaking.
 
 ---

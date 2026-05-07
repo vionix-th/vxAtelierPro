@@ -1,11 +1,11 @@
 import Foundation
 
-/// Utility for AI model provider detection and management.
+/// Utility for LLM model provider detection and management.
 ///
 /// This utility provides functionality to:
-/// - Detect AI model providers from model names
+/// - Detect LLM providers from model names
 /// - Infer model capabilities based on model name patterns
-public enum ModelProviderUtils {
+public enum LLMModelProviderUtils {
     
     /// Known AI model providers with standardized naming.
     ///

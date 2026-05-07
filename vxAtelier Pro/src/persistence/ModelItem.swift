@@ -85,7 +85,7 @@ final class ModelItem {
     ) {
         let resolvedProvider = apiConfiguration?.providerIDEnum.displayName
             ?? provider
-            ?? ModelProviderUtils.detectProvider(from: name)
+            ?? LLMModelProviderUtils.detectProvider(from: name)
         self.name = name
         self.modelID = name
         self.displayName = name
@@ -102,7 +102,7 @@ final class ModelItem {
         self.parameterMappings = []
 
         // Use the centralized utility method instead of our own implementation
-        self.capabilities = ModelProviderUtils.inferCapabilities(from: name)
+        self.capabilities = LLMModelProviderUtils.inferCapabilities(from: name)
         self.materializeDefaultParameterMappings(preserveCustomized: true)
     }
 
