@@ -40,6 +40,7 @@ let package = Package(
                 "llm_api/LLMResponseTypes.swift",
                 "llm_api/LLMGenerationOptions.swift",
                 "llm_api/LLMModelDescriptor.swift",
+                "llm_api/LLMDefaultsCatalog.swift",
                 "llm_api/LLMRequest.swift",
                 "llm_api/LLMParameterDefinitions.swift",
                 "llm_api/LLMParameterMapping.swift",
@@ -211,6 +212,9 @@ let package = Package(
                 "views/utility/LogHistorySheet.swift",
                 "views/utility/ContentFilter.swift",
                 "views/utility/Sorters.swift"
+            ],
+            resources: [
+                .process("llm_api/Resources/LLMDefaults.json")
             ],
             swiftSettings: [
                 .define("DEBUG", .when(configuration: .debug)),

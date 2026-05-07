@@ -16,11 +16,7 @@ struct LLMProviderRegistry {
                 authKind: .bearerToken,
                 defaultEndpointFamily: .responses,
                 supportedEndpointFamilies: [.responses, .chatCompletions, .models],
-                defaultModelID: AppDefaults.OpenAi.model,
                 endpointPaths: [.responses: "/responses", .chatCompletions: AppDefaults.OpenAi.chatCompletionsPath, .models: AppDefaults.OpenAi.modelsPath],
-                supportedParameters: ["temperature", "top_p", "max_output_tokens", "max_tokens", "stop", "response_format", "reasoning", "service_tier"],
-                schemaFeatures: [.tools, .strictTools, .jsonSchema, .jsonObject, .reasoning, .usage, .streaming],
-                modalities: [.text, .image, .file],
                 isEnabled: true
             ),
             LLMProviderProfile(
@@ -30,11 +26,7 @@ struct LLMProviderRegistry {
                 authKind: .chatGPTOAuth,
                 defaultEndpointFamily: .responses,
                 supportedEndpointFamilies: [.responses],
-                defaultModelID: nil,
                 endpointPaths: [:],
-                supportedParameters: [],
-                schemaFeatures: [.tools, .reasoning, .streaming],
-                modalities: [.text],
                 isEnabled: false
             ),
             LLMProviderProfile(
@@ -44,18 +36,13 @@ struct LLMProviderRegistry {
                 authKind: .xAPIKey,
                 defaultEndpointFamily: .anthropicMessages,
                 supportedEndpointFamilies: [.anthropicMessages, .models],
-                defaultModelID: AppDefaults.Anthropic.model,
                 endpointPaths: [.anthropicMessages: AppDefaults.Anthropic.messagesPath, .models: AppDefaults.Anthropic.modelsPath],
-                supportedParameters: ["temperature", "top_p", "max_output_tokens", "stop", "thinking"],
-                schemaFeatures: [.tools, .reasoning, .usage, .streaming],
-                modalities: [.text, .image],
                 isEnabled: true
             ),
             LLMProviderProfile.openAICompatible(
                 id: .openRouter,
                 name: "OpenRouter",
                 baseURL: "https://openrouter.ai/api",
-                defaultModelID: "openai/gpt-4o-mini",
                 chatPath: "/v1/chat/completions",
                 modelsPath: "/v1/models"
             ),
@@ -63,7 +50,6 @@ struct LLMProviderRegistry {
                 id: .lmStudio,
                 name: "LM Studio",
                 baseURL: "http://localhost:1234",
-                defaultModelID: nil,
                 chatPath: "/v1/chat/completions",
                 modelsPath: "/v1/models"
             ),
@@ -71,7 +57,6 @@ struct LLMProviderRegistry {
                 id: .ollama,
                 name: "Ollama",
                 baseURL: "http://localhost:11434",
-                defaultModelID: nil,
                 chatPath: "/v1/chat/completions",
                 modelsPath: "/v1/models"
             ),
@@ -79,7 +64,6 @@ struct LLMProviderRegistry {
                 id: .xAI,
                 name: "xAI",
                 baseURL: AppDefaults.XAI.baseURL,
-                defaultModelID: AppDefaults.XAI.model,
                 chatPath: AppDefaults.XAI.chatCompletionsPath,
                 modelsPath: AppDefaults.XAI.modelsPath
             ),
@@ -87,7 +71,6 @@ struct LLMProviderRegistry {
                 id: .deepSeek,
                 name: "DeepSeek",
                 baseURL: AppDefaults.DeepSeek.baseURL,
-                defaultModelID: AppDefaults.DeepSeek.model,
                 chatPath: AppDefaults.DeepSeek.chatCompletionsPath,
                 modelsPath: AppDefaults.DeepSeek.modelsPath
             ),
@@ -95,7 +78,6 @@ struct LLMProviderRegistry {
                 id: .customOpenAICompatible,
                 name: "Custom OpenAI Compatible",
                 baseURL: AppDefaults.OpenAi.baseURL,
-                defaultModelID: nil,
                 chatPath: AppDefaults.OpenAi.chatCompletionsPath,
                 modelsPath: AppDefaults.OpenAi.modelsPath
             )
@@ -153,7 +135,6 @@ extension LLMProviderProfile {
         id: LLMProviderID,
         name: String,
         baseURL: String,
-        defaultModelID: String?,
         chatPath: String,
         modelsPath: String
     ) -> LLMProviderProfile {
@@ -164,11 +145,7 @@ extension LLMProviderProfile {
             authKind: id == .lmStudio || id == .ollama ? .none : .bearerToken,
             defaultEndpointFamily: .chatCompletions,
             supportedEndpointFamilies: [.chatCompletions, .models],
-            defaultModelID: defaultModelID,
             endpointPaths: [.chatCompletions: chatPath, .models: modelsPath],
-            supportedParameters: ["temperature", "top_p", "max_tokens", "stop", "response_format"],
-            schemaFeatures: [.tools, .jsonObject, .usage, .streaming],
-            modalities: [.text],
             isEnabled: true
         )
     }

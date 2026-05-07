@@ -2,46 +2,58 @@ import Foundation
 
 /// Decodes provider model-list payloads into normalized model descriptors.
 enum LLMModelMetadataDecoder {
-    /// Maps OpenAI-compatible model objects using the supplied profile defaults.
+    /// Maps OpenAI-compatible model objects using provider metadata plus bundled model defaults.
     static func openAICompatibleDescriptors(
         from data: [JSONValue],
         profile: LLMProviderProfile,
-        endpointFamilies: [LLMEndpointFamily]
+        endpointFamilies: [LLMEndpointFamily],
+        defaultsCatalog: LLMDefaultsCatalog = .bundled
     ) -> [LLMModelDescriptor] {
         data.compactMap { item in
             guard let object = item.objectValue, let id = object.string("id") else { return nil }
-            return LLMModelDescriptor(
+            var descriptor = defaultsCatalog.modelDescriptor(
+                providerID: profile.id,
+                modelID: id,
+                displayName: object.string("name") ?? object.string("display_name") ?? id,
+                endpointFamilies: endpointFamilies,
+                rawMetadataJSON: rawJSONString(from: item)
+            ) ?? LLMModelDescriptor(
                 id: id,
                 displayName: object.string("name") ?? object.string("display_name") ?? id,
                 providerID: profile.id,
-                contextWindow: contextWindow(from: object),
+                contextWindow: nil,
                 endpointFamilies: endpointFamilies,
-                modalities: modalities(from: object, fallback: profile.modalities),
-                supportedParameters: supportedParameters(from: object, fallback: profile.supportedParameters),
-                schemaFeatures: schemaFeatures(from: object, fallback: profile.schemaFeatures),
                 rawMetadataJSON: rawJSONString(from: item)
             )
+            applyProviderMetadata(from: object, to: &descriptor)
+            return descriptor
         }
     }
 
-    /// Maps Anthropic model objects using Anthropic endpoint capabilities.
+    /// Maps Anthropic model objects using provider metadata plus bundled model defaults.
     static func anthropicDescriptors(
         from data: [JSONValue],
-        profile: LLMProviderProfile
+        profile: LLMProviderProfile,
+        defaultsCatalog: LLMDefaultsCatalog = .bundled
     ) -> [LLMModelDescriptor] {
         data.compactMap { item in
             guard let object = item.objectValue, let id = object.string("id") else { return nil }
-            return LLMModelDescriptor(
+            var descriptor = defaultsCatalog.modelDescriptor(
+                providerID: profile.id,
+                modelID: id,
+                displayName: object.string("display_name") ?? object.string("name") ?? id,
+                endpointFamilies: [.anthropicMessages],
+                rawMetadataJSON: rawJSONString(from: item)
+            ) ?? LLMModelDescriptor(
                 id: id,
                 displayName: object.string("display_name") ?? object.string("name") ?? id,
                 providerID: profile.id,
-                contextWindow: contextWindow(from: object),
+                contextWindow: nil,
                 endpointFamilies: [.anthropicMessages],
-                modalities: modalities(from: object, fallback: profile.modalities),
-                supportedParameters: supportedParameters(from: object, fallback: profile.supportedParameters),
-                schemaFeatures: schemaFeatures(from: object, fallback: profile.schemaFeatures),
                 rawMetadataJSON: rawJSONString(from: item)
             )
+            applyProviderMetadata(from: object, to: &descriptor)
+            return descriptor
         }
     }
 
@@ -59,23 +71,41 @@ enum LLMModelMetadataDecoder {
             ?? object.int("max_context_window")
     }
 
-    /// Combines provider-advertised parameter names with profile defaults.
-    private static func supportedParameters(
-        from object: [String: JSONValue],
-        fallback: [String]
-    ) -> [String] {
-        let direct = stringArray(object["supported_parameters"])
-            + stringArray(object["parameters"])
-        return direct.isEmpty ? fallback : Array(Set(direct + fallback)).sorted()
+    /// Applies direct provider metadata over already-resolved bundled defaults.
+    private static func applyProviderMetadata(from object: [String: JSONValue], to descriptor: inout LLMModelDescriptor) {
+        if let contextWindow = contextWindow(from: object) {
+            descriptor.contextWindow = contextWindow
+        }
+
+        let directModalities = modalities(from: object)
+        if !directModalities.isEmpty {
+            descriptor.modalities = directModalities
+        }
+
+        let directParameters = supportedParameters(from: object)
+        if !directParameters.isEmpty {
+            descriptor.supportedParameters = directParameters
+        }
+
+        let directFeatures = schemaFeatures(from: object, parameters: directParameters)
+        if !directFeatures.isEmpty {
+            descriptor.schemaFeatures = directFeatures
+        }
     }
 
-    /// Infers schema/runtime features from provider-advertised metadata and profile defaults.
+    /// Reads provider-advertised parameter names.
+    private static func supportedParameters(from object: [String: JSONValue]) -> [String] {
+        let direct = stringArray(object["supported_parameters"])
+            + stringArray(object["parameters"])
+        return Array(Set(direct)).sorted()
+    }
+
+    /// Infers schema/runtime features from provider-advertised metadata.
     private static func schemaFeatures(
         from object: [String: JSONValue],
-        fallback: [LLMSchemaFeature]
+        parameters: [String]
     ) -> [LLMSchemaFeature] {
-        let parameters = supportedParameters(from: object, fallback: [])
-        var features = Set(fallback)
+        var features = Set<LLMSchemaFeature>()
         if parameters.contains(where: { $0 == "tools" || $0 == "tool_choice" }) {
             features.insert(.tools)
         }
@@ -94,11 +124,8 @@ enum LLMModelMetadataDecoder {
         return Array(features).sorted { $0.rawValue < $1.rawValue }
     }
 
-    /// Infers supported modalities from provider metadata and profile defaults.
-    private static func modalities(
-        from object: [String: JSONValue],
-        fallback: [LLMModality]
-    ) -> [LLMModality] {
+    /// Infers supported modalities from provider metadata.
+    private static func modalities(from object: [String: JSONValue]) -> [LLMModality] {
         var modalities = Set<LLMModality>()
         appendModalities(from: object.string("modality"), to: &modalities)
         appendModalities(from: object.string("modalities"), to: &modalities)
@@ -115,9 +142,7 @@ enum LLMModelMetadataDecoder {
             }
         }
 
-        return modalities.isEmpty
-            ? fallback
-            : Array(modalities).sorted { $0.rawValue < $1.rawValue }
+        return Array(modalities).sorted { $0.rawValue < $1.rawValue }
     }
 
     /// Adds modalities detected in a provider text field.

@@ -31,7 +31,7 @@ struct ConversationRunContextResolver {
 
         let modelID = conversation.options.modelOverride
             ?? apiConfig.defaultModelID
-            ?? profile.defaultModelID
+            ?? LLMDefaultsCatalog.bundled.defaultModelID(for: providerID)
         guard let modelID, !modelID.isEmpty else {
             throw LLMProviderError.invalidConfiguration("No model configured for \(profile.name).")
         }
@@ -55,6 +55,7 @@ struct ConversationRunContextResolver {
                 for: modelID,
                 apiConfiguration: apiConfig,
                 providerID: providerID,
+                endpointFamily: endpoint,
                 conversation: conversation
             ),
             messages: orderedMessages(in: conversation).map { $0.asDomainMessage() },
@@ -79,6 +80,7 @@ struct ConversationRunContextResolver {
         for modelID: String,
         apiConfiguration: APIConfigurationItem,
         providerID: LLMProviderID,
+        endpointFamily: LLMEndpointFamily,
         conversation: ConversationItem
     ) throws -> LLMModelDescriptor? {
         guard let context = conversation.modelContext else {
@@ -101,7 +103,18 @@ struct ConversationRunContextResolver {
         let model = models.first { model in
             model.apiConfiguration?.id == apiConfiguration.id
         }
-        return model?.descriptor
+        if let model {
+            return model.descriptor
+        }
+        var defaultDescriptor = LLMDefaultsCatalog.bundled.modelDescriptor(
+            providerID: providerID,
+            modelID: modelID,
+            endpointFamilies: nil
+        )
+        if defaultDescriptor?.endpointFamilies.isEmpty == true {
+            defaultDescriptor?.endpointFamilies = [endpointFamily]
+        }
+        return defaultDescriptor
     }
 }
 

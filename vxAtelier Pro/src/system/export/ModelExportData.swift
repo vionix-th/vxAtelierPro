@@ -56,10 +56,19 @@ struct ModelExportData: Codable {
         model.modelID = modelID ?? name
         model.displayName = displayName ?? name
         model.providerID = providerID ?? LLMProviderRegistry.providerID(fromProviderName: provider).rawValue
-        model.endpointFamiliesRaw = endpointFamilies ?? [LLMEndpointFamily.chatCompletions.rawValue]
-        model.modalitiesRaw = modalities ?? [LLMModality.text.rawValue]
-        model.supportedParameters = supportedParameters ?? []
-        model.schemaFeaturesRaw = schemaFeatures ?? []
+        if let defaultDescriptor = LLMDefaultsCatalog.bundled.modelDescriptor(
+            providerID: LLMProviderID(rawValue: model.providerID) ?? .customOpenAICompatible,
+            modelID: model.modelID
+        ) {
+            model.endpointFamiliesRaw = defaultDescriptor.endpointFamilies.map(\.rawValue)
+            model.modalitiesRaw = defaultDescriptor.modalities.map(\.rawValue)
+            model.supportedParameters = defaultDescriptor.supportedParameters
+            model.schemaFeaturesRaw = defaultDescriptor.schemaFeatures.map(\.rawValue)
+        }
+        if let endpointFamilies { model.endpointFamiliesRaw = endpointFamilies }
+        if let modalities { model.modalitiesRaw = modalities }
+        if let supportedParameters { model.supportedParameters = supportedParameters }
+        if let schemaFeatures { model.schemaFeaturesRaw = schemaFeatures }
         model.rawMetadataJSON = rawMetadataJSON
         model.parameterMappings = parameterMappings?.map { $0.toDataItem() } ?? []
         model.materializeDefaultParameterMappings(preserveCustomized: true)

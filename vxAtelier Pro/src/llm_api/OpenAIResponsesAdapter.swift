@@ -40,7 +40,6 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
         return try await chatFallback.fetchModels(configuration: configuration).map { descriptor in
             var copy = descriptor
             copy.endpointFamilies = [.responses, .chatCompletions]
-            copy.schemaFeatures = profile.schemaFeatures
             return copy
         }
     }

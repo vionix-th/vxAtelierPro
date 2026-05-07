@@ -28,7 +28,7 @@ struct LLMStreamCompletionPolicy {
 /// - Emit `.responseMetadata` when HTTP response metadata is available.
 /// - Emit `.runCompleted` exactly once for complete provider responses, or throw if the provider stream ends before a required completion event.
 /// - Emit tool-call deltas and completed calls using provider order indexes so `LLMToolCallAssembler` can merge fragments deterministically.
-/// - Return model descriptors using provider/profile capabilities; throw for unsupported model listing instead of fabricating models.
+/// - Return model descriptors using provider metadata and bundled model defaults; throw for unsupported model listing instead of fabricating models.
 protocol LLMProviderAdapter {
     var profile: LLMProviderProfile { get }
 

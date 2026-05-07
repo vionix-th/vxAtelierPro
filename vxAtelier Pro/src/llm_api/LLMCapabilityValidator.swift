@@ -16,7 +16,7 @@ struct LLMCapabilityValidator {
 
     /// Resolves `.auto` streaming behavior and rejects unsupported forced streaming.
     static func resolveStreamEnabled(for request: LLMRequest, profile: LLMProviderProfile) throws -> Bool {
-        let supportsStreaming = hasSchemaFeature(.streaming, request: request, profile: profile)
+        let supportsStreaming = hasSchemaFeature(.streaming, request: request)
         switch request.options.streamMode {
         case .disabled:
             return false
@@ -56,7 +56,7 @@ struct LLMCapabilityValidator {
         if !options.stop.isEmpty { try requireMapping(.stopSequences, mappings: mappings, request: request, profile: profile) }
         if options.reasoning != nil {
             try requireMapping(.reasoningEffort, mappings: mappings, request: request, profile: profile)
-            guard hasSchemaFeature(.reasoning, request: request, profile: profile) else {
+            guard hasSchemaFeature(.reasoning, request: request) else {
                 throw LLMProviderError.unsupportedParameter("\(profile.name) does not support reasoning for \(request.modelID).")
             }
         }
@@ -66,12 +66,12 @@ struct LLMCapabilityValidator {
             break
         case .jsonObject:
             try requireMapping(.responseFormat, mappings: mappings, request: request, profile: profile)
-            guard hasSchemaFeature(.jsonObject, request: request, profile: profile) else {
+            guard hasSchemaFeature(.jsonObject, request: request) else {
                 throw LLMProviderError.unsupportedParameter("\(profile.name) does not support JSON object response format for \(request.modelID).")
             }
         case .jsonSchema:
             try requireMapping(.responseFormat, mappings: mappings, request: request, profile: profile)
-            guard hasSchemaFeature(.jsonSchema, request: request, profile: profile) else {
+            guard hasSchemaFeature(.jsonSchema, request: request) else {
                 throw LLMProviderError.unsupportedParameter("\(profile.name) does not support JSON schema response format for \(request.modelID).")
             }
             guard request.options.providerExtras["json_schema"]?.objectValue != nil else {
@@ -79,7 +79,7 @@ struct LLMCapabilityValidator {
             }
         }
         if !request.tools.isEmpty {
-            guard hasSchemaFeature(.tools, request: request, profile: profile) else {
+            guard hasSchemaFeature(.tools, request: request) else {
                 throw LLMProviderError.unsupportedCapability("\(profile.name) does not support tools for \(request.modelID).")
             }
         }
@@ -98,12 +98,12 @@ struct LLMCapabilityValidator {
                 case .text, .toolResult, .reasoning:
                     continue
                 case .image:
-                    guard supportsModality(.image, request: request, profile: profile) else {
+                    guard supportsModality(.image, request: request) else {
                         throw LLMProviderError.unsupportedCapability("\(profile.name) does not support image content for \(request.modelID).")
                     }
                 case .file:
                     guard request.endpointFamily == .responses,
-                          supportsModality(.file, request: request, profile: profile) else {
+                          supportsModality(.file, request: request) else {
                         throw LLMProviderError.unsupportedCapability("\(profile.name) does not support file content for \(request.endpointFamily.rawValue).")
                     }
                 case .audio:
@@ -182,19 +182,13 @@ struct LLMCapabilityValidator {
         }
     }
 
-    /// Resolves a schema feature against model metadata when present, otherwise profile defaults.
-    private static func hasSchemaFeature(_ feature: LLMSchemaFeature, request: LLMRequest, profile: LLMProviderProfile) -> Bool {
-        if let features = request.modelDescriptor?.schemaFeatures, !features.isEmpty {
-            return features.contains(feature) && profile.schemaFeatures.contains(feature)
-        }
-        return profile.schemaFeatures.contains(feature)
+    /// Resolves a schema feature against model metadata.
+    private static func hasSchemaFeature(_ feature: LLMSchemaFeature, request: LLMRequest) -> Bool {
+        request.modelDescriptor?.schemaFeatures.contains(feature) ?? false
     }
 
-    /// Resolves a modality against model metadata when present, otherwise profile defaults.
-    private static func supportsModality(_ modality: LLMModality, request: LLMRequest, profile: LLMProviderProfile) -> Bool {
-        if let modalities = request.modelDescriptor?.modalities, !modalities.isEmpty {
-            return modalities.contains(modality) && profile.modalities.contains(modality)
-        }
-        return profile.modalities.contains(modality)
+    /// Resolves a modality against model metadata.
+    private static func supportsModality(_ modality: LLMModality, request: LLMRequest) -> Bool {
+        request.modelDescriptor?.modalities.contains(modality) ?? false
     }
 }

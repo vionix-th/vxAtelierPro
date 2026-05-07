@@ -31,7 +31,6 @@ final class ConversationRunContextResolverTests: XCTestCase {
             providerID: .openAIPlatform,
             endpointFamilies: [.chatCompletions],
             modalities: [.text],
-            supportedParameters: LLMProviderRegistry.shared.profile(for: .openAIPlatform).supportedParameters,
             parameterMappings: [],
             schemaFeatures: [.streaming]
         )
@@ -76,7 +75,7 @@ final class ConversationRunContextResolverTests: XCTestCase {
         )
     }
 
-    func testResolverReturnsNilDescriptorWhenNoMatchingModelExists() throws {
+    func testResolverSynthesizesDefaultDescriptorWhenNoMatchingModelExists() throws {
         let env = TestEnvironment()
         let config = APIConfigurationItem(
             name: "OpenAI",
@@ -98,7 +97,9 @@ final class ConversationRunContextResolverTests: XCTestCase {
             apiConfig: config
         )
 
-        XCTAssertNil(context.modelDescriptor)
+        XCTAssertEqual(context.modelDescriptor?.id, "gpt-missing")
+        XCTAssertEqual(context.modelDescriptor?.providerID, .openAIPlatform)
+        XCTAssertTrue(context.modelDescriptor?.schemaFeatures.contains(.streaming) ?? false)
     }
 
     func testRequestFactoryProducesStableRequestFromFixedContext() throws {
@@ -125,13 +126,12 @@ final class ConversationRunContextResolverTests: XCTestCase {
                 providerID: .openAIPlatform,
                 endpointFamilies: [.responses],
                 modalities: [.text],
-                supportedParameters: profile.supportedParameters,
                 parameterMappings: LLMParameterMappingCatalog.defaults(
                     providerID: .openAIPlatform,
                     endpointFamily: .responses,
                     modelID: "gpt-test"
                 ),
-                schemaFeatures: profile.schemaFeatures
+                schemaFeatures: [.tools, .strictTools, .jsonSchema, .jsonObject, .reasoning, .usage, .streaming]
             ),
             messages: [
                 LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Hello")])

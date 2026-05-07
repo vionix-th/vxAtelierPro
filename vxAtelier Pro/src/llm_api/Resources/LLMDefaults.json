@@ -1,0 +1,187 @@
+{
+  "providerDefaults": [
+    {
+      "provider": "openAIPlatform",
+      "defaultModel": "gpt-4.1-nano"
+    },
+    {
+      "provider": "anthropic",
+      "defaultModel": "claude-3-sonnet-20240229"
+    },
+    {
+      "provider": "openRouter",
+      "defaultModel": "openai/gpt-4o-mini"
+    },
+    {
+      "provider": "xAI",
+      "defaultModel": "grok-2-1212"
+    },
+    {
+      "provider": "deepSeek",
+      "defaultModel": "deepseek-chat"
+    }
+  ],
+  "rules": [
+    {
+      "match": {
+        "providerRegex": "^openAIPlatform$"
+      },
+      "modelDefaults": {
+        "contextWindow": 4096,
+        "endpointFamilies": ["responses", "chatCompletions"],
+        "modalities": ["text", "image", "file"],
+        "supportedParameters": ["temperature", "top_p", "max_output_tokens", "max_tokens", "stop", "response_format", "reasoning", "service_tier"],
+        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "reasoning", "usage", "streaming"]
+      }
+    },
+    {
+      "match": {
+        "providerRegex": "^openAIChatGPTSubscription$"
+      },
+      "modelDefaults": {
+        "contextWindow": 4096,
+        "endpointFamilies": ["responses"],
+        "modalities": ["text"],
+        "supportedParameters": [],
+        "schemaFeatures": ["tools", "reasoning", "streaming"]
+      }
+    },
+    {
+      "match": {
+        "providerRegex": "^anthropic$"
+      },
+      "modelDefaults": {
+        "contextWindow": 4096,
+        "endpointFamilies": ["anthropicMessages"],
+        "modalities": ["text", "image"],
+        "supportedParameters": ["temperature", "top_p", "max_output_tokens", "stop", "thinking"],
+        "schemaFeatures": ["tools", "reasoning", "usage", "streaming"]
+      }
+    },
+    {
+      "match": {
+        "providerRegex": "^(openRouter|lmStudio|ollama|xAI|deepSeek|customOpenAICompatible)$"
+      },
+      "modelDefaults": {
+        "contextWindow": 4096,
+        "endpointFamilies": ["chatCompletions"],
+        "modalities": ["text"],
+        "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "response_format"],
+        "schemaFeatures": ["tools", "jsonObject", "usage", "streaming"]
+      }
+    },
+    {
+      "match": {
+        "providerRegex": "^openAIPlatform$",
+        "endpointFamily": "responses"
+      },
+      "parameterMappings": [
+        {
+          "parameter": "max_output_tokens",
+          "encoding": "scalarKey",
+          "wireKey": "max_output_tokens"
+        },
+        {
+          "parameter": "temperature",
+          "encoding": "scalarKey",
+          "wireKey": "temperature"
+        },
+        {
+          "parameter": "top_p",
+          "encoding": "scalarKey",
+          "wireKey": "top_p"
+        },
+        {
+          "parameter": "response_format",
+          "encoding": "structuredPreset",
+          "preset": "openAIResponsesTextFormat"
+        },
+        {
+          "parameter": "reasoning_effort",
+          "encoding": "structuredPreset",
+          "preset": "openAIResponsesReasoning"
+        },
+        {
+          "parameter": "service_tier",
+          "encoding": "scalarKey",
+          "wireKey": "service_tier"
+        }
+      ]
+    },
+    {
+      "match": {
+        "endpointFamily": "chatCompletions"
+      },
+      "parameterMappings": [
+        {
+          "parameter": "max_output_tokens",
+          "encoding": "scalarKey",
+          "wireKey": "max_tokens"
+        },
+        {
+          "parameter": "temperature",
+          "encoding": "scalarKey",
+          "wireKey": "temperature"
+        },
+        {
+          "parameter": "top_p",
+          "encoding": "scalarKey",
+          "wireKey": "top_p"
+        },
+        {
+          "parameter": "stop_sequences",
+          "encoding": "scalarKey",
+          "wireKey": "stop"
+        },
+        {
+          "parameter": "response_format",
+          "encoding": "structuredPreset",
+          "preset": "openAIChatResponseFormat"
+        }
+      ]
+    },
+    {
+      "match": {
+        "modelRegex": "(^|.*/)gpt-5([-.].*)?$",
+        "endpointFamily": "chatCompletions"
+      },
+      "parameterMappings": [
+        {
+          "parameter": "max_output_tokens",
+          "encoding": "scalarKey",
+          "wireKey": "max_completion_tokens"
+        }
+      ]
+    },
+    {
+      "match": {
+        "providerRegex": "^anthropic$",
+        "endpointFamily": "anthropicMessages"
+      },
+      "parameterMappings": [
+        {
+          "parameter": "max_output_tokens",
+          "required": true,
+          "encoding": "scalarKey",
+          "wireKey": "max_tokens",
+          "defaultValue": 4096
+        },
+        {
+          "parameter": "temperature",
+          "encoding": "scalarKey",
+          "wireKey": "temperature"
+        },
+        {
+          "parameter": "top_p",
+          "encoding": "scalarKey",
+          "wireKey": "top_p"
+        },
+        {
+          "parameter": "stop_sequences",
+          "encoding": "scalarKey",
+          "wireKey": "stop_sequences"
+        }
+      ]
+    }
+  ]
+}

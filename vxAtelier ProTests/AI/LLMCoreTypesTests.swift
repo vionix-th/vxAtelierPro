@@ -18,6 +18,230 @@ final class LLMCoreTypesTests: XCTestCase {
         XCTAssertEqual(LLMProviderRegistry.providerID(fromProviderName: "OpenRouter"), .openRouter)
     }
 
+    func testBundledDefaultsProvideProviderDefaultModels() {
+        let defaults = LLMDefaultsCatalog.bundled
+
+        XCTAssertEqual(defaults.defaultModelID(for: .openAIPlatform), "gpt-4.1-nano")
+        XCTAssertEqual(defaults.defaultModelID(for: .openRouter), "openai/gpt-4o-mini")
+        XCTAssertNil(defaults.defaultModelID(for: .customOpenAICompatible))
+    }
+
+    func testDefaultsCatalogDecodesValidJSON() throws {
+        let catalog = try LLMDefaultsCatalog(data: Data("""
+        {
+          "providerDefaults": [
+            {
+              "provider": "openAIPlatform",
+              "defaultModel": "unit-model"
+            }
+          ],
+          "rules": [
+            {
+              "match": {
+                "providerRegex": "^openAIPlatform$",
+                "modelRegex": "^unit-"
+              },
+              "modelDefaults": {
+                "endpointFamilies": ["responses"],
+                "modalities": ["text"],
+                "schemaFeatures": ["streaming"]
+              }
+            }
+          ]
+        }
+        """.utf8))
+
+        XCTAssertEqual(catalog.defaultModelID(for: .openAIPlatform), "unit-model")
+        XCTAssertEqual(catalog.modelDefaults(providerID: .openAIPlatform, modelID: "unit-anything")?.modalities, [.text])
+    }
+
+    func testDefaultsCatalogRejectsInvalidEnumValues() {
+        XCTAssertThrowsError(try LLMDefaultsCatalog(data: Data("""
+        {
+          "providerDefaults": [
+            {
+              "provider": "invalidProvider",
+              "defaultModel": "invalid"
+            }
+          ],
+          "rules": []
+        }
+        """.utf8)))
+    }
+
+    func testDefaultsCatalogRejectsMissingRequiredMappingFields() {
+        XCTAssertThrowsError(try LLMDefaultsCatalog(data: Data("""
+        {
+          "providerDefaults": [],
+          "rules": [
+            {
+              "match": {
+                "endpointFamily": "chatCompletions"
+              },
+              "parameterMappings": [
+                {
+                  "wireKey": "max_tokens"
+                }
+              ]
+            }
+          ]
+        }
+        """.utf8)))
+    }
+
+    func testDefaultsCatalogRejectsInvalidRegexSyntax() {
+        XCTAssertThrowsError(try LLMDefaultsCatalog(data: Data("""
+        {
+          "providerDefaults": [],
+          "rules": [
+            {
+              "match": {
+                "providerRegex": "["
+              },
+              "modelDefaults": {
+                "modalities": ["text"]
+              }
+            }
+          ]
+        }
+        """.utf8))) { error in
+            guard case LLMDefaultsCatalogError.invalidRegex(let field, let pattern, _) = error else {
+                return XCTFail("Expected invalidRegex, got \(error)")
+            }
+            XCTAssertEqual(field, "match.providerRegex")
+            XCTAssertEqual(pattern, "[")
+        }
+    }
+
+    func testDefaultsCatalogRejectsEmptyRegex() {
+        XCTAssertThrowsError(try LLMDefaultsCatalog(data: Data("""
+        {
+          "providerDefaults": [],
+          "rules": [
+            {
+              "match": {
+                "modelRegex": ""
+              },
+              "modelDefaults": {
+                "modalities": ["text"]
+              }
+            }
+          ]
+        }
+        """.utf8))) { error in
+            guard case LLMDefaultsCatalogError.emptyRegex(let field) = error else {
+                return XCTFail("Expected emptyRegex, got \(error)")
+            }
+            XCTAssertEqual(field, "match.modelRegex")
+        }
+    }
+
+    func testDefaultsCatalogAppliesRegexRulesInOrder() throws {
+        let catalog = try LLMDefaultsCatalog(data: Data("""
+        {
+          "providerDefaults": [],
+          "rules": [
+            {
+              "match": {
+                "providerRegex": "^openAIPlatform$"
+              },
+              "modelDefaults": {
+                  "modalities": ["text"],
+                  "schemaFeatures": ["streaming"]
+              }
+            },
+            {
+              "match": {
+                "providerRegex": "^openAIPlatform$",
+                "modelRegex": "^vision-"
+              },
+              "modelDefaults": {
+                  "modalities": ["image"],
+                  "schemaFeatures": ["jsonObject"]
+              }
+            },
+            {
+              "match": {
+                "endpointFamily": "chatCompletions"
+              },
+              "parameterMappings": [
+                {
+                  "parameter": "max_output_tokens",
+                  "encoding": "scalarKey",
+                  "wireKey": "max_tokens"
+                }
+              ]
+            },
+            {
+              "match": {
+                "modelRegex": "(^|.*/)gpt-5([-.].*)?$",
+                "endpointFamily": "chatCompletions"
+              },
+              "parameterMappings": [
+                {
+                  "parameter": "max_output_tokens",
+                  "encoding": "scalarKey",
+                  "wireKey": "max_completion_tokens"
+                }
+              ]
+            }
+          ]
+        }
+        """.utf8))
+
+        let modelDefaults = catalog.modelDefaults(providerID: .openAIPlatform, modelID: "vision-large")
+        XCTAssertEqual(modelDefaults?.modalities, [.image])
+        XCTAssertEqual(modelDefaults?.schemaFeatures, [.jsonObject])
+
+        let mapping = catalog.parameterMappings(
+            providerID: .openAIPlatform,
+            endpointFamily: .chatCompletions,
+            modelID: "gpt-5.4-nano"
+        ).first { $0.semanticParameterID == .maxOutputTokens }
+        XCTAssertEqual(mapping?.wireKey, "max_completion_tokens")
+
+        let aggregatorMapping = catalog.parameterMappings(
+            providerID: .openRouter,
+            endpointFamily: .chatCompletions,
+            modelID: "openai/gpt-5-mini"
+        ).first { $0.semanticParameterID == .maxOutputTokens }
+        XCTAssertEqual(aggregatorMapping?.wireKey, "max_completion_tokens")
+    }
+
+    func testModelMetadataDecoderUsesProviderMetadataOverDefaults() {
+        let profile = LLMProviderRegistry.shared.profile(for: .openRouter)
+        let models = LLMModelMetadataDecoder.openAICompatibleDescriptors(
+            from: [
+                .object([
+                    "id": .string("vision-model"),
+                    "context_window": .integer(999),
+                    "modalities": .array([.string("image")]),
+                    "supported_parameters": .array([.string("tools")])
+                ])
+            ],
+            profile: profile,
+            endpointFamilies: [.chatCompletions]
+        )
+
+        XCTAssertEqual(models.first?.contextWindow, 999)
+        XCTAssertEqual(models.first?.modalities, [.image])
+        XCTAssertEqual(models.first?.supportedParameters, ["tools"])
+        XCTAssertEqual(models.first?.schemaFeatures, [.tools])
+    }
+
+    func testModelMetadataDecoderFillsMissingFieldsFromDefaults() {
+        let profile = LLMProviderRegistry.shared.profile(for: .openRouter)
+        let models = LLMModelMetadataDecoder.openAICompatibleDescriptors(
+            from: [.object(["id": .string("fallback-model")])],
+            profile: profile,
+            endpointFamilies: [.chatCompletions]
+        )
+
+        XCTAssertEqual(models.first?.contextWindow, 4096)
+        XCTAssertEqual(models.first?.modalities, [.text])
+        XCTAssertTrue(models.first?.schemaFeatures.contains(.streaming) ?? false)
+    }
+
     func testAPIConfigurationCanonicalProviderFields() {
         let config = APIConfigurationItem(
             name: "OpenRouter",

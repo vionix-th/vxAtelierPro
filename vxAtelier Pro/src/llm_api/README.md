@@ -4,7 +4,7 @@
 
 - `LLMRequest`, `LLMContentTypes`, `LLMResponseTypes`, and related files define provider-neutral LLM values and stream events.
 - `LLMCapabilityValidator`, `LLMParameter*`, and `LLMRequestEncoding` define validation, parameter mapping, and request encoding.
-- `LLMProvider*` and `LLMModelMetadataDecoder` define provider identities, profiles, configuration values, adapter lookup, and model metadata decoding.
+- `LLMProvider*`, `LLMDefaultsCatalog`, and `LLMModelMetadataDecoder` define provider identities, transport profiles, configuration values, adapter lookup, defaults, and model metadata decoding.
 - `OpenAI*`, `Anthropic*`, and `LLMAdapterRunLoop` map provider-specific wire protocols into provider-neutral events.
 - `LLMHTTPClient` and `LLMSecretRedactor` contain provider HTTP/SSE helpers, response metadata handling, redaction, and normalized provider errors.
 - `LLMTool*` and `ConfigurableLLMTool` contain reusable tool schema, configuration, catalog, and registry contracts.

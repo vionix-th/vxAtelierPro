@@ -94,15 +94,26 @@ final class ModelItem {
         self.providerID = apiConfiguration?.providerID ?? LLMProviderRegistry.providerID(fromProviderName: resolvedProvider).rawValue
         self.apiConfiguration = apiConfiguration
         self.capabilities = []
-        self.endpointFamiliesRaw = [LLMEndpointFamily.chatCompletions.rawValue]
-        self.modalitiesRaw = [LLMModality.text.rawValue]
+        self.endpointFamiliesRaw = []
+        self.modalitiesRaw = []
         self.supportedParameters = []
-        self.schemaFeaturesRaw = [LLMSchemaFeature.streaming.rawValue]
+        self.schemaFeaturesRaw = []
         self.rawMetadataJSON = nil
         self.parameterMappings = []
 
-        // Use the centralized utility method instead of our own implementation
-        self.capabilities = LLMModelProviderUtils.inferCapabilities(from: name)
+        if let defaultDescriptor = LLMDefaultsCatalog.bundled.modelDescriptor(
+            providerID: LLMProviderID(rawValue: self.providerID) ?? .customOpenAICompatible,
+            modelID: name
+        ) {
+            self.contextSize = defaultDescriptor.contextWindow ?? contextSize
+            self.endpointFamiliesRaw = defaultDescriptor.endpointFamilies.map(\.rawValue)
+            self.modalitiesRaw = defaultDescriptor.modalities.map(\.rawValue)
+            self.supportedParameters = defaultDescriptor.supportedParameters
+            self.schemaFeaturesRaw = defaultDescriptor.schemaFeatures.map(\.rawValue)
+            self.capabilities = Self.capabilities(from: defaultDescriptor)
+        } else {
+            self.capabilities = LLMModelProviderUtils.inferCapabilities(from: name)
+        }
         self.materializeDefaultParameterMappings(preserveCustomized: true)
     }
 

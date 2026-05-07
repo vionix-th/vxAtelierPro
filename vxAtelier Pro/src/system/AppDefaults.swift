@@ -98,7 +98,6 @@ struct AppDefaults {
         static let top_p : Double? = nil
         static let temperature: Double = 0.0
         static let max_tokens: Int? = 2048
-        static let model: String = "gpt-4.1-nano"
         static let apiKey = "YOUR API KEY"
         static let baseURL = "https://api.openai.com/v1"
         static let chatCompletionsPath = "/chat/completions"
@@ -110,7 +109,6 @@ struct AppDefaults {
         static let temperature: Double = 0.0
         static let top_p: Double? = nil
         static let top_k: Int? = nil
-        static let model: String = "claude-3-sonnet-20240229"
         static let apiKey = "YOUR API KEY"
         static let baseURL = "https://api.anthropic.com"
         static let messagesPath = "/v1/messages"
@@ -126,7 +124,6 @@ struct AppDefaults {
         static let top_p : Double? = nil
         static let temperature: Double = 0.0
         static let max_tokens: Int? = 4096
-        static let model: String = "grok-2-1212"
         static let apiKey = "YOUR API KEY"
         static let baseURL = "https://api.x.ai/v1"
         static let chatCompletionsPath = "/chat/completions"
@@ -141,7 +138,6 @@ struct AppDefaults {
         static let top_p: Double = 0.7
         static let temperature: Double = 0.7
         static let max_tokens: Int = 2048
-        static let model: String = "deepseek-chat"
         static let apiKey = "YOUR API KEY"
         static let baseURL = "https://api.deepseek.com/v1"
         static let chatCompletionsPath = "/chat/completions"

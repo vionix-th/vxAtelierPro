@@ -169,23 +169,25 @@ extension LLMRequest {
         tools: [LLMToolDefinition] = [],
         options: LLMGenerationOptions = LLMGenerationOptions()
     ) -> LLMRequest {
-        let profile = LLMProviderRegistry.shared.profile(for: providerID)
+        var descriptor = LLMDefaultsCatalog.bundled.modelDescriptor(
+            providerID: providerID,
+            modelID: modelID,
+            endpointFamilies: [endpointFamily]
+        ) ?? LLMModelDescriptor(
+            id: modelID,
+            providerID: providerID,
+            endpointFamilies: [endpointFamily]
+        )
+        descriptor.parameterMappings = LLMParameterMappingCatalog.defaults(
+            providerID: providerID,
+            endpointFamily: endpointFamily,
+            modelID: modelID
+        )
         return LLMRequest(
             providerID: providerID,
             endpointFamily: endpointFamily,
             modelID: modelID,
-            modelDescriptor: LLMModelDescriptor(
-                id: modelID,
-                providerID: providerID,
-                endpointFamilies: [endpointFamily],
-                supportedParameters: profile.supportedParameters,
-                parameterMappings: LLMParameterMappingCatalog.defaults(
-                    providerID: providerID,
-                    endpointFamily: endpointFamily,
-                    modelID: modelID
-                ),
-                schemaFeatures: profile.schemaFeatures
-            ),
+            modelDescriptor: descriptor,
             messages: messages,
             tools: tools,
             options: options

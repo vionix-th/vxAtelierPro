@@ -63,7 +63,7 @@ enum LLMAuthKind: String, Codable, CaseIterable {
     case chatGPTCodexToken
 }
 
-/// Static provider capabilities and defaults used before model-specific overrides.
+/// Static provider transport metadata used for configuration and adapter selection.
 struct LLMProviderProfile: Codable, Identifiable, Equatable {
     var id: LLMProviderID
     var name: String
@@ -71,10 +71,6 @@ struct LLMProviderProfile: Codable, Identifiable, Equatable {
     var authKind: LLMAuthKind
     var defaultEndpointFamily: LLMEndpointFamily
     var supportedEndpointFamilies: [LLMEndpointFamily]
-    var defaultModelID: String?
     var endpointPaths: [LLMEndpointFamily: String]
-    var supportedParameters: [String]
-    var schemaFeatures: [LLMSchemaFeature]
-    var modalities: [LLMModality]
     var isEnabled: Bool
 }

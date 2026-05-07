@@ -57,7 +57,6 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
             providerID: .openAIPlatform,
             endpointFamilies: [.responses],
             modalities: [.text],
-            supportedParameters: LLMProviderRegistry.shared.profile(for: .openAIPlatform).supportedParameters,
             schemaFeatures: [.usage]
         )
         env.modelContext.insert(config)
@@ -94,7 +93,6 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
             providerID: .openAIPlatform,
             endpointFamilies: [.responses],
             modalities: [.text],
-            supportedParameters: LLMProviderRegistry.shared.profile(for: .openAIPlatform).supportedParameters,
             schemaFeatures: [.usage]
         )
         env.modelContext.insert(config)

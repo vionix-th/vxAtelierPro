@@ -313,7 +313,7 @@ struct ConversationOptionsView: View {
                 
                 let provider = config.providerIDEnum
                 let profile = LLMProviderRegistry.shared.profile(for: provider)
-                let defaultModel = config.defaultModelID ?? profile.defaultModelID ?? ""
+                let defaultModel = config.defaultModelID ?? LLMDefaultsCatalog.bundled.defaultModelID(for: provider) ?? ""
                 options.setParameterValue(name: "model", value: defaultModel)
                 if let override = options.endpointOverrideFamily,
                    !profile.supportedEndpointFamilies.contains(override) {

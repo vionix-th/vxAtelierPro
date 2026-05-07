@@ -24,6 +24,27 @@ final class LLMCapabilityAndRunStateTests: XCTestCase {
         }
     }
 
+    func testCapabilityValidationAcceptsModelSpecificImageContentForCompatibleProvider() {
+        let profile = LLMProviderRegistry.shared.profile(for: .openRouter)
+        let request = LLMRequest(
+            providerID: .openRouter,
+            endpointFamily: .chatCompletions,
+            modelID: "vision-model",
+            modelDescriptor: LLMModelDescriptor(
+                id: "vision-model",
+                providerID: .openRouter,
+                endpointFamilies: [.chatCompletions],
+                modalities: [.text, .image],
+                schemaFeatures: [.streaming]
+            ),
+            messages: [
+                LLMMessage(role: "user", content: [LLMContentPart(kind: .image, dataBase64: "aW1n")])
+            ]
+        )
+
+        XCTAssertNoThrow(try LLMCapabilityValidator.validate(request, profile: profile))
+    }
+
     func testCapabilityValidationRejectsFileContentOutsideResponses() {
         let profile = LLMProviderRegistry.shared.profile(for: .openAIPlatform)
         let request = LLMRequest(

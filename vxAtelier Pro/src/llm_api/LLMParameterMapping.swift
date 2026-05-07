@@ -73,7 +73,7 @@ struct LLMParameterMappingDescriptor: Codable, Equatable, Identifiable {
     }
 }
 
-/// Built-in parameter mappings for supported provider endpoint families.
+/// Default parameter mappings loaded from bundled LLM defaults.
 enum LLMParameterMappingCatalog {
     /// Returns default mappings for a provider, endpoint family, and model.
     static func defaults(
@@ -81,94 +81,11 @@ enum LLMParameterMappingCatalog {
         endpointFamily: LLMEndpointFamily,
         modelID: String
     ) -> [LLMParameterMappingDescriptor] {
-        switch endpointFamily {
-        case .responses:
-            guard providerID == .openAIPlatform else { return [] }
-            return openAIResponsesDefaults()
-        case .chatCompletions:
-            if providerID == .openAIPlatform {
-                return openAIChatDefaults(modelID: modelID)
-            }
-            if [.openRouter, .lmStudio, .ollama, .xAI, .deepSeek, .customOpenAICompatible].contains(providerID) {
-                return openAICompatibleChatDefaults()
-            }
-            return []
-        case .anthropicMessages:
-            guard providerID == .anthropic else { return [] }
-            return anthropicMessagesDefaults()
-        case .models:
-            return []
-        }
-    }
-
-    /// Selects the OpenAI chat token-limit key for the requested model generation.
-    private static func openAIChatDefaults(modelID: String) -> [LLMParameterMappingDescriptor] {
-        let maxTokenWireKey = modelID.lowercased().hasPrefix("gpt-5")
-            ? "max_completion_tokens"
-            : "max_tokens"
-        return commonChatDefaults(endpointFamily: .chatCompletions, maxTokenWireKey: maxTokenWireKey)
-    }
-
-    /// Defaults for OpenAI-compatible chat APIs that follow the legacy token-limit key.
-    private static func openAICompatibleChatDefaults() -> [LLMParameterMappingDescriptor] {
-        commonChatDefaults(endpointFamily: .chatCompletions, maxTokenWireKey: "max_tokens")
-    }
-
-    /// Builds mappings shared by OpenAI-compatible chat endpoints.
-    private static func commonChatDefaults(
-        endpointFamily: LLMEndpointFamily,
-        maxTokenWireKey: String
-    ) -> [LLMParameterMappingDescriptor] {
-        [
-            .init(endpointFamily: endpointFamily, semanticParameterID: .maxOutputTokens, wireKey: maxTokenWireKey),
-            .init(endpointFamily: endpointFamily, semanticParameterID: .temperature, wireKey: "temperature"),
-            .init(endpointFamily: endpointFamily, semanticParameterID: .topP, wireKey: "top_p"),
-            .init(endpointFamily: endpointFamily, semanticParameterID: .stopSequences, wireKey: "stop"),
-            .init(
-                endpointFamily: endpointFamily,
-                semanticParameterID: .responseFormat,
-                encodingKind: .structuredPreset,
-                structuredPreset: .openAIChatResponseFormat
-            )
-        ]
-    }
-
-    /// Defaults for OpenAI Responses endpoint structured and scalar parameters.
-    private static func openAIResponsesDefaults() -> [LLMParameterMappingDescriptor] {
-        [
-            .init(endpointFamily: .responses, semanticParameterID: .maxOutputTokens, wireKey: "max_output_tokens"),
-            .init(endpointFamily: .responses, semanticParameterID: .temperature, wireKey: "temperature"),
-            .init(endpointFamily: .responses, semanticParameterID: .topP, wireKey: "top_p"),
-            .init(
-                endpointFamily: .responses,
-                semanticParameterID: .responseFormat,
-                encodingKind: .structuredPreset,
-                structuredPreset: .openAIResponsesTextFormat
-            ),
-            .init(
-                endpointFamily: .responses,
-                semanticParameterID: .reasoningEffort,
-                encodingKind: .structuredPreset,
-                structuredPreset: .openAIResponsesReasoning
-            ),
-            .init(endpointFamily: .responses, semanticParameterID: .serviceTier, wireKey: "service_tier")
-        ]
-    }
-
-    /// Defaults required by Anthropic Messages, including the fallback max-token value.
-    private static func anthropicMessagesDefaults() -> [LLMParameterMappingDescriptor] {
-        [
-            .init(
-                endpointFamily: .anthropicMessages,
-                semanticParameterID: .maxOutputTokens,
-                isRequired: true,
-                wireKey: "max_tokens",
-                defaultValue: .integer(AppDefaults.Anthropic.max_tokens)
-            ),
-            .init(endpointFamily: .anthropicMessages, semanticParameterID: .temperature, wireKey: "temperature"),
-            .init(endpointFamily: .anthropicMessages, semanticParameterID: .topP, wireKey: "top_p"),
-            .init(endpointFamily: .anthropicMessages, semanticParameterID: .stopSequences, wireKey: "stop_sequences")
-        ]
+        LLMDefaultsCatalog.bundled.parameterMappings(
+            providerID: providerID,
+            endpointFamily: endpointFamily,
+            modelID: modelID
+        )
     }
 }
 

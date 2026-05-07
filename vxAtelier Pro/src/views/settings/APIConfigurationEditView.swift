@@ -403,7 +403,7 @@ struct APIConfigurationEditView: View {
 
     /// Suggests a default model for a provider.
     static func suggestedDefaultModel(for providerID: LLMProviderID) -> String {
-        LLMProviderRegistry.shared.profile(for: providerID).defaultModelID ?? ""
+        LLMDefaultsCatalog.bundled.defaultModelID(for: providerID) ?? ""
     }
 
     // MARK: - Helper Methods

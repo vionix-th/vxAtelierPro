@@ -250,14 +250,12 @@ final class ConversationOptions: Equatable {
             }
         }
 
-        let registry = LLMProviderRegistry.shared
         let providerID = config.providerIDEnum
-        let profile = registry.profile(for: providerID)
         let modelID = requestedModelID
             ?? existingStringValue(for: .model, existingValues: existingValues)
             ?? modelOverride
             ?? config.defaultModelID
-            ?? profile.defaultModelID
+            ?? LLMDefaultsCatalog.bundled.defaultModelID(for: providerID)
             ?? ""
         let endpoint = endpointOverrideFamily ?? config.defaultEndpointFamilyEnum
         modelOverride = modelID.isEmpty ? nil : modelID
