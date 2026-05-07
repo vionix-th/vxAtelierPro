@@ -131,7 +131,7 @@ struct ModelsSettingsView: View {
                                 SettingsListRow(
                                     title: model.name,
                                     subtitle: model.apiConfiguration?.providerIDEnum.displayName ?? model.provider,
-                                    icons: model.capabilities.map { Image(systemName: $0.systemName) },
+                                    icons: model.metadataIconSystemNames.map { Image(systemName: $0) },
                                     onEdit: {
                                         editingModel = EditingModel(model: model, isNew: false)
                                     },

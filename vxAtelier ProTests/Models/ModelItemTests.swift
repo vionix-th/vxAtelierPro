@@ -38,15 +38,15 @@ final class ModelItemTests: XCTestCase {
         XCTAssertTrue(empty.isEmpty)
     }
 
-    func testCapabilities() throws {
+    func testModelMetadata() throws {
         let model = ModelItem(name: "gpt-4", contextSize: 8192, provider: "OpenAI")
-        model.capabilities = [.text, .vision]
+        model.modalitiesRaw = [LLMModality.text.rawValue, LLMModality.image.rawValue]
+        model.schemaFeaturesRaw = [LLMSchemaFeature.streaming.rawValue]
         context.insert(model)
         try context.save()
         let fetched = try context.fetch(FetchDescriptor<ModelItem>()).first
-        XCTAssertTrue(fetched?.hasCapability(.text) ?? false)
-        XCTAssertTrue(fetched?.hasCapability(.vision) ?? false)
-        XCTAssertFalse(fetched?.hasCapability(.audio) ?? true)
+        XCTAssertEqual(fetched?.modalityEnums, [.text, .image])
+        XCTAssertEqual(fetched?.schemaFeatureEnums, [.streaming])
     }
 
     func testConfigurationOwnership() throws {

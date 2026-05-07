@@ -7,7 +7,6 @@ struct ModelExportData: Codable {
     let name: String
     let contextSize: Int
     let provider: String
-    let capabilities: [String]
     let modelID: String?
     let displayName: String?
     let providerID: String?
@@ -25,7 +24,6 @@ struct ModelExportData: Codable {
         self.name = model.name
         self.contextSize = model.contextSize
         self.provider = model.provider
-        self.capabilities = model.capabilities.map { $0.rawValue }
         self.modelID = model.modelID
         self.displayName = model.displayName
         self.providerID = model.providerID
@@ -52,19 +50,17 @@ struct ModelExportData: Codable {
             provider: provider,
             apiConfiguration: apiConfiguration
         )
-        model.capabilities = capabilities.compactMap { ModelCapability(rawValue: $0) }
         model.modelID = modelID ?? name
         model.displayName = displayName ?? name
         model.providerID = providerID ?? LLMProviderRegistry.providerID(fromProviderName: provider).rawValue
-        if let defaultDescriptor = LLMDefaultsCatalog.bundled.modelDescriptor(
+        let defaultDescriptor = LLMDefaultsCatalog.bundled.modelDescriptor(
             providerID: LLMProviderID(rawValue: model.providerID) ?? .customOpenAICompatible,
             modelID: model.modelID
-        ) {
-            model.endpointFamiliesRaw = defaultDescriptor.endpointFamilies.map(\.rawValue)
-            model.modalitiesRaw = defaultDescriptor.modalities.map(\.rawValue)
-            model.supportedParameters = defaultDescriptor.supportedParameters
-            model.schemaFeaturesRaw = defaultDescriptor.schemaFeatures.map(\.rawValue)
-        }
+        )
+        model.endpointFamiliesRaw = defaultDescriptor.endpointFamilies.map(\.rawValue)
+        model.modalitiesRaw = defaultDescriptor.modalities.map(\.rawValue)
+        model.supportedParameters = defaultDescriptor.supportedParameters
+        model.schemaFeaturesRaw = defaultDescriptor.schemaFeatures.map(\.rawValue)
         if let endpointFamilies { model.endpointFamiliesRaw = endpointFamilies }
         if let modalities { model.modalitiesRaw = modalities }
         if let supportedParameters { model.supportedParameters = supportedParameters }

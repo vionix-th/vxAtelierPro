@@ -465,12 +465,12 @@ final class QueryManager {
             } catch {
                 vxAtelierPro.log.error(
                     "Failed to fetch models from provider \(config.name): \(error.localizedDescription)")
-                if let defaultModelID = LLMDefaultsCatalog.bundled.defaultModelID(for: providerID),
-                   let descriptor = LLMDefaultsCatalog.bundled.modelDescriptor(
-                       providerID: providerID,
-                       modelID: defaultModelID,
-                       endpointFamilies: [profile.defaultEndpointFamily]
-                   ) {
+                if let defaultModelID = LLMDefaultsCatalog.bundled.defaultModelID(for: providerID) {
+                    let descriptor = LLMDefaultsCatalog.bundled.modelDescriptor(
+                        providerID: providerID,
+                        modelID: defaultModelID,
+                        endpointFamilies: [profile.defaultEndpointFamily]
+                    )
                     fetchedModels = [descriptor]
                 } else {
                     fetchedModels = []

@@ -8,13 +8,13 @@ import SwiftUI
     import AppKit
 #endif
 
-/// Represents an AI model with its capabilities and provider information.
+/// Represents an AI model with model metadata and provider information.
 ///
 /// This model stores information about AI models including:
 /// - Base model name (e.g., "gpt-4", "claude-3")
 /// - Context window size for token limits
 /// - Provider identification (e.g., OpenAI, Anthropic)
-/// - Capabilities the model supports (text generation, vision, etc.)
+/// - Model modalities and schema features
 @Model
 final class ModelItem {
     /// The name of the model (e.g., "gpt-4", "claude-3-opus")
@@ -25,9 +25,6 @@ final class ModelItem {
 
     /// The provider/company that created this model (e.g., "OpenAI", "Anthropic")
     var provider: String
-
-    /// Array of capabilities this model supports (text, vision, etc.)
-    var capabilities: [ModelCapability]
 
     var modelID: String
     var displayName: String
@@ -67,7 +64,6 @@ final class ModelItem {
             supportedParameters = newValue.supportedParameters
             schemaFeaturesRaw = newValue.schemaFeatures.map(\.rawValue)
             rawMetadataJSON = newValue.rawMetadataJSON
-            capabilities = Self.capabilities(from: newValue)
             self.materializeDefaultParameterMappings(preserveCustomized: true)
         }
     }
@@ -93,7 +89,6 @@ final class ModelItem {
         self.provider = resolvedProvider
         self.providerID = apiConfiguration?.providerID ?? LLMProviderRegistry.providerID(fromProviderName: resolvedProvider).rawValue
         self.apiConfiguration = apiConfiguration
-        self.capabilities = []
         self.endpointFamiliesRaw = []
         self.modalitiesRaw = []
         self.supportedParameters = []
@@ -101,28 +96,16 @@ final class ModelItem {
         self.rawMetadataJSON = nil
         self.parameterMappings = []
 
-        if let defaultDescriptor = LLMDefaultsCatalog.bundled.modelDescriptor(
+        let defaultDescriptor = LLMDefaultsCatalog.bundled.modelDescriptor(
             providerID: LLMProviderID(rawValue: self.providerID) ?? .customOpenAICompatible,
             modelID: name
-        ) {
-            self.contextSize = defaultDescriptor.contextWindow ?? contextSize
-            self.endpointFamiliesRaw = defaultDescriptor.endpointFamilies.map(\.rawValue)
-            self.modalitiesRaw = defaultDescriptor.modalities.map(\.rawValue)
-            self.supportedParameters = defaultDescriptor.supportedParameters
-            self.schemaFeaturesRaw = defaultDescriptor.schemaFeatures.map(\.rawValue)
-            self.capabilities = Self.capabilities(from: defaultDescriptor)
-        } else {
-            self.capabilities = LLMModelProviderUtils.inferCapabilities(from: name)
-        }
+        )
+        self.contextSize = defaultDescriptor.contextWindow ?? contextSize
+        self.endpointFamiliesRaw = defaultDescriptor.endpointFamilies.map(\.rawValue)
+        self.modalitiesRaw = defaultDescriptor.modalities.map(\.rawValue)
+        self.supportedParameters = defaultDescriptor.supportedParameters
+        self.schemaFeaturesRaw = defaultDescriptor.schemaFeatures.map(\.rawValue)
         self.materializeDefaultParameterMappings(preserveCustomized: true)
-    }
-
-    /// Checks if the model has a specific capability.
-    ///
-    /// - Parameter capability: The capability to check for
-    /// - Returns: True if the model has this capability, false otherwise
-    func hasCapability(_ capability: ModelCapability) -> Bool {
-        return capabilities.contains(capability)
     }
 
     func materializeDefaultParameterMappings(preserveCustomized: Bool = true) {
@@ -157,17 +140,6 @@ final class ModelItem {
             apiConfiguration: apiConfiguration
         )
         self.descriptor = descriptor
-    }
-
-    private static func capabilities(from descriptor: LLMModelDescriptor) -> [ModelCapability] {
-        var result: [ModelCapability] = []
-        if descriptor.modalities.contains(.text) { result.append(.text) }
-        if descriptor.modalities.contains(.image) { result.append(.vision) }
-        if descriptor.modalities.contains(.audio) { result.append(.audio) }
-        if descriptor.schemaFeatures.contains(.streaming) { result.append(.streaming) }
-        if descriptor.schemaFeatures.contains(.tools) { result.append(.function) }
-        if !result.contains(.chat) { result.append(.chat) }
-        return result
     }
 
     private func materializeDefaultParameterMappings(

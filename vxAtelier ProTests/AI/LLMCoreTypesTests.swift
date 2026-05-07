@@ -29,7 +29,7 @@ final class LLMCoreTypesTests: XCTestCase {
         XCTAssertNil(defaults.defaultModelID(for: .customOpenAICompatible))
     }
 
-    func testBundledDefaultsProvideCurrentModelCapabilities() {
+    func testBundledDefaultsProvideCurrentModelMetadata() {
         let defaults = LLMDefaultsCatalog.bundled
 
         let openAI = defaults.modelDefaults(providerID: .openAIPlatform, modelID: "gpt-5.4-nano")
@@ -49,6 +49,21 @@ final class LLMCoreTypesTests: XCTestCase {
         let deepSeek = defaults.modelDefaults(providerID: .deepSeek, modelID: "deepseek-v4-flash")
         XCTAssertEqual(deepSeek?.contextWindow, 1000000)
         XCTAssertTrue(deepSeek?.supportedParameters?.contains("tools") ?? false)
+    }
+
+    func testBundledDefaultsProvideConservativeFallbackDescriptor() {
+        let catalog = try! LLMDefaultsCatalog(data: Data("""
+        {
+          "providerDefaults": [],
+          "rules": []
+        }
+        """.utf8))
+        let descriptor = catalog.modelDescriptor(providerID: .customOpenAICompatible, modelID: "unknown-model")
+
+        XCTAssertEqual(descriptor.modalities, [.text])
+        XCTAssertTrue(descriptor.supportedParameters.isEmpty)
+        XCTAssertTrue(descriptor.schemaFeatures.isEmpty)
+        XCTAssertEqual(descriptor.displayName, "unknown-model")
     }
 
     func testDefaultsCatalogDecodesValidJSON() throws {

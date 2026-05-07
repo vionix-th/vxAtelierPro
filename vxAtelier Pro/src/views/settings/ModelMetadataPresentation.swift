@@ -1,0 +1,76 @@
+import SwiftUI
+
+extension LLMModality {
+    var displayName: String {
+        switch self {
+        case .text: return "Text"
+        case .image: return "Image"
+        case .audio: return "Audio"
+        case .file: return "File"
+        case .video: return "Video"
+        case .tool: return "Tool"
+        case .reasoning: return "Reasoning"
+        }
+    }
+
+    var systemName: String {
+        switch self {
+        case .text: return "text.justify"
+        case .image: return "photo"
+        case .audio: return "waveform"
+        case .file: return "doc"
+        case .video: return "video"
+        case .tool: return "wrench.and.screwdriver"
+        case .reasoning: return "brain"
+        }
+    }
+}
+
+extension LLMSchemaFeature {
+    var displayName: String {
+        switch self {
+        case .tools: return "Tools"
+        case .strictTools: return "Strict Tools"
+        case .jsonSchema: return "JSON Schema"
+        case .jsonObject: return "JSON Object"
+        case .reasoning: return "Reasoning"
+        case .usage: return "Usage"
+        case .streaming: return "Streaming"
+        }
+    }
+
+    var systemName: String {
+        switch self {
+        case .tools: return "function"
+        case .strictTools: return "checkmark.shield"
+        case .jsonSchema: return "curlybraces.square"
+        case .jsonObject: return "curlybraces"
+        case .reasoning: return "brain"
+        case .usage: return "chart.bar"
+        case .streaming: return "sparkles"
+        }
+    }
+}
+
+extension ModelItem {
+    var modalityEnums: [LLMModality] {
+        modalitiesRaw.compactMap(LLMModality.init(rawValue:))
+    }
+
+    var schemaFeatureEnums: [LLMSchemaFeature] {
+        schemaFeaturesRaw.compactMap(LLMSchemaFeature.init(rawValue:))
+    }
+
+    var metadataIconSystemNames: [String] {
+        (modalityEnums.map(\.systemName) + schemaFeatureEnums.map(\.systemName))
+            .reduce(into: [String]()) { result, symbol in
+                if !result.contains(symbol) {
+                    result.append(symbol)
+                }
+            }
+    }
+
+    var metadataSearchTerms: [String] {
+        modalityEnums.map(\.displayName) + schemaFeatureEnums.map(\.displayName)
+    }
+}

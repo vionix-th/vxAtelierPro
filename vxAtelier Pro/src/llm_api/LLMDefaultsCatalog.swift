@@ -71,17 +71,18 @@ struct LLMDefaultsCatalog {
         displayName: String? = nil,
         endpointFamilies: [LLMEndpointFamily]? = nil,
         rawMetadataJSON: String? = nil
-    ) -> LLMModelDescriptor? {
-        guard let defaults = modelDefaults(providerID: providerID, modelID: modelID) else { return nil }
+    ) -> LLMModelDescriptor {
+        let defaults = modelDefaults(providerID: providerID, modelID: modelID)
         return LLMModelDescriptor(
             id: modelID,
             displayName: displayName,
             providerID: providerID,
-            contextWindow: defaults.contextWindow,
-            endpointFamilies: endpointFamilies ?? defaults.endpointFamilies ?? [],
-            modalities: defaults.modalities ?? [],
-            supportedParameters: defaults.supportedParameters ?? [],
-            schemaFeatures: defaults.schemaFeatures ?? [],
+            contextWindow: defaults?.contextWindow,
+            endpointFamilies: endpointFamilies ?? defaults?.endpointFamilies ?? [],
+            modalities: defaults?.modalities ?? [.text],
+            supportedParameters: defaults?.supportedParameters ?? [],
+            parameterMappings: [],
+            schemaFeatures: defaults?.schemaFeatures ?? [],
             rawMetadataJSON: rawMetadataJSON
         )
     }

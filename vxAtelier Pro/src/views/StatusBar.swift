@@ -411,8 +411,11 @@ struct ConversationInfoHeader: View {
         modelParam?.stringValue ?? "No model"
     }
     
-    private var modelCapabilities: [ModelCapability] {
-        LLMModelProviderUtils.inferCapabilities(from: modelName)
+    private var modelDescriptor: LLMModelDescriptor {
+        LLMDefaultsCatalog.bundled.modelDescriptor(
+            providerID: currentProvider,
+            modelID: modelName
+        )
     }
     
     private var isStreamingEnabled: Bool {
@@ -491,7 +494,7 @@ struct ConversationInfoHeader: View {
                 .frame(height: 14)
 
             // Only show streaming toggle if model supports it and not compact
-            if modelCapabilities.contains(.streaming) && !isCompact {
+            if modelDescriptor.schemaFeatures.contains(.streaming) && !isCompact {
                 HStack(spacing: 4) {
                     Image(systemName: isStreamingEnabled ? "sparkles" : "text.alignleft")
                         .font(.caption)
@@ -516,15 +519,22 @@ struct ConversationInfoHeader: View {
                     .frame(height: 14)
             }                
             
-            if !modelCapabilities.isEmpty {                                
-                // Show model capabilities as icons
+            if !modelDescriptor.modalities.isEmpty || !modelDescriptor.schemaFeatures.isEmpty {
+                // Show model metadata as icons
                 HStack(spacing: 3) {
-                    ForEach(modelCapabilities, id: \.self) { capability in
-                        Image(systemName: capability.systemName)
+                    ForEach(modelDescriptor.modalities, id: \.self) { modality in
+                        Image(systemName: modality.systemName)
                             .foregroundColor(.blue)
                             .font(.caption2)
                             .frame(width: 14, height: 14)
-                            .help(capability.rawValue)
+                            .help(modality.displayName)
+                    }
+                    ForEach(modelDescriptor.schemaFeatures, id: \.self) { feature in
+                        Image(systemName: feature.systemName)
+                            .foregroundColor(.blue)
+                            .font(.caption2)
+                            .frame(width: 14, height: 14)
+                            .help(feature.displayName)
                     }
                 }
                 .layoutPriority(2)

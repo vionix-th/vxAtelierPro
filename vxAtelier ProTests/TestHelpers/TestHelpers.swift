@@ -173,10 +173,6 @@ extension LLMRequest {
             providerID: providerID,
             modelID: modelID,
             endpointFamilies: [endpointFamily]
-        ) ?? LLMModelDescriptor(
-            id: modelID,
-            providerID: providerID,
-            endpointFamilies: [endpointFamily]
         )
         descriptor.parameterMappings = LLMParameterMappingCatalog.defaults(
             providerID: providerID,

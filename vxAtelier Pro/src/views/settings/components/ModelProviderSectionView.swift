@@ -18,7 +18,7 @@ struct ModelProviderSectionView: View {
                     SettingsListRow(
                         title: model.name,
                         subtitle: model.provider,
-                        icons: model.capabilities.map { Image(systemName: $0.systemName) },
+                        icons: model.metadataIconSystemNames.map { Image(systemName: $0) },
                         onEdit: { onEditModel(model) },
                         onDelete: { onDeleteModel(model) }
                     ) {
@@ -56,8 +56,8 @@ struct ModelContextSizeRow: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
-                        ForEach(model.capabilities, id: \.self) { capability in
-                            Image(systemName: capability.systemName)
+                        ForEach(model.metadataIconSystemNames, id: \.self) { systemName in
+                            Image(systemName: systemName)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -79,4 +79,4 @@ struct ModelContextSizeRow: View {
         .buttonStyle(.plain)
         .padding(.vertical, AppDefaults.paddingSmall)
     }
-} 
+}

@@ -17,13 +17,6 @@ enum LLMModelMetadataDecoder {
                 displayName: object.string("name") ?? object.string("display_name") ?? id,
                 endpointFamilies: endpointFamilies,
                 rawMetadataJSON: rawJSONString(from: item)
-            ) ?? LLMModelDescriptor(
-                id: id,
-                displayName: object.string("name") ?? object.string("display_name") ?? id,
-                providerID: profile.id,
-                contextWindow: nil,
-                endpointFamilies: endpointFamilies,
-                rawMetadataJSON: rawJSONString(from: item)
             )
             applyProviderMetadata(from: object, to: &descriptor)
             return descriptor
@@ -42,13 +35,6 @@ enum LLMModelMetadataDecoder {
                 providerID: profile.id,
                 modelID: id,
                 displayName: object.string("display_name") ?? object.string("name") ?? id,
-                endpointFamilies: [.anthropicMessages],
-                rawMetadataJSON: rawJSONString(from: item)
-            ) ?? LLMModelDescriptor(
-                id: id,
-                displayName: object.string("display_name") ?? object.string("name") ?? id,
-                providerID: profile.id,
-                contextWindow: nil,
                 endpointFamilies: [.anthropicMessages],
                 rawMetadataJSON: rawJSONString(from: item)
             )

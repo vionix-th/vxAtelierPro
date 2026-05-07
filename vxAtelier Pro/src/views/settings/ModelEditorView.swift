@@ -12,7 +12,8 @@ struct ModelEditorView: View {
     @State private var name: String
     @State private var selectedConfigurationID: PersistentIdentifier?
     @State private var contextSize: Int
-    @State private var capabilities: [ModelCapability]
+    @State private var modalities: [LLMModality]
+    @State private var schemaFeatures: [LLMSchemaFeature]
     @State private var selectedEndpointFamilyRaw: String
     
     init(model: ModelItem) {
@@ -20,7 +21,8 @@ struct ModelEditorView: View {
         _name = State(initialValue: model.name)
         _selectedConfigurationID = State(initialValue: model.apiConfiguration?.persistentModelID)
         _contextSize = State(initialValue: model.contextSize)
-        _capabilities = State(initialValue: model.capabilities)
+        _modalities = State(initialValue: model.modalityEnums)
+        _schemaFeatures = State(initialValue: model.schemaFeatureEnums)
         _selectedEndpointFamilyRaw = State(
             initialValue: model.endpointFamiliesRaw.first ?? LLMEndpointFamily.chatCompletions.rawValue
         )
@@ -130,22 +132,22 @@ struct ModelEditorView: View {
                 
                 Section {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: AppDefaults.paddingLarge) {
-                        ForEach(ModelCapability.allCases.sorted(by: { $0.rawValue < $1.rawValue }), id: \.self) { capability in
+                        ForEach(LLMModality.allCases.sorted(by: { $0.displayName < $1.displayName }), id: \.self) { modality in
                             Toggle(isOn: Binding(
-                                get: { capabilities.contains(capability) },
+                                get: { modalities.contains(modality) },
                                 set: { isEnabled in
                                     if isEnabled {
-                                        capabilities.append(capability)
+                                        modalities.append(modality)
                                     } else {
-                                        capabilities.removeAll { $0 == capability }
+                                        modalities.removeAll { $0 == modality }
                                     }
                                 }
                             )) {
                                 Label {
-                                    Text(capability.rawValue)
+                                    Text(modality.displayName)
                                         .font(.system(.body, design: .rounded))
                                 } icon: {
-                                    Image(systemName: capability.systemName)
+                                    Image(systemName: modality.systemName)
                                         .foregroundColor(.accentColor)
                                 }
                             }
@@ -154,7 +156,39 @@ struct ModelEditorView: View {
                         }
                     }
                 } header: {
-                    Text("Capabilities")
+                    Text("Modalities")
+                        .font(.system(.headline, design: .rounded))
+                        .foregroundColor(.primary)
+                        .textCase(nil)
+                }
+
+                Section {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: AppDefaults.paddingLarge) {
+                        ForEach(LLMSchemaFeature.allCases.sorted(by: { $0.displayName < $1.displayName }), id: \.self) { feature in
+                            Toggle(isOn: Binding(
+                                get: { schemaFeatures.contains(feature) },
+                                set: { isEnabled in
+                                    if isEnabled {
+                                        schemaFeatures.append(feature)
+                                    } else {
+                                        schemaFeatures.removeAll { $0 == feature }
+                                    }
+                                }
+                            )) {
+                                Label {
+                                    Text(feature.displayName)
+                                        .font(.system(.body, design: .rounded))
+                                } icon: {
+                                    Image(systemName: feature.systemName)
+                                        .foregroundColor(.accentColor)
+                                }
+                            }
+                            .toggleStyle(.switch)
+                            .padding(.vertical, AppDefaults.paddingSmall)
+                        }
+                    }
+                } header: {
+                    Text("Schema Features")
                         .font(.system(.headline, design: .rounded))
                         .foregroundColor(.primary)
                         .textCase(nil)
@@ -263,7 +297,8 @@ struct ModelEditorView: View {
         model.provider = selectedConfiguration.providerIDEnum.displayName
         model.providerID = selectedConfiguration.providerID
         model.contextSize = contextSize
-        model.capabilities = capabilities
+        model.modalitiesRaw = modalities.map(\.rawValue)
+        model.schemaFeaturesRaw = schemaFeatures.map(\.rawValue)
         model.materializeDefaultParameterMappings(preserveCustomized: true)
         
         do {

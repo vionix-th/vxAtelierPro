@@ -29,7 +29,8 @@ final class ModelItemExportTests: XCTestCase {
             providerID: .openAIPlatform
         )
         let original = ModelItem(name: "gpt-4", contextSize: 8192, provider: "OpenAI", apiConfiguration: config)
-        original.capabilities = [.text, .vision]
+        original.modalitiesRaw = [LLMModality.text.rawValue, LLMModality.image.rawValue]
+        original.schemaFeaturesRaw = [LLMSchemaFeature.streaming.rawValue]
         let exportData = ModelExportData(original)
         let encoded = try JSONEncoder().encode(exportData)
         let decoded = try JSONDecoder().decode(ModelExportData.self, from: encoded)
@@ -37,7 +38,8 @@ final class ModelItemExportTests: XCTestCase {
         XCTAssertEqual(restored.name, original.name)
         XCTAssertEqual(restored.contextSize, original.contextSize)
         XCTAssertEqual(restored.provider, original.provider)
-        XCTAssertEqual(Set(restored.capabilities), Set(original.capabilities))
+        XCTAssertEqual(Set(restored.modalitiesRaw), Set(original.modalitiesRaw))
+        XCTAssertEqual(Set(restored.schemaFeaturesRaw), Set(original.schemaFeaturesRaw))
         XCTAssertEqual(restored.apiConfiguration?.name, config.name)
         let restoredMaxTokens = restored.parameterMappings.first {
             $0.endpointFamilyEnum == .chatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens

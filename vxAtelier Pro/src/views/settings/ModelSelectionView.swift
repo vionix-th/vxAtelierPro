@@ -24,8 +24,9 @@ struct ModelSelectionView: View {
     /// Search text for filtering models
     @State private var searchText = ""
     
-    /// Selected capabilities for filtering
-    @State private var selectedCapabilities: Set<ModelCapability> = []
+    /// Selected model metadata filters.
+    @State private var selectedModalities: Set<LLMModality> = []
+    @State private var selectedSchemaFeatures: Set<LLMSchemaFeature> = []
     
     /// Filtered models based on current provider, showAllModels setting, and search text
     private var filteredModels: [ModelItem] {
@@ -42,20 +43,21 @@ struct ModelSelectionView: View {
             models = models.filter { $0.apiConfiguration == nil }
         }
         
-        // Filter by selected capabilities (must have all selected)
-        if !selectedCapabilities.isEmpty {
+        // Filter by selected metadata values; all selected filters must match.
+        if !selectedModalities.isEmpty || !selectedSchemaFeatures.isEmpty {
             models = models.filter { model in
-                selectedCapabilities.isSubset(of: Set(model.capabilities))
+                selectedModalities.isSubset(of: Set(model.modalityEnums))
+                    && selectedSchemaFeatures.isSubset(of: Set(model.schemaFeatureEnums))
             }
         }
         
-        // Fulltext search: name, provider, capabilities
+        // Fulltext search: name, provider, modalities, and schema features.
         if !searchText.isEmpty {
             let lowercasedSearch = searchText.lowercased()
             models = models.filter { model in
                 model.name.lowercased().contains(lowercasedSearch) ||
                 model.provider.lowercased().contains(lowercasedSearch) ||
-                model.capabilities.map { $0.displayName.lowercased() }.contains(where: { $0.contains(lowercasedSearch) })
+                model.metadataSearchTerms.map { $0.lowercased() }.contains(where: { $0.contains(lowercasedSearch) })
             }
         }
         
@@ -105,18 +107,33 @@ struct ModelSelectionView: View {
                 }
                 .padding(.horizontal)
                 
-                // Capability filter chips
+                // Model metadata filter chips
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(ModelCapability.allCases, id: \.self) { capability in
-                            CapabilityChip(
-                                capability: capability,
-                                isSelected: selectedCapabilities.contains(capability),
+                        ForEach(LLMModality.allCases.sorted(by: { $0.displayName < $1.displayName }), id: \.self) { modality in
+                            MetadataChip(
+                                title: modality.displayName,
+                                systemName: modality.systemName,
+                                isSelected: selectedModalities.contains(modality),
                                 onTap: {
-                                    if selectedCapabilities.contains(capability) {
-                                        selectedCapabilities.remove(capability)
+                                    if selectedModalities.contains(modality) {
+                                        selectedModalities.remove(modality)
                                     } else {
-                                        selectedCapabilities.insert(capability)
+                                        selectedModalities.insert(modality)
+                                    }
+                                }
+                            )
+                        }
+                        ForEach(LLMSchemaFeature.allCases.sorted(by: { $0.displayName < $1.displayName }), id: \.self) { feature in
+                            MetadataChip(
+                                title: feature.displayName,
+                                systemName: feature.systemName,
+                                isSelected: selectedSchemaFeatures.contains(feature),
+                                onTap: {
+                                    if selectedSchemaFeatures.contains(feature) {
+                                        selectedSchemaFeatures.remove(feature)
+                                    } else {
+                                        selectedSchemaFeatures.insert(feature)
                                     }
                                 }
                             )
@@ -229,10 +246,6 @@ struct ModelRowView: View {
     let isSelected: Bool
     let onSelect: () -> Void
     
-    private var modelCapabilities: [ModelCapability] {
-        model.capabilities
-    }
-    
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .center) {
@@ -254,8 +267,8 @@ struct ModelRowView: View {
                 }
             }
             
-            // Capabilities and metadata row
-            if !modelCapabilities.isEmpty {
+            // Metadata row
+            if model.contextSize > 0 || !model.modalityEnums.isEmpty || !model.schemaFeatureEnums.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         // Context size info if available
@@ -274,13 +287,12 @@ struct ModelRowView: View {
                             .cornerRadius(4)
                             .help("Context window size")
                         }
-                        // Display model capabilities as icons
-                        ForEach(modelCapabilities, id: \.self) { capability in
+                        ForEach(model.modalityEnums, id: \.self) { modality in
                             HStack(spacing: 4) {
-                                Image(systemName: capability.systemName)
+                                Image(systemName: modality.systemName)
                                     .foregroundColor(.blue)
                                     .font(.caption)
-                                Text(capability.displayName)
+                                Text(modality.displayName)
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -288,7 +300,22 @@ struct ModelRowView: View {
                             .padding(.vertical, 2)
                             .background(Color.secondary.opacity(0.1))
                             .cornerRadius(4)
-                            .help(capability.rawValue)
+                            .help(modality.displayName)
+                        }
+                        ForEach(model.schemaFeatureEnums, id: \.self) { feature in
+                            HStack(spacing: 4) {
+                                Image(systemName: feature.systemName)
+                                    .foregroundColor(.blue)
+                                    .font(.caption)
+                                Text(feature.displayName)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.secondary.opacity(0.1))
+                            .cornerRadius(4)
+                            .help(feature.displayName)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -313,18 +340,19 @@ struct ModelRowView: View {
     }
 }
 
-/// A chip-style button for selecting a model capability
-private struct CapabilityChip: View {
-    let capability: ModelCapability
+/// A chip-style button for selecting model metadata filters.
+private struct MetadataChip: View {
+    let title: String
+    let systemName: String
     let isSelected: Bool
     let onTap: () -> Void
     
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 4) {
-                Image(systemName: capability.systemName)
+                Image(systemName: systemName)
                     .font(.caption)
-                Text(capability.displayName)
+                Text(title)
                     .font(.caption)
             }
             .padding(.horizontal, AppDefaults.paddingMedium)
@@ -338,6 +366,6 @@ private struct CapabilityChip: View {
             )
         }
         .buttonStyle(.plain)
-        .help(capability.rawValue)
+        .help(title)
     }
 }

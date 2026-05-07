@@ -181,7 +181,7 @@ let package = Package(
                 "views/settings/ApplicationSettingsView.swift",
                 "views/settings/ConfirmationContext.swift",
                 "views/settings/ModelSelectionView.swift",
-                "views/settings/ModelCapabilityPresentation.swift",
+                "views/settings/ModelMetadataPresentation.swift",
                 "views/settings/ModelEditorView.swift",
                 "views/settings/PromptTemplateEditView.swift",
                 "views/settings/PromptTemplateList.swift",

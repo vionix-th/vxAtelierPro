@@ -106,14 +106,11 @@ struct ConversationRunContextResolver {
         if let model {
             return model.descriptor
         }
-        var defaultDescriptor = LLMDefaultsCatalog.bundled.modelDescriptor(
+        let defaultDescriptor = LLMDefaultsCatalog.bundled.modelDescriptor(
             providerID: providerID,
             modelID: modelID,
             endpointFamilies: nil
         )
-        if defaultDescriptor?.endpointFamilies.isEmpty == true {
-            defaultDescriptor?.endpointFamilies = [endpointFamily]
-        }
         return defaultDescriptor
     }
 }
