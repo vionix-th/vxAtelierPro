@@ -266,6 +266,36 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         XCTAssertNil(body["json_schema"])
     }
 
+    func testOpenAIChatRejectsReservedProviderExtraCollision() {
+        let adapter = OpenAIChatAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
+        let request = LLMRequest(
+            providerID: .openAIPlatform,
+            endpointFamily: .chatCompletions,
+            modelID: "gpt-test",
+            messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Answer")])],
+            options: LLMGenerationOptions(providerExtras: ["stream": .boolean(false)])
+        )
+
+        XCTAssertThrowsError(try adapter.makeBody(for: request, stream: true)) { error in
+            XCTAssertEqual(error as? LLMProviderError, .unsupportedParameter("providerExtras.stream cannot override a reserved request field."))
+        }
+    }
+
+    func testOpenAIResponsesRejectsReservedProviderExtraCollision() {
+        let adapter = OpenAIResponsesAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
+        let request = LLMRequest(
+            providerID: .openAIPlatform,
+            endpointFamily: .responses,
+            modelID: "gpt-test",
+            messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Answer")])],
+            options: LLMGenerationOptions(providerExtras: ["text": .object(["format": .object(["type": .string("text")])])])
+        )
+
+        XCTAssertThrowsError(try adapter.makeBody(for: request, stream: false)) { error in
+            XCTAssertEqual(error as? LLMProviderError, .unsupportedParameter("providerExtras.text cannot override a reserved request field."))
+        }
+    }
+
     func testJsonSchemaEncodingRequiresProviderExtraObject() {
         var body: [String: JSONValue] = [:]
         let options = LLMGenerationOptions(responseFormat: .jsonSchema)
@@ -327,5 +357,49 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
 
         let body = try adapter.makeBody(for: request, stream: false)
         XCTAssertEqual(body["max_tokens"], .integer(AppDefaults.Anthropic.max_tokens))
+    }
+
+    func testAnthropicRejectsInvalidToolArgumentJSON() {
+        let adapter = AnthropicMessagesAdapter(profile: LLMProviderRegistry.shared.profile(for: .anthropic))
+        let request = LLMRequest(
+            providerID: .anthropic,
+            endpointFamily: .anthropicMessages,
+            modelID: "claude-test",
+            messages: [
+                LLMMessage(
+                    role: "assistant",
+                    content: [],
+                    toolCalls: [
+                        LLMToolCall(id: "tool_1", callID: "tool_1", index: 0, name: "lookup", argumentsJSON: "{")
+                    ]
+                )
+            ]
+        )
+
+        XCTAssertThrowsError(try adapter.anthropicMessages(from: request)) { error in
+            XCTAssertEqual(error as? LLMProviderError, .decoding("Anthropic tool_use arguments must be valid JSON object."))
+        }
+    }
+
+    func testAnthropicRejectsNonObjectToolArgumentJSON() {
+        let adapter = AnthropicMessagesAdapter(profile: LLMProviderRegistry.shared.profile(for: .anthropic))
+        let request = LLMRequest(
+            providerID: .anthropic,
+            endpointFamily: .anthropicMessages,
+            modelID: "claude-test",
+            messages: [
+                LLMMessage(
+                    role: "assistant",
+                    content: [],
+                    toolCalls: [
+                        LLMToolCall(id: "tool_1", callID: "tool_1", index: 0, name: "lookup", argumentsJSON: "[]")
+                    ]
+                )
+            ]
+        )
+
+        XCTAssertThrowsError(try adapter.anthropicMessages(from: request)) { error in
+            XCTAssertEqual(error as? LLMProviderError, .unsupportedParameter("Anthropic tool_use arguments must decode to a JSON object."))
+        }
     }
 }

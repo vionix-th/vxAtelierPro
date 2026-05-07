@@ -82,6 +82,18 @@ struct UnitEchoTool: ExecutableLLMTool {
     }
 }
 
+struct UnitFailingTool: ExecutableLLMTool {
+    static let toolName = "unit_failing_tool"
+
+    let name = UnitFailingTool.toolName
+    let description = "Fails execution for unit tests."
+    var parameters: any LLMToolParameters { GenericLLMToolParameters(properties: [:]) }
+
+    func execute(_ call: LLMToolExecutionCall) async throws -> String {
+        throw LLMToolExecutionError.executionFailed("unit failure")
+    }
+}
+
 struct UnitSchemaOnlyTool: LLMTool {
     static let toolName = "unit_schema_only_tool"
 

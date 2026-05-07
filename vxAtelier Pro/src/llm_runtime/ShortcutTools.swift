@@ -49,7 +49,7 @@ public struct ListShortcutsTool: ExecutableLLMTool, ConfigurableLLMTool {
                let jsonString = String(data: jsonData, encoding: .utf8) {
                 return jsonString
             } else {
-                return "Failed to encode restricted shortcuts list"
+                throw LLMToolExecutionError.executionFailed("Failed to encode restricted shortcuts list.")
             }
         }
         
@@ -73,10 +73,10 @@ public struct ListShortcutsTool: ExecutableLLMTool, ConfigurableLLMTool {
            let jsonString = String(data: jsonData, encoding: .utf8) {
             return jsonString
         } else {
-            return "Failed to encode shortcuts list"
+            throw LLMToolExecutionError.executionFailed("Failed to encode shortcuts list.")
         }
         #else
-        return "This feature is only available on macOS"
+        throw LLMToolExecutionError.unavailable("This feature is only available on macOS.")
         #endif
     }
     
@@ -132,7 +132,7 @@ public struct RunShortcutTool: ExecutableLLMTool {
         // Pass both identifier and input to the ShortcutsManager
         return await ShortcutsManager.shared.runShortcut(name: identifier, input: input)
         #else
-        return "This feature is only available on macOS"
+        throw LLMToolExecutionError.unavailable("This feature is only available on macOS.")
         #endif
     }
 }

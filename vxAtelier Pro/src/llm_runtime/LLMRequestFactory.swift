@@ -48,7 +48,7 @@ struct ConversationRunContextResolver {
             providerID: providerID,
             endpointFamily: endpoint,
             modelID: modelID,
-            modelDescriptor: modelDescriptor(
+            modelDescriptor: try modelDescriptor(
                 for: modelID,
                 apiConfiguration: apiConfig,
                 providerID: providerID,
@@ -75,15 +75,26 @@ struct ConversationRunContextResolver {
         apiConfiguration: APIConfigurationItem,
         providerID: LLMProviderID,
         conversation: ConversationItem
-    ) -> LLMModelDescriptor? {
-        guard let context = conversation.modelContext,
-              let models = try? context.fetch(FetchDescriptor<ModelItem>()) else {
-            return nil
+    ) throws -> LLMModelDescriptor? {
+        guard let context = conversation.modelContext else {
+            throw LLMProviderError.invalidConfiguration("Conversation has no model context while resolving descriptor for \(modelID).")
+        }
+        let requestedModelID = modelID
+        let requestedProviderID = providerID.rawValue
+        let descriptor = FetchDescriptor<ModelItem>(
+            predicate: #Predicate<ModelItem> { model in
+                (model.modelID == requestedModelID || model.name == requestedModelID)
+                    && model.providerID == requestedProviderID
+            }
+        )
+        let models: [ModelItem]
+        do {
+            models = try context.fetch(descriptor)
+        } catch {
+            throw LLMProviderError.invalidConfiguration("Failed to fetch model descriptor for \(modelID) in API configuration \(apiConfiguration.name): \(error.localizedDescription)")
         }
         let model = models.first { model in
-            (model.modelID == modelID || model.name == modelID)
-                && model.apiConfiguration?.id == apiConfiguration.id
-                && (LLMProviderID(rawValue: model.providerID) ?? .customOpenAICompatible) == providerID
+            model.apiConfiguration?.id == apiConfiguration.id
         }
         return model?.descriptor
     }

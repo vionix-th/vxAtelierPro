@@ -40,19 +40,19 @@ public struct WriteSettingTool: ExecutableLLMTool {
         guard let jsonData = arguments.data(using: .utf8),
               let args = try? JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any]
         else {
-            return "Error: Invalid argument format. Expected a JSON object with 'setting_key' and one 'new_*_value'."
+            throw LLMToolExecutionError.invalidArguments("Invalid argument format. Expected a JSON object with 'setting_key' and one 'new_*_value'.")
         }
 
         guard let settingKey = args["setting_key"] as? String else {
-            return "Error: Missing required argument: setting_key"
+            throw LLMToolExecutionError.invalidArguments("Missing required argument: setting_key")
         }
 
         guard let settingInfo = LLMToolSettingsRegistry.knownSettings[settingKey] else {
-            return "Error: Setting key '\(settingKey)' is not recognized or supported. Use 'list_settings' to see available keys."
+            throw LLMToolExecutionError.invalidArguments("Setting key '\(settingKey)' is not recognized or supported. Use 'list_settings' to see available keys.")
         }
 
         guard settingInfo.isWritable else {
-            return "Error: Setting key '\(settingKey)' is read-only and cannot be modified by this tool."
+            throw LLMToolExecutionError.unavailable("Setting key '\(settingKey)' is read-only and cannot be modified by this tool.")
         }
 
         let userDefaults = UserDefaults.standard
@@ -61,23 +61,23 @@ public struct WriteSettingTool: ExecutableLLMTool {
 
         if expectedType == String.self {
             guard let val = args["new_string_value"] as? String else {
-                return "Error: Missing or incorrect type for 'new_string_value' argument for setting '\(settingKey)'."
+                throw LLMToolExecutionError.invalidArguments("Missing or incorrect type for 'new_string_value' argument for setting '\(settingKey)'.")
             }
             if let allowed = settingInfo.allowedValues, !allowed.contains(val) {
-                return "Error: Invalid value '\(val)' for setting '\(settingKey)'. Allowed values: [\(allowed.joined(separator: ", "))]"
+                throw LLMToolExecutionError.invalidArguments("Invalid value '\(val)' for setting '\(settingKey)'. Allowed values: [\(allowed.joined(separator: ", "))]")
             }
             valueToWrite = val
         } else if expectedType == Bool.self {
             guard let val = args["new_bool_value"] as? Bool else {
-                return "Error: Missing or incorrect type for 'new_bool_value' argument for setting '\(settingKey)'."
+                throw LLMToolExecutionError.invalidArguments("Missing or incorrect type for 'new_bool_value' argument for setting '\(settingKey)'.")
             }
             valueToWrite = val
         } else if expectedType == Int.self {
             guard let val = args["new_int_value"] as? Int else {
-                return "Error: Missing or incorrect type for 'new_int_value' argument for setting '\(settingKey)'."
+                throw LLMToolExecutionError.invalidArguments("Missing or incorrect type for 'new_int_value' argument for setting '\(settingKey)'.")
             }
             if settingKey == "DefaultAvatarSize" && !(16...128).contains(val) {
-                return "Error: Value \(val) for '\(settingKey)' is outside the allowed range (16-128)."
+                throw LLMToolExecutionError.invalidArguments("Value \(val) for '\(settingKey)' is outside the allowed range (16-128).")
             }
             valueToWrite = val
         } else if expectedType == Double.self {
@@ -88,20 +88,20 @@ public struct WriteSettingTool: ExecutableLLMTool {
                 doubleVal = Double(val)
             }
             guard let finalDoubleVal = doubleVal else {
-                return "Error: Missing or incorrect type for 'new_double_value' argument for setting '\(settingKey)'. Expected number."
+                throw LLMToolExecutionError.invalidArguments("Missing or incorrect type for 'new_double_value' argument for setting '\(settingKey)'. Expected number.")
             }
 
             if settingKey == "ConversationTextEdit.buttonSize" && !(12...48).contains(finalDoubleVal) {
-                return "Error: Value \(finalDoubleVal) for '\(settingKey)' is outside the allowed range (12-48)."
+                throw LLMToolExecutionError.invalidArguments("Value \(finalDoubleVal) for '\(settingKey)' is outside the allowed range (12-48).")
             }
             if settingKey == "BubbleFontSize" && !(8...28).contains(finalDoubleVal) {
-                return "Error: Value \(finalDoubleVal) for '\(settingKey)' is outside the allowed range (8-28)."
+                throw LLMToolExecutionError.invalidArguments("Value \(finalDoubleVal) for '\(settingKey)' is outside the allowed range (8-28).")
             }
             valueToWrite = finalDoubleVal
         }
 
         guard let finalValue = valueToWrite else {
-            return "Error: Could not determine value to write for setting '\(settingKey)'. Type mismatch or missing value argument."
+            throw LLMToolExecutionError.invalidArguments("Could not determine value to write for setting '\(settingKey)'. Type mismatch or missing value argument.")
         }
 
         userDefaults.set(finalValue, forKey: settingKey)

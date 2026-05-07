@@ -76,6 +76,31 @@ final class ConversationRunContextResolverTests: XCTestCase {
         )
     }
 
+    func testResolverReturnsNilDescriptorWhenNoMatchingModelExists() throws {
+        let env = TestEnvironment()
+        let config = APIConfigurationItem(
+            name: "OpenAI",
+            apiKey: "key",
+            baseURL: "https://unit.test",
+            defaultModel: "gpt-missing",
+            providerID: .openAIPlatform
+        )
+        config.defaultEndpointFamilyEnum = .responses
+        let options = ConversationOptions(apiConfiguration: config, shouldSetupParameters: false)
+        let conversation = ConversationItem("No descriptor", options: options)
+        env.modelContext.insert(config)
+        env.modelContext.insert(conversation)
+
+        let context = try ConversationRunContextResolver(
+            toolCatalog: StaticLLMToolCatalog([])
+        ).resolve(
+            conversation: conversation,
+            apiConfig: config
+        )
+
+        XCTAssertNil(context.modelDescriptor)
+    }
+
     func testRequestFactoryProducesStableRequestFromFixedContext() throws {
         let profile = LLMProviderRegistry.shared.profile(for: .openAIPlatform)
         let options = LLMGenerationOptions(

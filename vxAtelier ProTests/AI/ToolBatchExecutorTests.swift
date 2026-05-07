@@ -92,6 +92,26 @@ final class ToolBatchExecutorTests: LLMTestCase {
         XCTAssertEqual(toolCall.errorMessage, "Tool '\(UnitEchoTool.toolName)' is not enabled.")
     }
 
+    func testThrownToolErrorPersistsFailedStatus() async throws {
+        let fixture = makeToolExecutionFixture(toolName: UnitFailingTool.toolName)
+        let conversation = fixture.conversation
+        let turn = fixture.turn
+        let toolCall = fixture.toolCall
+        conversation.options.setToolEnabled(UnitFailingTool.toolName, enabled: true)
+
+        await assertThrowsAsyncError(try await executeWithStore(
+            toolCall,
+            conversation: conversation,
+            turn: turn,
+            toolCatalog: StaticLLMToolCatalog([UnitFailingTool()])
+        )) { error in
+            XCTAssertEqual(error as? LLMToolExecutionError, .executionFailed("unit failure"))
+        }
+
+        XCTAssertEqual(toolCall.status, .failed)
+        XCTAssertEqual(toolCall.errorMessage, "unit failure")
+    }
+
     func testMissingToolCallFailsAndPersistsFailedStatus() async throws {
         let missingToolName = "unit_missing_tool"
         let fixture = makeToolExecutionFixture(toolName: missingToolName)

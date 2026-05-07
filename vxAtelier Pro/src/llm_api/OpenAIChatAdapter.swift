@@ -67,7 +67,8 @@ struct OpenAIChatAdapter: LLMProviderAdapter {
         try OpenAICompatibleEncoding.applyMappedOptions(
             request.options,
             to: &body,
-            mappings: mappings
+            mappings: mappings,
+            reservedProviderExtraKeys: OpenAICompatibleEncoding.chatReservedProviderExtraKeys
         )
         if !request.tools.isEmpty {
             body["tools"] = .array(OpenAICompatibleEncoding.chatTools(from: request.tools))

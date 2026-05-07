@@ -1,10 +1,18 @@
 import Foundation
 
 enum OpenAICompatibleEncoding {
+    static let chatReservedProviderExtraKeys: Set<String> = [
+        "model", "messages", "stream", "tools", "tool_choice", "response_format", "json_schema"
+    ]
+    static let responsesReservedProviderExtraKeys: Set<String> = [
+        "model", "input", "instructions", "stream", "tools", "text", "reasoning", "json_schema"
+    ]
+
     static func applyMappedOptions(
         _ options: LLMGenerationOptions,
         to body: inout [String: JSONValue],
-        mappings: [LLMParameterID: LLMParameterMappingDescriptor]
+        mappings: [LLMParameterID: LLMParameterMappingDescriptor],
+        reservedProviderExtraKeys: Set<String> = []
     ) throws {
         var providerExtras = options.providerExtras
         for mapping in mappings.values where mapping.isEnabled {
@@ -29,6 +37,9 @@ enum OpenAICompatibleEncoding {
         }
 
         for (key, value) in providerExtras {
+            guard !reservedProviderExtraKeys.contains(key), body[key] == nil else {
+                throw LLMProviderError.unsupportedParameter("providerExtras.\(key) cannot override a reserved request field.")
+            }
             body[key] = value
         }
     }

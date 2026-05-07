@@ -24,15 +24,15 @@ public struct ReadSettingTool: ExecutableLLMTool {
         guard let jsonData = arguments.data(using: .utf8),
               let args = try? JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any]
         else {
-            return "Error: Invalid argument format. Expected a JSON object with 'setting_key'."
+            throw LLMToolExecutionError.invalidArguments("Invalid argument format. Expected a JSON object with 'setting_key'.")
         }
 
         guard let settingKey = args["setting_key"] as? String else {
-            return "Error: Missing required argument: setting_key"
+            throw LLMToolExecutionError.invalidArguments("Missing required argument: setting_key")
         }
 
         guard let settingInfo = LLMToolSettingsRegistry.knownSettings[settingKey] else {
-            return "Error: Setting key '\(settingKey)' is not recognized or supported. Use 'list_settings' to see available keys."
+            throw LLMToolExecutionError.invalidArguments("Setting key '\(settingKey)' is not recognized or supported. Use 'list_settings' to see available keys.")
         }
 
         let userDefaults = UserDefaults.standard

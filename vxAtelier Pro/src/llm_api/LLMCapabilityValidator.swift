@@ -113,19 +113,24 @@ struct LLMCapabilityValidator {
     private static func validateToolReplay(_ request: LLMRequest) throws {
         var knownToolIDs = Set<String>()
         var answeredToolIDs = Set<String>()
-        var immediateAnthropicToolIDs: [String] = []
+        var pendingToolIDs: [String] = []
 
         for message in request.messages {
+            if message.role != "tool", !pendingToolIDs.isEmpty {
+                throw pendingToolResultError(for: request)
+            }
+
             if message.role == "assistant" {
                 let ids = message.toolCalls.sorted { $0.index < $1.index }.map { $0.callID ?? $0.id }
                 let uniqueIDs = Set(ids)
                 guard uniqueIDs.count == ids.count else {
                     throw LLMProviderError.unsupportedParameter("Assistant tool calls must have unique ids.")
                 }
-                knownToolIDs.formUnion(ids)
-                if request.endpointFamily == .anthropicMessages {
-                    immediateAnthropicToolIDs = ids
+                guard knownToolIDs.isDisjoint(with: uniqueIDs) else {
+                    throw LLMProviderError.unsupportedParameter("Assistant tool calls must have unique ids.")
                 }
+                knownToolIDs.formUnion(ids)
+                pendingToolIDs = ids
                 continue
             }
 
@@ -139,20 +144,25 @@ struct LLMCapabilityValidator {
                 guard !answeredToolIDs.contains(toolCallID) else {
                     throw LLMProviderError.unsupportedParameter("Tool result \(toolCallID) is duplicated.")
                 }
-                if request.endpointFamily == .anthropicMessages {
-                    guard let index = immediateAnthropicToolIDs.firstIndex(of: toolCallID) else {
-                        throw LLMProviderError.unsupportedParameter("Anthropic tool_result must immediately follow its assistant tool_use.")
-                    }
-                    immediateAnthropicToolIDs.remove(at: index)
+                guard let index = pendingToolIDs.firstIndex(of: toolCallID) else {
+                    throw pendingToolResultError(for: request)
                 }
+                pendingToolIDs.remove(at: index)
                 answeredToolIDs.insert(toolCallID)
                 continue
             }
-
-            if request.endpointFamily == .anthropicMessages, !immediateAnthropicToolIDs.isEmpty {
-                throw LLMProviderError.unsupportedParameter("Anthropic tool_result must immediately follow its assistant tool_use.")
-            }
         }
+
+        if !pendingToolIDs.isEmpty {
+            throw LLMProviderError.unsupportedParameter("Assistant tool calls must be followed by tool results.")
+        }
+    }
+
+    private static func pendingToolResultError(for request: LLMRequest) -> LLMProviderError {
+        if request.endpointFamily == .anthropicMessages {
+            return .unsupportedParameter("Anthropic tool_result must immediately follow its assistant tool_use.")
+        }
+        return .unsupportedParameter("Tool result must immediately follow assistant tool call.")
     }
 
     private static func requireMapping(

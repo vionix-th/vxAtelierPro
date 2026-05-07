@@ -101,14 +101,15 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
 
             var content = try anthropicContent(from: message)
             if !message.toolCalls.isEmpty {
-                content.append(contentsOf: message.toolCalls.sorted { $0.index < $1.index }.map { call in
+                let toolUses: [JSONValue] = try message.toolCalls.sorted { $0.index < $1.index }.map { call -> JSONValue in
                     .object([
                         "type": .string("tool_use"),
                         "id": .string(call.callID ?? call.id),
                         "name": .string(call.name),
-                        "input": jsonFromString(call.argumentsJSON)
+                        "input": try jsonFromString(call.argumentsJSON)
                     ])
-                })
+                }
+                content.append(contentsOf: toolUses)
             }
             if !content.isEmpty {
                 messages.append(.object([
@@ -235,12 +236,20 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
         continuation.yield(.runCompleted(responseID: object.string("id"), modelID: object.string("model")))
     }
 
-    private func jsonFromString(_ string: String) -> JSONValue {
-        guard let data = string.data(using: .utf8),
-              let value = try? JSONDecoder().decode(JSONValue.self, from: data) else {
-            return .object([:])
+    private func jsonFromString(_ string: String) throws -> JSONValue {
+        guard let data = string.data(using: .utf8) else {
+            throw LLMProviderError.decoding("Anthropic tool_use arguments must be valid UTF-8 JSON.")
         }
-        return value
+        let value: JSONValue
+        do {
+            value = try JSONDecoder().decode(JSONValue.self, from: data)
+        } catch {
+            throw LLMProviderError.decoding("Anthropic tool_use arguments must be valid JSON object.")
+        }
+        guard let object = value.objectValue else {
+            throw LLMProviderError.unsupportedParameter("Anthropic tool_use arguments must decode to a JSON object.")
+        }
+        return .object(object)
     }
 
 }

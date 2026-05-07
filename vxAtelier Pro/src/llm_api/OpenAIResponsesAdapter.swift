@@ -59,7 +59,8 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
         try OpenAICompatibleEncoding.applyMappedOptions(
             request.options,
             to: &body,
-            mappings: mappings
+            mappings: mappings,
+            reservedProviderExtraKeys: OpenAICompatibleEncoding.responsesReservedProviderExtraKeys
         )
         if !request.tools.isEmpty {
             body["tools"] = .array(OpenAICompatibleEncoding.responsesTools(from: request.tools))

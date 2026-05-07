@@ -33,22 +33,22 @@ public struct ReadWebsiteTool: ExecutableLLMTool {
               let args = try? JSONSerialization.jsonObject(with: jsonData) as? [String: String],
               let urlString = args["url"]
         else {
-             return "Error: Invalid argument format. Expected a JSON object with 'url' and optionally 'return_format'."
+            throw LLMToolExecutionError.invalidArguments("Invalid argument format. Expected a JSON object with 'url' and optionally 'return_format'.")
         }
 
         // Determine the return format, defaulting to 'summary'
         let returnFormat = args["return_format"] ?? "summary"
         guard ["summary", "full_html"].contains(returnFormat) else {
-             return "Error: Invalid 'return_format'. Must be 'summary' or 'full_html'."
+            throw LLMToolExecutionError.invalidArguments("Invalid 'return_format'. Must be 'summary' or 'full_html'.")
         }
 
         guard let url = URL(string: urlString) else {
-            return "Error: Invalid URL format provided: \(urlString)"
+            throw LLMToolExecutionError.invalidArguments("Invalid URL format provided: \(urlString)")
         }
 
         // Basic check for http/https scheme
         guard let scheme = url.scheme, ["http", "https"].contains(scheme.lowercased()) else {
-             return "Error: URL must use http or https scheme."
+            throw LLMToolExecutionError.invalidArguments("URL must use http or https scheme.")
         }
 
         do {
@@ -56,16 +56,16 @@ public struct ReadWebsiteTool: ExecutableLLMTool {
             let (data, response) = try await URLSession.shared.data(from: url)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                return "Error: Did not receive a valid HTTP response."
+                throw LLMToolExecutionError.executionFailed("Did not receive a valid HTTP response.")
             }
 
             guard (200..<300).contains(httpResponse.statusCode) else {
-                return "Error: Website request failed with status code \(httpResponse.statusCode)."
+                throw LLMToolExecutionError.executionFailed("Website request failed with status code \(httpResponse.statusCode).")
             }
 
             // Decode data as UTF-8 string
             guard let rawContent = String(data: data, encoding: .utf8) else {
-                return "Error: Failed to decode website content as UTF-8 text."
+                throw LLMToolExecutionError.executionFailed("Failed to decode website content as UTF-8 text.")
             }
 
             // Return based on requested format
@@ -88,7 +88,7 @@ public struct ReadWebsiteTool: ExecutableLLMTool {
                     await vxAtelierPro.log.debug("ReadWebsiteTool (Summary): Content truncated for URL \(urlString)")
                     return truncatedText
                 } else if textContent.isEmpty {
-                     return "Error: No readable text content found for summary at the URL."
+                    throw LLMToolExecutionError.executionFailed("No readable text content found for summary at the URL.")
                 } else {
                     return textContent
                 }
@@ -96,10 +96,12 @@ public struct ReadWebsiteTool: ExecutableLLMTool {
 
         } catch let error as URLError {
             await vxAtelierPro.log.error("ReadWebsiteTool: Network error fetching URL \(urlString): \(error.localizedDescription)")
-            return "Error: Network request failed: \(error.localizedDescription)"
+            throw LLMToolExecutionError.executionFailed("Network request failed: \(error.localizedDescription)")
+        } catch let error as LLMToolExecutionError {
+            throw error
         } catch {
             await vxAtelierPro.log.error("ReadWebsiteTool: Unexpected error fetching URL \(urlString): \(error.localizedDescription)")
-            return "Error: An unexpected error occurred: \(error.localizedDescription)"
+            throw LLMToolExecutionError.executionFailed("An unexpected error occurred: \(error.localizedDescription)")
         }
     }
 
@@ -121,4 +123,4 @@ public struct ReadWebsiteTool: ExecutableLLMTool {
         processed = processed.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
         return processed.trimmingCharacters(in: .whitespacesAndNewlines)
     }
-} 
+}

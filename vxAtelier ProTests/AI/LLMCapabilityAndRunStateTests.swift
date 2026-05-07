@@ -78,6 +78,70 @@ final class LLMCapabilityAndRunStateTests: XCTestCase {
         }
     }
 
+    func testCapabilityValidationRejectsDanglingToolCallBeforeUserMessage() {
+        let profile = LLMProviderRegistry.shared.profile(for: .openAIPlatform)
+        let request = LLMRequest(
+            providerID: .openAIPlatform,
+            endpointFamily: .responses,
+            modelID: "gpt-test",
+            messages: [
+                LLMMessage(
+                    role: "assistant",
+                    content: [LLMContentPart(kind: .text, text: "Checking")],
+                    toolCalls: [LLMToolCall(id: "call_1", callID: "call_1", index: 0, name: "lookup", argumentsJSON: "{}")]
+                ),
+                LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "interrupt")])
+            ]
+        )
+
+        XCTAssertThrowsError(try LLMCapabilityValidator.validate(request, profile: profile)) { error in
+            XCTAssertEqual(error as? LLMProviderError, .unsupportedParameter("Tool result must immediately follow assistant tool call."))
+        }
+    }
+
+    func testCapabilityValidationRejectsDanglingToolCallAtEnd() {
+        let profile = LLMProviderRegistry.shared.profile(for: .openAIPlatform)
+        let request = LLMRequest(
+            providerID: .openAIPlatform,
+            endpointFamily: .responses,
+            modelID: "gpt-test",
+            messages: [
+                LLMMessage(
+                    role: "assistant",
+                    content: [LLMContentPart(kind: .text, text: "Checking")],
+                    toolCalls: [LLMToolCall(id: "call_1", callID: "call_1", index: 0, name: "lookup", argumentsJSON: "{}")]
+                )
+            ]
+        )
+
+        XCTAssertThrowsError(try LLMCapabilityValidator.validate(request, profile: profile)) { error in
+            XCTAssertEqual(error as? LLMProviderError, .unsupportedParameter("Assistant tool calls must be followed by tool results."))
+        }
+    }
+
+    func testCapabilityValidationAcceptsMatchedToolCallResult() throws {
+        let profile = LLMProviderRegistry.shared.profile(for: .openAIPlatform)
+        let request = LLMRequest(
+            providerID: .openAIPlatform,
+            endpointFamily: .responses,
+            modelID: "gpt-test",
+            messages: [
+                LLMMessage(
+                    role: "assistant",
+                    content: [LLMContentPart(kind: .text, text: "Checking")],
+                    toolCalls: [LLMToolCall(id: "call_1", callID: "call_1", index: 0, name: "lookup", argumentsJSON: "{}")]
+                ),
+                LLMMessage(
+                    role: "tool",
+                    content: [LLMContentPart(kind: .toolResult, text: "result")],
+                    toolCallID: "call_1"
+                )
+            ]
+        )
+
+        XCTAssertNoThrow(try LLMCapabilityValidator.validate(request, profile: profile))
+    }
+
     func testResponseRunRejectsInvalidStatusTransition() throws {
         let run = ResponseRunItem(
             providerID: .openAIPlatform,
