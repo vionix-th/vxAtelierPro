@@ -29,8 +29,8 @@ enum ConversationParameterProjection {
         guard let apiConfiguration else { return [] }
 
         let providerID = apiConfiguration.providerIDEnum
-        let endpointFamily = options.endpointOverrideFamily ?? apiConfiguration.defaultEndpointFamilyEnum
-        let modelID = options.modelOverride
+        let endpointFamily = apiConfiguration.defaultEndpointFamilyEnum
+        let modelID = options.selectedModelID
             ?? resolver.defaultModelID(for: providerID, apiConfiguration: apiConfiguration)
             ?? ""
         let descriptor = try? resolver.descriptor(

@@ -13,7 +13,7 @@ final class ConversationOptionsFactory: BaseTestFactory<ConversationOptions>, Te
         options.systemPrompt = "Test system prompt \(uniqueIdentifier())"
         options.temperature = 0.7
         options.maxOutputTokens = 1000
-        options.modelOverride = "test-model"
+        options.selectedModelID = "test-model"
         return options
     }
 

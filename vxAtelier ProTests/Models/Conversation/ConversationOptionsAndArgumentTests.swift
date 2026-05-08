@@ -30,7 +30,7 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
         XCTAssertEqual(options.systemPrompt, "System")
         XCTAssertEqual(options.temperature, 0.8)
         XCTAssertEqual(options.maxOutputTokens, 2048)
-        XCTAssertEqual(options.modelOverride, "unit-model")
+        XCTAssertEqual(options.selectedModelID, "unit-model")
         XCTAssertEqual(options.parameterValue(.systemPrompt), .string("System"))
         XCTAssertEqual(options.parameterValue(.temperature), .number(0.8))
         XCTAssertEqual(options.parameterValue(.maxOutputTokens), .integer(2048))

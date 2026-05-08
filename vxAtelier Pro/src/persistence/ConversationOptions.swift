@@ -13,8 +13,7 @@ final class ConversationOptions: Equatable {
     var isMarkdownEnabled: Bool = AppDefaults.isMarkdownEnabled
 
     var systemPrompt: String
-    var modelOverride: String?
-    var endpointOverride: String?
+    var selectedModelID: String?
     var temperature: Double?
     var topP: Double?
     var maxOutputTokens: Int?
@@ -25,11 +24,6 @@ final class ConversationOptions: Equatable {
     var streamModeRaw: String
     var retryPolicyRaw: String
     var providerExtrasJSON: String
-
-    var endpointOverrideFamily: LLMEndpointFamily? {
-        get { endpointOverride.flatMap { LLMEndpointFamily(rawValue: $0) } }
-        set { endpointOverride = newValue?.rawValue }
-    }
 
     var streamMode: LLMGenerationOptions.StreamMode {
         get { LLMGenerationOptions.StreamMode(rawValue: streamModeRaw) ?? .auto }
@@ -53,8 +47,7 @@ final class ConversationOptions: Equatable {
         enabledParameterOverrides = from.enabledParameterOverrides
         isMarkdownEnabled = from.isMarkdownEnabled
         systemPrompt = from.systemPrompt
-        modelOverride = from.modelOverride
-        endpointOverride = from.endpointOverride
+        selectedModelID = from.selectedModelID
         temperature = from.temperature
         topP = from.topP
         maxOutputTokens = from.maxOutputTokens
@@ -77,8 +70,7 @@ final class ConversationOptions: Equatable {
         self.enabledToolsDict = [:]
         self.enabledParameterOverrides = [:]
         self.systemPrompt = ""
-        self.modelOverride = nil
-        self.endpointOverride = nil
+        self.selectedModelID = nil
         self.temperature = nil
         self.topP = nil
         self.maxOutputTokens = nil
@@ -89,43 +81,30 @@ final class ConversationOptions: Equatable {
         self.streamModeRaw = LLMGenerationOptions.StreamMode.auto.rawValue
         self.retryPolicyRaw = LLMGenerationOptions.RetryPolicy.disabled.rawValue
         self.providerExtrasJSON = "{}"
-        applyAPIConfigurationDefaults(replaceModel: false)
+        applyAPIConfigurationDefaults(replaceSelectedModel: false)
     }
 
     func copy() -> ConversationOptions {
         ConversationOptions(from: self)
     }
 
-    func applyAPIConfigurationDefaults(replaceModel: Bool) {
+    func applyAPIConfigurationDefaults(replaceSelectedModel: Bool) {
         guard let apiConfiguration else { return }
         let providerID = apiConfiguration.providerIDEnum
-        let profile = LLMProviderRegistry.shared.profile(for: providerID)
-
-        if let override = endpointOverrideFamily,
-           !profile.supportedEndpointFamilies.contains(override) {
-            endpointOverrideFamily = nil
-        }
-        if endpointOverrideFamily == nil {
-            endpointOverrideFamily = apiConfiguration.defaultEndpointFamilyEnum
-        }
 
         let defaultModel = LLMModelDescriptorResolver().defaultModelID(
             for: providerID,
             apiConfiguration: apiConfiguration
         )
-        let currentModel = modelOverride?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if replaceModel || currentModel.isEmpty {
-            modelOverride = defaultModel
+        let currentModel = selectedModelID?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if replaceSelectedModel || currentModel.isEmpty {
+            selectedModelID = defaultModel
         }
     }
 
-    func setEndpointOverride(_ endpoint: LLMEndpointFamily?) {
-        endpointOverrideFamily = endpoint
-    }
-
-    func setModelOverride(_ model: String?) {
+    func setSelectedModelID(_ model: String?) {
         let trimmed = model?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        modelOverride = trimmed.isEmpty ? nil : trimmed
+        selectedModelID = trimmed.isEmpty ? nil : trimmed
     }
 
     func setStreamMode(_ mode: LLMGenerationOptions.StreamMode) {
@@ -135,7 +114,7 @@ final class ConversationOptions: Equatable {
     func parameterValue(_ parameter: LLMParameterID) -> JSONValue? {
         switch parameter {
         case .model:
-            return modelOverride.flatMap { $0.isEmpty ? nil : .string($0) }
+            return selectedModelID.flatMap { $0.isEmpty ? nil : .string($0) }
         case .systemPrompt:
             return .string(systemPrompt)
         case .maxOutputTokens:
@@ -158,7 +137,7 @@ final class ConversationOptions: Equatable {
     func setParameterValue(_ parameter: LLMParameterID, value: JSONValue?) {
         switch parameter {
         case .model:
-            setModelOverride(value?.stringValue)
+            setSelectedModelID(value?.stringValue)
         case .systemPrompt:
             systemPrompt = value?.stringValue ?? ""
         case .maxOutputTokens:
@@ -205,8 +184,8 @@ final class ConversationOptions: Equatable {
     ) -> LLMGenerationOptions {
         LLMGenerationOptions(
             systemPrompt: systemPrompt,
-            modelID: modelOverride ?? resolvedModelID,
-            endpointFamily: endpointOverrideFamily ?? resolvedEndpointFamily,
+            modelID: selectedModelID ?? resolvedModelID,
+            endpointFamily: resolvedEndpointFamily,
             temperature: includedDouble(.temperature, mappings: mappings),
             topP: includedDouble(.topP, mappings: mappings),
             maxOutputTokens: includedInt(.maxOutputTokens, mappings: mappings),
@@ -341,8 +320,7 @@ final class ConversationOptions: Equatable {
             && lhs.enabledParameterOverrides == rhs.enabledParameterOverrides
             && lhs.isMarkdownEnabled == rhs.isMarkdownEnabled
             && lhs.systemPrompt == rhs.systemPrompt
-            && lhs.modelOverride == rhs.modelOverride
-            && lhs.endpointOverride == rhs.endpointOverride
+            && lhs.selectedModelID == rhs.selectedModelID
             && lhs.temperature == rhs.temperature
             && lhs.topP == rhs.topP
             && lhs.maxOutputTokens == rhs.maxOutputTokens

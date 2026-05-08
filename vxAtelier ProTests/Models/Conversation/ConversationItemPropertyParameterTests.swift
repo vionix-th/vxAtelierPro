@@ -40,7 +40,7 @@ final class ConversationItemPropertyParameterTests: XCTestCase {
         XCTAssertFalse(conversation.options.systemPrompt.isEmpty)
         XCTAssertEqual(conversation.options.temperature, 0.7)
         XCTAssertEqual(conversation.options.maxOutputTokens, 1000)
-        XCTAssertEqual(conversation.options.modelOverride, "test-model")
+        XCTAssertEqual(conversation.options.selectedModelID, "test-model")
     }
     
     func testParameterEdgeCases() {

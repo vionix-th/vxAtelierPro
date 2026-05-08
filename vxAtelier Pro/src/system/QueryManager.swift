@@ -421,7 +421,7 @@ final class QueryManager {
     }
 
     func setModel(_ model: String, for conversation: ConversationItem) throws {
-        conversation.options.setModelOverride(model)
+        conversation.options.setSelectedModelID(model)
         try saveContext()
         vxAtelierPro.log.info("Updated model to \(model) for \(conversation.title)")
     }
@@ -429,9 +429,9 @@ final class QueryManager {
     func modelDescriptor(for conversation: ConversationItem) -> LLMModelDescriptor? {
         guard let apiConfiguration = conversation.options.apiConfiguration else { return nil }
         let providerID = apiConfiguration.providerIDEnum
-        let endpoint = conversation.options.endpointOverrideFamily ?? apiConfiguration.defaultEndpointFamilyEnum
+        let endpoint = apiConfiguration.defaultEndpointFamilyEnum
         let resolver = LLMModelDescriptorResolver()
-        guard let modelID = conversation.options.modelOverride
+        guard let modelID = conversation.options.selectedModelID
             ?? resolver.defaultModelID(for: providerID, apiConfiguration: apiConfiguration) else {
             return nil
         }

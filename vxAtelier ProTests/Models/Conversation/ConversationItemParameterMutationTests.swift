@@ -37,7 +37,7 @@ final class ConversationItemParameterMutationTests: XCTestCase {
         XCTAssertEqual(conversation.options.systemPrompt, newSystemPrompt)
         XCTAssertEqual(conversation.options.temperature, newTemperature)
         XCTAssertEqual(conversation.options.maxOutputTokens, newMaxTokens)
-        XCTAssertEqual(conversation.options.modelOverride, newModel)
+        XCTAssertEqual(conversation.options.selectedModelID, newModel)
     }
 
     func testTypedParameterValueConversions() {

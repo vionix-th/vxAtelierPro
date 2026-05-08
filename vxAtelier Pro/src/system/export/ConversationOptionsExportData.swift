@@ -11,8 +11,7 @@ struct ConversationOptionsExportData: Codable {
     let enabledParameterOverrides: [String: Bool]
     let isMarkdownEnabled: Bool
     let systemPrompt: String?
-    let modelOverride: String?
-    let endpointOverride: String?
+    let selectedModelID: String?
     let temperature: Double?
     let topP: Double?
     let maxOutputTokens: Int?
@@ -32,8 +31,7 @@ struct ConversationOptionsExportData: Codable {
         self.enabledParameterOverrides = options.enabledParameterOverrides
         self.isMarkdownEnabled = options.isMarkdownEnabled
         self.systemPrompt = options.systemPrompt
-        self.modelOverride = options.modelOverride
-        self.endpointOverride = options.endpointOverride
+        self.selectedModelID = options.selectedModelID
         self.temperature = options.temperature
         self.topP = options.topP
         self.maxOutputTokens = options.maxOutputTokens
@@ -57,8 +55,7 @@ struct ConversationOptionsExportData: Codable {
         options.enabledParameterOverrides = enabledParameterOverrides
         options.isMarkdownEnabled = isMarkdownEnabled
         options.systemPrompt = systemPrompt ?? ""
-        options.modelOverride = modelOverride
-        options.endpointOverride = endpointOverride
+        options.selectedModelID = selectedModelID
         options.temperature = temperature
         options.topP = topP
         options.maxOutputTokens = maxOutputTokens

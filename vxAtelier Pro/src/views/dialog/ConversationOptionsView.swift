@@ -13,7 +13,6 @@ import SwiftUI
 struct ConversationOptionsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Environment(QueryManager.self) private var queryManager
     @Binding var options: ConversationOptions
 
     @Query(sort: [SortDescriptor(\APIConfigurationItem.name)]) private var apiConfigurations: [APIConfigurationItem]
@@ -27,21 +26,6 @@ struct ConversationOptionsView: View {
             .scaledToFit()
             .frame(width: AppDefaults.avatarImageSize, height: AppDefaults.avatarImageSize)
             .foregroundColor(.accentColor)
-    }
-
-    private var selectableEndpointFamilies: [LLMEndpointFamily] {
-        guard let config = options.apiConfiguration else { return [] }
-        let provider = config.providerIDEnum
-        return LLMProviderRegistry.shared.profile(for: provider).supportedEndpointFamilies.filter { $0 != .models }
-    }
-
-    private var endpointSelection: Binding<String> {
-        Binding(
-            get: { options.endpointOverride ?? "" },
-            set: { value in
-                options.setEndpointOverride(value.isEmpty ? nil : LLMEndpointFamily(rawValue: value))
-            }
-        )
     }
 
     private var parameterControls: [ConversationParameterControl] {
@@ -67,22 +51,6 @@ struct ConversationOptionsView: View {
         }
     }
 
-    @ViewBuilder
-    private func endpointPicker() -> some View {
-        HStack {
-            Text("API Mode")
-                .frame(width: 150, alignment: .leading)
-            Picker("", selection: endpointSelection) {
-                Text("Configuration Default").tag("")
-                ForEach(selectableEndpointFamilies) { family in
-                    Text(family.displayName).tag(family.rawValue)
-                }
-            }
-            .pickerStyle(.menu)
-            .disabled(options.apiConfiguration == nil || selectableEndpointFamilies.isEmpty)
-        }
-    }
-
     var body: some View {
         TabView(selection: $selectedTab) {
             // MARK: Parameters Tab (Tab 0)
@@ -90,7 +58,6 @@ struct ConversationOptionsView: View {
                 ScrollView {
                     VStack(spacing: AppDefaults.paddingLarge) {
                         apiConfigurationPicker()
-                        endpointPicker()
                         
                         // Use SettingsSectionView for parameters
                         SettingsSectionView(title: "Model Parameters") {
@@ -302,8 +269,8 @@ struct ConversationOptionsView: View {
             if let config = options.apiConfiguration {
                 vxAtelierPro.log.info("API configuration changed, updating defaults")
                 let provider = config.providerIDEnum
-                options.applyAPIConfigurationDefaults(replaceModel: true)
-                let defaultModel = options.modelOverride ?? ""
+                options.applyAPIConfigurationDefaults(replaceSelectedModel: true)
+                let defaultModel = options.selectedModelID ?? ""
                 vxAtelierPro.log.info("Set default model to \(defaultModel) for provider \(provider.displayName)")
             }
         }

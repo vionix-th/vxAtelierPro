@@ -26,12 +26,12 @@ struct ConversationRunContextResolver {
     ) throws -> ConversationRunContext {
         let providerID = apiConfig.providerIDEnum
         let profile = registry.profile(for: providerID)
-        let endpoint = conversation.options.endpointOverrideFamily ?? apiConfig.defaultEndpointFamilyEnum
+        let endpoint = apiConfig.defaultEndpointFamilyEnum
         guard profile.supportedEndpointFamilies.contains(endpoint) else {
             throw LLMProviderError.unsupportedCapability("\(profile.name) does not support \(endpoint.rawValue).")
         }
 
-        let modelID = conversation.options.modelOverride
+        let modelID = conversation.options.selectedModelID
             ?? modelDescriptorResolver.defaultModelID(for: providerID, apiConfiguration: apiConfig)
         guard let modelID, !modelID.isEmpty else {
             throw LLMProviderError.invalidConfiguration("No model configured for \(profile.name).")

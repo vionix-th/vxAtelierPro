@@ -404,7 +404,7 @@ struct ConversationInfoHeader: View {
     @State private var refreshTrigger = UUID()
 
     private var modelName: String {
-        conversation.options.modelOverride
+        conversation.options.selectedModelID
             ?? conversation.options.apiConfiguration.flatMap {
                 LLMModelDescriptorResolver().defaultModelID(for: $0.providerIDEnum, apiConfiguration: $0)
             }

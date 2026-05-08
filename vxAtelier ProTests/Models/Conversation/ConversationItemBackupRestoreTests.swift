@@ -38,7 +38,7 @@ final class ConversationItemBackupRestoreTests: XCTestCase {
         conversation.options.systemPrompt = "System"
         conversation.options.temperature = 0.7
         conversation.options.maxOutputTokens = 1000
-        conversation.options.modelOverride = "test-model"
+        conversation.options.selectedModelID = "test-model"
         conversation.options.setParameterEnabled(.temperature, enabled: false)
 
         // Add a turn with a user message and an event, all with fixed timestamp
@@ -83,7 +83,7 @@ final class ConversationItemBackupRestoreTests: XCTestCase {
         XCTAssertEqual(restored.options.systemPrompt, conversation.options.systemPrompt)
         XCTAssertEqual(restored.options.temperature, conversation.options.temperature)
         XCTAssertEqual(restored.options.maxOutputTokens, conversation.options.maxOutputTokens)
-        XCTAssertEqual(restored.options.modelOverride, conversation.options.modelOverride)
+        XCTAssertEqual(restored.options.selectedModelID, conversation.options.selectedModelID)
         XCTAssertEqual(restored.options.enabledParameterOverrides, conversation.options.enabledParameterOverrides)
     }
 }

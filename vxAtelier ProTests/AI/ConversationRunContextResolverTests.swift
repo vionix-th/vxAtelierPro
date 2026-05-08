@@ -48,7 +48,7 @@ final class ConversationRunContextResolverTests: XCTestCase {
         mappingB?.markCustomized()
 
         let options = ConversationOptions(apiConfiguration: configB)
-        options.modelOverride = "gpt-test"
+        options.selectedModelID = "gpt-test"
         let conversation = ConversationItem("Scoped model", options: options)
 
         env.modelContext.insert(configA)

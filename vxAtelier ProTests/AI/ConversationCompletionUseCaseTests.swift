@@ -49,7 +49,7 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
             providerID: .openAIPlatform
         )
         let options = ConversationOptions(apiConfiguration: config)
-        options.modelOverride = "gpt-test"
+        options.selectedModelID = "gpt-test"
         options.streamMode = .auto
         let conversation = ConversationItem("Auto stream", options: options)
         let descriptor = LLMModelDescriptor(
@@ -85,7 +85,7 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
             providerID: .openAIPlatform
         )
         let options = ConversationOptions(apiConfiguration: config)
-        options.modelOverride = "gpt-test"
+        options.selectedModelID = "gpt-test"
         options.streamMode = .enabled
         let conversation = ConversationItem("Stream required", options: options)
         let descriptor = LLMModelDescriptor(
@@ -136,7 +136,7 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
             providerID: .openAIPlatform
         )
         let options = ConversationOptions(apiConfiguration: config)
-        options.modelOverride = "gpt-test"
+        options.selectedModelID = "gpt-test"
         options.streamMode = .disabled
         let conversation = ConversationItem("Failure", options: options)
         env.modelContext.insert(config)
@@ -198,7 +198,7 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
             providerID: .openAIPlatform
         )
         let options = ConversationOptions(apiConfiguration: config)
-        options.modelOverride = "gpt-test"
+        options.selectedModelID = "gpt-test"
         options.streamMode = .disabled
         options.retryPolicy = .oneRetryBeforeTools
         let conversation = ConversationItem("Retry", options: options)
@@ -245,7 +245,7 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
             providerID: .openAIPlatform
         )
         let options = ConversationOptions(apiConfiguration: config)
-        options.modelOverride = "gpt-test"
+        options.selectedModelID = "gpt-test"
         options.streamMode = .disabled
         options.retryPolicy = .oneRetryBeforeTools
         let conversation = ConversationItem("No Retry", options: options)
@@ -294,7 +294,7 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
             providerID: .openAIPlatform
         )
         let options = ConversationOptions(apiConfiguration: config)
-        options.modelOverride = "gpt-test"
+        options.selectedModelID = "gpt-test"
         options.streamMode = .disabled
         let conversation = ConversationItem("Tool failure", options: options)
         env.modelContext.insert(config)
@@ -346,7 +346,7 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
             providerID: .openAIPlatform
         )
         let options = ConversationOptions(apiConfiguration: config)
-        options.modelOverride = "gpt-test"
+        options.selectedModelID = "gpt-test"
         options.streamMode = .disabled
         let conversation = ConversationItem("Success", options: options)
         env.modelContext.insert(config)
@@ -389,7 +389,7 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
             providerID: .openAIPlatform
         )
         let options = ConversationOptions(apiConfiguration: config)
-        options.modelOverride = "gpt-test"
+        options.selectedModelID = "gpt-test"
         options.streamMode = .disabled
         let conversation = ConversationItem("Cancelled", options: options)
         env.modelContext.insert(config)
