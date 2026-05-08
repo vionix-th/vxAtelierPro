@@ -5,14 +5,17 @@ import SwiftData
 struct ConversationRunContextResolver {
     let registry: LLMProviderRegistry
     let toolCatalog: LLMToolCatalog
+    let modelDescriptorResolver: LLMModelDescriptorResolver
 
     /// Creates a resolver with injectable provider and tool registries.
     init(
         registry: LLMProviderRegistry = .shared,
-        toolCatalog: LLMToolCatalog = LLMToolRegistry.shared
+        toolCatalog: LLMToolCatalog = LLMToolRegistry.shared,
+        modelDescriptorResolver: LLMModelDescriptorResolver = LLMModelDescriptorResolver()
     ) {
         self.registry = registry
         self.toolCatalog = toolCatalog
+        self.modelDescriptorResolver = modelDescriptorResolver
     }
 
     /// Resolves model, endpoint, tools, options, and message history for one run.
@@ -23,22 +26,34 @@ struct ConversationRunContextResolver {
     ) throws -> ConversationRunContext {
         let providerID = apiConfig.providerIDEnum
         let profile = registry.profile(for: providerID)
-        conversation.options.syncTypedFieldsFromParameters()
         let endpoint = conversation.options.endpointOverrideFamily ?? apiConfig.defaultEndpointFamilyEnum
         guard profile.supportedEndpointFamilies.contains(endpoint) else {
             throw LLMProviderError.unsupportedCapability("\(profile.name) does not support \(endpoint.rawValue).")
         }
 
         let modelID = conversation.options.modelOverride
-            ?? apiConfig.defaultModelID
-            ?? LLMDefaultsCatalog.bundled.defaultModelID(for: providerID)
+            ?? modelDescriptorResolver.defaultModelID(for: providerID, apiConfiguration: apiConfig)
         guard let modelID, !modelID.isEmpty else {
             throw LLMProviderError.invalidConfiguration("No model configured for \(profile.name).")
         }
 
+        let descriptor = try modelDescriptorResolver.descriptor(
+            for: modelID,
+            providerID: providerID,
+            apiConfiguration: apiConfig,
+            modelContext: conversation.modelContext,
+            endpointFamilies: [endpoint]
+        )
+        let mappings = LLMParameterMappingResolver.resolve(
+            providerID: providerID,
+            endpointFamily: endpoint,
+            modelID: modelID,
+            modelDescriptor: descriptor
+        )
         let options = conversation.options.generationOptions(
             resolvedModelID: modelID,
-            resolvedEndpointFamily: endpoint
+            resolvedEndpointFamily: endpoint,
+            mappings: mappings
         )
         let tools = toolCatalog.allTools()
             .filter { conversation.options.isToolEnabled($0.name) }
@@ -51,13 +66,7 @@ struct ConversationRunContextResolver {
             providerID: providerID,
             endpointFamily: endpoint,
             modelID: modelID,
-            modelDescriptor: try modelDescriptor(
-                for: modelID,
-                apiConfiguration: apiConfig,
-                providerID: providerID,
-                endpointFamily: endpoint,
-                conversation: conversation
-            ),
+            modelDescriptor: descriptor,
             messages: orderedMessages(in: conversation).map { $0.asDomainMessage() },
             tools: tools,
             options: options
@@ -74,45 +83,6 @@ struct ConversationRunContextResolver {
             }
     }
 
-    /// Fetches stored model metadata for the selected API configuration when available.
-    @MainActor
-    private func modelDescriptor(
-        for modelID: String,
-        apiConfiguration: APIConfigurationItem,
-        providerID: LLMProviderID,
-        endpointFamily: LLMEndpointFamily,
-        conversation: ConversationItem
-    ) throws -> LLMModelDescriptor? {
-        guard let context = conversation.modelContext else {
-            throw LLMProviderError.invalidConfiguration("Conversation has no model context while resolving descriptor for \(modelID).")
-        }
-        let requestedModelID = modelID
-        let requestedProviderID = providerID.rawValue
-        let descriptor = FetchDescriptor<ModelItem>(
-            predicate: #Predicate<ModelItem> { model in
-                (model.modelID == requestedModelID || model.name == requestedModelID)
-                    && model.providerID == requestedProviderID
-            }
-        )
-        let models: [ModelItem]
-        do {
-            models = try context.fetch(descriptor)
-        } catch {
-            throw LLMProviderError.invalidConfiguration("Failed to fetch model descriptor for \(modelID) in API configuration \(apiConfiguration.name): \(error.localizedDescription)")
-        }
-        let model = models.first { model in
-            model.apiConfiguration?.id == apiConfiguration.id
-        }
-        if let model {
-            return model.descriptor
-        }
-        let defaultDescriptor = LLMDefaultsCatalog.bundled.modelDescriptor(
-            providerID: providerID,
-            modelID: modelID,
-            endpointFamilies: nil
-        )
-        return defaultDescriptor
-    }
 }
 
 /// Builds and validates provider-neutral `LLMRequest` values from resolved run context.

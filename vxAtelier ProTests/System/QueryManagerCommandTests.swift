@@ -129,6 +129,57 @@ final class QueryManagerCommandTests: XCTestCase {
         XCTAssertEqual(queryManager.defaultApiConfiguration?.name, "Config 1")
     }
 
+    func testUpsertApiConfigurationNormalizesDefaultUniqueness() throws {
+        let config1 = APIConfigurationItem(
+            name: "Config 1",
+            baseURL: "https://api.example.com",
+            isDefault: true
+        )
+        let config2 = APIConfigurationItem(
+            name: "Config 2",
+            baseURL: "https://api2.example.com",
+            isDefault: true
+        )
+
+        try queryManager.upsertAPIConfiguration(config1, makeDefault: true)
+        try queryManager.upsertAPIConfiguration(config2, makeDefault: true)
+
+        let configs = try testEnv.apiConfigurations()
+        XCTAssertEqual(configs.filter(\.isDefault).count, 1)
+        XCTAssertEqual(queryManager.defaultApiConfiguration?.persistentModelID, config2.persistentModelID)
+    }
+
+    func testUpsertApiConfigurationGuaranteesOneDefault() throws {
+        let config1 = APIConfigurationItem(
+            name: "Config 1",
+            baseURL: "https://api.example.com",
+            isDefault: false
+        )
+        let config2 = APIConfigurationItem(
+            name: "Config 2",
+            baseURL: "https://api2.example.com",
+            isDefault: false
+        )
+
+        try queryManager.upsertAPIConfiguration(config1, makeDefault: false)
+        try queryManager.upsertAPIConfiguration(config2, makeDefault: false)
+
+        XCTAssertEqual(try testEnv.apiConfigurations().filter(\.isDefault).count, 1)
+        XCTAssertNotNil(queryManager.defaultApiConfiguration)
+    }
+
+    func testUpsertWebSearchConfigurationNormalizesDefaultUniqueness() throws {
+        let config1 = WebSearchConfigurationItem(name: "Search 1", isDefault: true)
+        let config2 = WebSearchConfigurationItem(name: "Search 2", isDefault: true)
+
+        try queryManager.upsertWebSearchConfiguration(config1, makeDefault: true)
+        try queryManager.upsertWebSearchConfiguration(config2, makeDefault: true)
+
+        let configs = try testEnv.fetchAll(WebSearchConfigurationItem.self)
+        XCTAssertEqual(configs.filter(\.isDefault).count, 1)
+        XCTAssertEqual(queryManager.defaultWebSearchConfiguration?.persistentModelID, config2.persistentModelID)
+    }
+
     func testModelsForConfigurationReturnsOnlyScopedModels() throws {
         let configA = APIConfigurationItem(name: "A", baseURL: "https://a.example.com")
         let configB = APIConfigurationItem(name: "B", baseURL: "https://b.example.com")

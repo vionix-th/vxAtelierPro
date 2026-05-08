@@ -127,7 +127,8 @@ struct vxAtelierPro: App {
             VoiceConfigurationItem.self,
             WebSearchConfigurationItem.self,
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: isRunningTests)
 
         do {
             return try ModelContainer(

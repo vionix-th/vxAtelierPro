@@ -53,9 +53,9 @@ struct ModelExportData: Codable {
         model.modelID = modelID ?? name
         model.displayName = displayName ?? name
         model.providerID = providerID ?? LLMProviderRegistry.providerID(fromProviderName: provider).rawValue
-        let defaultDescriptor = LLMDefaultsCatalog.bundled.modelDescriptor(
-            providerID: LLMProviderID(rawValue: model.providerID) ?? .customOpenAICompatible,
-            modelID: model.modelID
+        let defaultDescriptor = LLMModelDescriptorResolver().catalogDescriptor(
+            for: model.modelID,
+            providerID: LLMProviderID(rawValue: model.providerID) ?? .customOpenAICompatible
         )
         model.endpointFamiliesRaw = defaultDescriptor.endpointFamilies.map(\.rawValue)
         model.modalitiesRaw = defaultDescriptor.modalities.map(\.rawValue)

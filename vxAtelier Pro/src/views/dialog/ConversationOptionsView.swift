@@ -17,7 +17,6 @@ struct ConversationOptionsView: View {
     @Binding var options: ConversationOptions
 
     @Query(sort: [SortDescriptor(\APIConfigurationItem.name)]) private var apiConfigurations: [APIConfigurationItem]
-    @Query(sort: [SortDescriptor(\ModelItem.name)]) private var models: [ModelItem]
     
     @State private var isAvatarImageImporting: Bool = false
     @State private var selectedTab = 0
@@ -40,11 +39,16 @@ struct ConversationOptionsView: View {
         Binding(
             get: { options.endpointOverride ?? "" },
             set: { value in
-                options.endpointOverride = value.isEmpty ? nil : value
-                if let config = options.apiConfiguration {
-                    options.setupAiRequestArguments(for: config, modelContext: modelContext)
-                }
+                options.setEndpointOverride(value.isEmpty ? nil : LLMEndpointFamily(rawValue: value))
             }
+        )
+    }
+
+    private var parameterControls: [ConversationParameterControl] {
+        ConversationParameterProjection.controls(
+            for: options,
+            apiConfiguration: options.apiConfiguration,
+            modelContext: modelContext
         )
     }
 
@@ -91,29 +95,17 @@ struct ConversationOptionsView: View {
                         // Use SettingsSectionView for parameters
                         SettingsSectionView(title: "Model Parameters") {
                             VStack(spacing: AppDefaults.paddingMedium) {
-                                if !options.parameters.isEmpty {
-                                    ForEach(
-                                        options.parameters.sorted { p1, p2 in
-                                            if p1.required != p2.required {
-                                                return p1.required
-                                            }
-                                            if !p1.required && !p2.required && p1.isEnabled != p2.isEnabled {
-                                                return p1.isEnabled
-                                            }
-                                            return p1.displayName.localizedCaseInsensitiveCompare(p2.displayName) == .orderedAscending
-                                        }, id: \.id
-                                    ) { param in
+                                let controls = parameterControls
+                                if !controls.isEmpty {
+                                    ForEach(controls) { control in
                                         ParameterControlView(
-                                            parameter: param,
+                                            control: control,
                                             apiConfiguration: options.apiConfiguration,
-                                            onModelChanged: { modelID in
-                                                if let config = options.apiConfiguration {
-                                                    options.setupAiRequestArguments(
-                                                        for: config,
-                                                        modelContext: modelContext,
-                                                        requestedModelID: modelID
-                                                    )
-                                                }
+                                            onValueChanged: { value in
+                                                options.setParameterValue(control.parameterID, value: value)
+                                            },
+                                            onEnabledChanged: { isEnabled in
+                                                options.setParameterEnabled(control.parameterID, enabled: isEnabled)
                                             }
                                         )
                                     }
@@ -308,17 +300,10 @@ struct ConversationOptionsView: View {
         .padding(AppDefaults.paddingMedium)
         .onChange(of: options.apiConfiguration) {
             if let config = options.apiConfiguration {
-                vxAtelierPro.log.info("API configuration changed, updating parameters")
-                options.setupAiRequestArguments(for: config, modelContext: modelContext)
-                
+                vxAtelierPro.log.info("API configuration changed, updating defaults")
                 let provider = config.providerIDEnum
-                let profile = LLMProviderRegistry.shared.profile(for: provider)
-                let defaultModel = config.defaultModelID ?? LLMDefaultsCatalog.bundled.defaultModelID(for: provider) ?? ""
-                options.setParameterValue(name: "model", value: defaultModel)
-                if let override = options.endpointOverrideFamily,
-                   !profile.supportedEndpointFamilies.contains(override) {
-                    options.endpointOverride = nil
-                }
+                options.applyAPIConfigurationDefaults(replaceModel: true)
+                let defaultModel = options.modelOverride ?? ""
                 vxAtelierPro.log.info("Set default model to \(defaultModel) for provider \(provider.displayName)")
             }
         }
@@ -439,54 +424,37 @@ private struct SystemPromptEditor: View {
 }
 
 // MARK: - Parameter Control View
-/// A view that dynamically renders controls for different parameter types.
-/// Supports various input types including text fields, steppers, sliders, toggles, and pickers.
 struct ParameterControlView: View {
-    @ObservedObject var parameter: AiRequestArgument
-    @State private var isModelPickerPresented: Bool = false
+    let control: ConversationParameterControl
     let apiConfiguration: APIConfigurationItem?
-    let onModelChanged: (String) -> Void
-    
-    init(
-        parameter: AiRequestArgument,
-        apiConfiguration: APIConfigurationItem?,
-        onModelChanged: @escaping (String) -> Void = { _ in }
-    ) {
-        self.parameter = parameter
-        self.apiConfiguration = apiConfiguration
-        self.onModelChanged = onModelChanged
-    }
+    let onValueChanged: (JSONValue?) -> Void
+    let onEnabledChanged: (Bool) -> Void
+    @State private var isModelPickerPresented: Bool = false
 
     var body: some View {
-        let controlType = AiArgumentControlType(rawValue: parameter.controlType) ?? .textField
-        let valueType = LLMParameterValueType(rawValue: parameter.valueType) ?? .string
-
         HStack(spacing: AppDefaults.paddingMedium) {
-            Text(parameter.displayName)
+            Text(control.displayName)
                 .frame(width: 130, alignment: .leading)
-                .help(parameter.paramDescription)
-                .foregroundColor(parameter.isEnabled ? .primary : .secondary)
+                .help(control.description)
+                .foregroundColor(control.isEnabled ? .primary : .secondary)
 
-            if parameter.isEnabled {
-                switch controlType {
+            if control.isEnabled {
+                switch control.controlType {
                 case .textField:
-                    if parameter.name == "system_prompt" {
-                        SystemPromptEditor(promptValue: Binding(
-                            get: { parameter.stringValue ?? "" },
-                            set: { parameter.setValue($0) }
-                        ))
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if control.parameterID == .systemPrompt {
+                        SystemPromptEditor(promptValue: stringBinding)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     } else {
-                        textFieldControl(for: valueType)
+                        textFieldControl(for: control.valueType)
                     }
                 case .stepper:
-                    stepperControl(for: valueType)
+                    stepperControl(for: control.valueType)
                 case .slider:
-                    sliderControl(for: valueType)
+                    sliderControl(for: control.valueType)
                 case .toggle:
                     toggleControl()
                 case .picker:
-                    pickerControl(for: valueType)
+                    pickerControl(for: control.valueType)
                 }
             } else {
                 Text("Not used")
@@ -495,10 +463,10 @@ struct ParameterControlView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            if !parameter.required {
+            if !control.required {
                 Toggle("", isOn: Binding(
-                    get: { parameter.isEnabled },
-                    set: { parameter.isEnabled = $0 }
+                    get: { control.isEnabled },
+                    set: onEnabledChanged
                 ))
                 .labelsHidden()
                 .toggleStyle(SwitchToggleStyle(tint: .accentColor))
@@ -506,22 +474,38 @@ struct ParameterControlView: View {
         }
     }
 
-    // MARK: - Control Builders
-    
+    private var stringBinding: Binding<String> {
+        Binding(
+            get: { control.value?.stringValue ?? "" },
+            set: { onValueChanged(.string($0)) }
+        )
+    }
+
+    private var intBinding: Binding<Double> {
+        Binding(
+            get: { Double(control.value?.integerValue ?? Int(control.minValue ?? 0)) },
+            set: { onValueChanged(.integer(Int($0))) }
+        )
+    }
+
+    private var doubleBinding: Binding<Double> {
+        Binding(
+            get: { control.value?.doubleValue ?? control.minValue ?? 0 },
+            set: { onValueChanged(.number($0)) }
+        )
+    }
+
     @ViewBuilder
     private func textFieldControl(for valueType: LLMParameterValueType) -> some View {
         switch valueType {
         case .string:
-            if parameter.name == "model" {
+            if control.parameterID == .model {
                 HStack {
-                    TextField(parameter.name, text: Binding(
-                        get: { parameter.stringValue ?? "" },
-                        set: { parameter.setValue($0) }
+                    TextField(control.parameterID.rawValue, text: Binding(
+                        get: { control.value?.stringValue ?? "" },
+                        set: { onValueChanged(.string($0)) }
                     ))
                     .textFieldStyle(.roundedBorder)
-                    .onSubmit {
-                        onModelChanged(parameter.stringValue ?? "")
-                    }
 
                     Button {
                         vxAtelierPro.log.debug("Opening model picker")
@@ -538,41 +522,37 @@ struct ParameterControlView: View {
                 .sheet(isPresented: $isModelPickerPresented) {
                     if let config = apiConfiguration {
                         ModelSelectionView(
-                            selectedModel: parameter.stringValue ?? "",
-                            onModelSelected: { modelId in
-                                parameter.setValue(modelId)
-                                onModelChanged(modelId)
+                            selectedModel: control.value?.stringValue ?? "",
+                            onModelSelected: { modelID in
+                                onValueChanged(.string(modelID))
                             },
                             apiConfiguration: config
                         )
                     }
                 }
             } else {
-                TextField(parameter.name, text: Binding(
-                    get: { parameter.stringValue ?? "" },
-                    set: { parameter.setValue($0) }
-                ))
-                .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                TextField(control.parameterID.rawValue, text: stringBinding)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         case .integer:
-            TextField(parameter.name, value: Binding(
-                get: { parameter.intValue ?? 0 },
-                set: { parameter.setValue($0) }
+            TextField(control.parameterID.rawValue, value: Binding(
+                get: { control.value?.integerValue ?? 0 },
+                set: { onValueChanged(.integer($0)) }
             ), formatter: NumberFormatter())
             .textFieldStyle(.roundedBorder)
             .frame(maxWidth: .infinity, alignment: .leading)
         case .float:
-            TextField(parameter.name, value: Binding(
-                get: { parameter.floatValue ?? 0.0 },
-                set: { parameter.setValue($0) }
+            TextField(control.parameterID.rawValue, value: Binding(
+                get: { control.value?.doubleValue ?? 0 },
+                set: { onValueChanged(.number($0)) }
             ), formatter: NumberFormatter())
             .textFieldStyle(.roundedBorder)
             .frame(maxWidth: .infinity, alignment: .leading)
         case .boolean:
-            TextField(parameter.name, text: Binding(
-                get: { (parameter.boolValue ?? false) ? "true" : "false" },
-                set: { parameter.setValue($0.lowercased() == "true") }
+            TextField(control.parameterID.rawValue, text: Binding(
+                get: { (control.value?.boolValue ?? false) ? "true" : "false" },
+                set: { onValueChanged(.boolean($0.lowercased() == "true")) }
             ))
             .textFieldStyle(.roundedBorder)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -581,82 +561,39 @@ struct ParameterControlView: View {
 
     @ViewBuilder
     private func stepperControl(for valueType: LLMParameterValueType) -> some View {
-        switch valueType {
-        case .integer:
-            let minVal = Double(parameter.minValue ?? 0)
-            let maxVal = Double(parameter.maxValue ?? 10)
-            let stepVal = Double(parameter.step ?? 1)
-            HybridNumericInputView(
-                label: nil,
-                value: Binding(
-                    get: { Double(parameter.intValue ?? Int(minVal)) },
-                    set: { parameter.setValue(Int($0)) }
-                ),
-                minValue: minVal,
-                maxValue: maxVal,
-                step: stepVal,
-                isInteger: true,
-                useStepper: true
-            )
-        case .float:
-            let minVal = parameter.minValue ?? 0.0
-            let maxVal = parameter.maxValue ?? 1.0
-            let stepVal = parameter.step ?? 0.1
-            HybridNumericInputView(
-                label: nil,
-                value: Binding(
-                    get: { parameter.floatValue ?? minVal },
-                    set: { parameter.setValue($0) }
-                ),
-                minValue: minVal,
-                maxValue: maxVal,
-                step: stepVal,
-                isInteger: false,
-                useStepper: true
-            )
-        default:
-            Text("Unsupported type for stepper")
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
+        numericControl(for: valueType, useStepper: true)
     }
 
     @ViewBuilder
     private func sliderControl(for valueType: LLMParameterValueType) -> some View {
+        numericControl(for: valueType, useStepper: false)
+    }
+
+    @ViewBuilder
+    private func numericControl(for valueType: LLMParameterValueType, useStepper: Bool) -> some View {
         switch valueType {
         case .integer:
-            let minVal = Double(parameter.minValue ?? 0)
-            let maxVal = Double(parameter.maxValue ?? 10)
-            let stepVal = Double(parameter.step ?? 1)
             HybridNumericInputView(
                 label: nil,
-                value: Binding(
-                    get: { Double(parameter.intValue ?? Int(minVal)) },
-                    set: { parameter.setValue(Int($0)) }
-                ),
-                minValue: minVal,
-                maxValue: maxVal,
-                step: stepVal,
+                value: intBinding,
+                minValue: control.minValue ?? 0,
+                maxValue: control.maxValue ?? 10,
+                step: control.step ?? 1,
                 isInteger: true,
-                useStepper: false
+                useStepper: useStepper
             )
         case .float:
-            let minVal = parameter.minValue ?? 0.0
-            let maxVal = parameter.maxValue ?? 1.0
-            let stepVal = parameter.step ?? 0.1
             HybridNumericInputView(
                 label: nil,
-                value: Binding(
-                    get: { parameter.floatValue ?? minVal },
-                    set: { parameter.setValue($0) }
-                ),
-                minValue: minVal,
-                maxValue: maxVal,
-                step: stepVal,
+                value: doubleBinding,
+                minValue: control.minValue ?? 0,
+                maxValue: control.maxValue ?? 1,
+                step: control.step ?? 0.1,
                 isInteger: false,
-                useStepper: false
+                useStepper: useStepper
             )
         default:
-            Text("Unsupported type for slider")
+            Text("Unsupported numeric parameter")
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -664,8 +601,8 @@ struct ParameterControlView: View {
     @ViewBuilder
     private func toggleControl() -> some View {
         Toggle("", isOn: Binding(
-            get: { parameter.boolValue ?? false },
-            set: { parameter.setValue($0) }
+            get: { control.value?.boolValue ?? false },
+            set: { onValueChanged(.boolean($0)) }
         ))
         .labelsHidden()
         .toggleStyle(SwitchToggleStyle(tint: .accentColor))
@@ -674,52 +611,17 @@ struct ParameterControlView: View {
 
     @ViewBuilder
     private func pickerControl(for valueType: LLMParameterValueType) -> some View {
-        if let options = parameter.options, !options.isEmpty {
-            switch valueType {
-            case .string:
-                Picker("", selection: Binding(
-                    get: { parameter.stringValue ?? options.first ?? "" },
-                    set: { parameter.setValue($0) }
-                )) {
-                    ForEach(options, id: \.self) { option in
-                        Text(option).tag(option)
-                    }
+        if let options = control.options, !options.isEmpty {
+            Picker("", selection: Binding(
+                get: { control.value?.stringValue ?? options.first ?? "" },
+                set: { onValueChanged(.string($0)) }
+            )) {
+                ForEach(options, id: \.self) { option in
+                    Text(option).tag(option)
                 }
-                .pickerStyle(.menu)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            case .integer:
-                Picker("", selection: Binding(
-                    get: { String(parameter.intValue ?? 0) },
-                    set: { parameter.setValue(Int($0) ?? 0) }
-                )) {
-                    ForEach(options, id: \.self) { option in
-                        Text(option).tag(option)
-                    }
-                }
-                .pickerStyle(.menu)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            case .float:
-                Picker("", selection: Binding(
-                    get: { String(parameter.floatValue ?? 0.0) },
-                    set: { parameter.setValue(Double($0) ?? 0.0) }
-                )) {
-                    ForEach(options, id: \.self) { option in
-                        Text(option).tag(option)
-                    }
-                }
-                .pickerStyle(.menu)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            case .boolean:
-                Picker("", selection: Binding(
-                    get: { (parameter.boolValue ?? false) ? "true" : "false" },
-                    set: { parameter.setValue($0 == "true") }
-                )) {
-                    Text("True").tag("true")
-                    Text("False").tag("false")
-                }
-                .pickerStyle(.menu)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .pickerStyle(.menu)
+            .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             Text("No options available")
                 .foregroundColor(.gray)

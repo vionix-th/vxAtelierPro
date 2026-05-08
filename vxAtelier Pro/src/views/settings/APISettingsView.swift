@@ -22,16 +22,9 @@ struct APISettingsView: View {
     }
 
     private func deleteAPIConfiguration(_ config: APIConfigurationItem) {
-        let configWasDefault = config.isDefault
         do {
             try queryManager.cleanupReferences(for: config)
             try queryManager.delete(config)
-            if configWasDefault {
-                if let newDefault = apiConfigurations.sorted(by: { $0.name < $1.name }).first {
-                    newDefault.isDefault = true
-                    try queryManager.saveContext()
-                }
-            }
         } catch {
             apiConfigErrorMessage = "Failed to delete configuration \(config.name): \(error.localizedDescription)"
             showApiConfigError = true

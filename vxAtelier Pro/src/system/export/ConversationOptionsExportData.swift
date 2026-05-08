@@ -6,8 +6,9 @@ import SwiftData
 struct ConversationOptionsExportData: Codable {
     let avatarImageData: Data?
     let apiConfiguration: APIConfigurationExportData?
-    let parameters: [ParameterValueExportData]
     let enabledToolsDict: [String: Bool]
+    let toolConfigurations: [String: String]
+    let enabledParameterOverrides: [String: Bool]
     let isMarkdownEnabled: Bool
     let systemPrompt: String?
     let modelOverride: String?
@@ -26,8 +27,9 @@ struct ConversationOptionsExportData: Codable {
     init(_ options: ConversationOptions) {
         self.avatarImageData = options.avatarImageData
         self.apiConfiguration = options.apiConfiguration.map { APIConfigurationExportData($0) }
-        self.parameters = options.parameters.map { ParameterValueExportData($0) }
         self.enabledToolsDict = options.enabledToolsDict
+        self.toolConfigurations = options.toolConfigurations
+        self.enabledParameterOverrides = options.enabledParameterOverrides
         self.isMarkdownEnabled = options.isMarkdownEnabled
         self.systemPrompt = options.systemPrompt
         self.modelOverride = options.modelOverride
@@ -49,17 +51,10 @@ struct ConversationOptionsExportData: Codable {
             avatarImageData: avatarImageData,
             apiConfiguration: apiConfiguration?.toDataItem()
         )
-        
-        // Add all parameters
-        for paramData in parameters {
-            options.parameters.removeAll { param in
-                param.name == paramData.name
-            }
-            options.parameters.append(paramData.toParameter())
-        }
-        
-        // Set enabled tools
+
         options.enabledToolsDict = enabledToolsDict
+        options.toolConfigurations = toolConfigurations
+        options.enabledParameterOverrides = enabledParameterOverrides
         options.isMarkdownEnabled = isMarkdownEnabled
         options.systemPrompt = systemPrompt ?? ""
         options.modelOverride = modelOverride

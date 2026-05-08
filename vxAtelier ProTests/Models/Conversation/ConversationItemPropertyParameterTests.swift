@@ -37,29 +37,17 @@ final class ConversationItemPropertyParameterTests: XCTestCase {
         let optionsFactory = ConversationOptionsFactory()
         let options = optionsFactory.create()
         let conversation = ConversationItem(timestamp: Date(), title: "Parameter Access Test", options: options)
-        XCTAssertTrue(conversation.options.hasParameterValue(name: "system_prompt"))
-        XCTAssertTrue(conversation.options.hasParameterValue(name: "temperature"))
-        XCTAssertTrue(conversation.options.hasParameterValue(name: "max_output_tokens"))
-        XCTAssertTrue(conversation.options.hasParameterValue(name: "model"))
-        let systemPrompt: String = conversation.options.getParameterValue(name: "system_prompt", defaultValue: "")
-        XCTAssertFalse(systemPrompt.isEmpty)
-        let temperature: Double = conversation.options.getParameterValue(name: "temperature", defaultValue: 0.0)
-        XCTAssertEqual(temperature, 0.7)
-        let maxTokens: Int = conversation.options.getParameterValue(name: "max_output_tokens", defaultValue: 0)
-        XCTAssertEqual(maxTokens, 1000)
-        let model: String = conversation.options.getParameterValue(name: "model", defaultValue: "")
-        XCTAssertEqual(model, "test-model")
+        XCTAssertFalse(conversation.options.systemPrompt.isEmpty)
+        XCTAssertEqual(conversation.options.temperature, 0.7)
+        XCTAssertEqual(conversation.options.maxOutputTokens, 1000)
+        XCTAssertEqual(conversation.options.modelOverride, "test-model")
     }
     
     func testParameterEdgeCases() {
         let conversation = testEnv.createConversation()
-        XCTAssertFalse(conversation.options.hasParameterValue(name: "non_existent_param"))
-        let defaultValue = "default"
-        let nonExistentValue: String = conversation.options.getParameterValue(name: "non_existent_param", defaultValue: defaultValue)
-        XCTAssertEqual(nonExistentValue, defaultValue)
-        let temperatureAsString: String = conversation.options.getParameterValue(name: "temperature", defaultValue: "wrong type")
-        XCTAssertEqual(temperatureAsString, "wrong type")
-        let maxTokensAsDouble: Double = conversation.options.getParameterValue(name: "max_output_tokens", defaultValue: -1.0)
-        XCTAssertEqual(maxTokensAsDouble, -1.0)
+        XCTAssertNil(conversation.options.temperature)
+        XCTAssertNil(conversation.options.maxOutputTokens)
+        XCTAssertNil(conversation.options.parameterValue(.reasoningEffort))
+        XCTAssertEqual(conversation.options.parameterValue(.systemPrompt), .string(""))
     }
 }

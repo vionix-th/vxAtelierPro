@@ -23,6 +23,13 @@
   ],
   "rules": [
     {
+      "modelDefaults": {
+        "modalities": ["text"],
+        "supportedParameters": [],
+        "schemaFeatures": []
+      }
+    },
+    {
       "match": {
         "providerRegex": "^openAIPlatform$"
       },
@@ -257,7 +264,7 @@
       "modelDefaults": {
         "contextWindow": 1000000,
         "endpointFamilies": ["chatCompletions"],
-        "modalities": ["text", "reasoning"],
+        "modalities": ["text"],
         "supportedParameters": ["max_tokens", "response_format", "thinking", "tools", "tool_choice"],
         "schemaFeatures": ["tools", "jsonObject", "reasoning", "usage", "streaming"]
       }

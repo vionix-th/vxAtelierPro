@@ -7,8 +7,6 @@ enum LLMModality: String, Codable, CaseIterable {
     case audio
     case file
     case video
-    case tool
-    case reasoning
 }
 
 /// Structured-output and runtime feature advertised by a provider or model.

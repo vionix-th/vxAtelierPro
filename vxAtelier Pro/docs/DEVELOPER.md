@@ -268,7 +268,7 @@ This file defines the `AppDefaults` struct, which serves as a centralized, stati
 *   **Scope**: It contains a wide range of defaults, including:
     *   **UI Constants**: Font sizes, padding, corner radii, and colors.
     *   **Feature Settings**: Default states for TTS, Markdown rendering, and UI toggles.
-    *   **API Provider Defaults**: Pre-configured parameters (e.g., model name, temperature, endpoints) for providers like OpenAI, Anthropic, and DeepSeek.
+    *   **Transport Defaults**: Built-in base URLs, endpoint paths, UI constants, and non-model application defaults.
 *   **Settings Reset**: It includes a `resetUserDefaults()` function that restores all settings stored in `UserDefaults` to their original default values, providing a convenient way to reset the application's configuration.
 
 #### JSON Serializer (`JsonSerializer.swift`)
@@ -315,7 +315,7 @@ These models store user-configurable settings.
 *   **`WebSearchConfigurationItem`**: Stores the configuration for a web search provider, such as an API key and custom search engine ID.
 *   **`VoiceConfigurationItem`**: Stores the configuration for a specific TTS voice, linking a voice identifier to a language and role.
 *   **`PromptTemplateItem`**: A user-created, reusable prompt template.
-*   **`AiRequestArgument`**: A flexible model representing a single parameter for an AI request (e.g., `temperature`). It stores the parameter's name, type, constraints, and value, allowing for dynamic generation of settings UI.
+*   **`ConversationOptions`**: Stores typed per-conversation generation settings. Parameter controls are rendered from a non-persistent projection over these typed fields and the resolved model descriptor.
 
 #### Supporting Enums & Structs
 These non-persisted types are critical for application logic.
@@ -325,13 +325,13 @@ These non-persisted types are critical for application logic.
 
 This module contains the core SwiftData models and supporting data structures that define the application's persistence layer and state.
 
-#### AI Request Parameter (`AiRequestArgument.swift`)
+#### Conversation Parameter Projection (`ConversationParameterControl.swift`)
 
-This is a flexible SwiftData `@Model` that represents a single, configurable parameter for an AI service request (e.g., `temperature`, `top_p`). It is a cornerstone of the dynamic AI configuration system.
+This is a non-persistent value type that represents one configurable generation parameter row in the UI.
 
-*   **Dynamic UI Generation**: It stores rich metadata, including the parameter's name, description, data type (`string`, `integer`), validation rules (min/max values), and a hint for the appropriate UI control (`slider`, `toggle`). This allows the application to dynamically generate a settings screen for any AI provider.
-*   **Type-Erased Storage**: The parameter's value is serialized to `Data` using `JSONEncoder`, allowing various types to be stored in a single database field. A computed `value` property with validation logic provides convenient, type-safe access.
-*   **Observable**: It conforms to `ObservableObject`, allowing it to be bound directly to SwiftUI views for seamless user interaction.
+*   **Dynamic UI Generation**: It combines semantic parameter definitions, presentation metadata, resolved model parameter mappings, and typed values from `ConversationOptions`.
+*   **No Value Ownership**: It does not persist values. `ConversationOptions` owns generation values and parameter enablement overrides.
+*   **Descriptor-Backed Availability**: It is materialized from `LLMModelDescriptorResolver`, so UI and runtime use the same model metadata path.
 
 #### API Configuration (`APIConfigurationItem.swift`)
 
@@ -375,15 +375,16 @@ This SwiftData `@Model` represents a single conversation thread and stores the p
 
 This SwiftData `@Model` is a comprehensive container for all settings that govern a single `ConversationItem`.
 
-*   **Parameter Generation**: Its `setupAiRequestArguments(...)` method builds typed controls from the selected `LLMProviderProfile` and configuration defaults.
+*   **Typed Generation Settings**: It stores semantic generation values directly (`systemPrompt`, `modelOverride`, `temperature`, `topP`, `maxOutputTokens`, response format, reasoning, service tier, streaming, retry policy, and provider extras).
+*   **Parameter Enablement**: It stores `enabledParameterOverrides` for optional parameter inclusion. The values themselves remain typed fields.
 *   **Per-Conversation Tool Management**: It provides a complete system for managing tools on a per-conversation basis, storing which tools are enabled and their specific configurations as serialized JSON.
-*   **Relationships**: It holds a relationship to the `APIConfigurationItem` to be used for the conversation and a cascade-delete relationship to its list of `AiRequestArgument` parameters.
+*   **Relationships**: It holds a relationship to the `APIConfigurationItem` to be used for the conversation.
 
 #### AI Model (`ModelItem.swift`)
 
 This SwiftData `@Model` represents a specific, selectable AI model from a provider.
 
-*   **Automated Inference**: Its `init` method uses a centralized `LLMModelProviderUtils` helper to automatically infer the model's provider and capabilities from its name string, then materializes default parameter mappings from `LLMParameterMappingCatalog`.
+*   **Catalog Defaults**: Its initializer seeds model metadata from `LLMDefaultsCatalog` and materializes default parameter mappings from `LLMParameterMappingCatalog`.
 *   **Descriptor Bridge**: `descriptor` is a computed property that bridges between persisted fields (`modelID`, `providerID`, `endpointFamiliesRaw`, `modalitiesRaw`, `supportedParameters`, `schemaFeaturesRaw`, `parameterMappings`, `rawMetadataJSON`) and the domain `LLMModelDescriptor` struct used by adapters, validators, and resolvers.
 *   **API Configuration Scoping**: `apiConfiguration` links a model to a specific `APIConfigurationItem`, so two configurations with the same model name can carry different parameter mappings.
 
@@ -481,8 +482,8 @@ This module contains core services, managers, and utilities that provide foundat
 
 This `struct` acts as a centralized namespace for all static default values and constants used throughout the application. This is a critical architectural pattern for maintainability and consistency.
 
-*   **Centralized Configuration**: It provides a single source of truth for UI constants (fonts, padding), default names, application behavior toggles, and, most importantly, default parameters for all supported AI service providers (OpenAI, Anthropic, etc.).
-*   **Extensible Provider Defaults**: Default settings for each AI provider, including model names, API endpoints, and request parameters, are organized into nested structs. This makes it trivial to add or update provider configurations without altering other parts of the codebase.
+*   **Centralized Configuration**: It provides a single source of truth for UI constants, default names, and non-model application behavior toggles.
+*   **Model Defaults Boundary**: Model capabilities and parameter mappings are not stored here; they are loaded from `LLMDefaults.json` through `LLMDefaultsCatalog`.
 *   **User Settings Management**: It defines the initial state for settings that are managed via `UserDefaults` (`@AppStorage`). It also includes a `resetUserDefaults()` function to programmatically revert all user-customized settings back to these defined defaults.
 
 #### Appearance Style (`AppearanceStyle.swift`)
@@ -1092,7 +1093,8 @@ All logging routes through `vxAtelierPro.log` (`LoggingService.shared`), which w
 
 ## Extending the App
 1. **Add a new AI Provider**
-   * Add an `LLMProviderProfile` entry in `LLMProviderRegistry` with provider ID, auth kind, endpoint families, supported parameters, schema features, and modalities.
+   * Add an `LLMProviderProfile` entry in `LLMProviderRegistry` with provider ID, auth kind, base URL, endpoint families, endpoint paths, and enabled state.
+   * Add model capability and parameter-mapping defaults to `LLMDefaults.json`.
    * If the provider uses a non-OpenAI-compatible API, implement `LLMProviderAdapter` (`stream` + `fetchModels`) and wire it in `LLMProviderRegistry.adapter(for:)`.
    * Add model decoding and fixture tests under `vxAtelier ProTests/AI`.
 2. **Add a New Feature Tab**

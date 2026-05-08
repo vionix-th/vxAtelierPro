@@ -94,6 +94,28 @@ final class QueryManager {
         fetch(ModelItem.self, sort: modelSort)
     }
 
+    func normalizeDefaultAPIConfigurations(preferredDefault: APIConfigurationItem? = nil) {
+        let configurations = fetchApiConfigurations()
+        guard !configurations.isEmpty else { return }
+        let selected = preferredDefault
+            ?? configurations.first(where: { $0.isDefault })
+            ?? configurations.first
+        for configuration in configurations {
+            configuration.isDefault = configuration.id == selected?.id
+        }
+    }
+
+    func normalizeDefaultWebSearchConfigurations(preferredDefault: WebSearchConfigurationItem? = nil) {
+        let configurations = fetchWebSearchConfigurations()
+        guard !configurations.isEmpty else { return }
+        let selected = preferredDefault
+            ?? configurations.first(where: { $0.isDefault })
+            ?? configurations.first
+        for configuration in configurations {
+            configuration.isDefault = configuration.id == selected?.id
+        }
+    }
+
     func models(for apiConfiguration: APIConfigurationItem?) -> [ModelItem] {
         guard let apiConfiguration else { return [] }
         return fetchModels().filter { $0.apiConfiguration?.id == apiConfiguration.id }
@@ -101,17 +123,19 @@ final class QueryManager {
 
     // MARK: - Defaults
     var defaultApiConfiguration: APIConfigurationItem? {
-        if let explicit = fetchApiConfigurations().first(where: { $0.isDefault }) {
+        let configurations = fetchApiConfigurations()
+        if let explicit = configurations.first(where: { $0.isDefault }) {
             return explicit
         }
-        return fetchApiConfigurations().first
+        return configurations.first
     }
 
     var defaultWebSearchConfiguration: WebSearchConfigurationItem? {
-        if let explicit = fetchWebSearchConfigurations().first(where: { $0.isDefault }) {
+        let configurations = fetchWebSearchConfigurations()
+        if let explicit = configurations.first(where: { $0.isDefault }) {
             return explicit
         }
-        return fetchWebSearchConfigurations().first
+        return configurations.first
     }
 
     var utilityPanelConversation: ConversationItem? {
@@ -165,9 +189,30 @@ final class QueryManager {
         vxAtelierPro.log.debug("Inserted \(String(describing: T.self)): \(item.persistentModelID)")
     }
 
+    func upsertAPIConfiguration(_ configuration: APIConfigurationItem, makeDefault: Bool) throws {
+        if configuration.modelContext == nil {
+            modelContext.insert(configuration)
+        }
+        normalizeDefaultAPIConfigurations(preferredDefault: makeDefault ? configuration : nil)
+        try saveContext()
+    }
+
+    func upsertWebSearchConfiguration(_ configuration: WebSearchConfigurationItem, makeDefault: Bool) throws {
+        if configuration.modelContext == nil {
+            modelContext.insert(configuration)
+        }
+        normalizeDefaultWebSearchConfigurations(preferredDefault: makeDefault ? configuration : nil)
+        try saveContext()
+    }
+
     func delete<T: PersistentModel>(_ item: T) throws {
         let itemID = item.persistentModelID
         modelContext.delete(item)
+        if item is APIConfigurationItem {
+            normalizeDefaultAPIConfigurations()
+        } else if item is WebSearchConfigurationItem {
+            normalizeDefaultWebSearchConfigurations()
+        }
         try saveContext()
         vxAtelierPro.log.debug("Deleted \(String(describing: T.self)): \(itemID)")
     }
@@ -301,9 +346,6 @@ final class QueryManager {
 
         let conversation = try createConversation()
         conversation.title = AppDefaults.newConversationName
-        if let config = conversation.options.apiConfiguration {
-            conversation.options.setupAiRequestArguments(for: config, modelContext: modelContext)
-        }
         try setUtilityPanelConversation(conversation, isLinked: true)
         return conversation
     }
@@ -373,22 +415,33 @@ final class QueryManager {
     }
 
     func setStreamingEnabled(_ enabled: Bool, for conversation: ConversationItem) throws {
-        conversation.options.streamMode = enabled ? .enabled : .disabled
-        if let streamParam = conversation.options.parameters.first(where: { $0.name == "stream" }) {
-            streamParam.setValue(enabled)
-            streamParam.isEnabled = enabled
-        }
+        conversation.options.setStreamMode(enabled ? .enabled : .disabled)
         try saveContext()
         vxAtelierPro.log.info("Set streaming to \(enabled) for \(conversation.title)")
     }
 
     func setModel(_ model: String, for conversation: ConversationItem) throws {
-        conversation.options.modelOverride = model
-        if let modelParam = conversation.options.parameters.first(where: { $0.name == "model" }) {
-            modelParam.setValue(model)
-        }
+        conversation.options.setModelOverride(model)
         try saveContext()
         vxAtelierPro.log.info("Updated model to \(model) for \(conversation.title)")
+    }
+
+    func modelDescriptor(for conversation: ConversationItem) -> LLMModelDescriptor? {
+        guard let apiConfiguration = conversation.options.apiConfiguration else { return nil }
+        let providerID = apiConfiguration.providerIDEnum
+        let endpoint = conversation.options.endpointOverrideFamily ?? apiConfiguration.defaultEndpointFamilyEnum
+        let resolver = LLMModelDescriptorResolver()
+        guard let modelID = conversation.options.modelOverride
+            ?? resolver.defaultModelID(for: providerID, apiConfiguration: apiConfiguration) else {
+            return nil
+        }
+        return try? resolver.descriptor(
+            for: modelID,
+            providerID: providerID,
+            apiConfiguration: apiConfiguration,
+            modelContext: modelContext,
+            endpointFamilies: [endpoint]
+        )
     }
 
     // MARK: - Reference Cleanup
@@ -456,6 +509,7 @@ final class QueryManager {
         for config in apiConfigurations {
             let providerID = config.providerIDEnum
             let profile = LLMProviderRegistry.shared.profile(for: providerID)
+            let resolver = LLMModelDescriptorResolver()
             let adapter = LLMProviderRegistry.shared.adapter(for: providerID)
             let providerConfiguration = config.makeLLMProviderConfiguration()
             var fetchedModels: [LLMModelDescriptor] = []
@@ -465,13 +519,15 @@ final class QueryManager {
             } catch {
                 vxAtelierPro.log.error(
                     "Failed to fetch models from provider \(config.name): \(error.localizedDescription)")
-                if let defaultModelID = LLMDefaultsCatalog.bundled.defaultModelID(for: providerID) {
-                    let descriptor = LLMDefaultsCatalog.bundled.modelDescriptor(
+                if let defaultModelID = resolver.defaultModelID(for: providerID, apiConfiguration: config) {
+                    let descriptor = try? resolver.descriptor(
+                        for: defaultModelID,
                         providerID: providerID,
-                        modelID: defaultModelID,
+                        apiConfiguration: config,
+                        modelContext: modelContext,
                         endpointFamilies: [profile.defaultEndpointFamily]
                     )
-                    fetchedModels = [descriptor]
+                    fetchedModels = descriptor.map { [$0] } ?? []
                 } else {
                     fetchedModels = []
                 }

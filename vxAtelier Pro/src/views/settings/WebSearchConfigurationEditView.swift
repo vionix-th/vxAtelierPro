@@ -275,51 +275,11 @@ struct WebSearchConfigurationEditView: View {
         if configToSave.searchEngineId != finalCxId { configToSave.searchEngineId = finalCxId; needsSave = true }
         if configToSave.isDefault != isDefault { configToSave.isDefault = isDefault; needsSave = true }
 
-        // Handle default uniqueness
-        if configToSave.isDefault {
-            // Unset default for other configurations
-            let otherConfigs = webSearchConfigurations.filter { $0.id != configToSave.id }
-            for otherConfig in otherConfigs where otherConfig.isDefault {
-                otherConfig.isDefault = false
-                vxAtelierPro.log.debug("🕸️ WebSearchConfigurationEditView: Unset previous default: \(otherConfig.name)")
-                needsSave = true
-            }
-        } else if !isNewConfiguration {
-            // If editing and unchecking default, ensure another default exists or set one
-             let originalConfig = webSearchConfigurations.first { $0.id == configToSave.id }
-             let wasOriginallyDefault = originalConfig?.isDefault ?? false
-
-            if wasOriginallyDefault {
-                 // Check if any *other* config is already default
-                 let anyOtherDefaultExists = webSearchConfigurations.contains { $0.id != configToSave.id && $0.isDefault }
-
-                 if !anyOtherDefaultExists {
-                     // No other default exists, set the first *other* available one as default
-                    if let fallbackConfig = webSearchConfigurations
-                         .filter({ $0.id != configToSave.id })
-                         .sorted(by: { $0.name < $1.name })
-                         .first
-                     {
-                         fallbackConfig.isDefault = true
-                         vxAtelierPro.log.notice("🕸️ WebSearchConfigurationEditView: Set fallback default: \(fallbackConfig.name)")
-                         needsSave = true
-                     } else {
-                         // This was the *only* config, and it's being unset as default
-                         vxAtelierPro.log.warning("🕸️ WebSearchConfigurationEditView: Unset the only configuration as default. No default configuration is now set.")
-                         // needsSave is already true because isDefault changed
-                     }
-                 }
-             }
-        }
-
-        // Save using QueryManager
         do {
+            try queryManager.upsertWebSearchConfiguration(configToSave, makeDefault: isDefault)
             if shouldInsert {
-                try queryManager.insert(configToSave)
                 vxAtelierPro.log.info("🕸️ WebSearchConfigurationEditView: Inserted config: \(configToSave.name)")
             } else if needsSave {
-                // Only save if changes were actually made or default status changed
-                try queryManager.saveContext()
                 vxAtelierPro.log.info("🕸️ WebSearchConfigurationEditView: Saved config: \(configToSave.name)")
             } else {
                  vxAtelierPro.log.info("🕸️ WebSearchConfigurationEditView: No changes detected for config: \(configToSave.name)")

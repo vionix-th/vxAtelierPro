@@ -9,7 +9,7 @@ import XCTest
 @MainActor
 final class ToolBatchExecutorTests: LLMTestCase {
     func testConfigurableToolDefaultsRoundTripThroughConversationOptions() throws {
-        let options = ConversationOptions(shouldSetupParameters: false)
+        let options = ConversationOptions()
         let defaults = ListShortcutsTool().defaultConfiguration()
 
         options.setToolConfiguration("list_shortcuts", configuration: defaults)
@@ -44,7 +44,7 @@ final class ToolBatchExecutorTests: LLMTestCase {
 
     func testListShortcutsToolReceivesJSONValueConfiguration() async throws {
         let env = TestEnvironment()
-        let conversation = ConversationItem("Shortcuts", options: ConversationOptions(shouldSetupParameters: false))
+        let conversation = ConversationItem("Shortcuts", options: ConversationOptions())
         let turn = ConversationTurn(
             sequenceNumber: 0,
             userMessage: MessageItem(role: "user", text: "List shortcuts"),

@@ -54,7 +54,7 @@ class LLMTestCase: XCTestCase {
         toolName: String
     ) -> (environment: TestEnvironment, conversation: ConversationItem, turn: ConversationTurn, toolCall: ToolCallItem) {
         let env = TestEnvironment()
-        let conversation = ConversationItem("Tool Test", options: ConversationOptions(shouldSetupParameters: false))
+        let conversation = ConversationItem("Tool Test", options: ConversationOptions())
         let userMessage = MessageItem(role: "user", text: "Run tool")
         let turn = ConversationTurn(sequenceNumber: 0, userMessage: userMessage, conversation: conversation)
         let toolCall = ToolCallItem(

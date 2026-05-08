@@ -402,31 +402,21 @@ struct ConversationInfoHeader: View {
     let queryManager: QueryManager
     @State private var isModelPickerPresented: Bool = false
     @State private var refreshTrigger = UUID()
-    
-    private var modelParam: AiRequestArgument? {
-        conversation.options.parameters.first(where: { $0.name == "model" })
-    }
-    
+
     private var modelName: String {
-        modelParam?.stringValue ?? "No model"
+        conversation.options.modelOverride
+            ?? conversation.options.apiConfiguration.flatMap {
+                LLMModelDescriptorResolver().defaultModelID(for: $0.providerIDEnum, apiConfiguration: $0)
+            }
+            ?? "No model"
     }
-    
-    private var modelDescriptor: LLMModelDescriptor {
-        LLMDefaultsCatalog.bundled.modelDescriptor(
-            providerID: currentProvider,
-            modelID: modelName
-        )
+
+    private var modelDescriptor: LLMModelDescriptor? {
+        queryManager.modelDescriptor(for: conversation)
     }
     
     private var isStreamingEnabled: Bool {
         conversation.options.streamMode != .disabled
-    }
-    
-    private var currentProvider: LLMProviderID {
-        if let config = conversation.options.apiConfiguration {
-            return config.providerIDEnum
-        }
-        return .openAIPlatform
     }
     
     var body: some View {
@@ -494,7 +484,7 @@ struct ConversationInfoHeader: View {
                 .frame(height: 14)
 
             // Only show streaming toggle if model supports it and not compact
-            if modelDescriptor.schemaFeatures.contains(.streaming) && !isCompact {
+            if modelDescriptor?.schemaFeatures.contains(.streaming) == true && !isCompact {
                 HStack(spacing: 4) {
                     Image(systemName: isStreamingEnabled ? "sparkles" : "text.alignleft")
                         .font(.caption)
@@ -519,7 +509,8 @@ struct ConversationInfoHeader: View {
                     .frame(height: 14)
             }                
             
-            if !modelDescriptor.modalities.isEmpty || !modelDescriptor.schemaFeatures.isEmpty {
+            if let modelDescriptor,
+               !modelDescriptor.modalities.isEmpty || !modelDescriptor.schemaFeatures.isEmpty {
                 // Show model metadata as icons
                 HStack(spacing: 3) {
                     ForEach(modelDescriptor.modalities, id: \.self) { modality in

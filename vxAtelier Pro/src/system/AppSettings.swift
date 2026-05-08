@@ -3,6 +3,31 @@ import Foundation
 /// Single source of truth for all UserDefaults keys used by the app.
 /// Keep keys here; use them with @AppStorage or direct UserDefaults access.
 enum AppSettings {
+    struct SettingDescriptor {
+        let key: String
+        let type: Any.Type
+        let allowedValues: [String]?
+        let isWritable: Bool
+        let intRange: ClosedRange<Int>?
+        let doubleRange: ClosedRange<Double>?
+
+        init(
+            key: String,
+            type: Any.Type,
+            allowedValues: [String]? = nil,
+            isWritable: Bool = true,
+            intRange: ClosedRange<Int>? = nil,
+            doubleRange: ClosedRange<Double>? = nil
+        ) {
+            self.key = key
+            self.type = type
+            self.allowedValues = allowedValues
+            self.isWritable = isWritable
+            self.intRange = intRange
+            self.doubleRange = doubleRange
+        }
+    }
+
     enum Keys {
         // Navigation & layout
         static let showEmptySections = "ShowEmptySections"
@@ -68,4 +93,33 @@ enum AppSettings {
         static let popupLogTypeFilters = "popupLogTypeFilters"
         static let statusBarLogTypeFilters = "statusBarLogTypeFilters"
     }
+
+    static let settingDescriptors: [String: SettingDescriptor] = [
+        Keys.shouldTerminateAfterLastWindowClosed: .init(key: Keys.shouldTerminateAfterLastWindowClosed, type: Bool.self),
+        Keys.appearanceStyle: .init(key: Keys.appearanceStyle, type: String.self, allowedValues: ["System", "Light", "Dark"]),
+        Keys.showRowToolButtons: .init(key: Keys.showRowToolButtons, type: Bool.self),
+        Keys.conversationTextEditButtonSize: .init(key: Keys.conversationTextEditButtonSize, type: Double.self, doubleRange: 12...48),
+        Keys.disableAvatar: .init(key: Keys.disableAvatar, type: Bool.self),
+        Keys.defaultAvatarSize: .init(key: Keys.defaultAvatarSize, type: Int.self, intRange: 16...128),
+        Keys.bubbleFontSize: .init(key: Keys.bubbleFontSize, type: Double.self, doubleRange: 8...28),
+        Keys.autoNameConversations: .init(key: Keys.autoNameConversations, type: Bool.self),
+        Keys.statusBarVisible: .init(key: Keys.statusBarVisible, type: Bool.self),
+        Keys.showConversationLastMessageLabel: .init(key: Keys.showConversationLastMessageLabel, type: Bool.self),
+        Keys.showConversationCreatedLabel: .init(key: Keys.showConversationCreatedLabel, type: Bool.self),
+        Keys.defaultAvatarData: .init(key: Keys.defaultAvatarData, type: Data.self, isWritable: false),
+        Keys.isMarkdownEnabled: .init(key: Keys.isMarkdownEnabled, type: Bool.self),
+        Keys.isMarkdownTextSelectable: .init(key: Keys.isMarkdownTextSelectable, type: Bool.self),
+        Keys.showSystemConversations: .init(key: Keys.showSystemConversations, type: Bool.self),
+        Keys.projectConversationsSortDescending: .init(key: Keys.projectConversationsSortDescending, type: Bool.self),
+        Keys.projectConversationsSortType: .init(
+            key: Keys.projectConversationsSortType,
+            type: String.self,
+            allowedValues: ["conversationDate", "lastMessageDate", "alphabetically"]
+        ),
+        Keys.autoSendConversationTemplates: .init(key: Keys.autoSendConversationTemplates, type: Bool.self),
+        Keys.ttsAutoplay: .init(key: Keys.ttsAutoplay, type: Bool.self),
+        Keys.ttsRepeatMode: .init(key: Keys.ttsRepeatMode, type: String.self, allowedValues: ["none", "one", "all"]),
+        Keys.allowSelfSignedCertificates: .init(key: Keys.allowSelfSignedCertificates, type: Bool.self),
+        Keys.selfSignedCertWhitelist: .init(key: Keys.selfSignedCertWhitelist, type: String.self)
+    ]
 }

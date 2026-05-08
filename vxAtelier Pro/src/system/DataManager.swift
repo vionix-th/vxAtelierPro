@@ -184,10 +184,10 @@ class DataManager {
                 context.insert(model)
             }
             
-            // Normalize API Configuration default status
-            try normalizeDefaultAPIConfiguration(in: context)
-            // Normalize Web Search Configuration default status (assuming a similar function might exist or be needed)
-            try normalizeDefaultWebSearchConfiguration(in: context)
+            let queryManager = QueryManager(modelContext: context)
+            queryManager.normalizeDefaultAPIConfigurations()
+            queryManager.normalizeDefaultWebSearchConfigurations()
+            try queryManager.saveContext()
 
             try await normalizeModelContext(context)
         } catch let error as DataManagerError {
@@ -392,76 +392,6 @@ class DataManager {
         }
     }
 
-    // MARK: - Helper Methods
-
-    /// Ensures exactly one API configuration is marked as default after restore.
-    @MainActor
-    private func normalizeDefaultAPIConfiguration(in context: ModelContext) throws {
-        let descriptor = FetchDescriptor<APIConfigurationItem>(sortBy: [SortDescriptor(\APIConfigurationItem.name)])
-        let configurations = try context.fetch(descriptor)
-
-        if configurations.isEmpty {
-            vxAtelierPro.log.warning("No API configurations found during normalization.")
-            return // Nothing to do
-        }
-
-        let defaultConfigurations = configurations.filter { $0.isDefault }
-
-        switch defaultConfigurations.count {
-        case 0:
-            // No default found, set the first one as default
-            if let firstConfig = configurations.first {
-                firstConfig.isDefault = true
-                vxAtelierPro.log.notice("Set \(firstConfig.name) as default API configuration during restore (none was marked)." )
-            }
-        case 1:
-            // Exactly one default exists, which is correct
-            vxAtelierPro.log.debug("Exactly one default API configuration found during restore.")
-            return
-        default:
-            // Multiple defaults found, keep the first one and unset others
-            vxAtelierPro.log.warning("Multiple (\(defaultConfigurations.count)) default API configurations found during restore. Normalizing.")
-            if let firstDefault = defaultConfigurations.first {
-                for config in defaultConfigurations where config.id != firstDefault.id {
-                    config.isDefault = false
-                }
-                 vxAtelierPro.log.notice("Kept \(firstDefault.name) as default API configuration, unset others.")
-            }
-        }
-
-        // Save changes made during normalization
-        try context.save()
-    }
-
-    // Placeholder for potential normalization function
-    @MainActor
-    private func normalizeDefaultWebSearchConfiguration(in context: ModelContext) throws {
-        let descriptor = FetchDescriptor<WebSearchConfigurationItem>()
-        let configs = try context.fetch(descriptor)
-
-        // Find all currently default configs
-        let defaultConfigs = configs.filter { $0.isDefault }
-
-        if defaultConfigs.count > 1 {
-            // More than one default, keep the first one found (e.g., oldest) and unset others
-            if let firstDefault = defaultConfigs.sorted(by: { $0.createdAt < $1.createdAt }).first {
-                for config in defaultConfigs where config != firstDefault {
-                    config.isDefault = false
-                }
-            } else {
-                // Should not happen if count > 1, but handle defensively
-                if let firstConfig = configs.first {
-                    firstConfig.isDefault = true
-                }
-            }
-        } else if defaultConfigs.isEmpty && !configs.isEmpty {
-            // No default, set the first one found as default
-            if let firstConfig = configs.sorted(by: { $0.createdAt < $1.createdAt }).first {
-                firstConfig.isDefault = true
-            }
-        }
-        // If configs is empty, or exactly one is default, do nothing
-    }
 }
 
 /// Represents errors that can occur during data operations

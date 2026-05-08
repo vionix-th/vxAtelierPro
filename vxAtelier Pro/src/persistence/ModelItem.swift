@@ -96,9 +96,9 @@ final class ModelItem {
         self.rawMetadataJSON = nil
         self.parameterMappings = []
 
-        let defaultDescriptor = LLMDefaultsCatalog.bundled.modelDescriptor(
-            providerID: LLMProviderID(rawValue: self.providerID) ?? .customOpenAICompatible,
-            modelID: name
+        let defaultDescriptor = LLMModelDescriptorResolver().catalogDescriptor(
+            for: name,
+            providerID: LLMProviderID(rawValue: self.providerID) ?? .customOpenAICompatible
         )
         self.contextSize = defaultDescriptor.contextWindow ?? contextSize
         self.endpointFamiliesRaw = defaultDescriptor.endpointFamilies.map(\.rawValue)

@@ -1,5 +1,5 @@
-import XCTest
 import SwiftData
+import XCTest
 #if canImport(vxAtelier_Pro_debug)
 @testable import vxAtelier_Pro_debug
 #else
@@ -20,78 +20,94 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
         super.tearDown()
     }
 
-    // MARK: - Parameter Management
-    func testAddAndRemoveParameters() throws {
+    func testSemanticParameterValuesAreTypedFields() {
         let options = ConversationOptions()
-        let param = AiRequestArgument(
-            name: "temperature",
-            displayName: "Temperature",
-            valueType: .float,
-            controlType: .slider,
-            minValue: 0.0,
-            maxValue: 2.0,
-            step: 0.01,
-            defaultValue: 1.0
+        options.setParameterValue(.systemPrompt, value: .string("System"))
+        options.setParameterValue(.temperature, value: .number(0.8))
+        options.setParameterValue(.maxOutputTokens, value: .integer(2048))
+        options.setParameterValue(.model, value: .string("unit-model"))
+
+        XCTAssertEqual(options.systemPrompt, "System")
+        XCTAssertEqual(options.temperature, 0.8)
+        XCTAssertEqual(options.maxOutputTokens, 2048)
+        XCTAssertEqual(options.modelOverride, "unit-model")
+        XCTAssertEqual(options.parameterValue(.systemPrompt), .string("System"))
+        XCTAssertEqual(options.parameterValue(.temperature), .number(0.8))
+        XCTAssertEqual(options.parameterValue(.maxOutputTokens), .integer(2048))
+        XCTAssertEqual(options.parameterValue(.model), .string("unit-model"))
+    }
+
+    func testParameterEnablementOverridesDoNotClearTypedValues() {
+        let options = ConversationOptions()
+        options.temperature = 0.9
+        let mapping = LLMParameterMappingDescriptor(
+            endpointFamily: .chatCompletions,
+            semanticParameterID: .temperature,
+            wireKey: "temperature"
         )
-        options.parameters.append(param)
-        XCTAssertEqual(options.parameters.count, 1)
-        options.parameters.removeAll()
-        XCTAssertEqual(options.parameters.count, 0)
+
+        XCTAssertTrue(options.isParameterEnabled(.temperature, mapping: mapping))
+        options.setParameterEnabled(.temperature, enabled: false)
+        XCTAssertFalse(options.isParameterEnabled(.temperature, mapping: mapping))
+        XCTAssertEqual(options.temperature, 0.9)
     }
 
-    // MARK: - API/Model/Voice/Search Config
-    func testApiConfigurationAssignment() throws {
+    func testGenerationOptionsOmitDisabledOptionalParameters() {
         let options = ConversationOptions()
-        let apiConfig = APIConfigurationItem(name: "OpenAI", apiKey: "sk-test", baseURL: "https://api.openai.com/v1")
-        options.apiConfiguration = apiConfig
-        XCTAssertEqual(options.apiConfiguration?.name, "OpenAI")
-    }
+        options.temperature = 0.9
+        options.maxOutputTokens = 1000
+        options.setParameterEnabled(.temperature, enabled: false)
+        let mappings: [LLMParameterID: LLMParameterMappingDescriptor] = [
+            .temperature: LLMParameterMappingDescriptor(
+                endpointFamily: .chatCompletions,
+                semanticParameterID: .temperature,
+                wireKey: "temperature"
+            ),
+            .maxOutputTokens: LLMParameterMappingDescriptor(
+                endpointFamily: .chatCompletions,
+                semanticParameterID: .maxOutputTokens,
+                wireKey: "max_tokens"
+            )
+        ]
 
-    // MARK: - Edge Cases
-    func testRequiredParameterEnforcement() throws {
-        let options = ConversationOptions()
-        let param = AiRequestArgument(
-            name: "system_prompt",
-            displayName: "System Prompt",
-            required: true,
-            valueType: .string,
-            controlType: .textField
+        let generationOptions = options.generationOptions(
+            resolvedModelID: "model",
+            resolvedEndpointFamily: .chatCompletions,
+            mappings: mappings
         )
-        options.parameters.append(param)
-        XCTAssertTrue(options.parameters.first?.required ?? false)
-        // Required parameter should be enabled by default
-        XCTAssertTrue(options.parameters.first?.isEnabled ?? false)
+
+        XCTAssertNil(generationOptions.temperature)
+        XCTAssertEqual(generationOptions.maxOutputTokens, 1000)
+        XCTAssertEqual(options.temperature, 0.9)
     }
 
-    func testOptionalParameterToggle() throws {
-        let options = ConversationOptions()
-        let param = AiRequestArgument(
-            name: "top_p",
-            displayName: "Top P",
-            required: false,
-            valueType: .float,
-            controlType: .slider
+    func testProjectionUsesSemanticPresentationAndMappings() {
+        let config = APIConfigurationItem(
+            name: "OpenAI",
+            apiKey: "key",
+            baseURL: "https://unit.test",
+            defaultModel: "gpt-4.1-nano",
+            providerID: .openAIPlatform
         )
-        options.parameters.append(param)
-        XCTAssertFalse(options.parameters.first?.required ?? true)
-        XCTAssertFalse(options.parameters.first?.isEnabled ?? true)
-        options.parameters.first?.toggleEnabled()
-        XCTAssertTrue(options.parameters.first?.isEnabled ?? false)
+        config.defaultEndpointFamilyEnum = .chatCompletions
+        let options = ConversationOptions(apiConfiguration: config)
+        options.temperature = 0.7
+
+        let controls = ConversationParameterProjection.controls(
+            for: options,
+            apiConfiguration: config,
+            modelContext: nil
+        )
+        let temperature = controls.first { $0.parameterID == .temperature }
+
+        XCTAssertEqual(temperature?.valueType, .float)
+        XCTAssertEqual(temperature?.controlType, .slider)
+        XCTAssertEqual(temperature?.displayName, AiParameterPresentationCatalog.displayName(for: .temperature))
+        XCTAssertEqual(temperature?.value, .number(0.7))
+        XCTAssertTrue(temperature?.isEnabled ?? false)
     }
 
-    func testParameterValueTypeEnforcement() throws {
-        let argString = AiRequestArgument(name: "s", displayName: "S", required: true, valueType: .string, controlType: .textField, defaultValue: "abc")
-        XCTAssertEqual(argString.stringValue ?? "", "abc")
-        let argInt = AiRequestArgument(name: "i", displayName: "I", required: true, valueType: .integer, controlType: .stepper, defaultValue: 42)
-        XCTAssertEqual(argInt.intValue ?? 0, 42)
-        let argFloat = AiRequestArgument(name: "f", displayName: "F", required: true, valueType: .float, controlType: .slider, defaultValue: 3.14)
-        XCTAssertEqual(argFloat.floatValue ?? 1.23 , 3.14)
-        let argBool = AiRequestArgument(name: "b", displayName: "B", required: true, valueType: .boolean, controlType: .toggle, defaultValue: true)
-        XCTAssertEqual(argBool.boolValue ?? false, true)
-    }
-
-    // MARK: - Tool Config
-    func testToolEnableDisable() throws {
+    func testToolEnableDisable() {
         let options = ConversationOptions()
         options.setToolEnabled("web_search", enabled: true)
         XCTAssertTrue(options.isToolEnabled("web_search"))

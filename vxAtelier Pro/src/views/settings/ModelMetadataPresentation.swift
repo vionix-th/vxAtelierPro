@@ -8,8 +8,6 @@ extension LLMModality {
         case .audio: return "Audio"
         case .file: return "File"
         case .video: return "Video"
-        case .tool: return "Tool"
-        case .reasoning: return "Reasoning"
         }
     }
 
@@ -20,8 +18,6 @@ extension LLMModality {
         case .audio: return "waveform"
         case .file: return "doc"
         case .video: return "video"
-        case .tool: return "wrench.and.screwdriver"
-        case .reasoning: return "brain"
         }
     }
 }

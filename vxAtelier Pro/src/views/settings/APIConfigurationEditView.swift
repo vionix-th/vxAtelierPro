@@ -403,7 +403,7 @@ struct APIConfigurationEditView: View {
 
     /// Suggests a default model for a provider.
     static func suggestedDefaultModel(for providerID: LLMProviderID) -> String {
-        LLMDefaultsCatalog.bundled.defaultModelID(for: providerID) ?? ""
+        LLMModelDescriptorResolver().defaultModelID(for: providerID, apiConfiguration: nil) ?? ""
     }
 
     // MARK: - Helper Methods
@@ -461,20 +461,10 @@ struct APIConfigurationEditView: View {
         configToSave.defaultEndpointFamily = defaultEndpointFamily.rawValue
 
         let configsCount = apiConfigurations.count
-        if configsCount == 0 {
-            isDefault = true
-        } else if configsCount == 1 && !isNewConfiguration {
+        if configsCount == 0 || configsCount == 1 && !isNewConfiguration {
             isDefault = true
         }
-
         configToSave.isDefault = isDefault
-        if configToSave.isDefault {
-            for other in apiConfigurations
-            where other.id != configToSave.id && other.isDefault {
-                other.isDefault = false
-                vxAtelierPro.log.debug("🔑 Unset previous default: \(other.name)")
-            }
-        }
 
         let trimmedDefaultModel = defaultModel.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmedDefaultModel.isEmpty {
@@ -486,14 +476,10 @@ struct APIConfigurationEditView: View {
         }
 
         do {
-            if shouldInsert {
-                try queryManager.insert(configToSave)
-                vxAtelierPro.log.info(
-                    "🔑 Inserted configuration: \(configToSave.name), isDefault: \(configToSave.isDefault)"
-                )
-            } else {
-                try queryManager.saveContext()
-            }
+            try queryManager.upsertAPIConfiguration(configToSave, makeDefault: isDefault)
+            vxAtelierPro.log.info(
+                "🔑 Saved configuration: \(configToSave.name), isDefault: \(configToSave.isDefault), inserted: \(shouldInsert)"
+            )
             dismiss()
         } catch {
             validationErrorMessage = "Failed to save configuration: \(error.localizedDescription)"

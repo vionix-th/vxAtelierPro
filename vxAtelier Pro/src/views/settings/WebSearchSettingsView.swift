@@ -17,15 +17,8 @@ struct WebSearchSettingsView: View {
     }
 
     private func deleteWebSearchConfiguration(_ config: WebSearchConfigurationItem) {
-        let configWasDefault = config.isDefault
         do {
             try queryManager.delete(config)
-            if configWasDefault {
-                if let newDefault = webSearchConfigurations.sorted(by: { $0.name < $1.name }).first {
-                    newDefault.isDefault = true
-                    try queryManager.saveContext()
-                }
-            }
         } catch {
             webSearchConfigErrorMessage = "Failed to delete configuration \(config.name): \(error.localizedDescription)"
             showWebSearchConfigError = true

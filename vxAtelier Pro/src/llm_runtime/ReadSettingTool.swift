@@ -40,7 +40,7 @@ public struct ReadSettingTool: ExecutableLLMTool {
 
         let userDefaults = UserDefaults.standard
 
-        if settingKey == "defaultAvatar" {
+        if settingKey == AppSettings.Keys.defaultAvatarData {
             let dataExists = userDefaults.data(forKey: settingKey) != nil
             return "Setting '\(settingKey)' (Data): \(dataExists ? "Exists" : "Does not exist")"
         }

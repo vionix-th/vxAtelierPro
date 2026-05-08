@@ -38,13 +38,18 @@ public struct ListSettingsTool: ExecutableLLMTool {
             if let allowed = info.allowedValues, !allowed.isEmpty {
                 listDescription += ", Allowed Values: [\(allowed.joined(separator: ", "))]"
             }
+            if let range = info.intRange {
+                listDescription += ", Range: \(range.lowerBound)-\(range.upperBound)"
+            }
+            if let range = info.doubleRange {
+                listDescription += ", Range: \(range.lowerBound)-\(range.upperBound)"
+            }
             if !info.isWritable {
                 listDescription += " (Read-only via tool)"
             }
             listDescription += ", Current Value: \(valueString)"
             listDescription += "\n"
         }
-        listDescription += "\nNote: Some numeric settings have specific ranges (e.g., 'ConversationTextEdit.buttonSize': 12-48)."
         return listDescription
     }
 }

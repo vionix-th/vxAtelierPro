@@ -47,33 +47,9 @@ final class ConversationItemEdgeCaseTests: XCTestCase {
         XCTAssertThrowsError(try context.save(), "Empty message content should trigger validation error or rejection")
     }
 
-    func testConversationOptionsNoParameters() throws {
-        XCTExpectFailure("Lacking mechanism")
-        
+    func testConversationOptionsAllowNoProviderConfiguration() throws {
         let options = ConversationOptions()
-        options.parameters = []
         context.insert(options)
-        XCTAssertThrowsError(try context.save(), "Options with no parameters should not be allowed")
-    }
-
-    func testParameterNameUniqueness() throws {
-        XCTExpectFailure("Lacking mechanism")
-        
-        let options = ConversationOptions()
-        let param1 = AiRequestArgument(
-            name: "temp",
-            displayName: "Temperature",
-            valueType: .float,
-            controlType: .slider
-        )
-        let param2 = AiRequestArgument(
-            name: "temp",
-            displayName: "Temperature",
-            valueType: .float,
-            controlType: .slider
-        )
-        options.parameters = [param1, param2]
-        context.insert(options)
-        XCTAssertThrowsError(try context.save(), "Duplicate parameter names should not be allowed")
+        XCTAssertNoThrow(try context.save())
     }
 }

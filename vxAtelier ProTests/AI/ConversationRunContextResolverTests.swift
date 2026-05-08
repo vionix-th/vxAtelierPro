@@ -47,7 +47,7 @@ final class ConversationRunContextResolverTests: XCTestCase {
         mappingB?.wireKey = "max_tokens_b"
         mappingB?.markCustomized()
 
-        let options = ConversationOptions(apiConfiguration: configB, shouldSetupParameters: false)
+        let options = ConversationOptions(apiConfiguration: configB)
         options.modelOverride = "gpt-test"
         let conversation = ConversationItem("Scoped model", options: options)
 
@@ -85,7 +85,7 @@ final class ConversationRunContextResolverTests: XCTestCase {
             providerID: .openAIPlatform
         )
         config.defaultEndpointFamilyEnum = .responses
-        let options = ConversationOptions(apiConfiguration: config, shouldSetupParameters: false)
+        let options = ConversationOptions(apiConfiguration: config)
         let conversation = ConversationItem("No descriptor", options: options)
         env.modelContext.insert(config)
         env.modelContext.insert(conversation)

@@ -63,7 +63,7 @@ enum LLMModelMetadataDecoder {
             descriptor.contextWindow = contextWindow
         }
 
-        let directModalities = modalities(from: object)
+        let directModalities = explicitModalities(from: object)
         if !directModalities.isEmpty {
             descriptor.modalities = directModalities
         }
@@ -73,7 +73,7 @@ enum LLMModelMetadataDecoder {
             descriptor.supportedParameters = directParameters
         }
 
-        let directFeatures = schemaFeatures(from: object, parameters: directParameters)
+        let directFeatures = explicitSchemaFeatures(from: object)
         if !directFeatures.isEmpty {
             descriptor.schemaFeatures = directFeatures
         }
@@ -86,23 +86,15 @@ enum LLMModelMetadataDecoder {
         return Array(Set(direct)).sorted()
     }
 
-    /// Infers schema/runtime features from provider-advertised metadata.
-    private static func schemaFeatures(
-        from object: [String: JSONValue],
-        parameters: [String]
-    ) -> [LLMSchemaFeature] {
+    /// Reads explicit schema/runtime feature fields from provider metadata.
+    private static func explicitSchemaFeatures(from object: [String: JSONValue]) -> [LLMSchemaFeature] {
         var features = Set<LLMSchemaFeature>()
-        if parameters.contains(where: { $0 == "tools" || $0 == "tool_choice" }) {
-            features.insert(.tools)
-        }
-        if parameters.contains("response_format") {
-            features.insert(.jsonObject)
-        }
-        if parameters.contains(where: { $0 == "json_schema" || $0 == "structured_outputs" }) {
-            features.insert(.jsonSchema)
-        }
-        if parameters.contains(where: { $0 == "reasoning" || $0 == "thinking" }) {
-            features.insert(.reasoning)
+        for key in ["schema_features", "features"] {
+            for value in stringArray(object[key]) {
+                if let feature = LLMSchemaFeature(rawValue: value) {
+                    features.insert(feature)
+                }
+            }
         }
         if object.bool("supports_streaming") == true || object.bool("streaming") == true {
             features.insert(.streaming)
@@ -110,20 +102,17 @@ enum LLMModelMetadataDecoder {
         return Array(features).sorted { $0.rawValue < $1.rawValue }
     }
 
-    /// Infers supported modalities from provider metadata.
-    private static func modalities(from object: [String: JSONValue]) -> [LLMModality] {
+    /// Reads explicit modality arrays from provider metadata.
+    private static func explicitModalities(from object: [String: JSONValue]) -> [LLMModality] {
         var modalities = Set<LLMModality>()
-        appendModalities(from: object.string("modality"), to: &modalities)
-        appendModalities(from: object.string("modalities"), to: &modalities)
         for value in stringArray(object["modalities"]) {
-            appendModalities(from: value, to: &modalities)
+            appendModality(value, to: &modalities)
         }
 
         if let architecture = object.object("architecture") {
-            appendModalities(from: architecture.string("modality"), to: &modalities)
             for key in ["input_modalities", "output_modalities"] {
                 for value in stringArray(architecture[key]) {
-                    appendModalities(from: value, to: &modalities)
+                    appendModality(value, to: &modalities)
                 }
             }
         }
@@ -131,15 +120,11 @@ enum LLMModelMetadataDecoder {
         return Array(modalities).sorted { $0.rawValue < $1.rawValue }
     }
 
-    /// Adds modalities detected in a provider text field.
-    private static func appendModalities(from text: String?, to modalities: inout Set<LLMModality>) {
-        guard let text else { return }
-        let lowercased = text.lowercased()
-        if lowercased.contains("text") { modalities.insert(.text) }
-        if lowercased.contains("image") || lowercased.contains("vision") { modalities.insert(.image) }
-        if lowercased.contains("audio") { modalities.insert(.audio) }
-        if lowercased.contains("file") || lowercased.contains("document") { modalities.insert(.file) }
-        if lowercased.contains("video") { modalities.insert(.video) }
+    /// Adds one exact modality token from provider metadata.
+    private static func appendModality(_ value: String, to modalities: inout Set<LLMModality>) {
+        if let modality = LLMModality(rawValue: value.lowercased()) {
+            modalities.insert(modality)
+        }
     }
 
     /// Reads a provider metadata field that may be either one string or an array of strings.

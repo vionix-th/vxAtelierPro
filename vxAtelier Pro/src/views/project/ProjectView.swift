@@ -98,8 +98,7 @@ struct ProjectView: View {
     func systemPromptEditor() -> some View {
         TextEditor(text: $systemPromptValue)
         .onChange(of: project?.defaultOptions) { oldValue, newValue in
-            // Update local state when options change
-            systemPromptValue = project?.defaultOptions.parameters.first(where: { $0.name == "system_prompt" })?.stringValue ?? ""
+            systemPromptValue = project?.defaultOptions.systemPrompt ?? ""
         }
         .frame(minHeight: 100)
         .font(.system(.body, design: .monospaced))
@@ -347,12 +346,12 @@ struct ProjectView: View {
         }
         .onAppear() {
             if let project = self.project {
-                systemPromptValue = project.defaultOptions.getParameterValue(name: "system_prompt", defaultValue: "")
+                systemPromptValue = project.defaultOptions.systemPrompt
             }
         }
         .onChange(of: systemPromptValue) {
             if let project = self.project {
-                project.defaultOptions.setParameterValue(name: "system_prompt", value: systemPromptValue)
+                project.defaultOptions.setParameterValue(.systemPrompt, value: .string(systemPromptValue))
                 do {
                     try queryManager.saveContext()
                 } catch {

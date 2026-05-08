@@ -79,8 +79,8 @@ public struct WriteSettingTool: ExecutableLLMTool {
             guard let val = args["new_int_value"] as? Int else {
                 throw LLMToolExecutionError.invalidArguments("Missing or incorrect type for 'new_int_value' argument for setting '\(settingKey)'.")
             }
-            if settingKey == "DefaultAvatarSize" && !(16...128).contains(val) {
-                throw LLMToolExecutionError.invalidArguments("Value \(val) for '\(settingKey)' is outside the allowed range (16-128).")
+            if let range = settingInfo.intRange, !range.contains(val) {
+                throw LLMToolExecutionError.invalidArguments("Value \(val) for '\(settingKey)' is outside the allowed range (\(range.lowerBound)-\(range.upperBound)).")
             }
             valueToWrite = val
         } else if expectedType == Double.self {
@@ -94,11 +94,8 @@ public struct WriteSettingTool: ExecutableLLMTool {
                 throw LLMToolExecutionError.invalidArguments("Missing or incorrect type for 'new_double_value' argument for setting '\(settingKey)'. Expected number.")
             }
 
-            if settingKey == "ConversationTextEdit.buttonSize" && !(12...48).contains(finalDoubleVal) {
-                throw LLMToolExecutionError.invalidArguments("Value \(finalDoubleVal) for '\(settingKey)' is outside the allowed range (12-48).")
-            }
-            if settingKey == "BubbleFontSize" && !(8...28).contains(finalDoubleVal) {
-                throw LLMToolExecutionError.invalidArguments("Value \(finalDoubleVal) for '\(settingKey)' is outside the allowed range (8-28).")
+            if let range = settingInfo.doubleRange, !range.contains(finalDoubleVal) {
+                throw LLMToolExecutionError.invalidArguments("Value \(finalDoubleVal) for '\(settingKey)' is outside the allowed range (\(range.lowerBound)-\(range.upperBound)).")
             }
             valueToWrite = finalDoubleVal
         }

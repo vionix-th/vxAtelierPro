@@ -285,11 +285,21 @@ struct ModelEditorView: View {
                     selectedEndpointFamilyRaw = endpointFamilies.first?.rawValue ?? LLMEndpointFamily.chatCompletions.rawValue
                 }
             }
+            .onChange(of: selectedConfigurationID) { _, _ in
+                applyCatalogDefaultsForSelectedConfiguration()
+            }
         }
     }
     
     private func save() {
         guard let selectedConfiguration else { return }
+        let defaultDescriptor = try? LLMModelDescriptorResolver().descriptor(
+            for: name,
+            providerID: selectedConfiguration.providerIDEnum,
+            apiConfiguration: selectedConfiguration,
+            modelContext: modelContext,
+            endpointFamilies: [selectedConfiguration.defaultEndpointFamilyEnum]
+        )
         model.name = name
         model.modelID = name
         model.displayName = name
@@ -297,6 +307,8 @@ struct ModelEditorView: View {
         model.provider = selectedConfiguration.providerIDEnum.displayName
         model.providerID = selectedConfiguration.providerID
         model.contextSize = contextSize
+        model.endpointFamiliesRaw = defaultDescriptor?.endpointFamilies.map(\.rawValue)
+            ?? [selectedConfiguration.defaultEndpointFamilyEnum.rawValue]
         model.modalitiesRaw = modalities.map(\.rawValue)
         model.schemaFeaturesRaw = schemaFeatures.map(\.rawValue)
         model.materializeDefaultParameterMappings(preserveCustomized: true)
@@ -326,6 +338,22 @@ struct ModelEditorView: View {
             vxAtelierPro.log.error("Failed to delete model \(model.name): \(error.localizedDescription)")
             // Optionally show an alert to the user here
         }
+    }
+
+    private func applyCatalogDefaultsForSelectedConfiguration() {
+        guard let selectedConfiguration else { return }
+        let descriptor = try? LLMModelDescriptorResolver().descriptor(
+            for: name,
+            providerID: selectedConfiguration.providerIDEnum,
+            apiConfiguration: selectedConfiguration,
+            modelContext: modelContext,
+            endpointFamilies: [selectedConfiguration.defaultEndpointFamilyEnum]
+        )
+        contextSize = descriptor?.contextWindow ?? AppDefaults.ModelContextSizes.defaultSize
+        modalities = descriptor?.modalities ?? [.text]
+        schemaFeatures = descriptor?.schemaFeatures ?? []
+        selectedEndpointFamilyRaw = descriptor?.endpointFamilies.first?.rawValue
+            ?? selectedConfiguration.defaultEndpointFamilyEnum.rawValue
     }
 
     private func addMapping(_ parameterID: LLMParameterID) {

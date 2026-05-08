@@ -29,6 +29,12 @@ final class LLMCoreTypesTests: XCTestCase {
         XCTAssertNil(defaults.defaultModelID(for: .customOpenAICompatible))
     }
 
+    func testModalityTaxonomyIsMediaOnly() {
+        XCTAssertEqual(Set(LLMModality.allCases), [.text, .image, .audio, .file, .video])
+        XCTAssertTrue(LLMSchemaFeature.allCases.contains(.tools))
+        XCTAssertTrue(LLMSchemaFeature.allCases.contains(.reasoning))
+    }
+
     func testBundledDefaultsProvideCurrentModelMetadata() {
         let defaults = LLMDefaultsCatalog.bundled
 
@@ -64,6 +70,31 @@ final class LLMCoreTypesTests: XCTestCase {
         XCTAssertTrue(descriptor.supportedParameters.isEmpty)
         XCTAssertTrue(descriptor.schemaFeatures.isEmpty)
         XCTAssertEqual(descriptor.displayName, "unknown-model")
+    }
+
+    func testCatalogCanProvideMinimalUnknownModelDefaults() throws {
+        let defaults = try LLMDefaultsCatalog(data: Data("""
+        {
+          "providerDefaults": [],
+          "rules": [
+            {
+              "modelDefaults": {
+                "modalities": ["text"],
+                "supportedParameters": [],
+                "schemaFeatures": []
+              }
+            }
+          ]
+        }
+        """.utf8))
+        let descriptor = defaults.modelDescriptor(
+            providerID: .openAIPlatform,
+            modelID: "unknown-future-model"
+        )
+
+        XCTAssertEqual(descriptor.modalities, [.text])
+        XCTAssertTrue(descriptor.supportedParameters.isEmpty)
+        XCTAssertTrue(descriptor.schemaFeatures.isEmpty)
     }
 
     func testDefaultsCatalogDecodesValidJSON() throws {
@@ -266,7 +297,7 @@ final class LLMCoreTypesTests: XCTestCase {
         XCTAssertEqual(models.first?.contextWindow, 999)
         XCTAssertEqual(models.first?.modalities, [.image])
         XCTAssertEqual(models.first?.supportedParameters, ["tools"])
-        XCTAssertEqual(models.first?.schemaFeatures, [.tools])
+        XCTAssertEqual(models.first?.schemaFeatures.contains(.streaming), true)
     }
 
     func testModelMetadataDecoderFillsMissingFieldsFromDefaults() {
@@ -280,6 +311,18 @@ final class LLMCoreTypesTests: XCTestCase {
         XCTAssertEqual(models.first?.contextWindow, 128000)
         XCTAssertEqual(models.first?.modalities, [.text])
         XCTAssertTrue(models.first?.schemaFeatures.contains(.streaming) ?? false)
+    }
+
+    func testLLMToolSettingsRegistryUsesAppSettingsDescriptors() {
+        XCTAssertEqual(
+            Set(LLMToolSettingsRegistry.knownSettings.keys),
+            Set(AppSettings.settingDescriptors.keys)
+        )
+        XCTAssertNil(LLMToolSettingsRegistry.knownSettings["defaultModel"])
+        XCTAssertEqual(
+            LLMToolSettingsRegistry.knownSettings[AppSettings.Keys.defaultAvatarSize]?.intRange,
+            16...128
+        )
     }
 
     func testAPIConfigurationCanonicalProviderFields() {

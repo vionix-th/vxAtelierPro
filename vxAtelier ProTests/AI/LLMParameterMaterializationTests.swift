@@ -79,7 +79,7 @@ final class LLMParameterMaterializationTests: XCTestCase {
         XCTAssertFalse(reasoningEffort?.isCustomized ?? true)
     }
 
-    func testConversationArgumentSetupUsesSemanticDefinitionsAndPresentation() {
+    func testConversationProjectionUsesSemanticDefinitionsAndPresentation() {
         let config = APIConfigurationItem(
             name: "OpenAI",
             apiKey: "key",
@@ -88,42 +88,40 @@ final class LLMParameterMaterializationTests: XCTestCase {
             providerID: .openAIPlatform
         )
         config.defaultEndpointFamilyEnum = .chatCompletions
-        let options = ConversationOptions(apiConfiguration: config, shouldSetupParameters: false)
-        let existingTemperature = AiRequestArgument(
-            name: LLMParameterID.temperature.rawValue,
-            displayName: "Old Temperature",
-            required: false,
-            valueType: .float,
-            controlType: .textField,
-            defaultValue: 0.7
+        let options = ConversationOptions(apiConfiguration: config)
+        options.temperature = 0.7
+
+        let controls = ConversationParameterProjection.controls(
+            for: options,
+            apiConfiguration: config,
+            modelContext: nil
         )
-        existingTemperature.isEnabled = true
-        options.parameters = [existingTemperature]
 
-        options.setupAiRequestArguments(for: config, modelContext: nil)
-
-        let temperature = options.parameters.first { $0.name == LLMParameterID.temperature.rawValue }
-        XCTAssertEqual(temperature?.valueType, LLMParameterValueType.float.rawValue)
-        XCTAssertEqual(temperature?.controlType, AiArgumentControlType.slider.rawValue)
+        let temperature = controls.first { $0.parameterID == .temperature }
+        XCTAssertEqual(temperature?.valueType, .float)
+        XCTAssertEqual(temperature?.controlType, .slider)
         XCTAssertEqual(temperature?.displayName, AiParameterPresentationCatalog.displayName(for: .temperature))
-        XCTAssertEqual(temperature?.floatValue, 0.7)
+        XCTAssertEqual(temperature?.value, .number(0.7))
         XCTAssertTrue(temperature?.isEnabled ?? false)
     }
 
     func testDisabledOptionalParameterDoesNotReachGenerationOptions() {
-        let options = ConversationOptions(shouldSetupParameters: false)
+        let options = ConversationOptions()
         options.temperature = 0.9
-        let temperature = AiRequestArgument(
-            name: LLMParameterID.temperature.rawValue,
-            displayName: AiParameterPresentationCatalog.displayName(for: .temperature),
-            valueType: .float,
-            controlType: .slider,
-            defaultValue: 0.9
-        )
-        temperature.isEnabled = false
-        options.parameters = [temperature]
+        options.setParameterEnabled(.temperature, enabled: false)
+        let mappings: [LLMParameterID: LLMParameterMappingDescriptor] = [
+            .temperature: LLMParameterMappingDescriptor(
+                endpointFamily: .chatCompletions,
+                semanticParameterID: .temperature,
+                wireKey: "temperature"
+            )
+        ]
 
-        let generationOptions = options.generationOptions(resolvedModelID: "model", resolvedEndpointFamily: .chatCompletions)
+        let generationOptions = options.generationOptions(
+            resolvedModelID: "model",
+            resolvedEndpointFamily: .chatCompletions,
+            mappings: mappings
+        )
 
         XCTAssertNil(generationOptions.temperature)
     }

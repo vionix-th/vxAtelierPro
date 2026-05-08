@@ -27,7 +27,7 @@ final class ConversationItemBackupRestoreTests: XCTestCase {
     func testConversationItemBackupRestoreRoundtrip() throws {
         // Use a fixed timestamp for deterministic roundtrip
         let fixedTimestamp = Date()
-        // Create a conversation with nested turns, options, and parameters
+        // Create a conversation with nested turns and typed options.
         let conversation = testEnv.createConversation(timestamp: fixedTimestamp)
         conversation.title = "Backup/Restore Dialog"
         conversation.tokenCount = 123
@@ -35,6 +35,11 @@ final class ConversationItemBackupRestoreTests: XCTestCase {
         conversation.purpose = .system
         conversation.status = .archived
         conversation.timestamp = fixedTimestamp
+        conversation.options.systemPrompt = "System"
+        conversation.options.temperature = 0.7
+        conversation.options.maxOutputTokens = 1000
+        conversation.options.modelOverride = "test-model"
+        conversation.options.setParameterEnabled(.temperature, enabled: false)
 
         // Add a turn with a user message and an event, all with fixed timestamp
         let userMessage = MessageItem(role: "user", text: "Test message", timestamp: fixedTimestamp, toolCallId: nil)
@@ -75,15 +80,10 @@ final class ConversationItemBackupRestoreTests: XCTestCase {
         let sortedOriginalEvents = sortedOriginalTurns[0].events.sorted { $0.timestamp < $1.timestamp }
         XCTAssertEqual(sortedRestoredEvents.count, sortedOriginalEvents.count)
         XCTAssertEqual(sortedRestoredEvents[0].message.displayText, sortedOriginalEvents[0].message.displayText)
-        // Options and parameters: sort by name for deterministic comparison
-        let sortedRestoredParams = restored.options.parameters.sorted { $0.name < $1.name }
-        let sortedOriginalParams = conversation.options.parameters.sorted { $0.name < $1.name }
-        XCTAssertEqual(sortedRestoredParams.count, sortedOriginalParams.count)
-        for (a, b) in zip(sortedRestoredParams, sortedOriginalParams) {
-            XCTAssertEqual(a.name, b.name)
-            XCTAssertEqual(a.valueType, b.valueType)
-            // Value comparison is type-dependent, so basic string comparison
-            XCTAssertEqual(String(describing: a.value), String(describing: b.value))
-        }
+        XCTAssertEqual(restored.options.systemPrompt, conversation.options.systemPrompt)
+        XCTAssertEqual(restored.options.temperature, conversation.options.temperature)
+        XCTAssertEqual(restored.options.maxOutputTokens, conversation.options.maxOutputTokens)
+        XCTAssertEqual(restored.options.modelOverride, conversation.options.modelOverride)
+        XCTAssertEqual(restored.options.enabledParameterOverrides, conversation.options.enabledParameterOverrides)
     }
 }
