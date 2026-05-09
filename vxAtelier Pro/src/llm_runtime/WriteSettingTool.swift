@@ -105,7 +105,7 @@ public struct WriteSettingTool: ExecutableLLMTool {
         }
 
         userDefaults.set(finalValue, forKey: settingKey)
-        await vxAtelierPro.log.info("Setting '\(settingKey)' updated via LLM tool to '\(String(describing: finalValue))'.")
+        vxAtelierPro.log.info("Setting '\(settingKey)' updated via LLM tool to '\(String(describing: finalValue))'.")
         return "Successfully updated setting '\(settingKey)' to '\(finalValue)' (Type: \(expectedType))."
     }
 }

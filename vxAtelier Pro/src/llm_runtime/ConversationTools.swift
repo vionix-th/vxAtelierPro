@@ -48,7 +48,7 @@ public struct RenameConversationTool: ExecutableLLMTool {
             do {
                 conversations = try modelContext.fetch(descriptor)
             } catch {
-                await vxAtelierPro.log.error("Failed to fetch \(ConversationItem.self): \(error.localizedDescription)")
+                vxAtelierPro.log.error("Failed to fetch \(ConversationItem.self): \(error.localizedDescription)")
                 throw AppError.dataFetchFailed(error.localizedDescription)
             }
 
@@ -67,10 +67,10 @@ public struct RenameConversationTool: ExecutableLLMTool {
             
             return "Conversation renamed to: \(newTitle)"
         } catch let decodingError as DecodingError {
-            await vxAtelierPro.log.error("Failed to decode rename conversation arguments: \(decodingError.localizedDescription)")
+            vxAtelierPro.log.error("Failed to decode rename conversation arguments: \(decodingError.localizedDescription)")
             throw AppError.invalidArguments("Invalid argument format: \(decodingError.localizedDescription)")
         } catch {
-            await vxAtelierPro.log.error("Failed to rename conversation: \(error.localizedDescription)")
+            vxAtelierPro.log.error("Failed to rename conversation: \(error.localizedDescription)")
             throw error
         }
     }
@@ -116,10 +116,10 @@ public struct ListConversationsTool: ExecutableLLMTool {
             }
             return jsonString
         } catch let error as AppError {
-            await vxAtelierPro.log.error("Failed to process conversations: \(error.localizedDescription)")
+            vxAtelierPro.log.error("Failed to process conversations: \(error.localizedDescription)")
             throw error
         } catch {
-            await vxAtelierPro.log.error("Unexpected error: \(error.localizedDescription)")
+            vxAtelierPro.log.error("Unexpected error: \(error.localizedDescription)")
             throw AppError.aiServiceError(error.localizedDescription)
         }
     }
@@ -180,13 +180,13 @@ public struct FindConversationTool: ExecutableLLMTool {
                 return "No conversation found with title containing: \(title)"
             }
         } catch let error as DecodingError {
-            await vxAtelierPro.log.error("Failed to decode find conversation arguments: \(error.localizedDescription)")
+            vxAtelierPro.log.error("Failed to decode find conversation arguments: \(error.localizedDescription)")
             throw AppError.invalidArguments("Invalid argument format: \(error.localizedDescription)")
         } catch let error as AppError {
-            await vxAtelierPro.log.error("Failed to process conversation: \(error.localizedDescription)")
+            vxAtelierPro.log.error("Failed to process conversation: \(error.localizedDescription)")
             throw error
         } catch {
-            await vxAtelierPro.log.error("Unexpected error: \(error.localizedDescription)")
+            vxAtelierPro.log.error("Unexpected error: \(error.localizedDescription)")
             throw AppError.aiServiceError(error.localizedDescription)
         }
     }
@@ -223,10 +223,10 @@ public struct CurrentConversationTool: ExecutableLLMTool {
             }
             return jsonString
         } catch let error as EncodingError {
-            await vxAtelierPro.log.error("Failed to encode current conversation information: \(error.localizedDescription)")
+            vxAtelierPro.log.error("Failed to encode current conversation information: \(error.localizedDescription)")
             throw AppError.encodingFailed(error.localizedDescription)
         } catch {
-            await vxAtelierPro.log.error("Unexpected error: \(error.localizedDescription)")
+            vxAtelierPro.log.error("Unexpected error: \(error.localizedDescription)")
             throw AppError.aiServiceError(error.localizedDescription)
         }
     }

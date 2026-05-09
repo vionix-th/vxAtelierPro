@@ -52,7 +52,7 @@ public struct ReadSettingTool: ExecutableLLMTool {
             } else if expectedType == Int.self && value is NSNumber {
                 return "Setting '\(settingKey)': \((value as! NSNumber).intValue)"
             } else {
-                await vxAtelierPro.log.warning("Type mismatch for key '\(settingKey)'. Expected \(expectedType), got \(type(of: value))")
+                vxAtelierPro.log.warning("Type mismatch for key '\(settingKey)'. Expected \(expectedType), got \(type(of: value))")
                 return "Setting '\(settingKey)': (Value exists, but type mismatch detected: \(type(of: value)))"
             }
         } else {

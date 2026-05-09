@@ -68,19 +68,19 @@ public struct ReadWebsiteTool: ExecutableLLMTool {
             }
 
             if returnFormat == "full_html" {
-                 await vxAtelierPro.log.debug("ReadWebsiteTool: Returning full HTML for URL \(urlString)")
+                 vxAtelierPro.log.debug("ReadWebsiteTool: Returning full HTML for URL \(urlString)")
                  return rawContent
             } else {
                 if let contentType = httpResponse.mimeType,
                    !(contentType.lowercased().contains("text/html") || contentType.lowercased().contains("text/plain")) {
-                     await vxAtelierPro.log.warning("ReadWebsiteTool (Summary): Received non-text content type '\(contentType)' from \(urlString). Attempting to parse anyway.")
+                     vxAtelierPro.log.warning("ReadWebsiteTool (Summary): Received non-text content type '\(contentType)' from \(urlString). Attempting to parse anyway.")
                 }
 
                 let textContent = stripHTML(from: rawContent)
 
                 if textContent.count > maxSummaryLength {
                     let truncatedText = String(textContent.prefix(maxSummaryLength)) + "... (summary truncated)"
-                    await vxAtelierPro.log.debug("ReadWebsiteTool (Summary): Content truncated for URL \(urlString)")
+                    vxAtelierPro.log.debug("ReadWebsiteTool (Summary): Content truncated for URL \(urlString)")
                     return truncatedText
                 } else if textContent.isEmpty {
                     throw LLMToolExecutionError.executionFailed("No readable text content found for summary at the URL.")
@@ -90,12 +90,12 @@ public struct ReadWebsiteTool: ExecutableLLMTool {
             }
 
         } catch let error as URLError {
-            await vxAtelierPro.log.error("ReadWebsiteTool: Network error fetching URL \(urlString): \(error.localizedDescription)")
+            vxAtelierPro.log.error("ReadWebsiteTool: Network error fetching URL \(urlString): \(error.localizedDescription)")
             throw LLMToolExecutionError.executionFailed("Network request failed: \(error.localizedDescription)")
         } catch let error as LLMToolExecutionError {
             throw error
         } catch {
-            await vxAtelierPro.log.error("ReadWebsiteTool: Unexpected error fetching URL \(urlString): \(error.localizedDescription)")
+            vxAtelierPro.log.error("ReadWebsiteTool: Unexpected error fetching URL \(urlString): \(error.localizedDescription)")
             throw LLMToolExecutionError.executionFailed("An unexpected error occurred: \(error.localizedDescription)")
         }
     }
