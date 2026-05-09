@@ -18,6 +18,48 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         try await runLiveSmoke(providerID: .openAIPlatform, adapterID: .openAIChatCompletions)
     }
 
+    func testOpenAIResponsesLiveFetchModelsCompletesDefaults() async throws {
+        try await runLiveModelFetch(providerID: .openAIPlatform, adapterID: .openAIResponses)
+    }
+
+    func testOpenAIQueryManagerLiveFetchModelsPersistsCompletedDefaults() async throws {
+        let (suite, provider) = try loadEnabledProvider(providerID: .openAIPlatform, adapterID: .openAIResponses)
+        let config = makeAPIConfigurationItem(for: provider, suite: suite, adapterID: .openAIResponses)
+        let configuration = config.makeLLMProviderConfiguration()
+        recordConfigurationActivity(provider: provider, adapterID: .openAIResponses, configuration: configuration)
+        assertRequiredCredentialPresent(provider: provider, configuration: configuration)
+
+        let testEnv = TestEnvironment()
+        let queryManager = testEnv.createQueryManager()
+        try queryManager.insert(config)
+
+        let summary = await queryManager.fetchModelsFromProviders()
+        XCTContext.runActivity(named: "QueryManager live fetch summary") { activity in
+            activity.add(XCTAttachment(string: "added=\(summary.added), updated=\(summary.updated), failures=\(summary.failures.map(\.message).joined(separator: "\n"))"))
+        }
+
+        XCTAssertTrue(summary.failures.isEmpty, summary.failures.map(\.message).joined(separator: "\n"))
+        XCTAssertGreaterThan(summary.added + summary.updated, 0)
+
+        let persistedModels = queryManager.models(for: config)
+        XCTAssertFalse(persistedModels.isEmpty)
+        try assertFetchedModelsCompleteDefaults(
+            persistedModels.map(\.descriptor),
+            provider: provider,
+            adapterID: .openAIResponses
+        )
+
+        let primaryModel = try XCTUnwrap(persistedModels.first { $0.modelID == provider.primaryModel })
+        XCTContext.runActivity(named: "QueryManager materialized parameter mappings") { activity in
+            let mappings = primaryModel.parameterMappings
+                .sorted { $0.semanticParameterID < $1.semanticParameterID }
+                .map { "\($0.adapterIDRaw):\($0.semanticParameterID) enabled=\($0.isEnabled) wireKey=\($0.wireKey)" }
+                .joined(separator: "\n")
+            activity.add(XCTAttachment(string: mappings))
+        }
+        XCTAssertFalse(primaryModel.parameterMappings.isEmpty)
+    }
+
     func testAnthropicMessagesLiveSmoke() async throws {
         try await runLiveSmoke(providerID: .anthropic, adapterID: .anthropicMessages)
     }
@@ -47,20 +89,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
     }
 
     private func runLiveSmoke(providerID: LLMProviderID, adapterID: LLMAdapterID) async throws {
-        let suite = try loadSuite()
-        guard suite.enabled ?? true else {
-            throw XCTSkip("Live LLM smoke tests are disabled in the local provider config.")
-        }
-
-        let candidates = suite.providers.filter { provider in
-            provider.id == providerID && provider.adapterIDs.contains(adapterID)
-        }
-        guard !candidates.isEmpty else {
-            throw XCTSkip("No \(providerID.rawValue) \(adapterID.rawValue) entry in the local provider config.")
-        }
-        guard let provider = candidates.first(where: { $0.enabled ?? true }) else {
-            throw XCTSkip("\(providerID.rawValue) \(adapterID.rawValue) is disabled in the local provider config.")
-        }
+        let (suite, provider) = try loadEnabledProvider(providerID: providerID, adapterID: adapterID)
 
         let adapter = LLMProviderRegistry.shared.adapter(for: adapterID, providerID: providerID)
         let models = try provider.resolvedModels()
@@ -106,11 +135,54 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         }
     }
 
+    private func runLiveModelFetch(providerID: LLMProviderID, adapterID: LLMAdapterID) async throws {
+        let (suite, provider) = try loadEnabledProvider(providerID: providerID, adapterID: adapterID)
+        let adapter = LLMProviderRegistry.shared.adapter(for: adapterID, providerID: providerID)
+        let configuration = makeConfiguration(for: provider, suite: suite, adapterID: adapterID)
+        recordConfigurationActivity(provider: provider, adapterID: adapterID, configuration: configuration)
+        assertRequiredCredentialPresent(provider: provider, configuration: configuration)
+
+        let fetchedModels = try await runProviderModelFetch(
+            provider: provider,
+            adapterID: adapterID,
+            adapter: adapter,
+            configuration: configuration
+        )
+        try assertFetchedModelsCompleteDefaults(fetchedModels, provider: provider, adapterID: adapterID)
+    }
+
+    private func runProviderModelFetch(
+        provider: LiveSmokeProvider,
+        adapterID: LLMAdapterID,
+        adapter: LLMProviderAdapter,
+        configuration: LLMProviderConfiguration
+    ) async throws -> [LLMModelDescriptor] {
+        var fetchedModels: [LLMModelDescriptor] = []
+        _ = try await runProviderOperation(provider: provider, adapterID: adapterID, operation: "live model fetch") {
+            fetchedModels = try await adapter.fetchModels(configuration: configuration)
+            return true
+        }
+        XCTContext.runActivity(named: "Adapter live /models response") { activity in
+            let ids = fetchedModels.map(\.id).prefix(80).joined(separator: "\n")
+            activity.add(XCTAttachment(string: "count=\(fetchedModels.count)\n\(ids)"))
+        }
+        return fetchedModels
+    }
+
     private func makeConfiguration(
         for provider: LiveSmokeProvider,
         suite: LiveSmokeSuite,
         adapterID: LLMAdapterID
     ) -> LLMProviderConfiguration {
+        makeAPIConfigurationItem(for: provider, suite: suite, adapterID: adapterID)
+            .makeLLMProviderConfiguration()
+    }
+
+    private func makeAPIConfigurationItem(
+        for provider: LiveSmokeProvider,
+        suite: LiveSmokeSuite,
+        adapterID: LLMAdapterID
+    ) -> APIConfigurationItem {
         let profile = LLMProviderRegistry.shared.profile(for: provider.id)
         let configuration = APIConfigurationItem(
             name: provider.name ?? "\(profile.name) Live Smoke",
@@ -125,7 +197,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         configuration.defaultAdapterIDEnum = adapterID
         configuration.decodedHeaders = provider.headers ?? [:]
         configuration.decodedOptions = mergedOptions(provider: provider, suite: suite)
-        return configuration.makeLLMProviderConfiguration()
+        return configuration
     }
 
     private func mergedOptions(provider: LiveSmokeProvider, suite: LiveSmokeSuite) -> [String: String] {
@@ -140,6 +212,122 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
             options[key] = value
         }
         return options
+    }
+
+    private func assertRequiredCredentialPresent(
+        provider: LiveSmokeProvider,
+        configuration: LLMProviderConfiguration
+    ) {
+        let authKind = configuration.authKind ?? LLMProviderRegistry.shared.profile(for: provider.id).authKind
+        switch authKind {
+        case .bearerToken, .xAPIKey:
+            guard case .secret(let secret) = configuration.credential,
+                  !secret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                XCTFail("\(provider.name ?? provider.id.rawValue) is enabled but APIConfiguration did not produce a secret credential.")
+                return
+            }
+        case .none, .customHeaders, .chatGPTOAuth, .chatGPTDeviceCode, .chatGPTCodexToken:
+            return
+        }
+    }
+
+    private func recordConfigurationActivity(
+        provider: LiveSmokeProvider,
+        adapterID: LLMAdapterID,
+        configuration: LLMProviderConfiguration
+    ) {
+        XCTContext.runActivity(named: "Live APIConfiguration conversion") { activity in
+            let authKind = configuration.authKind ?? LLMProviderRegistry.shared.profile(for: provider.id).authKind
+            let credentialState: String
+            if case .secret = configuration.credential {
+                credentialState = "present"
+            } else {
+                credentialState = "missing"
+            }
+            activity.add(XCTAttachment(string: [
+                "providerID=\(provider.id.rawValue)",
+                "adapterID=\(adapterID.rawValue)",
+                "baseURL=\(configuration.baseURL)",
+                "authKind=\(authKind.rawValue)",
+                "credential=\(credentialState)",
+                "configuredModels=\((try? provider.resolvedModels().joined(separator: ",")) ?? "")"
+            ].joined(separator: "\n")))
+        }
+    }
+
+    private func assertFetchedModelsCompleteDefaults(
+        _ fetchedModels: [LLMModelDescriptor],
+        provider: LiveSmokeProvider,
+        adapterID: LLMAdapterID
+    ) throws {
+        XCTAssertFalse(fetchedModels.isEmpty)
+        let fetchedIDs = Set(fetchedModels.map(\.id))
+        for modelID in try provider.resolvedModels() {
+            XCTAssertTrue(fetchedIDs.contains(modelID), "Live /models response missing configured model \(modelID).")
+        }
+
+        let primaryModelID = try XCTUnwrap(provider.primaryModel)
+        let descriptor = try XCTUnwrap(
+            fetchedModels.first { $0.id == primaryModelID },
+            "Live /models response missing primary model \(primaryModelID)."
+        )
+        let defaults = try XCTUnwrap(
+            LLMDefaultsCatalog.bundled.modelDefaults(providerID: provider.id, modelID: primaryModelID),
+            "LLMDefaults.json has no rule for \(provider.id.rawValue) \(primaryModelID)."
+        )
+
+        XCTContext.runActivity(named: "LLMDefaults completion for live model") { activity in
+            activity.add(XCTAttachment(string: [
+                "modelID=\(descriptor.id)",
+                "context=\(descriptor.contextWindow.map(String.init) ?? "nil")",
+                "adapterIDs=\(descriptor.adapterIDs.map(\.rawValue).joined(separator: ","))",
+                "modalities=\(descriptor.modalities.map(\.rawValue).joined(separator: ","))",
+                "supportedParameters=\(descriptor.supportedParameters.joined(separator: ","))",
+                "schemaFeatures=\(descriptor.schemaFeatures.map(\.rawValue).joined(separator: ","))",
+                "rawMetadata=\(descriptor.rawMetadataJSON == nil ? "missing" : "present")"
+            ].joined(separator: "\n")))
+        }
+
+        if let contextWindow = defaults.contextWindow {
+            XCTAssertEqual(descriptor.contextWindow, contextWindow)
+        }
+        if let adapterIDs = defaults.adapterIDs, adapterID != .openAIResponses {
+            XCTAssertEqual(Set(descriptor.adapterIDs), Set(adapterIDs))
+        }
+        if adapterID == .openAIResponses {
+            XCTAssertEqual(Set(descriptor.adapterIDs), Set([.openAIResponses, .openAIChatCompletions]))
+        }
+        if let modalities = defaults.modalities {
+            XCTAssertEqual(Set(descriptor.modalities), Set(modalities))
+        }
+        if let supportedParameters = defaults.supportedParameters {
+            XCTAssertEqual(Set(descriptor.supportedParameters), Set(supportedParameters))
+        }
+        if let schemaFeatures = defaults.schemaFeatures {
+            XCTAssertEqual(Set(descriptor.schemaFeatures), Set(schemaFeatures))
+        }
+        XCTAssertNotNil(descriptor.rawMetadataJSON)
+    }
+
+    private func loadEnabledProvider(
+        providerID: LLMProviderID,
+        adapterID: LLMAdapterID
+    ) throws -> (LiveSmokeSuite, LiveSmokeProvider) {
+        let suite = try loadSuite()
+        guard suite.enabled ?? true else {
+            throw XCTSkip("Live LLM smoke tests are disabled in the local provider config.")
+        }
+
+        let candidates = suite.providers.filter { provider in
+            provider.id == providerID && provider.adapterIDs.contains(adapterID)
+        }
+        guard !candidates.isEmpty else {
+            throw XCTSkip("No \(providerID.rawValue) \(adapterID.rawValue) entry in the local provider config.")
+        }
+        guard let provider = candidates.first(where: { $0.enabled ?? true }) else {
+            throw XCTSkip("\(providerID.rawValue) \(adapterID.rawValue) is disabled in the local provider config.")
+        }
+        return (suite, provider)
     }
 
     private func activityName(
@@ -278,6 +466,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
     private static var configDirectoryURL: URL {
         URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     }
+
 }
 
 private struct LiveSmokeSuite: Decodable {

@@ -2,6 +2,18 @@ import Observation
 import SwiftData
 import Foundation
 
+struct ModelProviderFetchFailure: Equatable {
+    let configurationName: String
+    let providerID: LLMProviderID
+    let message: String
+}
+
+struct ModelProviderFetchSummary: Equatable {
+    var updated = 0
+    var added = 0
+    var failures: [ModelProviderFetchFailure] = []
+}
+
 @Observable
 @MainActor
 final class QueryManager {
@@ -501,36 +513,38 @@ final class QueryManager {
     }
 
     // MARK: - Models
-    func fetchModelsFromProviders() async {
+    @discardableResult
+    func fetchModelsFromProviders() async -> ModelProviderFetchSummary {
         let apiConfigurations = fetchApiConfigurations()
-        var updated = 0
-        var added = 0
+        var summary = ModelProviderFetchSummary()
 
         for config in apiConfigurations {
             let providerID = config.providerIDEnum
-            let profile = LLMProviderRegistry.shared.profile(for: providerID)
-            let resolver = LLMModelDescriptorResolver()
             let adapter = LLMProviderRegistry.shared.defaultAdapter(for: providerID)
             let providerConfiguration = config.makeLLMProviderConfiguration()
-            var fetchedModels: [LLMModelDescriptor] = []
+            let fetchedModels: [LLMModelDescriptor]
+            let credentialState: String
+            if case .secret = providerConfiguration.credential {
+                credentialState = "present"
+            } else {
+                credentialState = "missing"
+            }
+            vxAtelierPro.log.debug(
+                "Fetching models from provider \(config.name): providerID=\(providerID.rawValue), authKind=\(config.authKind), adapter=\(config.defaultAdapterID), baseURL=\(providerConfiguration.baseURL), apiKeyLength=\(config.apiKey.count), credential=\(credentialState)"
+            )
 
             do {
                 fetchedModels = try await adapter.fetchModels(configuration: providerConfiguration)
             } catch {
+                let message = Self.errorMessage(from: error)
                 vxAtelierPro.log.error(
-                    "Failed to fetch models from provider \(config.name): \(error.localizedDescription)")
-                if let defaultModelID = resolver.defaultModelID(for: providerID, apiConfiguration: config) {
-                    let descriptor = try? resolver.descriptor(
-                        for: defaultModelID,
-                        providerID: providerID,
-                        apiConfiguration: config,
-                        modelContext: modelContext,
-                        adapterIDs: [profile.defaultAdapterID]
-                    )
-                    fetchedModels = descriptor.map { [$0] } ?? []
-                } else {
-                    fetchedModels = []
-                }
+                    "Failed to fetch models from provider \(config.name): \(message)")
+                summary.failures.append(ModelProviderFetchFailure(
+                    configurationName: config.name,
+                    providerID: providerID,
+                    message: message
+                ))
+                continue
             }
 
             let existingModels = models(for: config)
@@ -541,13 +555,13 @@ final class QueryManager {
                     existing.descriptor = fetchedModel
                     existing.apiConfiguration = config
                     existing.materializeDefaultParameterMappings(preserveCustomized: true)
-                    updated += 1
+                    summary.updated += 1
                     vxAtelierPro.log.debug("Overwrote model: \(fetchedModel.id)")
                 } else {
                     let modelItem = ModelItem(descriptor: fetchedModel, apiConfiguration: config)
                     modelItem.materializeDefaultParameterMappings(preserveCustomized: true)
                     modelContext.insert(modelItem)
-                    added += 1
+                    summary.added += 1
                     vxAtelierPro.log.debug("Added new model: \(fetchedModel.id)")
                 }
             }
@@ -556,10 +570,20 @@ final class QueryManager {
         do {
             try self.saveContext()
             vxAtelierPro.log.info(
-                "fetchModelsFromProviders: Updated \(updated), added \(added) models.")
+                "fetchModelsFromProviders: Updated \(summary.updated), added \(summary.added) models, failures \(summary.failures.count).")
         } catch {
             vxAtelierPro.log.error("fetchModelsFromProviders failed: \(error.localizedDescription)")
+            summary.failures.append(ModelProviderFetchFailure(
+                configurationName: "ModelContext",
+                providerID: .customOpenAICompatible,
+                message: error.localizedDescription
+            ))
         }
+        return summary
+    }
+
+    private static func errorMessage(from error: Error) -> String {
+        (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
     }
 }
 
