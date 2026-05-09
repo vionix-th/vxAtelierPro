@@ -2,18 +2,20 @@ import Foundation
 
 /// Adapter for Anthropic Messages requests and events.
 struct AnthropicMessagesAdapter: LLMProviderAdapter {
+    private static let generationPath = "/messages"
+    private static let modelsPath = "/models"
+
     let profile: LLMProviderProfile
     private let httpClient = LLMHTTPClient()
 
     /// Executes a Messages request through the shared adapter run loop.
     func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration) -> AsyncThrowingStream<LLMStreamEvent, Error> {
-        let endpoint = configuration.endpointPath(for: .anthropicMessages) ?? profile.endpointPaths[.anthropicMessages] ?? "/v1/messages"
         return LLMAdapterRunLoop.stream(
             request: request,
             configuration: configuration,
             profile: profile,
             httpClient: httpClient,
-            endpoint: endpoint,
+            endpoint: Self.generationPath,
             completionPolicy: .requireExplicitEvent { event in
                 event.string("type") == "message_stop"
             },
@@ -31,9 +33,8 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
 
     /// Fetches Anthropic model metadata and maps descriptors to Messages support.
     func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
-        let endpoint = configuration.endpointPath(for: .models) ?? profile.endpointPaths[.models] ?? "/v1/models"
         let response: JSONValue = try await httpClient.getJSON(
-            path: endpoint,
+            path: Self.modelsPath,
             configuration: httpClient.makeConfiguration(for: configuration),
             responseType: JSONValue.self
         )
@@ -53,7 +54,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
         }
         let mappings = LLMParameterMappingResolver.resolve(
             providerID: request.providerID,
-            endpointFamily: request.endpointFamily,
+            adapterID: request.adapterID,
             modelID: request.modelID,
             modelDescriptor: request.modelDescriptor
         )

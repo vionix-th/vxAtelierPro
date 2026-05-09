@@ -163,7 +163,7 @@ extension XCTestCase {
 extension LLMRequest {
     static func runtimeEquivalent(
         providerID: LLMProviderID,
-        endpointFamily: LLMEndpointFamily,
+        adapterID: LLMAdapterID,
         modelID: String,
         messages: [LLMMessage],
         tools: [LLMToolDefinition] = [],
@@ -172,16 +172,16 @@ extension LLMRequest {
         var descriptor = LLMDefaultsCatalog.bundled.modelDescriptor(
             providerID: providerID,
             modelID: modelID,
-            endpointFamilies: [endpointFamily]
+            adapterIDs: [adapterID]
         )
         descriptor.parameterMappings = LLMParameterMappingCatalog.defaults(
             providerID: providerID,
-            endpointFamily: endpointFamily,
+            adapterID: adapterID,
             modelID: modelID
         )
         return LLMRequest(
             providerID: providerID,
-            endpointFamily: endpointFamily,
+            adapterID: adapterID,
             modelID: modelID,
             modelDescriptor: descriptor,
             messages: messages,

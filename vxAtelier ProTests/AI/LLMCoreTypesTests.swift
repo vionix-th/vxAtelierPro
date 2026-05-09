@@ -11,8 +11,8 @@ final class LLMCoreTypesTests: XCTestCase {
     func testProviderRegistryProfiles() {
         let registry = LLMProviderRegistry.shared
 
-        XCTAssertEqual(registry.profile(for: .openAIPlatform).defaultEndpointFamily, .responses)
-        XCTAssertTrue(registry.profile(for: .openAIPlatform).supportedEndpointFamilies.contains(.chatCompletions))
+        XCTAssertEqual(registry.profile(for: .openAIPlatform).defaultAdapterID, .openAIResponses)
+        XCTAssertTrue(registry.profile(for: .openAIPlatform).supportedAdapterIDs.contains(.openAIChatCompletions))
         XCTAssertFalse(registry.profile(for: .openAIChatGPTSubscription).isEnabled)
         XCTAssertEqual(LLMProviderRegistry.providerID(fromProviderName: "LM Studio"), .lmStudio)
         XCTAssertEqual(LLMProviderRegistry.providerID(fromProviderName: "OpenRouter"), .openRouter)
@@ -113,7 +113,7 @@ final class LLMCoreTypesTests: XCTestCase {
                 "modelRegex": "^unit-"
               },
               "modelDefaults": {
-                "endpointFamilies": ["responses"],
+                "adapterIDs": ["openAIResponses"],
                 "modalities": ["text"],
                 "schemaFeatures": ["streaming"]
               }
@@ -147,7 +147,7 @@ final class LLMCoreTypesTests: XCTestCase {
           "rules": [
             {
               "match": {
-                "endpointFamily": "chatCompletions"
+                "adapterID": "openAIChatCompletions"
               },
               "parameterMappings": [
                 {
@@ -233,7 +233,7 @@ final class LLMCoreTypesTests: XCTestCase {
             },
             {
               "match": {
-                "endpointFamily": "chatCompletions"
+                "adapterID": "openAIChatCompletions"
               },
               "parameterMappings": [
                 {
@@ -246,7 +246,32 @@ final class LLMCoreTypesTests: XCTestCase {
             {
               "match": {
                 "modelRegex": "(^|.*/)gpt-5([-.].*)?$",
-                "endpointFamily": "chatCompletions"
+                "adapterID": "openAIChatCompletions"
+              },
+              "parameterMappings": [
+                {
+                  "parameter": "max_output_tokens",
+                  "encoding": "scalarKey",
+                  "wireKey": "max_completion_tokens"
+                }
+              ]
+            },
+            {
+              "match": {
+                "adapterID": "openAICompatibleChatCompletions"
+              },
+              "parameterMappings": [
+                {
+                  "parameter": "max_output_tokens",
+                  "encoding": "scalarKey",
+                  "wireKey": "max_tokens"
+                }
+              ]
+            },
+            {
+              "match": {
+                "modelRegex": "(^|.*/)gpt-5([-.].*)?$",
+                "adapterID": "openAICompatibleChatCompletions"
               },
               "parameterMappings": [
                 {
@@ -266,14 +291,14 @@ final class LLMCoreTypesTests: XCTestCase {
 
         let mapping = catalog.parameterMappings(
             providerID: .openAIPlatform,
-            endpointFamily: .chatCompletions,
+            adapterID: .openAIChatCompletions,
             modelID: "gpt-5.4-nano"
         ).first { $0.semanticParameterID == .maxOutputTokens }
         XCTAssertEqual(mapping?.wireKey, "max_completion_tokens")
 
         let aggregatorMapping = catalog.parameterMappings(
             providerID: .openRouter,
-            endpointFamily: .chatCompletions,
+            adapterID: .openAICompatibleChatCompletions,
             modelID: "openai/gpt-5-mini"
         ).first { $0.semanticParameterID == .maxOutputTokens }
         XCTAssertEqual(aggregatorMapping?.wireKey, "max_completion_tokens")
@@ -291,7 +316,7 @@ final class LLMCoreTypesTests: XCTestCase {
                 ])
             ],
             profile: profile,
-            endpointFamilies: [.chatCompletions]
+            adapterIDs: [.openAICompatibleChatCompletions]
         )
 
         XCTAssertEqual(models.first?.contextWindow, 999)
@@ -305,7 +330,7 @@ final class LLMCoreTypesTests: XCTestCase {
         let models = LLMModelMetadataDecoder.openAICompatibleDescriptors(
             from: [.object(["id": .string("fallback-model")])],
             profile: profile,
-            endpointFamilies: [.chatCompletions]
+            adapterIDs: [.openAICompatibleChatCompletions]
         )
 
         XCTAssertEqual(models.first?.contextWindow, 128000)
@@ -329,14 +354,13 @@ final class LLMCoreTypesTests: XCTestCase {
         let config = APIConfigurationItem(
             name: "OpenRouter",
             apiKey: "key",
-            baseURL: "https://openrouter.ai/api",
+            baseURL: "https://openrouter.ai/api/v1",
             providerID: .openRouter
         )
 
         XCTAssertEqual(config.providerIDEnum, .openRouter)
-        XCTAssertEqual(config.defaultEndpointFamilyEnum, .chatCompletions)
-        XCTAssertEqual(config.endpointPath(for: .chatCompletions), "/v1/chat/completions")
-        XCTAssertEqual(config.endpointPath(for: .models), "/v1/models")
+        XCTAssertEqual(config.defaultAdapterIDEnum, .openAICompatibleChatCompletions)
+        XCTAssertEqual(config.makeLLMProviderConfiguration().baseURL, "https://openrouter.ai/api/v1")
     }
 
     func testMessageContentPartsAndDisplayTextOrdering() {

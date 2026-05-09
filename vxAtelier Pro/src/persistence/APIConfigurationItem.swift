@@ -29,7 +29,7 @@ final class APIConfigurationItem {
     var defaultModel: String?
     @Relationship(deleteRule: .cascade, inverse: \ModelItem.apiConfiguration) var models: [ModelItem] = []
 
-    var defaultEndpointFamily: String
+    var defaultAdapterID: String
     var headersJSON: String
     var optionsJSON: String
 
@@ -43,9 +43,9 @@ final class APIConfigurationItem {
         set { authKind = newValue.rawValue }
     }
 
-    var defaultEndpointFamilyEnum: LLMEndpointFamily {
-        get { LLMEndpointFamily(rawValue: defaultEndpointFamily) ?? LLMProviderRegistry.shared.profile(for: providerIDEnum).defaultEndpointFamily }
-        set { defaultEndpointFamily = newValue.rawValue }
+    var defaultAdapterIDEnum: LLMAdapterID {
+        get { LLMAdapterID(rawValue: defaultAdapterID) ?? LLMProviderRegistry.shared.profile(for: providerIDEnum).defaultAdapterID }
+        set { defaultAdapterID = newValue.rawValue }
     }
 
     var defaultModelID: String? {
@@ -87,7 +87,7 @@ final class APIConfigurationItem {
         self.baseURL = baseURL
         self.isDefault = isDefault
         self.defaultModel = defaultModel
-        self.defaultEndpointFamily = profile.defaultEndpointFamily.rawValue
+        self.defaultAdapterID = profile.defaultAdapterID.rawValue
         self.headersJSON = "{}"
         self.optionsJSON = "{}"
     }
@@ -101,16 +101,11 @@ final class APIConfigurationItem {
             baseURL: baseURL.isEmpty ? profile.defaultBaseURL : baseURL,
             credential: apiKey.isEmpty ? .none : .secret(apiKey),
             customHeaders: decodedHeaders,
-            endpointPaths: profile.endpointPaths,
             requestTimeout: Self.secondsOption("request_timeout_seconds", in: options, defaultValue: 60),
             streamIdleTimeout: Self.secondsOption("sse_idle_timeout_seconds", in: options, defaultValue: 120),
             maxResponseBodyBytes: Self.intOption("max_response_body_bytes", in: options, defaultValue: 10 * 1024 * 1024),
             maxSSEEventBytes: Self.intOption("max_sse_event_bytes", in: options, defaultValue: 1024 * 1024)
         )
-    }
-
-    func endpointPath(for endpointFamily: LLMEndpointFamily) -> String? {
-        LLMProviderRegistry.shared.profile(for: providerIDEnum).endpointPaths[endpointFamily]
     }
 
     private static func secondsOption(

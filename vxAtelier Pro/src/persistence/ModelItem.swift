@@ -30,7 +30,7 @@ final class ModelItem {
     var displayName: String
     var providerID: String
     var apiConfiguration: APIConfigurationItem?
-    var endpointFamiliesRaw: [String]
+    var adapterIDsRaw: [String]
     var modalitiesRaw: [String]
     var supportedParameters: [String]
     var schemaFeaturesRaw: [String]
@@ -44,7 +44,7 @@ final class ModelItem {
                 displayName: displayName,
                 providerID: LLMProviderID(rawValue: providerID) ?? .customOpenAICompatible,
                 contextWindow: contextSize,
-                endpointFamilies: endpointFamiliesRaw.compactMap { LLMEndpointFamily(rawValue: $0) },
+                adapterIDs: adapterIDsRaw.compactMap { LLMAdapterID(rawValue: $0) },
                 modalities: modalitiesRaw.compactMap { LLMModality(rawValue: $0) },
                 supportedParameters: supportedParameters,
                 parameterMappings: parameterMappings.map(\.descriptor),
@@ -59,7 +59,7 @@ final class ModelItem {
             providerID = newValue.providerID.rawValue
             provider = newValue.providerID.displayName
             contextSize = newValue.contextWindow ?? AppDefaults.ModelContextSizes.defaultSize
-            endpointFamiliesRaw = newValue.endpointFamilies.map(\.rawValue)
+            adapterIDsRaw = newValue.adapterIDs.map(\.rawValue)
             modalitiesRaw = newValue.modalities.map(\.rawValue)
             supportedParameters = newValue.supportedParameters
             schemaFeaturesRaw = newValue.schemaFeatures.map(\.rawValue)
@@ -89,7 +89,7 @@ final class ModelItem {
         self.provider = resolvedProvider
         self.providerID = apiConfiguration?.providerID ?? LLMProviderRegistry.providerID(fromProviderName: resolvedProvider).rawValue
         self.apiConfiguration = apiConfiguration
-        self.endpointFamiliesRaw = []
+        self.adapterIDsRaw = []
         self.modalitiesRaw = []
         self.supportedParameters = []
         self.schemaFeaturesRaw = []
@@ -101,7 +101,7 @@ final class ModelItem {
             providerID: LLMProviderID(rawValue: self.providerID) ?? .customOpenAICompatible
         )
         self.contextSize = defaultDescriptor.contextWindow ?? contextSize
-        self.endpointFamiliesRaw = defaultDescriptor.endpointFamilies.map(\.rawValue)
+        self.adapterIDsRaw = defaultDescriptor.adapterIDs.map(\.rawValue)
         self.modalitiesRaw = defaultDescriptor.modalities.map(\.rawValue)
         self.supportedParameters = defaultDescriptor.supportedParameters
         self.schemaFeaturesRaw = defaultDescriptor.schemaFeatures.map(\.rawValue)
@@ -110,23 +110,22 @@ final class ModelItem {
 
     func materializeDefaultParameterMappings(preserveCustomized: Bool = true) {
         let providerID = LLMProviderID(rawValue: providerID) ?? .customOpenAICompatible
-        let endpointFamilies = endpointFamiliesRaw
-            .compactMap { LLMEndpointFamily(rawValue: $0) }
-            .filter { $0 != .models }
+        let adapterIDs = adapterIDsRaw
+            .compactMap { LLMAdapterID(rawValue: $0) }
 
-        for endpointFamily in endpointFamilies {
+        for adapterID in adapterIDs {
             materializeDefaultParameterMappings(
-                endpointFamily: endpointFamily,
+                adapterID: adapterID,
                 providerID: providerID,
                 preserveCustomized: preserveCustomized
             )
         }
     }
 
-    func resetDefaultParameterMappings(endpointFamily: LLMEndpointFamily) {
+    func resetDefaultParameterMappings(adapterID: LLMAdapterID) {
         let providerID = LLMProviderID(rawValue: providerID) ?? .customOpenAICompatible
         materializeDefaultParameterMappings(
-            endpointFamily: endpointFamily,
+            adapterID: adapterID,
             providerID: providerID,
             preserveCustomized: false
         )
@@ -143,19 +142,19 @@ final class ModelItem {
     }
 
     private func materializeDefaultParameterMappings(
-        endpointFamily: LLMEndpointFamily,
+        adapterID: LLMAdapterID,
         providerID: LLMProviderID,
         preserveCustomized: Bool
     ) {
         let defaults = LLMParameterMappingCatalog.defaults(
             providerID: providerID,
-            endpointFamily: endpointFamily,
+            adapterID: adapterID,
             modelID: modelID
         )
 
         for descriptor in defaults {
             if let existing = parameterMappings.first(where: {
-                $0.endpointFamilyEnum == endpointFamily && $0.semanticParameterIDEnum == descriptor.semanticParameterID
+                $0.adapterIDEnum == adapterID && $0.semanticParameterIDEnum == descriptor.semanticParameterID
             }) {
                 if preserveCustomized && existing.isCustomized {
                     continue
@@ -169,7 +168,7 @@ final class ModelItem {
         if !preserveCustomized {
             let defaultIDs = Set(defaults.map(\.semanticParameterID))
             parameterMappings.removeAll { mapping in
-                mapping.endpointFamilyEnum == endpointFamily && !defaultIDs.contains(mapping.semanticParameterIDEnum)
+                mapping.adapterIDEnum == adapterID && !defaultIDs.contains(mapping.semanticParameterIDEnum)
             }
         }
     }

@@ -20,10 +20,10 @@ final class ProviderRunExecutorTests: LLMTestCase {
         let profile = LLMProviderRegistry.shared.profile(for: .openAIPlatform)
         var options = LLMGenerationOptions(streamMode: .enabled)
         options.modelID = "gpt-4.1-mini"
-        options.endpointFamily = .responses
+        options.adapterID = .openAIResponses
         let request = LLMRequest.runtimeEquivalent(
             providerID: .openAIPlatform,
-            endpointFamily: .responses,
+            adapterID: .openAIResponses,
             modelID: "gpt-4.1-mini",
             messages: [
                 LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Hello")])
@@ -34,8 +34,7 @@ final class ProviderRunExecutorTests: LLMTestCase {
             providerID: .openAIPlatform,
             authKind: .bearerToken,
             baseURL: "https://unit.test/v1",
-            credential: .secret("key"),
-            endpointPaths: profile.endpointPaths
+            credential: .secret("key")
         )
         let sink = RecordingDraftSink()
 

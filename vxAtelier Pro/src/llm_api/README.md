@@ -26,7 +26,7 @@ SwiftData is not written per token or per tool-argument delta.
 
 Supported profiles:
 
-- OpenAI Platform: Responses first, with Chat Completions endpoint support.
+- OpenAI Platform: Responses first, with OpenAI Chat Completions adapter support.
 - Anthropic: Messages API.
 - OpenRouter, LM Studio, Ollama, xAI, DeepSeek, custom OpenAI-compatible: Chat Completions-compatible adapter.
 - ChatGPT Subscription: profile exists but is disabled until supported OAuth, device-code, or Codex-token auth can be embedded safely.
@@ -35,7 +35,7 @@ Supported profiles:
 
 `LLMCapabilityValidator` performs provider/model preflight before runtime persists a run:
 
-- endpoint family support
+- adapter support
 - stream mode support
 - typed parameter support
 - JSON object/schema response format support

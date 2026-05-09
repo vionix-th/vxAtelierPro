@@ -15,10 +15,10 @@ final class LLMStreamingFixtureTests: LLMTestCase {
             MockLLMURLProtocol.requestHandler = nil
         }
 
-        let adapter = OpenAIChatAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
+        let adapter = OpenAIChatCompletionsAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
         let request = LLMRequest.runtimeEquivalent(
             providerID: .openAIPlatform,
-            endpointFamily: .chatCompletions,
+            adapterID: .openAIChatCompletions,
             modelID: "gpt-test",
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Hello")])],
             options: LLMGenerationOptions(streamMode: .enabled)
@@ -55,7 +55,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         let adapter = OpenAIResponsesAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
         let request = LLMRequest.runtimeEquivalent(
             providerID: .openAIPlatform,
-            endpointFamily: .responses,
+            adapterID: .openAIResponses,
             modelID: "gpt-test",
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Hello")])],
             options: LLMGenerationOptions(streamMode: .enabled)
@@ -92,9 +92,9 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         }
 
         let adapter = OpenAIResponsesAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
-        let request = LLMRequest(
+        let request = LLMRequest.runtimeEquivalent(
             providerID: .openAIPlatform,
-            endpointFamily: .responses,
+            adapterID: .openAIResponses,
             modelID: "gpt-test",
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Hello")])],
             options: LLMGenerationOptions(streamMode: .enabled)
@@ -125,7 +125,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         let adapter = AnthropicMessagesAdapter(profile: LLMProviderRegistry.shared.profile(for: .anthropic))
         let request = LLMRequest.runtimeEquivalent(
             providerID: .anthropic,
-            endpointFamily: .anthropicMessages,
+            adapterID: .anthropicMessages,
             modelID: "claude-test",
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Hello")])],
             options: LLMGenerationOptions(streamMode: .enabled)
@@ -159,7 +159,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         let openRouterModels = LLMModelMetadataDecoder.openAICompatibleDescriptors(
             from: openRouterData,
             profile: openRouterProfile,
-            endpointFamilies: [.chatCompletions]
+            adapterIDs: [.openAICompatibleChatCompletions]
         )
         XCTAssertEqual(openRouterModels.first?.id, "openai/gpt-4o-mini")
         XCTAssertEqual(openRouterModels.first?.displayName, "GPT-4o Mini")
@@ -170,7 +170,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         let lmStudioModels = LLMModelMetadataDecoder.openAICompatibleDescriptors(
             from: lmStudioData,
             profile: LLMProviderRegistry.shared.profile(for: .lmStudio),
-            endpointFamilies: [.chatCompletions]
+            adapterIDs: [.openAICompatibleChatCompletions]
         )
         XCTAssertEqual(lmStudioModels.first?.id, "local-model")
         XCTAssertEqual(lmStudioModels.first?.modalities, [.text])
@@ -179,10 +179,10 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         let ollamaModels = LLMModelMetadataDecoder.openAICompatibleDescriptors(
             from: ollamaData,
             profile: LLMProviderRegistry.shared.profile(for: .ollama),
-            endpointFamilies: [.chatCompletions]
+            adapterIDs: [.openAICompatibleChatCompletions]
         )
         XCTAssertEqual(ollamaModels.first?.id, "llama3.2")
-        XCTAssertEqual(ollamaModels.first?.endpointFamilies, [.chatCompletions])
+        XCTAssertEqual(ollamaModels.first?.adapterIDs, [.openAICompatibleChatCompletions])
     }
 
     func testMessageExportRoundtripPreservesPartsAndToolCalls() {

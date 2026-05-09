@@ -2,6 +2,8 @@ import Foundation
 
 /// Adapter for OpenAI Responses requests and events.
 struct OpenAIResponsesAdapter: LLMProviderAdapter {
+    private static let generationPath = "/responses"
+
     let profile: LLMProviderProfile
     private let httpClient = LLMHTTPClient()
 
@@ -12,13 +14,12 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
 
     /// Executes a Responses request through the shared adapter run loop.
     func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration) -> AsyncThrowingStream<LLMStreamEvent, Error> {
-        let endpoint = configuration.endpointPath(for: .responses) ?? profile.endpointPaths[.responses] ?? "/v1/responses"
         return LLMAdapterRunLoop.stream(
             request: request,
             configuration: configuration,
             profile: profile,
             httpClient: httpClient,
-            endpoint: endpoint,
+            endpoint: Self.generationPath,
             completionPolicy: .requireExplicitEvent { event in
                 event.string("type") == "response.completed"
             },
@@ -36,10 +37,10 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
 
     /// Reuses Chat Completions model listing and broadens descriptors to Responses support.
     func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
-        let chatFallback = OpenAIChatAdapter(profile: profile)
+        let chatFallback = OpenAIChatCompletionsAdapter(profile: profile)
         return try await chatFallback.fetchModels(configuration: configuration).map { descriptor in
             var copy = descriptor
-            copy.endpointFamilies = [.responses, .chatCompletions]
+            copy.adapterIDs = [.openAIResponses, .openAIChatCompletions]
             return copy
         }
     }
@@ -56,7 +57,7 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
         }
         let mappings = LLMParameterMappingResolver.resolve(
             providerID: request.providerID,
-            endpointFamily: request.endpointFamily,
+            adapterID: request.adapterID,
             modelID: request.modelID,
             modelDescriptor: request.modelDescriptor
         )

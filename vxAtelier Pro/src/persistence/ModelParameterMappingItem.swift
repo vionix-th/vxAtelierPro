@@ -3,7 +3,7 @@ import SwiftData
 
 @Model
 final class ModelParameterMappingItem {
-    var endpointFamilyRaw: String
+    var adapterIDRaw: String
     var semanticParameterID: String
     var isEnabled: Bool
     var isRequired: Bool
@@ -21,9 +21,9 @@ final class ModelParameterMappingItem {
     var defaultValueData: Data?
     var isCustomized: Bool
 
-    var endpointFamilyEnum: LLMEndpointFamily {
-        get { LLMEndpointFamily(rawValue: endpointFamilyRaw) ?? .chatCompletions }
-        set { endpointFamilyRaw = newValue.rawValue }
+    var adapterIDEnum: LLMAdapterID {
+        get { LLMAdapterID(rawValue: adapterIDRaw) ?? .openAIChatCompletions }
+        set { adapterIDRaw = newValue.rawValue }
     }
 
     var semanticParameterIDEnum: LLMParameterID {
@@ -60,7 +60,7 @@ final class ModelParameterMappingItem {
 
     var descriptor: LLMParameterMappingDescriptor {
         LLMParameterMappingDescriptor(
-            endpointFamily: endpointFamilyEnum,
+            adapterID: adapterIDEnum,
             semanticParameterID: semanticParameterIDEnum,
             isEnabled: isEnabled,
             isRequired: isRequired,
@@ -72,7 +72,7 @@ final class ModelParameterMappingItem {
     }
 
     init(
-        endpointFamily: LLMEndpointFamily,
+        adapterID: LLMAdapterID,
         semanticParameterID: LLMParameterID,
         isEnabled: Bool = true,
         isRequired: Bool = false,
@@ -82,7 +82,7 @@ final class ModelParameterMappingItem {
         defaultValue: JSONValue? = nil,
         isCustomized: Bool = false
     ) {
-        self.endpointFamilyRaw = endpointFamily.rawValue
+        self.adapterIDRaw = adapterID.rawValue
         self.semanticParameterID = semanticParameterID.rawValue
         self.isEnabled = isEnabled
         self.isRequired = isRequired
@@ -108,7 +108,7 @@ final class ModelParameterMappingItem {
 
     convenience init(descriptor: LLMParameterMappingDescriptor, isCustomized: Bool = false) {
         self.init(
-            endpointFamily: descriptor.endpointFamily,
+            adapterID: descriptor.adapterID,
             semanticParameterID: descriptor.semanticParameterID,
             isEnabled: descriptor.isEnabled,
             isRequired: descriptor.isRequired,
@@ -121,7 +121,7 @@ final class ModelParameterMappingItem {
     }
 
     func apply(_ descriptor: LLMParameterMappingDescriptor, markCustomized: Bool) {
-        endpointFamilyEnum = descriptor.endpointFamily
+        adapterIDEnum = descriptor.adapterID
         semanticParameterIDEnum = descriptor.semanticParameterID
         isEnabled = descriptor.isEnabled
         isRequired = descriptor.isRequired

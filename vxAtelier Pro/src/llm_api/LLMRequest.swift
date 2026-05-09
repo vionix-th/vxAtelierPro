@@ -3,17 +3,17 @@ import Foundation
 /// Fully resolved provider-neutral request ready for validation and adapter encoding.
 struct LLMRequest: Codable, Equatable {
     var providerID: LLMProviderID
-    var endpointFamily: LLMEndpointFamily
+    var adapterID: LLMAdapterID
     var modelID: String
     var modelDescriptor: LLMModelDescriptor?
     var messages: [LLMMessage]
     var tools: [LLMToolDefinition]
     var options: LLMGenerationOptions
 
-    /// Creates a resolved request after runtime configuration has selected provider, endpoint, and model.
+    /// Creates a resolved request after runtime configuration has selected provider, adapter, and model.
     init(
         providerID: LLMProviderID,
-        endpointFamily: LLMEndpointFamily,
+        adapterID: LLMAdapterID,
         modelID: String,
         modelDescriptor: LLMModelDescriptor? = nil,
         messages: [LLMMessage],
@@ -21,7 +21,7 @@ struct LLMRequest: Codable, Equatable {
         options: LLMGenerationOptions = LLMGenerationOptions()
     ) {
         self.providerID = providerID
-        self.endpointFamily = endpointFamily
+        self.adapterID = adapterID
         self.modelID = modelID
         self.modelDescriptor = modelDescriptor
         self.messages = messages

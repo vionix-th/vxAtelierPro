@@ -42,7 +42,7 @@ final class ModelItemExportTests: XCTestCase {
         XCTAssertEqual(Set(restored.schemaFeaturesRaw), Set(original.schemaFeaturesRaw))
         XCTAssertEqual(restored.apiConfiguration?.name, config.name)
         let restoredMaxTokens = restored.parameterMappings.first {
-            $0.endpointFamilyEnum == .chatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
+            $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
         }
         XCTAssertEqual(restoredMaxTokens?.wireKey, "max_tokens")
     }

@@ -30,14 +30,14 @@ struct LLMCapabilityValidator {
         }
     }
 
-    /// Confirms that both provider profile and model metadata allow the selected endpoint.
+    /// Confirms that both provider profile and model metadata allow the selected adapter.
     private static func validateEndpoint(_ request: LLMRequest, profile: LLMProviderProfile) throws {
-        guard profile.supportedEndpointFamilies.contains(request.endpointFamily) else {
-            throw LLMProviderError.unsupportedCapability("\(profile.name) does not support \(request.endpointFamily.rawValue).")
+        guard profile.supportedAdapterIDs.contains(request.adapterID) else {
+            throw LLMProviderError.unsupportedCapability("\(profile.name) does not support \(request.adapterID.rawValue).")
         }
-        guard let model = request.modelDescriptor, !model.endpointFamilies.isEmpty else { return }
-        guard model.endpointFamilies.contains(request.endpointFamily) else {
-            throw LLMProviderError.unsupportedCapability("\(request.modelID) does not support \(request.endpointFamily.rawValue).")
+        guard let model = request.modelDescriptor, !model.adapterIDs.isEmpty else { return }
+        guard model.adapterIDs.contains(request.adapterID) else {
+            throw LLMProviderError.unsupportedCapability("\(request.modelID) does not support \(request.adapterID.rawValue).")
         }
     }
 
@@ -46,7 +46,7 @@ struct LLMCapabilityValidator {
         let options = request.options
         let mappings = LLMParameterMappingResolver.resolve(
             providerID: request.providerID,
-            endpointFamily: request.endpointFamily,
+            adapterID: request.adapterID,
             modelID: request.modelID,
             modelDescriptor: request.modelDescriptor
         )
@@ -102,9 +102,9 @@ struct LLMCapabilityValidator {
                         throw LLMProviderError.unsupportedCapability("\(profile.name) does not support image content for \(request.modelID).")
                     }
                 case .file:
-                    guard request.endpointFamily == .responses,
+                    guard request.adapterID == .openAIResponses,
                           supportsModality(.file, request: request) else {
-                        throw LLMProviderError.unsupportedCapability("\(profile.name) does not support file content for \(request.endpointFamily.rawValue).")
+                        throw LLMProviderError.unsupportedCapability("\(profile.name) does not support file content for \(request.adapterID.rawValue).")
                     }
                 case .audio:
                     throw LLMProviderError.unsupportedCapability("\(profile.name) does not support audio content.")
@@ -164,7 +164,7 @@ struct LLMCapabilityValidator {
 
     /// Returns the provider-specific error for an interrupted tool-result sequence.
     private static func pendingToolResultError(for request: LLMRequest) -> LLMProviderError {
-        if request.endpointFamily == .anthropicMessages {
+        if request.adapterID == .anthropicMessages {
             return .unsupportedParameter("Anthropic tool_result must immediately follow its assistant tool_use.")
         }
         return .unsupportedParameter("Tool result must immediately follow assistant tool call.")

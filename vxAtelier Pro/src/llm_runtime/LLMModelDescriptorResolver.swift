@@ -19,15 +19,15 @@ struct LLMModelDescriptorResolver {
     func catalogDescriptor(
         for modelID: String,
         providerID: LLMProviderID,
-        endpointFamilies: [LLMEndpointFamily]? = nil
+        adapterIDs: [LLMAdapterID]? = nil
     ) -> LLMModelDescriptor {
         var descriptor = defaultsCatalog.modelDescriptor(
             providerID: providerID,
             modelID: modelID,
-            endpointFamilies: endpointFamilies
+            adapterIDs: adapterIDs
         )
-        if descriptor.endpointFamilies.isEmpty, let endpointFamilies {
-            descriptor.endpointFamilies = endpointFamilies
+        if descriptor.adapterIDs.isEmpty, let adapterIDs {
+            descriptor.adapterIDs = adapterIDs
         }
         return descriptor
     }
@@ -38,7 +38,7 @@ struct LLMModelDescriptorResolver {
         providerID: LLMProviderID,
         apiConfiguration: APIConfigurationItem?,
         modelContext: ModelContext?,
-        endpointFamilies: [LLMEndpointFamily]? = nil
+        adapterIDs: [LLMAdapterID]? = nil
     ) throws -> LLMModelDescriptor {
         if let modelContext,
            let model = try persistedModel(
@@ -54,7 +54,7 @@ struct LLMModelDescriptorResolver {
         return catalogDescriptor(
             for: modelID,
             providerID: providerID,
-            endpointFamilies: endpointFamilies
+            adapterIDs: adapterIDs
         )
     }
 

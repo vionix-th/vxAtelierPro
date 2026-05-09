@@ -29,7 +29,7 @@ enum ConversationParameterProjection {
         guard let apiConfiguration else { return [] }
 
         let providerID = apiConfiguration.providerIDEnum
-        let endpointFamily = apiConfiguration.defaultEndpointFamilyEnum
+        let adapterID = apiConfiguration.defaultAdapterIDEnum
         let modelID = options.selectedModelID
             ?? resolver.defaultModelID(for: providerID, apiConfiguration: apiConfiguration)
             ?? ""
@@ -38,11 +38,11 @@ enum ConversationParameterProjection {
             providerID: providerID,
             apiConfiguration: apiConfiguration,
             modelContext: modelContext,
-            endpointFamilies: [endpointFamily]
+            adapterIDs: [adapterID]
         )
         let mappings = LLMParameterMappingResolver.resolve(
             providerID: providerID,
-            endpointFamily: endpointFamily,
+            adapterID: adapterID,
             modelID: modelID,
             modelDescriptor: descriptor
         )

@@ -4,7 +4,7 @@ import SwiftData
 @Model
 final class ResponseRunItem {
     var providerID: String
-    var endpointFamily: String
+    var adapterID: String
     var requestedModelID: String
     var actualModelID: String?
     var requestID: String?
@@ -23,7 +23,7 @@ final class ResponseRunItem {
 
     init(
         providerID: LLMProviderID,
-        endpointFamily: LLMEndpointFamily,
+        adapterID: LLMAdapterID,
         requestedModelID: String,
         actualModelID: String? = nil,
         requestID: String? = nil,
@@ -34,7 +34,7 @@ final class ResponseRunItem {
         turn: ConversationTurn? = nil
     ) {
         self.providerID = providerID.rawValue
-        self.endpointFamily = endpointFamily.rawValue
+        self.adapterID = adapterID.rawValue
         self.requestedModelID = requestedModelID
         self.actualModelID = actualModelID
         self.requestID = requestID

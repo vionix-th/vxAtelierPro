@@ -29,7 +29,7 @@ struct APIConfigurationEditView: View {
     @State private var isDefault: Bool
     @State private var defaultModel: String
     @State private var providerID: LLMProviderID
-    @State private var defaultEndpointFamily: LLMEndpointFamily
+    @State private var defaultAdapterID: LLMAdapterID
 
     // UI state
     @State private var isAPIKeyVisible = false
@@ -54,7 +54,7 @@ struct APIConfigurationEditView: View {
         _baseURL = State(initialValue: configuration.baseURL)
         _isDefault = State(initialValue: configuration.isDefault)
         _providerID = State(initialValue: configuration.providerIDEnum)
-        _defaultEndpointFamily = State(initialValue: configuration.defaultEndpointFamilyEnum)
+        _defaultAdapterID = State(initialValue: configuration.defaultAdapterIDEnum)
         let initialDefaultModel = (configuration.defaultModel?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { !$0.isEmpty ? $0 : nil }
             ?? APIConfigurationEditView.suggestedDefaultModel(for: configuration.providerIDEnum)
         _defaultModel = State(initialValue: initialDefaultModel)
@@ -64,8 +64,8 @@ struct APIConfigurationEditView: View {
         LLMProviderRegistry.shared.profile(for: providerID)
     }
 
-    private var selectableEndpointFamilies: [LLMEndpointFamily] {
-        currentProfile.supportedEndpointFamilies.filter { $0 != .models }
+    private var selectableAdapterIDs: [LLMAdapterID] {
+        currentProfile.supportedAdapterIDs
     }
 
     // MARK: - View Body
@@ -287,15 +287,15 @@ struct APIConfigurationEditView: View {
                             Text("Default API Mode")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
-                            if selectableEndpointFamilies.count > 1 {
-                                Picker("", selection: $defaultEndpointFamily) {
-                                    ForEach(selectableEndpointFamilies) { family in
+                            if selectableAdapterIDs.count > 1 {
+                                Picker("", selection: $defaultAdapterID) {
+                                    ForEach(selectableAdapterIDs) { family in
                                         Text(family.displayName).tag(family)
                                     }
                                 }
                                 .pickerStyle(.segmented)
                             } else {
-                                Text(selectableEndpointFamilies.first?.displayName ?? currentProfile.defaultEndpointFamily.displayName)
+                                Text(selectableAdapterIDs.first?.displayName ?? currentProfile.defaultAdapterID.displayName)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .foregroundColor(.secondary)
                             }
@@ -363,15 +363,15 @@ struct APIConfigurationEditView: View {
                 defaultModel = APIConfigurationEditView.suggestedDefaultModel(for: newValue)
             }
             let profile = LLMProviderRegistry.shared.profile(for: newValue)
-            if !profile.supportedEndpointFamilies.contains(defaultEndpointFamily) {
-                defaultEndpointFamily = profile.defaultEndpointFamily
+            if !profile.supportedAdapterIDs.contains(defaultAdapterID) {
+                defaultAdapterID = profile.defaultAdapterID
             }
             fetchedFallbackModels = nil
             modelFetchError = nil
         }
         .onAppear {
-            if !currentProfile.supportedEndpointFamilies.contains(defaultEndpointFamily) {
-                defaultEndpointFamily = currentProfile.defaultEndpointFamily
+            if !currentProfile.supportedAdapterIDs.contains(defaultAdapterID) {
+                defaultAdapterID = currentProfile.defaultAdapterID
             }
         }
     }
@@ -458,7 +458,7 @@ struct APIConfigurationEditView: View {
         let profile = LLMProviderRegistry.shared.profile(for: providerID)
         configToSave.providerID = providerID.rawValue
         configToSave.authKind = profile.authKind.rawValue
-        configToSave.defaultEndpointFamily = defaultEndpointFamily.rawValue
+        configToSave.defaultAdapterID = defaultAdapterID.rawValue
 
         let configsCount = apiConfigurations.count
         if configsCount == 0 || configsCount == 1 && !isNewConfiguration {
@@ -505,7 +505,7 @@ struct APIConfigurationEditView: View {
         isFetchingModels = true
         defer { isFetchingModels = false }
 
-        let adapter = LLMProviderRegistry.shared.adapter(for: providerID)
+        let adapter = LLMProviderRegistry.shared.adapter(for: defaultAdapterID, providerID: providerID)
         let tempConfig = APIConfigurationItem(
             name: "_temp",
             apiKey: apiKey,
@@ -544,7 +544,7 @@ struct APIConfigurationEditView: View {
 
         baseURL = preset.baseURL
         providerID = preset.providerID
-        defaultEndpointFamily = LLMProviderRegistry.shared.profile(for: preset.providerID).defaultEndpointFamily
+        defaultAdapterID = LLMProviderRegistry.shared.profile(for: preset.providerID).defaultAdapterID
 
         defaultModel = APIConfigurationEditView.suggestedDefaultModel(for: preset.providerID)
         hasUserEditedDefaultModel = false
@@ -616,9 +616,9 @@ enum APIPreset: String, CaseIterable {
         case .anthropic: return AppDefaults.Anthropic.baseURL
         case .xAI: return AppDefaults.XAI.baseURL
         case .deepSeek: return AppDefaults.DeepSeek.baseURL
-        case .openRouter: return "https://openrouter.ai/api"
-        case .lmStudio: return "http://localhost:1234"
-        case .ollama: return "http://localhost:11434"
+        case .openRouter: return "https://openrouter.ai/api/v1"
+        case .lmStudio: return "http://localhost:1234/v1"
+        case .ollama: return "http://localhost:11434/v1"
         case .customOpenAICompatible: return AppDefaults.OpenAi.baseURL
         }
     }

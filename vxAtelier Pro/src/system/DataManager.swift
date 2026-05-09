@@ -335,7 +335,7 @@ class DataManager {
             var duplicates: [(original: APIConfigurationItem, duplicate: APIConfigurationItem)] = []
             
             for config in configurations {
-                let key = "\(config.name)|\(config.providerID)|\(config.baseURL)|\(config.defaultEndpointFamily)"
+                let key = "\(config.name)|\(config.providerID)|\(config.baseURL)|\(config.defaultAdapterID)"
                 
                 if let existing = uniqueConfigs[key] {
                     duplicates.append((original: existing, duplicate: config))

@@ -14,9 +14,8 @@ struct LLMProviderRegistry {
                 name: "OpenAI",
                 defaultBaseURL: AppDefaults.OpenAi.baseURL,
                 authKind: .bearerToken,
-                defaultEndpointFamily: .responses,
-                supportedEndpointFamilies: [.responses, .chatCompletions, .models],
-                endpointPaths: [.responses: "/responses", .chatCompletions: AppDefaults.OpenAi.chatCompletionsPath, .models: AppDefaults.OpenAi.modelsPath],
+                defaultAdapterID: .openAIResponses,
+                supportedAdapterIDs: [.openAIResponses, .openAIChatCompletions],
                 isEnabled: true
             ),
             LLMProviderProfile(
@@ -24,9 +23,8 @@ struct LLMProviderRegistry {
                 name: "ChatGPT Subscription",
                 defaultBaseURL: "http://127.0.0.1",
                 authKind: .chatGPTOAuth,
-                defaultEndpointFamily: .responses,
-                supportedEndpointFamilies: [.responses],
-                endpointPaths: [:],
+                defaultAdapterID: .openAIResponses,
+                supportedAdapterIDs: [.openAIResponses],
                 isEnabled: false
             ),
             LLMProviderProfile(
@@ -34,52 +32,39 @@ struct LLMProviderRegistry {
                 name: "Anthropic",
                 defaultBaseURL: AppDefaults.Anthropic.baseURL,
                 authKind: .xAPIKey,
-                defaultEndpointFamily: .anthropicMessages,
-                supportedEndpointFamilies: [.anthropicMessages, .models],
-                endpointPaths: [.anthropicMessages: AppDefaults.Anthropic.messagesPath, .models: AppDefaults.Anthropic.modelsPath],
+                defaultAdapterID: .anthropicMessages,
+                supportedAdapterIDs: [.anthropicMessages],
                 isEnabled: true
             ),
             LLMProviderProfile.openAICompatible(
                 id: .openRouter,
                 name: "OpenRouter",
-                baseURL: "https://openrouter.ai/api",
-                chatPath: "/v1/chat/completions",
-                modelsPath: "/v1/models"
+                baseURL: "https://openrouter.ai/api/v1"
             ),
             LLMProviderProfile.openAICompatible(
                 id: .lmStudio,
                 name: "LM Studio",
-                baseURL: "http://localhost:1234",
-                chatPath: "/v1/chat/completions",
-                modelsPath: "/v1/models"
+                baseURL: "http://localhost:1234/v1"
             ),
             LLMProviderProfile.openAICompatible(
                 id: .ollama,
                 name: "Ollama",
-                baseURL: "http://localhost:11434",
-                chatPath: "/v1/chat/completions",
-                modelsPath: "/v1/models"
+                baseURL: "http://localhost:11434/v1"
             ),
             LLMProviderProfile.openAICompatible(
                 id: .xAI,
                 name: "xAI",
-                baseURL: AppDefaults.XAI.baseURL,
-                chatPath: AppDefaults.XAI.chatCompletionsPath,
-                modelsPath: AppDefaults.XAI.modelsPath
+                baseURL: AppDefaults.XAI.baseURL
             ),
             LLMProviderProfile.openAICompatible(
                 id: .deepSeek,
                 name: "DeepSeek",
-                baseURL: AppDefaults.DeepSeek.baseURL,
-                chatPath: AppDefaults.DeepSeek.chatCompletionsPath,
-                modelsPath: AppDefaults.DeepSeek.modelsPath
+                baseURL: AppDefaults.DeepSeek.baseURL
             ),
             LLMProviderProfile.openAICompatible(
                 id: .customOpenAICompatible,
                 name: "Custom OpenAI Compatible",
-                baseURL: AppDefaults.OpenAi.baseURL,
-                chatPath: AppDefaults.OpenAi.chatCompletionsPath,
-                modelsPath: AppDefaults.OpenAi.modelsPath
+                baseURL: AppDefaults.OpenAi.baseURL
             )
         ]
         self.profiles = Dictionary(uniqueKeysWithValues: allProfiles.map { ($0.id, $0) })
@@ -90,25 +75,37 @@ struct LLMProviderRegistry {
         profiles[id] ?? profiles[.customOpenAICompatible]!
     }
 
-    /// Creates an adapter appropriate for the provider profile.
-    func adapter(for id: LLMProviderID) -> LLMProviderAdapter {
-        let profile = profile(for: id)
+    /// Creates the default adapter appropriate for the provider profile.
+    func defaultAdapter(for providerID: LLMProviderID) -> LLMProviderAdapter {
+        let profile = profile(for: providerID)
+        return adapter(for: profile.defaultAdapterID, providerID: providerID)
+    }
+
+    /// Creates an adapter appropriate for a provider and generation wire contract.
+    func adapter(for adapterID: LLMAdapterID, providerID: LLMProviderID) -> LLMProviderAdapter {
+        let profile = profile(for: providerID)
         guard profile.isEnabled else {
             return DisabledLLMProviderAdapter(
                 profile: profile,
                 message: "ChatGPT subscription auth is disabled because no supported embedded OAuth, device-code, or Codex-token flow is configured."
             )
         }
+        guard profile.supportedAdapterIDs.contains(adapterID) else {
+            return DisabledLLMProviderAdapter(
+                profile: profile,
+                message: "\(profile.name) does not support \(adapterID.rawValue)."
+            )
+        }
 
-        switch id {
-        case .openAIPlatform:
+        switch adapterID {
+        case .openAIResponses:
             return OpenAIResponsesAdapter(profile: profile)
-        case .anthropic:
+        case .openAIChatCompletions:
+            return OpenAIChatCompletionsAdapter(profile: profile)
+        case .openAICompatibleChatCompletions:
+            return OpenAICompatibleChatCompletionsAdapter(profile: profile)
+        case .anthropicMessages:
             return AnthropicMessagesAdapter(profile: profile)
-        case .openAIChatGPTSubscription:
-            return DisabledLLMProviderAdapter(profile: profile, message: "ChatGPT subscription auth is unavailable.")
-        case .openRouter, .lmStudio, .ollama, .xAI, .deepSeek, .customOpenAICompatible:
-            return OpenAIChatAdapter(profile: profile)
         }
     }
 
@@ -134,18 +131,15 @@ extension LLMProviderProfile {
     static func openAICompatible(
         id: LLMProviderID,
         name: String,
-        baseURL: String,
-        chatPath: String,
-        modelsPath: String
+        baseURL: String
     ) -> LLMProviderProfile {
         LLMProviderProfile(
             id: id,
             name: name,
             defaultBaseURL: baseURL,
             authKind: id == .lmStudio || id == .ollama ? .none : .bearerToken,
-            defaultEndpointFamily: .chatCompletions,
-            supportedEndpointFamilies: [.chatCompletions, .models],
-            endpointPaths: [.chatCompletions: chatPath, .models: modelsPath],
+            defaultAdapterID: .openAICompatibleChatCompletions,
+            supportedAdapterIDs: [.openAICompatibleChatCompletions],
             isEnabled: true
         )
     }

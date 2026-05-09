@@ -118,7 +118,7 @@ struct TurnEventExportData: Codable {
 
 struct ResponseRunExportData: Codable {
     let providerID: String
-    let endpointFamily: String
+    let adapterID: String
     let requestedModelID: String
     let actualModelID: String?
     let requestID: String?
@@ -135,7 +135,7 @@ struct ResponseRunExportData: Codable {
 
     init(_ item: ResponseRunItem) {
         self.providerID = item.providerID
-        self.endpointFamily = item.endpointFamily
+        self.adapterID = item.adapterID
         self.requestedModelID = item.requestedModelID
         self.actualModelID = item.actualModelID
         self.requestID = item.requestID
@@ -154,7 +154,7 @@ struct ResponseRunExportData: Codable {
     func toDataItem(turn: ConversationTurn) -> ResponseRunItem {
         let item = ResponseRunItem(
             providerID: LLMProviderID(rawValue: providerID) ?? .customOpenAICompatible,
-            endpointFamily: LLMEndpointFamily(rawValue: endpointFamily) ?? .chatCompletions,
+            adapterID: LLMAdapterID(rawValue: adapterID) ?? .openAIChatCompletions,
             requestedModelID: requestedModelID,
             actualModelID: actualModelID,
             requestID: requestID,

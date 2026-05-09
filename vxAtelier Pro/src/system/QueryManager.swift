@@ -429,7 +429,7 @@ final class QueryManager {
     func modelDescriptor(for conversation: ConversationItem) -> LLMModelDescriptor? {
         guard let apiConfiguration = conversation.options.apiConfiguration else { return nil }
         let providerID = apiConfiguration.providerIDEnum
-        let endpoint = apiConfiguration.defaultEndpointFamilyEnum
+        let adapterID = apiConfiguration.defaultAdapterIDEnum
         let resolver = LLMModelDescriptorResolver()
         guard let modelID = conversation.options.selectedModelID
             ?? resolver.defaultModelID(for: providerID, apiConfiguration: apiConfiguration) else {
@@ -440,7 +440,7 @@ final class QueryManager {
             providerID: providerID,
             apiConfiguration: apiConfiguration,
             modelContext: modelContext,
-            endpointFamilies: [endpoint]
+            adapterIDs: [adapterID]
         )
     }
 
@@ -510,7 +510,7 @@ final class QueryManager {
             let providerID = config.providerIDEnum
             let profile = LLMProviderRegistry.shared.profile(for: providerID)
             let resolver = LLMModelDescriptorResolver()
-            let adapter = LLMProviderRegistry.shared.adapter(for: providerID)
+            let adapter = LLMProviderRegistry.shared.defaultAdapter(for: providerID)
             let providerConfiguration = config.makeLLMProviderConfiguration()
             var fetchedModels: [LLMModelDescriptor] = []
 
@@ -525,7 +525,7 @@ final class QueryManager {
                         providerID: providerID,
                         apiConfiguration: config,
                         modelContext: modelContext,
-                        endpointFamilies: [profile.defaultEndpointFamily]
+                        adapterIDs: [profile.defaultAdapterID]
                     )
                     fetchedModels = descriptor.map { [$0] } ?? []
                 } else {

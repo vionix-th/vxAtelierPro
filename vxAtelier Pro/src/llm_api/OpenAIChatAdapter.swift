@@ -1,20 +1,30 @@
 import Foundation
 
-/// Adapter for OpenAI-compatible Chat Completions providers.
-struct OpenAIChatAdapter: LLMProviderAdapter {
+/// Adapter for OpenAI Platform Chat Completions requests and events.
+struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
+    private static let generationPath = "/chat/completions"
+    private static let modelsPath = "/models"
+
     let profile: LLMProviderProfile
+    private let adapterID: LLMAdapterID
     private let httpClient = LLMHTTPClient()
+
+    /// Creates a Chat Completions adapter for a concrete adapter identity.
+    init(profile: LLMProviderProfile, adapterID: LLMAdapterID = .openAIChatCompletions) {
+        self.profile = profile
+        self.adapterID = adapterID
+    }
 
     /// Executes a Chat Completions request through the shared adapter run loop.
     func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration) -> AsyncThrowingStream<LLMStreamEvent, Error> {
         do {
-            let endpoint = try endpointPath(for: request.endpointFamily, configuration: configuration)
+            try validateAdapterID(request.adapterID)
             return LLMAdapterRunLoop.stream(
                 request: request,
                 configuration: configuration,
                 profile: profile,
                 httpClient: httpClient,
-                endpoint: endpoint,
+                endpoint: Self.generationPath,
                 completionPolicy: .synthesizeOnStreamEnd,
                 makeBody: { stream in
                     try makeBody(for: request, stream: stream)
@@ -37,23 +47,21 @@ struct OpenAIChatAdapter: LLMProviderAdapter {
 
     /// Fetches OpenAI-compatible model metadata and marks descriptors as chat-capable.
     func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
-        let endpoint = configuration.endpointPath(for: .models) ?? profile.endpointPaths[.models] ?? "/v1/models"
         let httpConfig = httpClient.makeConfiguration(for: configuration)
-        let response: JSONValue = try await httpClient.getJSON(path: endpoint, configuration: httpConfig, responseType: JSONValue.self)
+        let response: JSONValue = try await httpClient.getJSON(path: Self.modelsPath, configuration: httpConfig, responseType: JSONValue.self)
         guard let data = response.objectValue?.array("data") else { return [] }
         return LLMModelMetadataDecoder.openAICompatibleDescriptors(
             from: data,
             profile: profile,
-            endpointFamilies: [.chatCompletions]
+            adapterIDs: [adapterID]
         )
     }
 
-    /// Resolves a configured or profile endpoint path for a request family.
-    private func endpointPath(for endpointFamily: LLMEndpointFamily, configuration: LLMProviderConfiguration) throws -> String {
-        guard let endpoint = configuration.endpointPath(for: endpointFamily) ?? profile.endpointPaths[endpointFamily] else {
-            throw LLMProviderError.unsupportedCapability("\(profile.name) does not support \(endpointFamily.rawValue).")
+    /// Confirms the runtime request is routed through the expected chat adapter.
+    private func validateAdapterID(_ requestedAdapterID: LLMAdapterID) throws {
+        guard requestedAdapterID == adapterID else {
+            throw LLMProviderError.unsupportedCapability("\(profile.name) does not support \(adapterID.rawValue).")
         }
-        return endpoint
     }
 
     /// Encodes a provider-neutral request into a Chat Completions JSON body.
@@ -65,7 +73,7 @@ struct OpenAIChatAdapter: LLMProviderAdapter {
         ]
         let mappings = LLMParameterMappingResolver.resolve(
             providerID: request.providerID,
-            endpointFamily: request.endpointFamily,
+            adapterID: request.adapterID,
             modelID: request.modelID,
             modelDescriptor: request.modelDescriptor
         )
@@ -181,5 +189,30 @@ struct OpenAIChatAdapter: LLMProviderAdapter {
             continuation.yield(.usage(OpenAICompatibleEncoding.usage(from: usage, inputKey: "prompt_tokens", outputKey: "completion_tokens")))
         }
         continuation.yield(.runCompleted(responseID: object.string("id"), modelID: object.string("model")))
+    }
+}
+
+/// Adapter for providers that implement the OpenAI-compatible Chat Completions shape.
+struct OpenAICompatibleChatCompletionsAdapter: LLMProviderAdapter {
+    let profile: LLMProviderProfile
+    private let chatAdapter: OpenAIChatCompletionsAdapter
+
+    /// Creates an OpenAI-compatible Chat Completions adapter for a provider profile.
+    init(profile: LLMProviderProfile) {
+        self.profile = profile
+        self.chatAdapter = OpenAIChatCompletionsAdapter(
+            profile: profile,
+            adapterID: .openAICompatibleChatCompletions
+        )
+    }
+
+    /// Executes a compatible Chat Completions request through the shared chat implementation.
+    func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration) -> AsyncThrowingStream<LLMStreamEvent, Error> {
+        chatAdapter.stream(request, configuration: configuration)
+    }
+
+    /// Fetches OpenAI-compatible model metadata and marks descriptors as compatible-chat-capable.
+    func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
+        try await chatAdapter.fetchModels(configuration: configuration)
     }
 }

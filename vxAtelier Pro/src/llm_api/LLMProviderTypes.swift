@@ -31,23 +31,23 @@ enum LLMProviderID: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-/// Provider API family used to choose request encoding and parsing.
-enum LLMEndpointFamily: String, Codable, CaseIterable, Identifiable {
-    case chatCompletions
-    case responses
+/// Stable identifier for a generation adapter wire contract.
+enum LLMAdapterID: String, Codable, CaseIterable, Identifiable {
+    case openAIResponses
+    case openAIChatCompletions
+    case openAICompatibleChatCompletions
     case anthropicMessages
-    case models
 
-    /// Exposes the raw endpoint family key as the SwiftUI identity.
+    /// Exposes the raw adapter key as the SwiftUI identity.
     var id: String { rawValue }
 
-    /// Human-facing endpoint family name for settings and diagnostics.
+    /// Human-facing adapter name for settings and diagnostics.
     var displayName: String {
         switch self {
-        case .chatCompletions: return "Chat Completions"
-        case .responses: return "Responses"
+        case .openAIResponses: return "OpenAI Responses"
+        case .openAIChatCompletions: return "OpenAI Chat Completions"
+        case .openAICompatibleChatCompletions: return "OpenAI-Compatible Chat Completions"
         case .anthropicMessages: return "Anthropic Messages"
-        case .models: return "Models"
         }
     }
 }
@@ -69,8 +69,7 @@ struct LLMProviderProfile: Codable, Identifiable, Equatable {
     var name: String
     var defaultBaseURL: String
     var authKind: LLMAuthKind
-    var defaultEndpointFamily: LLMEndpointFamily
-    var supportedEndpointFamilies: [LLMEndpointFamily]
-    var endpointPaths: [LLMEndpointFamily: String]
+    var defaultAdapterID: LLMAdapterID
+    var supportedAdapterIDs: [LLMAdapterID]
     var isEnabled: Bool
 }

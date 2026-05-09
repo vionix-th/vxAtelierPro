@@ -24,7 +24,7 @@ struct LLMGenerationOptions: Codable, Equatable {
 
     var systemPrompt: String
     var modelID: String?
-    var endpointFamily: LLMEndpointFamily?
+    var adapterID: LLMAdapterID?
     var temperature: Double?
     var topP: Double?
     var maxOutputTokens: Int?
@@ -40,7 +40,7 @@ struct LLMGenerationOptions: Codable, Equatable {
     init(
         systemPrompt: String = "",
         modelID: String? = nil,
-        endpointFamily: LLMEndpointFamily? = nil,
+        adapterID: LLMAdapterID? = nil,
         temperature: Double? = nil,
         topP: Double? = nil,
         maxOutputTokens: Int? = nil,
@@ -54,7 +54,7 @@ struct LLMGenerationOptions: Codable, Equatable {
     ) {
         self.systemPrompt = systemPrompt
         self.modelID = modelID
-        self.endpointFamily = endpointFamily
+        self.adapterID = adapterID
         self.temperature = temperature
         self.topP = topP
         self.maxOutputTokens = maxOutputTokens

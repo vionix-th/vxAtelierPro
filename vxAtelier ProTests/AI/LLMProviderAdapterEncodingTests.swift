@@ -12,7 +12,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         let adapter = OpenAIResponsesAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
         let request = LLMRequest(
             providerID: .openAIPlatform,
-            endpointFamily: .responses,
+            adapterID: .openAIResponses,
             modelID: "gpt-test",
             messages: [
                 LLMMessage(
@@ -49,10 +49,10 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
     }
 
     func testOpenAIChatEncodesImageContentParts() throws {
-        let adapter = OpenAIChatAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
+        let adapter = OpenAIChatCompletionsAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
         let request = LLMRequest(
             providerID: .openAIPlatform,
-            endpointFamily: .chatCompletions,
+            adapterID: .openAIChatCompletions,
             modelID: "gpt-test",
             messages: [
                 LLMMessage(
@@ -77,7 +77,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         let adapter = OpenAIResponsesAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
         let request = LLMRequest(
             providerID: .openAIPlatform,
-            endpointFamily: .responses,
+            adapterID: .openAIResponses,
             modelID: "gpt-test",
             messages: [
                 LLMMessage(
@@ -102,7 +102,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         let adapter = OpenAIResponsesAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
         let request = LLMRequest(
             providerID: .openAIPlatform,
-            endpointFamily: .responses,
+            adapterID: .openAIResponses,
             modelID: "gpt-test",
             messages: [
                 LLMMessage(
@@ -128,7 +128,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         let adapter = AnthropicMessagesAdapter(profile: LLMProviderRegistry.shared.profile(for: .anthropic))
         let request = LLMRequest(
             providerID: .anthropic,
-            endpointFamily: .anthropicMessages,
+            adapterID: .anthropicMessages,
             modelID: "claude-test",
             messages: [
                 LLMMessage(
@@ -154,7 +154,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         let adapter = AnthropicMessagesAdapter(profile: LLMProviderRegistry.shared.profile(for: .anthropic))
         let request = LLMRequest(
             providerID: .anthropic,
-            endpointFamily: .anthropicMessages,
+            adapterID: .anthropicMessages,
             modelID: "claude-test",
             messages: [
                 LLMMessage(
@@ -173,7 +173,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         let adapter = AnthropicMessagesAdapter(profile: LLMProviderRegistry.shared.profile(for: .anthropic))
         let request = LLMRequest(
             providerID: .anthropic,
-            endpointFamily: .anthropicMessages,
+            adapterID: .anthropicMessages,
             modelID: "claude-test",
             messages: [
                 LLMMessage(
@@ -225,7 +225,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
             to: &body,
             mappings: [
                 .responseFormat: LLMParameterMappingDescriptor(
-                    endpointFamily: .chatCompletions,
+                    adapterID: .openAIChatCompletions,
                     semanticParameterID: .responseFormat,
                     encodingKind: .structuredPreset,
                     structuredPreset: .openAIChatResponseFormat
@@ -244,7 +244,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         let adapter = OpenAIResponsesAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
         let request = LLMRequest(
             providerID: .openAIPlatform,
-            endpointFamily: .responses,
+            adapterID: .openAIResponses,
             modelID: "gpt-test",
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Answer")])],
             options: LLMGenerationOptions(
@@ -267,10 +267,10 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
     }
 
     func testOpenAIChatRejectsReservedProviderExtraCollision() {
-        let adapter = OpenAIChatAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
+        let adapter = OpenAIChatCompletionsAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
         let request = LLMRequest(
             providerID: .openAIPlatform,
-            endpointFamily: .chatCompletions,
+            adapterID: .openAIChatCompletions,
             modelID: "gpt-test",
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Answer")])],
             options: LLMGenerationOptions(providerExtras: ["stream": .boolean(false)])
@@ -285,7 +285,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         let adapter = OpenAIResponsesAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
         let request = LLMRequest(
             providerID: .openAIPlatform,
-            endpointFamily: .responses,
+            adapterID: .openAIResponses,
             modelID: "gpt-test",
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Answer")])],
             options: LLMGenerationOptions(providerExtras: ["text": .object(["format": .object(["type": .string("text")])])])
@@ -305,7 +305,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
             to: &body,
             mappings: [
                 .responseFormat: LLMParameterMappingDescriptor(
-                    endpointFamily: .chatCompletions,
+                    adapterID: .openAIChatCompletions,
                     semanticParameterID: .responseFormat,
                     encodingKind: .structuredPreset,
                     structuredPreset: .openAIChatResponseFormat
@@ -317,10 +317,10 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
     }
 
     func testOpenAIChatMapsGPT5MaxOutputTokensToMaxCompletionTokens() throws {
-        let adapter = OpenAIChatAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
+        let adapter = OpenAIChatCompletionsAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
         let request = LLMRequest(
             providerID: .openAIPlatform,
-            endpointFamily: .chatCompletions,
+            adapterID: .openAIChatCompletions,
             modelID: "gpt-5.4-nano",
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])],
             options: LLMGenerationOptions(
@@ -342,10 +342,10 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
     }
 
     func testOpenAIChatMapsGPT41MaxOutputTokensToMaxTokens() throws {
-        let adapter = OpenAIChatAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
+        let adapter = OpenAIChatCompletionsAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
         let request = LLMRequest(
             providerID: .openAIPlatform,
-            endpointFamily: .chatCompletions,
+            adapterID: .openAIChatCompletions,
             modelID: "gpt-4.1-nano",
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])],
             options: LLMGenerationOptions(maxOutputTokens: 16)
@@ -360,7 +360,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         let adapter = AnthropicMessagesAdapter(profile: LLMProviderRegistry.shared.profile(for: .anthropic))
         let request = LLMRequest(
             providerID: .anthropic,
-            endpointFamily: .anthropicMessages,
+            adapterID: .anthropicMessages,
             modelID: "claude-test",
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])]
         )
@@ -373,7 +373,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         let adapter = AnthropicMessagesAdapter(profile: LLMProviderRegistry.shared.profile(for: .anthropic))
         let request = LLMRequest(
             providerID: .anthropic,
-            endpointFamily: .anthropicMessages,
+            adapterID: .anthropicMessages,
             modelID: "claude-test",
             messages: [
                 LLMMessage(
@@ -395,7 +395,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         let adapter = AnthropicMessagesAdapter(profile: LLMProviderRegistry.shared.profile(for: .anthropic))
         let request = LLMRequest(
             providerID: .anthropic,
-            endpointFamily: .anthropicMessages,
+            adapterID: .anthropicMessages,
             modelID: "claude-test",
             messages: [
                 LLMMessage(

@@ -12,12 +12,12 @@ final class LLMParameterMaterializationTests: XCTestCase {
         let model = ModelItem(descriptor: LLMModelDescriptor(
             id: "gpt-5.4-nano",
             providerID: .openAIPlatform,
-            endpointFamilies: [.chatCompletions],
+            adapterIDs: [.openAIChatCompletions],
             modalities: [.text],
             schemaFeatures: [.streaming]
         ))
         let mapping = model.parameterMappings.first {
-            $0.endpointFamilyEnum == .chatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
+            $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
         }
         mapping?.wireKey = "custom_max_tokens"
         mapping?.markCustomized()
@@ -31,13 +31,13 @@ final class LLMParameterMaterializationTests: XCTestCase {
         let model = ModelItem(descriptor: LLMModelDescriptor(
             id: "gpt-4.1-nano",
             providerID: .openAIPlatform,
-            endpointFamilies: [.chatCompletions],
+            adapterIDs: [.openAIChatCompletions],
             modalities: [.text],
             schemaFeatures: [.streaming]
         ))
 
         let mapping = model.parameterMappings.first {
-            $0.endpointFamilyEnum == .chatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
+            $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
         }
 
         XCTAssertEqual(mapping?.wireKey, "max_tokens")
@@ -45,35 +45,35 @@ final class LLMParameterMaterializationTests: XCTestCase {
         XCTAssertEqual(mapping?.controlType, AiArgumentControlType.stepper.rawValue)
     }
 
-    func testResetDefaultParameterMappingsRestoresEndpointDefaults() {
+    func testResetDefaultParameterMappingsRestoresAdapterDefaults() {
         let model = ModelItem(descriptor: LLMModelDescriptor(
             id: "gpt-5.4-nano",
             providerID: .openAIPlatform,
-            endpointFamilies: [.chatCompletions],
+            adapterIDs: [.openAIChatCompletions],
             modalities: [.text],
             schemaFeatures: [.streaming]
         ))
         let maxTokens = model.parameterMappings.first {
-            $0.endpointFamilyEnum == .chatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
+            $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
         }
         maxTokens?.wireKey = "custom_max_tokens"
         maxTokens?.markCustomized()
         model.parameterMappings.append(ModelParameterMappingItem(
-            endpointFamily: .chatCompletions,
+            adapterID: .openAIChatCompletions,
             semanticParameterID: .reasoningEffort,
             wireKey: "reasoning_effort",
             isCustomized: true
         ))
 
-        model.resetDefaultParameterMappings(endpointFamily: .chatCompletions)
+        model.resetDefaultParameterMappings(adapterID: .openAIChatCompletions)
 
         let resetMaxTokens = model.parameterMappings.first {
-            $0.endpointFamilyEnum == .chatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
+            $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
         }
         XCTAssertEqual(resetMaxTokens?.wireKey, "max_completion_tokens")
         XCTAssertFalse(resetMaxTokens?.isCustomized ?? true)
         let reasoningEffort = model.parameterMappings.first {
-            $0.endpointFamilyEnum == .chatCompletions && $0.semanticParameterIDEnum == .reasoningEffort
+            $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .reasoningEffort
         }
         XCTAssertEqual(reasoningEffort?.wireKey, "reasoning_effort")
         XCTAssertFalse(reasoningEffort?.isCustomized ?? true)
@@ -87,7 +87,7 @@ final class LLMParameterMaterializationTests: XCTestCase {
             defaultModel: "gpt-4.1-nano",
             providerID: .openAIPlatform
         )
-        config.defaultEndpointFamilyEnum = .chatCompletions
+        config.defaultAdapterIDEnum = .openAIChatCompletions
         let options = ConversationOptions(apiConfiguration: config)
         options.temperature = 0.7
 
@@ -111,7 +111,7 @@ final class LLMParameterMaterializationTests: XCTestCase {
         options.setParameterEnabled(.temperature, enabled: false)
         let mappings: [LLMParameterID: LLMParameterMappingDescriptor] = [
             .temperature: LLMParameterMappingDescriptor(
-                endpointFamily: .chatCompletions,
+                adapterID: .openAIChatCompletions,
                 semanticParameterID: .temperature,
                 wireKey: "temperature"
             )
@@ -119,7 +119,7 @@ final class LLMParameterMaterializationTests: XCTestCase {
 
         let generationOptions = options.generationOptions(
             resolvedModelID: "model",
-            resolvedEndpointFamily: .chatCompletions,
+            resolvedAdapterID: .openAIChatCompletions,
             mappings: mappings
         )
 

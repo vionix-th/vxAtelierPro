@@ -38,11 +38,11 @@ enum LLMParameterStructuredPreset: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-/// Mapping from one semantic parameter to one provider endpoint encoding.
+/// Mapping from one semantic parameter to one adapter-specific wire encoding.
 struct LLMParameterMappingDescriptor: Codable, Equatable, Identifiable {
-    /// Combines endpoint and semantic parameter so one model can store per-endpoint mappings.
-    var id: String { "\(endpointFamily.rawValue):\(semanticParameterID.rawValue)" }
-    var endpointFamily: LLMEndpointFamily
+    /// Combines adapter and semantic parameter so one model can store per-adapter mappings.
+    var id: String { "\(adapterID.rawValue):\(semanticParameterID.rawValue)" }
+    var adapterID: LLMAdapterID
     var semanticParameterID: LLMParameterID
     var isEnabled: Bool
     var isRequired: Bool
@@ -51,9 +51,9 @@ struct LLMParameterMappingDescriptor: Codable, Equatable, Identifiable {
     var structuredPreset: LLMParameterStructuredPreset?
     var defaultValue: JSONValue?
 
-    /// Creates a provider mapping for a semantic parameter at one endpoint.
+    /// Creates a provider mapping for a semantic parameter at one adapter.
     init(
-        endpointFamily: LLMEndpointFamily,
+        adapterID: LLMAdapterID,
         semanticParameterID: LLMParameterID,
         isEnabled: Bool = true,
         isRequired: Bool = false,
@@ -62,7 +62,7 @@ struct LLMParameterMappingDescriptor: Codable, Equatable, Identifiable {
         structuredPreset: LLMParameterStructuredPreset? = nil,
         defaultValue: JSONValue? = nil
     ) {
-        self.endpointFamily = endpointFamily
+        self.adapterID = adapterID
         self.semanticParameterID = semanticParameterID
         self.isEnabled = isEnabled
         self.isRequired = isRequired
@@ -75,15 +75,15 @@ struct LLMParameterMappingDescriptor: Codable, Equatable, Identifiable {
 
 /// Default parameter mappings loaded from bundled LLM defaults.
 enum LLMParameterMappingCatalog {
-    /// Returns default mappings for a provider, endpoint family, and model.
+    /// Returns default mappings for a provider, adapter, and model.
     static func defaults(
         providerID: LLMProviderID,
-        endpointFamily: LLMEndpointFamily,
+        adapterID: LLMAdapterID,
         modelID: String
     ) -> [LLMParameterMappingDescriptor] {
         LLMDefaultsCatalog.bundled.parameterMappings(
             providerID: providerID,
-            endpointFamily: endpointFamily,
+            adapterID: adapterID,
             modelID: modelID
         )
     }
@@ -94,13 +94,13 @@ struct LLMParameterMappingResolver {
     /// Returns active mappings keyed by semantic parameter.
     static func resolve(
         providerID: LLMProviderID,
-        endpointFamily: LLMEndpointFamily,
+        adapterID: LLMAdapterID,
         modelID: String,
         modelDescriptor: LLMModelDescriptor?
     ) -> [LLMParameterID: LLMParameterMappingDescriptor] {
-        let persisted = modelDescriptor?.parameterMappings.filter { $0.endpointFamily == endpointFamily } ?? []
+        let persisted = modelDescriptor?.parameterMappings.filter { $0.adapterID == adapterID } ?? []
         let source = persisted.isEmpty
-            ? LLMParameterMappingCatalog.defaults(providerID: providerID, endpointFamily: endpointFamily, modelID: modelID)
+            ? LLMParameterMappingCatalog.defaults(providerID: providerID, adapterID: adapterID, modelID: modelID)
             : persisted
         return Dictionary(uniqueKeysWithValues: source.map { ($0.semanticParameterID, $0) })
     }

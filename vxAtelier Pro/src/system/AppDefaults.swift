@@ -110,9 +110,9 @@ struct AppDefaults {
         static let top_p: Double? = nil
         static let top_k: Int? = nil
         static let apiKey = "YOUR API KEY"
-        static let baseURL = "https://api.anthropic.com"
-        static let messagesPath = "/v1/messages"
-        static let modelsPath = "/v1/models"
+        static let baseURL = "https://api.anthropic.com/v1"
+        static let messagesPath = "/messages"
+        static let modelsPath = "/models"
         static let max_tokens: Int = 4096
         static let stream: Bool = false
     }

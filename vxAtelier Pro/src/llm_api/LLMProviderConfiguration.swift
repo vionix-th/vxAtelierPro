@@ -13,7 +13,6 @@ struct LLMProviderConfiguration: Codable, Equatable {
     var baseURL: String
     var credential: LLMProviderCredential
     var customHeaders: [String: String]
-    var endpointPaths: [LLMEndpointFamily: String]
     var requestTimeout: TimeInterval
     var streamIdleTimeout: TimeInterval
     var maxResponseBodyBytes: Int
@@ -26,7 +25,6 @@ struct LLMProviderConfiguration: Codable, Equatable {
         baseURL: String,
         credential: LLMProviderCredential = .none,
         customHeaders: [String: String] = [:],
-        endpointPaths: [LLMEndpointFamily: String] = [:],
         requestTimeout: TimeInterval = 60,
         streamIdleTimeout: TimeInterval = 120,
         maxResponseBodyBytes: Int = 10 * 1024 * 1024,
@@ -37,16 +35,10 @@ struct LLMProviderConfiguration: Codable, Equatable {
         self.baseURL = baseURL
         self.credential = credential
         self.customHeaders = customHeaders
-        self.endpointPaths = endpointPaths
         self.requestTimeout = requestTimeout
         self.streamIdleTimeout = streamIdleTimeout
         self.maxResponseBodyBytes = maxResponseBodyBytes
         self.maxSSEEventBytes = maxSSEEventBytes
-    }
-
-    /// Returns a runtime endpoint override for a provider endpoint family.
-    func endpointPath(for endpointFamily: LLMEndpointFamily) -> String? {
-        endpointPaths[endpointFamily]
     }
 }
 

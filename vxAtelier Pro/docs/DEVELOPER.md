@@ -268,7 +268,7 @@ This file defines the `AppDefaults` struct, which serves as a centralized, stati
 *   **Scope**: It contains a wide range of defaults, including:
     *   **UI Constants**: Font sizes, padding, corner radii, and colors.
     *   **Feature Settings**: Default states for TTS, Markdown rendering, and UI toggles.
-    *   **Transport Defaults**: Built-in base URLs, endpoint paths, UI constants, and non-model application defaults.
+    *   **Transport Defaults**: Built-in API-root base URLs, UI constants, and non-model application defaults.
 *   **Settings Reset**: It includes a `resetUserDefaults()` function that restores all settings stored in `UserDefaults` to their original default values, providing a convenient way to reset the application's configuration.
 
 #### JSON Serializer (`JsonSerializer.swift`)
@@ -306,7 +306,7 @@ These are the primary entities persisted in the SwiftData store.
 *   **`MessageItem`**: The fundamental unit of content, representing a single message from a user, assistant, or tool. It stores ordered `MessageContentPartItem` records, role, timestamp, tool result ID, and durable tool-call records.
 *   **`MessageContentPartItem`**: An ordered content part for text, media references, reasoning, or tool-result content.
 *   **`ToolCallItem`**: A persisted tool call with call ID, provider call ID, provider index, name, argument JSON, status, and assistant/result links.
-*   **`ResponseRunItem`**: A persisted provider run with provider/endpoint/model/request IDs, status, usage, error, and turn link.
+*   **`ResponseRunItem`**: A persisted provider run with provider/adapter/model/request IDs, status, usage, error, and turn link.
 
 #### Configuration Models (SwiftData)
 These models store user-configurable settings.
@@ -337,7 +337,7 @@ This is a non-persistent value type that represents one configurable generation 
 
 This SwiftData `@Model` stores all the necessary information to connect to a specific AI provider's API.
 
-*   **Connection Details**: It holds the provider's `name`, provider ID, auth kind, API key, base URL, default endpoint family, default model, headers JSON, and options JSON. Endpoint paths are profile-owned except for provider profiles that intentionally expose custom OpenAI-compatible base URLs.
+*   **Connection Details**: It holds the provider's `name`, provider ID, auth kind, API key, API-root base URL, default adapter ID, default model, headers JSON, and options JSON. Fixed generation/model paths are adapter-owned.
 *   **Default Management**: It includes an `isDefault` flag to identify the primary configuration for the application and an optional `defaultModel` to override profile defaults for this configuration.
 
 #### Bookmark (`BookmarkItem.swift`)
@@ -385,7 +385,7 @@ This SwiftData `@Model` is a comprehensive container for all settings that gover
 This SwiftData `@Model` represents a specific, selectable AI model from a provider.
 
 *   **Catalog Defaults**: Its initializer seeds model metadata from `LLMDefaultsCatalog` and materializes default parameter mappings from `LLMParameterMappingCatalog`.
-*   **Descriptor Bridge**: `descriptor` is a computed property that bridges between persisted fields (`modelID`, `providerID`, `endpointFamiliesRaw`, `modalitiesRaw`, `supportedParameters`, `schemaFeaturesRaw`, `parameterMappings`, `rawMetadataJSON`) and the domain `LLMModelDescriptor` struct used by adapters, validators, and resolvers.
+*   **Descriptor Bridge**: `descriptor` is a computed property that bridges between persisted fields (`modelID`, `providerID`, `adapterIDsRaw`, `modalitiesRaw`, `supportedParameters`, `schemaFeaturesRaw`, `parameterMappings`, `rawMetadataJSON`) and the domain `LLMModelDescriptor` struct used by adapters, validators, and resolvers.
 *   **API Configuration Scoping**: `apiConfiguration` links a model to a specific `APIConfigurationItem`, so two configurations with the same model name can carry different parameter mappings.
 
 #### Project (`ProjectItem.swift`)
@@ -902,7 +902,7 @@ This section documents the views responsible for configuring the application's b
 * **`ApplicationSettingsView.swift`** – The main container for the settings UI. It uses a `NavigationSplitView` to present a sidebar of settings categories (defined in a `SettingsTab` enum) and displays the corresponding view for the selected category (e.g., `GeneralSettingsView`, `APISettingsView`).
 *   **`GeneralSettingsView.swift`**: Manages general application preferences. It provides controls for setting the app's `AppearanceStyle`, toggling UI elements like the status bar, and configuring default avatar settings. All settings are persisted directly via `@AppStorage`.
 *   **`APISettingsView.swift`**: The main view for managing AI service provider configurations. It lists all saved `APIConfigurationItem`s, shows which is the default, allows users to add new ones, and handles deletion. It presents the `APIConfigurationEditView` in a sheet for creating or editing a configuration.
-*   **`APIConfigurationEditView.swift`**: A sheet view for creating or editing an `APIConfigurationItem`. It exposes provider preset, name, API key, base URL, default endpoint family, default model, and advanced headers/options JSON. Provider endpoint paths come from profiles; users do not edit fixed chat/responses/models paths in normal configuration.
+*   **`APIConfigurationEditView.swift`**: A sheet view for creating or editing an `APIConfigurationItem`. It exposes provider preset, name, API key, API-root base URL, default adapter ID, default model, and advanced headers/options JSON. Users do not edit fixed chat/responses/messages/models paths in normal configuration.
 *   **`WebSearchSettingsView.swift`**: The main view for managing web search service configurations. It lists all saved `WebSearchConfigurationItem`s, allows users to add new ones, and handles deletion. It presents the `WebSearchConfigurationEditView` in a sheet for creating or editing a configuration.
 *   **`WebSearchConfigurationEditView.swift`**: A detailed sheet view for creating or editing a `WebSearchConfigurationItem`. It allows the user to select a provider (e.g., Google), enter the required credentials like an API key and a search engine ID, and set the configuration as the default for the application. It dynamically shows the required fields based on the selected provider.
 *   **`ModelsSettingsView.swift`**: The main interface for managing the AI models available to the application. It provides a primary action to fetch and update the list of models from all configured API providers. The view displays models grouped by provider and allows for the manual addition, editing, or deletion of any model. It also includes a destructive action to remove all models at once.
@@ -995,12 +995,12 @@ views/
 ### LLM API Layer
 | Protocol | Purpose | Key Conformers |
 |----------|---------|----------------|
-| `LLMProviderAdapter` | Top-level provider adapter interface for streaming and model fetches. | `OpenAIResponsesAdapter`, `OpenAIChatAdapter`, `AnthropicMessagesAdapter` |
+| `LLMProviderAdapter` | Top-level provider adapter interface for streaming and model fetches. | `OpenAIResponsesAdapter`, `OpenAIChatCompletionsAdapter`, `OpenAICompatibleChatCompletionsAdapter`, `AnthropicMessagesAdapter` |
 | `LLMRequest` / `LLMMessage` / `LLMStreamEvent` | Provider-neutral request, message, and streaming event types. | LLM protocol structs under `src/llm_api` |
-| `LLMProviderProfile` | Provider capabilities, auth kind, endpoint families, defaults, and feature flags. | Profiles in `LLMProviderRegistry` |
+| `LLMProviderProfile` | Provider capabilities, auth kind, supported adapters, defaults, and feature flags. | Profiles in `LLMProviderRegistry` |
 | `NetworkClient` / `LLMHTTPClient` | Shared JSON/SSE transport plus core-owned provider header resolution, metadata redaction, and normalized provider errors. | Used by web search and all LLM adapters |
 | `LLMAdapterRunLoop` | Shared streamed/non-streamed adapter flow and metadata forwarding. | Used by provider adapters |
-| `LLMCapabilityValidator` | Common preflight validation for endpoint, model, parameter, content, and tool replay support. | Used by `LLMRequestFactory` and adapters |
+| `LLMCapabilityValidator` | Common preflight validation for adapter, model, parameter, content, and tool replay support. | Used by `LLMRequestFactory` and adapters |
 
 ### Tooling Layer
 | Protocol | Purpose |
@@ -1093,7 +1093,7 @@ All logging routes through `vxAtelierPro.log` (`LoggingService.shared`), which w
 
 ## Extending the App
 1. **Add a new AI Provider**
-   * Add an `LLMProviderProfile` entry in `LLMProviderRegistry` with provider ID, auth kind, base URL, endpoint families, endpoint paths, and enabled state.
+   * Add an `LLMProviderProfile` entry in `LLMProviderRegistry` with provider ID, auth kind, API-root base URL, supported adapter IDs, default adapter ID, and enabled state.
    * Add model capability and parameter-mapping defaults to `LLMDefaults.json`.
    * If the provider uses a non-OpenAI-compatible API, implement `LLMProviderAdapter` (`stream` + `fetchModels`) and wire it in `LLMProviderRegistry.adapter(for:)`.
    * Add model decoding and fixture tests under `vxAtelier ProTests/AI`.

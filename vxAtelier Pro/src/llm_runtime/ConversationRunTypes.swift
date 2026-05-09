@@ -7,7 +7,7 @@ struct ConversationRunContext {
     var providerConfiguration: LLMProviderConfiguration
     var providerProfile: LLMProviderProfile
     var providerID: LLMProviderID
-    var endpointFamily: LLMEndpointFamily
+    var adapterID: LLMAdapterID
     var modelID: String
     var modelDescriptor: LLMModelDescriptor?
     var messages: [LLMMessage]

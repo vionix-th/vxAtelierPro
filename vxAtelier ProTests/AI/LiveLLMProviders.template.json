@@ -9,49 +9,70 @@
       "enabled": false,
       "baseURL": "https://api.openai.com/v1",
       "apiKey": "replace-with-openai-api-key",
-      "models": ["replace-with-openai-model"],
-      "endpointFamilies": ["responses", "chatCompletions"],
-      "checkModels": true
+      "models": [
+        "replace-with-openai-model"
+      ],
+      "checkModels": true,
+      "adapterIDs": [
+        "openAIResponses",
+        "openAIChatCompletions"
+      ]
     },
     {
       "id": "anthropic",
       "name": "Anthropic",
       "enabled": false,
-      "baseURL": "https://api.anthropic.com",
+      "baseURL": "https://api.anthropic.com/v1",
       "apiKey": "replace-with-anthropic-api-key",
-      "models": ["replace-with-anthropic-model"],
-      "endpointFamilies": ["anthropicMessages"],
-      "checkModels": true
+      "models": [
+        "replace-with-anthropic-model"
+      ],
+      "checkModels": true,
+      "adapterIDs": [
+        "anthropicMessages"
+      ]
     },
     {
       "id": "openRouter",
       "name": "OpenRouter",
       "enabled": false,
-      "baseURL": "https://openrouter.ai/api",
+      "baseURL": "https://openrouter.ai/api/v1",
       "apiKey": "replace-with-openrouter-api-key",
-      "models": ["replace-with-openrouter-model"],
-      "endpointFamilies": ["chatCompletions"],
-      "checkModels": true
+      "models": [
+        "replace-with-openrouter-model"
+      ],
+      "checkModels": true,
+      "adapterIDs": [
+        "openAICompatibleChatCompletions"
+      ]
     },
     {
       "id": "lmStudio",
       "name": "LM Studio",
       "enabled": false,
-      "baseURL": "http://localhost:1234",
+      "baseURL": "http://localhost:1234/v1",
       "apiKey": "",
-      "models": ["replace-with-loaded-lmstudio-model"],
-      "endpointFamilies": ["chatCompletions"],
-      "checkModels": true
+      "models": [
+        "replace-with-loaded-lmstudio-model"
+      ],
+      "checkModels": true,
+      "adapterIDs": [
+        "openAICompatibleChatCompletions"
+      ]
     },
     {
       "id": "ollama",
       "name": "Ollama",
       "enabled": false,
-      "baseURL": "http://localhost:11434",
+      "baseURL": "http://localhost:11434/v1",
       "apiKey": "",
-      "models": ["replace-with-loaded-ollama-model"],
-      "endpointFamilies": ["chatCompletions"],
-      "checkModels": true
+      "models": [
+        "replace-with-loaded-ollama-model"
+      ],
+      "checkModels": true,
+      "adapterIDs": [
+        "openAICompatibleChatCompletions"
+      ]
     },
     {
       "id": "xAI",
@@ -59,9 +80,13 @@
       "enabled": false,
       "baseURL": "https://api.x.ai/v1",
       "apiKey": "replace-with-xai-api-key",
-      "models": ["replace-with-xai-model"],
-      "endpointFamilies": ["chatCompletions"],
-      "checkModels": true
+      "models": [
+        "replace-with-xai-model"
+      ],
+      "checkModels": true,
+      "adapterIDs": [
+        "openAICompatibleChatCompletions"
+      ]
     },
     {
       "id": "deepSeek",
@@ -69,9 +94,13 @@
       "enabled": false,
       "baseURL": "https://api.deepseek.com/v1",
       "apiKey": "replace-with-deepseek-api-key",
-      "models": ["replace-with-deepseek-model"],
-      "endpointFamilies": ["chatCompletions"],
-      "checkModels": true
+      "models": [
+        "replace-with-deepseek-model"
+      ],
+      "checkModels": true,
+      "adapterIDs": [
+        "openAICompatibleChatCompletions"
+      ]
     },
     {
       "id": "customOpenAICompatible",
@@ -79,12 +108,16 @@
       "enabled": false,
       "baseURL": "https://example.test/v1",
       "apiKey": "replace-with-api-key-or-empty-string",
-      "models": ["replace-with-model"],
-      "endpointFamilies": ["chatCompletions"],
+      "models": [
+        "replace-with-model"
+      ],
       "authKind": "bearerToken",
       "checkModels": true,
       "headers": {},
-      "options": {}
+      "options": {},
+      "adapterIDs": [
+        "openAICompatibleChatCompletions"
+      ]
     }
   ]
 }

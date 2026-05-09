@@ -12,7 +12,7 @@ final class LLMCapabilityAndRunStateTests: XCTestCase {
         let profile = LLMProviderRegistry.shared.profile(for: .lmStudio)
         let request = LLMRequest(
             providerID: .lmStudio,
-            endpointFamily: .chatCompletions,
+            adapterID: .openAIChatCompletions,
             modelID: "local-model",
             messages: [
                 LLMMessage(role: "user", content: [LLMContentPart(kind: .image, dataBase64: "aW1n")])
@@ -28,12 +28,12 @@ final class LLMCapabilityAndRunStateTests: XCTestCase {
         let profile = LLMProviderRegistry.shared.profile(for: .openRouter)
         let request = LLMRequest(
             providerID: .openRouter,
-            endpointFamily: .chatCompletions,
+            adapterID: .openAIChatCompletions,
             modelID: "vision-model",
             modelDescriptor: LLMModelDescriptor(
                 id: "vision-model",
                 providerID: .openRouter,
-                endpointFamilies: [.chatCompletions],
+                adapterIDs: [.openAIChatCompletions],
                 modalities: [.text, .image],
                 schemaFeatures: [.streaming]
             ),
@@ -49,7 +49,7 @@ final class LLMCapabilityAndRunStateTests: XCTestCase {
         let profile = LLMProviderRegistry.shared.profile(for: .openAIPlatform)
         let request = LLMRequest(
             providerID: .openAIPlatform,
-            endpointFamily: .chatCompletions,
+            adapterID: .openAIChatCompletions,
             modelID: "gpt-test",
             messages: [
                 LLMMessage(role: "user", content: [LLMContentPart(kind: .file, dataBase64: "ZmlsZQ==")])
@@ -65,7 +65,7 @@ final class LLMCapabilityAndRunStateTests: XCTestCase {
         let profile = LLMProviderRegistry.shared.profile(for: .openAIPlatform)
         let request = LLMRequest(
             providerID: .openAIPlatform,
-            endpointFamily: .responses,
+            adapterID: .openAIResponses,
             modelID: "gpt-test",
             messages: [
                 LLMMessage(role: "tool", content: [LLMContentPart(kind: .toolResult, text: "result")], toolCallID: "call_missing")
@@ -81,7 +81,7 @@ final class LLMCapabilityAndRunStateTests: XCTestCase {
         let profile = LLMProviderRegistry.shared.profile(for: .anthropic)
         let request = LLMRequest(
             providerID: .anthropic,
-            endpointFamily: .anthropicMessages,
+            adapterID: .anthropicMessages,
             modelID: "claude-test",
             messages: [
                 LLMMessage(
@@ -103,7 +103,7 @@ final class LLMCapabilityAndRunStateTests: XCTestCase {
         let profile = LLMProviderRegistry.shared.profile(for: .openAIPlatform)
         let request = LLMRequest(
             providerID: .openAIPlatform,
-            endpointFamily: .responses,
+            adapterID: .openAIResponses,
             modelID: "gpt-test",
             messages: [
                 LLMMessage(
@@ -124,7 +124,7 @@ final class LLMCapabilityAndRunStateTests: XCTestCase {
         let profile = LLMProviderRegistry.shared.profile(for: .openAIPlatform)
         let request = LLMRequest(
             providerID: .openAIPlatform,
-            endpointFamily: .responses,
+            adapterID: .openAIResponses,
             modelID: "gpt-test",
             messages: [
                 LLMMessage(
@@ -144,7 +144,7 @@ final class LLMCapabilityAndRunStateTests: XCTestCase {
         let profile = LLMProviderRegistry.shared.profile(for: .openAIPlatform)
         let request = LLMRequest(
             providerID: .openAIPlatform,
-            endpointFamily: .responses,
+            adapterID: .openAIResponses,
             modelID: "gpt-test",
             messages: [
                 LLMMessage(
@@ -166,7 +166,7 @@ final class LLMCapabilityAndRunStateTests: XCTestCase {
     func testResponseRunRejectsInvalidStatusTransition() throws {
         let run = ResponseRunItem(
             providerID: .openAIPlatform,
-            endpointFamily: .responses,
+            adapterID: .openAIResponses,
             requestedModelID: "gpt-test",
             status: .pending
         )

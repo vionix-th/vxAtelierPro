@@ -41,7 +41,7 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
         let options = ConversationOptions()
         options.temperature = 0.9
         let mapping = LLMParameterMappingDescriptor(
-            endpointFamily: .chatCompletions,
+            adapterID: .openAIChatCompletions,
             semanticParameterID: .temperature,
             wireKey: "temperature"
         )
@@ -59,12 +59,12 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
         options.setParameterEnabled(.temperature, enabled: false)
         let mappings: [LLMParameterID: LLMParameterMappingDescriptor] = [
             .temperature: LLMParameterMappingDescriptor(
-                endpointFamily: .chatCompletions,
+                adapterID: .openAIChatCompletions,
                 semanticParameterID: .temperature,
                 wireKey: "temperature"
             ),
             .maxOutputTokens: LLMParameterMappingDescriptor(
-                endpointFamily: .chatCompletions,
+                adapterID: .openAIChatCompletions,
                 semanticParameterID: .maxOutputTokens,
                 wireKey: "max_tokens"
             )
@@ -72,7 +72,7 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
 
         let generationOptions = options.generationOptions(
             resolvedModelID: "model",
-            resolvedEndpointFamily: .chatCompletions,
+            resolvedAdapterID: .openAIChatCompletions,
             mappings: mappings
         )
 
@@ -89,7 +89,7 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
             defaultModel: "gpt-4.1-nano",
             providerID: .openAIPlatform
         )
-        config.defaultEndpointFamilyEnum = .chatCompletions
+        config.defaultAdapterIDEnum = .openAIChatCompletions
         let options = ConversationOptions(apiConfiguration: config)
         options.temperature = 0.7
 

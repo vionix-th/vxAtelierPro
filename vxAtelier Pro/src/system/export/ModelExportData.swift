@@ -10,7 +10,7 @@ struct ModelExportData: Codable {
     let modelID: String?
     let displayName: String?
     let providerID: String?
-    let endpointFamilies: [String]?
+    let adapterIDs: [String]?
     let modalities: [String]?
     let supportedParameters: [String]?
     let schemaFeatures: [String]?
@@ -27,7 +27,7 @@ struct ModelExportData: Codable {
         self.modelID = model.modelID
         self.displayName = model.displayName
         self.providerID = model.providerID
-        self.endpointFamilies = model.endpointFamiliesRaw
+        self.adapterIDs = model.adapterIDsRaw
         self.modalities = model.modalitiesRaw
         self.supportedParameters = model.supportedParameters
         self.schemaFeatures = model.schemaFeaturesRaw
@@ -57,11 +57,11 @@ struct ModelExportData: Codable {
             for: model.modelID,
             providerID: LLMProviderID(rawValue: model.providerID) ?? .customOpenAICompatible
         )
-        model.endpointFamiliesRaw = defaultDescriptor.endpointFamilies.map(\.rawValue)
+        model.adapterIDsRaw = defaultDescriptor.adapterIDs.map(\.rawValue)
         model.modalitiesRaw = defaultDescriptor.modalities.map(\.rawValue)
         model.supportedParameters = defaultDescriptor.supportedParameters
         model.schemaFeaturesRaw = defaultDescriptor.schemaFeatures.map(\.rawValue)
-        if let endpointFamilies { model.endpointFamiliesRaw = endpointFamilies }
+        if let adapterIDs { model.adapterIDsRaw = adapterIDs }
         if let modalities { model.modalitiesRaw = modalities }
         if let supportedParameters { model.supportedParameters = supportedParameters }
         if let schemaFeatures { model.schemaFeaturesRaw = schemaFeatures }
@@ -73,7 +73,7 @@ struct ModelExportData: Codable {
 }
 
 struct ModelParameterMappingExportData: Codable {
-    let endpointFamilyRaw: String
+    let adapterIDRaw: String
     let semanticParameterID: String
     let isEnabled: Bool
     let isRequired: Bool
@@ -92,7 +92,7 @@ struct ModelParameterMappingExportData: Codable {
     let isCustomized: Bool
 
     init(_ mapping: ModelParameterMappingItem) {
-        endpointFamilyRaw = mapping.endpointFamilyRaw
+        adapterIDRaw = mapping.adapterIDRaw
         semanticParameterID = mapping.semanticParameterID
         isEnabled = mapping.isEnabled
         isRequired = mapping.isRequired
@@ -113,7 +113,7 @@ struct ModelParameterMappingExportData: Codable {
 
     func toDataItem() -> ModelParameterMappingItem {
         let mapping = ModelParameterMappingItem(
-            endpointFamily: LLMEndpointFamily(rawValue: endpointFamilyRaw) ?? .chatCompletions,
+            adapterID: LLMAdapterID(rawValue: adapterIDRaw) ?? .openAIChatCompletions,
             semanticParameterID: LLMParameterID(rawValue: semanticParameterID) ?? .maxOutputTokens,
             isEnabled: isEnabled,
             isRequired: isRequired,

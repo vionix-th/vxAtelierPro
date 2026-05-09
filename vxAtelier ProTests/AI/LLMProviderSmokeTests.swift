@@ -11,94 +11,94 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
     private static let templateConfigFileName = "LiveLLMProviders.template.json"
 
     func testOpenAIResponsesLiveSmoke() async throws {
-        try await runLiveSmoke(providerID: .openAIPlatform, endpointFamily: .responses)
+        try await runLiveSmoke(providerID: .openAIPlatform, adapterID: .openAIResponses)
     }
 
     func testOpenAIChatCompletionsLiveSmoke() async throws {
-        try await runLiveSmoke(providerID: .openAIPlatform, endpointFamily: .chatCompletions)
+        try await runLiveSmoke(providerID: .openAIPlatform, adapterID: .openAIChatCompletions)
     }
 
     func testAnthropicMessagesLiveSmoke() async throws {
-        try await runLiveSmoke(providerID: .anthropic, endpointFamily: .anthropicMessages)
+        try await runLiveSmoke(providerID: .anthropic, adapterID: .anthropicMessages)
     }
 
     func testOpenRouterChatCompletionsLiveSmoke() async throws {
-        try await runLiveSmoke(providerID: .openRouter, endpointFamily: .chatCompletions)
+        try await runLiveSmoke(providerID: .openRouter, adapterID: .openAICompatibleChatCompletions)
     }
 
     func testLMStudioChatCompletionsLiveSmoke() async throws {
-        try await runLiveSmoke(providerID: .lmStudio, endpointFamily: .chatCompletions)
+        try await runLiveSmoke(providerID: .lmStudio, adapterID: .openAICompatibleChatCompletions)
     }
 
     func testOllamaChatCompletionsLiveSmoke() async throws {
-        try await runLiveSmoke(providerID: .ollama, endpointFamily: .chatCompletions)
+        try await runLiveSmoke(providerID: .ollama, adapterID: .openAICompatibleChatCompletions)
     }
 
     func testXAIChatCompletionsLiveSmoke() async throws {
-        try await runLiveSmoke(providerID: .xAI, endpointFamily: .chatCompletions)
+        try await runLiveSmoke(providerID: .xAI, adapterID: .openAICompatibleChatCompletions)
     }
 
     func testDeepSeekChatCompletionsLiveSmoke() async throws {
-        try await runLiveSmoke(providerID: .deepSeek, endpointFamily: .chatCompletions)
+        try await runLiveSmoke(providerID: .deepSeek, adapterID: .openAICompatibleChatCompletions)
     }
 
     func testCustomOpenAICompatibleChatCompletionsLiveSmoke() async throws {
-        try await runLiveSmoke(providerID: .customOpenAICompatible, endpointFamily: .chatCompletions)
+        try await runLiveSmoke(providerID: .customOpenAICompatible, adapterID: .openAICompatibleChatCompletions)
     }
 
-    private func runLiveSmoke(providerID: LLMProviderID, endpointFamily: LLMEndpointFamily) async throws {
+    private func runLiveSmoke(providerID: LLMProviderID, adapterID: LLMAdapterID) async throws {
         let suite = try loadSuite()
         guard suite.enabled ?? true else {
             throw XCTSkip("Live LLM smoke tests are disabled in the local provider config.")
         }
 
         let candidates = suite.providers.filter { provider in
-            provider.id == providerID && provider.endpointFamilies.contains(endpointFamily)
+            provider.id == providerID && provider.adapterIDs.contains(adapterID)
         }
         guard !candidates.isEmpty else {
-            throw XCTSkip("No \(providerID.rawValue) \(endpointFamily.rawValue) entry in the local provider config.")
+            throw XCTSkip("No \(providerID.rawValue) \(adapterID.rawValue) entry in the local provider config.")
         }
         guard let provider = candidates.first(where: { $0.enabled ?? true }) else {
-            throw XCTSkip("\(providerID.rawValue) \(endpointFamily.rawValue) is disabled in the local provider config.")
+            throw XCTSkip("\(providerID.rawValue) \(adapterID.rawValue) is disabled in the local provider config.")
         }
 
-        let adapter = LLMProviderRegistry.shared.adapter(for: providerID)
+        let adapter = LLMProviderRegistry.shared.adapter(for: adapterID, providerID: providerID)
         let models = try provider.resolvedModels()
-        let configuration = makeConfiguration(for: provider, suite: suite, endpointFamily: endpointFamily)
+        let configuration = makeConfiguration(for: provider, suite: suite, adapterID: adapterID)
 
         if provider.checkModels ?? true {
-            _ = try await runProviderOperation(provider: provider, endpointFamily: endpointFamily, operation: "models") {
+            _ = try await runProviderOperation(provider: provider, adapterID: adapterID, operation: "models") {
                 _ = try await adapter.fetchModels(configuration: configuration)
                 return true
             }
         }
 
         for model in models {
-            let nonStreamingActivity = activityName(provider: provider, endpointFamily: endpointFamily, model: model, streamMode: .disabled)
+            let nonStreamingActivity = activityName(provider: provider, adapterID: adapterID, model: model, streamMode: .disabled)
             recordActivity(named: nonStreamingActivity)
-            let nonStreamingPassed = try await runProviderOperation(provider: provider, endpointFamily: endpointFamily, model: model, operation: "non-streaming turn") {
+            let nonStreamingPassed = try await runProviderOperation(provider: provider, adapterID: adapterID, model: model, operation: "non-streaming turn") {
                 let events = try await collectEvents(
                     adapter.stream(
-                        makeRequest(providerID: providerID, endpointFamily: endpointFamily, model: model, streamMode: .disabled),
+                        makeRequest(providerID: providerID, adapterID: adapterID, model: model, streamMode: .disabled),
                         configuration: configuration
                     )
                 )
-                return assertCompletedTextTurn(events, provider: provider, endpointFamily: endpointFamily, model: model, streamMode: .disabled)
+                return assertCompletedTextTurn(events, provider: provider, adapterID: adapterID, model: model, streamMode: .disabled)
             }
             if nonStreamingPassed {
                 recordActivity(named: "\(nonStreamingActivity) passed")
             }
 
-            let streamingActivity = activityName(provider: provider, endpointFamily: endpointFamily, model: model, streamMode: .enabled)
+            let streamingActivity = activityName(provider: provider, adapterID: adapterID, model: model, streamMode: .enabled)
             recordActivity(named: streamingActivity)
-            let streamingPassed = try await runProviderOperation(provider: provider, endpointFamily: endpointFamily, model: model, operation: "streaming turn") {
+            let streamingPassed = try await runProviderOperation(provider: provider, adapterID: adapterID, model: model, operation: "streaming turn") {
                 let events = try await collectEvents(
                     adapter.stream(
-                        makeRequest(providerID: providerID, endpointFamily: endpointFamily, model: model, streamMode: .enabled),
+                        makeRequest(providerID: providerID, adapterID: adapterID, model: model, streamMode: .enabled),
                         configuration: configuration
                     )
                 )
-                return assertCompletedTextTurn(events, provider: provider, endpointFamily: endpointFamily, model: model, streamMode: .enabled)
+                return assertCompletedTextTurn(events, provider: provider, adapterID: adapterID, model: model, streamMode: .enabled)
             }
             if streamingPassed {
                 recordActivity(named: "\(streamingActivity) passed")
@@ -109,7 +109,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
     private func makeConfiguration(
         for provider: LiveSmokeProvider,
         suite: LiveSmokeSuite,
-        endpointFamily: LLMEndpointFamily
+        adapterID: LLMAdapterID
     ) -> LLMProviderConfiguration {
         let profile = LLMProviderRegistry.shared.profile(for: provider.id)
         let configuration = APIConfigurationItem(
@@ -122,7 +122,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         if let authKind = provider.authKind {
             configuration.authKindEnum = authKind
         }
-        configuration.defaultEndpointFamilyEnum = endpointFamily
+        configuration.defaultAdapterIDEnum = adapterID
         configuration.decodedHeaders = provider.headers ?? [:]
         configuration.decodedOptions = mergedOptions(provider: provider, suite: suite)
         return configuration.makeLLMProviderConfiguration()
@@ -144,11 +144,11 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
 
     private func activityName(
         provider: LiveSmokeProvider,
-        endpointFamily: LLMEndpointFamily,
+        adapterID: LLMAdapterID,
         model: String,
         streamMode: LLMGenerationOptions.StreamMode
     ) -> String {
-        "\(provider.name ?? provider.id.rawValue) / \(endpointFamily.rawValue) / \(model) / \(streamMode.rawValue)"
+        "\(provider.name ?? provider.id.rawValue) / \(adapterID.rawValue) / \(model) / \(streamMode.rawValue)"
     }
 
     private func recordActivity(named name: String) {
@@ -161,13 +161,13 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
 
     private func makeRequest(
         providerID: LLMProviderID,
-        endpointFamily: LLMEndpointFamily,
+        adapterID: LLMAdapterID,
         model: String,
         streamMode: LLMGenerationOptions.StreamMode
     ) -> LLMRequest {
         LLMRequest.runtimeEquivalent(
             providerID: providerID,
-            endpointFamily: endpointFamily,
+            adapterID: adapterID,
             modelID: model,
             messages: [
                 LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Reply with only: ok")])
@@ -179,7 +179,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
     private func assertCompletedTextTurn(
         _ events: [LLMStreamEvent],
         provider: LiveSmokeProvider,
-        endpointFamily: LLMEndpointFamily,
+        adapterID: LLMAdapterID,
         model: String,
         streamMode: LLMGenerationOptions.StreamMode
     ) -> Bool {
@@ -197,11 +197,11 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
 
         var passed = true
         if text.isEmpty {
-            XCTFail("\(provider.name ?? provider.id.rawValue) \(endpointFamily.rawValue) \(model) \(streamMode.rawValue) produced no text.")
+            XCTFail("\(provider.name ?? provider.id.rawValue) \(adapterID.rawValue) \(model) \(streamMode.rawValue) produced no text.")
             passed = false
         }
         if !completed {
-            XCTFail("\(provider.name ?? provider.id.rawValue) \(endpointFamily.rawValue) \(model) \(streamMode.rawValue) did not complete.")
+            XCTFail("\(provider.name ?? provider.id.rawValue) \(adapterID.rawValue) \(model) \(streamMode.rawValue) did not complete.")
             passed = false
         }
         return passed
@@ -209,7 +209,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
 
     private func runProviderOperation(
         provider: LiveSmokeProvider,
-        endpointFamily: LLMEndpointFamily,
+        adapterID: LLMAdapterID,
         model: String? = nil,
         operation: String,
         _ work: () async throws -> Bool
@@ -219,9 +219,9 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         } catch {
             let modelSuffix = model.map { " \($0)" } ?? ""
             if let reason = unavailableReason(from: error) {
-                throw XCTSkip("\(provider.name ?? provider.id.rawValue) \(endpointFamily.rawValue)\(modelSuffix) \(operation) unavailable: \(reason)")
+                throw XCTSkip("\(provider.name ?? provider.id.rawValue) \(adapterID.rawValue)\(modelSuffix) \(operation) unavailable: \(reason)")
             }
-            XCTFail("\(provider.name ?? provider.id.rawValue) \(endpointFamily.rawValue)\(modelSuffix) \(operation) failed: \(error)")
+            XCTFail("\(provider.name ?? provider.id.rawValue) \(adapterID.rawValue)\(modelSuffix) \(operation) failed: \(error)")
             return false
         }
     }
@@ -294,7 +294,7 @@ private struct LiveSmokeProvider: Decodable {
     var baseURL: String?
     var apiKey: String?
     var models: [String]
-    var endpointFamilies: [LLMEndpointFamily]
+    var adapterIDs: [LLMAdapterID]
     var authKind: LLMAuthKind?
     var checkModels: Bool?
     var headers: [String: String]?

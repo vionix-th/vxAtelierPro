@@ -9,7 +9,7 @@ struct APIConfigurationExportData: Codable {
     let authKind: String?
     let baseURL: String
     let apiKey: String
-    let defaultEndpointFamily: String?
+    let defaultAdapterID: String?
     let defaultModelID: String?
     let headersJSON: String?
     let optionsJSON: String?
@@ -21,7 +21,7 @@ struct APIConfigurationExportData: Codable {
         self.authKind = config.authKind
         self.baseURL = config.baseURL
         self.apiKey = config.apiKey
-        self.defaultEndpointFamily = config.defaultEndpointFamily
+        self.defaultAdapterID = config.defaultAdapterID
         self.defaultModelID = config.defaultModelID
         self.headersJSON = config.headersJSON
         self.optionsJSON = config.optionsJSON
@@ -38,7 +38,7 @@ struct APIConfigurationExportData: Codable {
             providerID: providerID.flatMap(LLMProviderID.init(rawValue:)) ?? .customOpenAICompatible
         )
         if let authKind { item.authKind = authKind }
-        if let defaultEndpointFamily { item.defaultEndpointFamily = defaultEndpointFamily }
+        if let defaultAdapterID { item.defaultAdapterID = defaultAdapterID }
         if let headersJSON { item.headersJSON = headersJSON }
         if let optionsJSON { item.optionsJSON = optionsJSON }
         return item

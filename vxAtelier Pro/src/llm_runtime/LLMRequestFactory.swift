@@ -18,7 +18,7 @@ struct ConversationRunContextResolver {
         self.modelDescriptorResolver = modelDescriptorResolver
     }
 
-    /// Resolves model, endpoint, tools, options, and message history for one run.
+    /// Resolves model, adapter, tools, options, and message history for one run.
     @MainActor
     func resolve(
         conversation: ConversationItem,
@@ -26,9 +26,9 @@ struct ConversationRunContextResolver {
     ) throws -> ConversationRunContext {
         let providerID = apiConfig.providerIDEnum
         let profile = registry.profile(for: providerID)
-        let endpoint = apiConfig.defaultEndpointFamilyEnum
-        guard profile.supportedEndpointFamilies.contains(endpoint) else {
-            throw LLMProviderError.unsupportedCapability("\(profile.name) does not support \(endpoint.rawValue).")
+        let adapterID = apiConfig.defaultAdapterIDEnum
+        guard profile.supportedAdapterIDs.contains(adapterID) else {
+            throw LLMProviderError.unsupportedCapability("\(profile.name) does not support \(adapterID.rawValue).")
         }
 
         let modelID = conversation.options.selectedModelID
@@ -42,17 +42,17 @@ struct ConversationRunContextResolver {
             providerID: providerID,
             apiConfiguration: apiConfig,
             modelContext: conversation.modelContext,
-            endpointFamilies: [endpoint]
+            adapterIDs: [adapterID]
         )
         let mappings = LLMParameterMappingResolver.resolve(
             providerID: providerID,
-            endpointFamily: endpoint,
+            adapterID: adapterID,
             modelID: modelID,
             modelDescriptor: descriptor
         )
         let options = conversation.options.generationOptions(
             resolvedModelID: modelID,
-            resolvedEndpointFamily: endpoint,
+            resolvedAdapterID: adapterID,
             mappings: mappings
         )
         let tools = toolCatalog.allTools()
@@ -64,7 +64,7 @@ struct ConversationRunContextResolver {
             providerConfiguration: apiConfig.makeLLMProviderConfiguration(),
             providerProfile: profile,
             providerID: providerID,
-            endpointFamily: endpoint,
+            adapterID: adapterID,
             modelID: modelID,
             modelDescriptor: descriptor,
             messages: orderedMessages(in: conversation).map { $0.asDomainMessage() },
@@ -91,7 +91,7 @@ struct LLMRequestFactory {
     func makeRequest(from context: ConversationRunContext) throws -> LLMRequest {
         var request = LLMRequest(
             providerID: context.providerID,
-            endpointFamily: context.endpointFamily,
+            adapterID: context.adapterID,
             modelID: context.modelID,
             modelDescriptor: context.modelDescriptor,
             messages: context.messages,

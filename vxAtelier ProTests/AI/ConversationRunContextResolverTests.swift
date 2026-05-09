@@ -24,12 +24,12 @@ final class ConversationRunContextResolverTests: XCTestCase {
             defaultModel: "gpt-test",
             providerID: .openAIPlatform
         )
-        configA.defaultEndpointFamilyEnum = .chatCompletions
-        configB.defaultEndpointFamilyEnum = .chatCompletions
+        configA.defaultAdapterIDEnum = .openAIChatCompletions
+        configB.defaultAdapterIDEnum = .openAIChatCompletions
         let descriptor = LLMModelDescriptor(
             id: "gpt-test",
             providerID: .openAIPlatform,
-            endpointFamilies: [.chatCompletions],
+            adapterIDs: [.openAIChatCompletions],
             modalities: [.text],
             parameterMappings: [],
             schemaFeatures: [.streaming]
@@ -37,12 +37,12 @@ final class ConversationRunContextResolverTests: XCTestCase {
         let modelA = ModelItem(descriptor: descriptor, apiConfiguration: configA)
         let modelB = ModelItem(descriptor: descriptor, apiConfiguration: configB)
         let mappingA = modelA.parameterMappings.first {
-            $0.endpointFamilyEnum == .chatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
+            $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
         }
         mappingA?.wireKey = "max_tokens_a"
         mappingA?.markCustomized()
         let mappingB = modelB.parameterMappings.first {
-            $0.endpointFamilyEnum == .chatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
+            $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
         }
         mappingB?.wireKey = "max_tokens_b"
         mappingB?.markCustomized()
@@ -66,7 +66,7 @@ final class ConversationRunContextResolverTests: XCTestCase {
         let request = try LLMRequestFactory().makeRequest(from: context)
 
         let maxOutputMapping = request.modelDescriptor?.parameterMappings.first {
-            $0.endpointFamily == .chatCompletions && $0.semanticParameterID == .maxOutputTokens
+            $0.adapterID == .openAIChatCompletions && $0.semanticParameterID == .maxOutputTokens
         }
         XCTAssertEqual(
             maxOutputMapping?.wireKey,
@@ -84,7 +84,7 @@ final class ConversationRunContextResolverTests: XCTestCase {
             defaultModel: "gpt-missing",
             providerID: .openAIPlatform
         )
-        config.defaultEndpointFamilyEnum = .responses
+        config.defaultAdapterIDEnum = .openAIResponses
         let options = ConversationOptions(apiConfiguration: config)
         let conversation = ConversationItem("No descriptor", options: options)
         env.modelContext.insert(config)
@@ -106,7 +106,7 @@ final class ConversationRunContextResolverTests: XCTestCase {
         let profile = LLMProviderRegistry.shared.profile(for: .openAIPlatform)
         let options = LLMGenerationOptions(
             modelID: "gpt-test",
-            endpointFamily: .responses,
+            adapterID: .openAIResponses,
             streamMode: .disabled
         )
         let context = ConversationRunContext(
@@ -114,21 +114,20 @@ final class ConversationRunContextResolverTests: XCTestCase {
             providerConfiguration: LLMProviderConfiguration(
                 providerID: .openAIPlatform,
                 baseURL: "https://unit.test/v1",
-                credential: .secret("key"),
-                endpointPaths: profile.endpointPaths
+                credential: .secret("key")
             ),
             providerProfile: profile,
             providerID: .openAIPlatform,
-            endpointFamily: .responses,
+            adapterID: .openAIResponses,
             modelID: "gpt-test",
             modelDescriptor: LLMModelDescriptor(
                 id: "gpt-test",
                 providerID: .openAIPlatform,
-                endpointFamilies: [.responses],
+                adapterIDs: [.openAIResponses],
                 modalities: [.text],
                 parameterMappings: LLMParameterMappingCatalog.defaults(
                     providerID: .openAIPlatform,
-                    endpointFamily: .responses,
+                    adapterID: .openAIResponses,
                     modelID: "gpt-test"
                 ),
                 schemaFeatures: [.tools, .strictTools, .jsonSchema, .jsonObject, .reasoning, .usage, .streaming]

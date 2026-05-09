@@ -186,7 +186,7 @@ final class QueryManagerCommandTests: XCTestCase {
         let descriptor = LLMModelDescriptor(
             id: "unit-model",
             providerID: .openAIPlatform,
-            endpointFamilies: [.chatCompletions]
+            adapterIDs: [.openAIChatCompletions]
         )
         let modelA = ModelItem(descriptor: descriptor, apiConfiguration: configA)
         let modelB = ModelItem(descriptor: descriptor, apiConfiguration: configB)

@@ -61,7 +61,7 @@ struct ProviderRunExecutor {
                 "Provider configuration \(providerConfiguration.providerID.rawValue) does not match request provider \(request.providerID.rawValue)."
             )
         }
-        let adapter = registry.adapter(for: request.providerID)
+        let adapter = registry.adapter(for: request.adapterID, providerID: request.providerID)
         var result = ProviderRunResult()
 
         for try await event in adapter.stream(request, configuration: providerConfiguration) {

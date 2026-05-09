@@ -26,7 +26,7 @@ struct LLMModelDescriptor: Codable, Equatable, Identifiable {
     var displayName: String
     var providerID: LLMProviderID
     var contextWindow: Int?
-    var endpointFamilies: [LLMEndpointFamily]
+    var adapterIDs: [LLMAdapterID]
     var modalities: [LLMModality]
     var supportedParameters: [String]
     var parameterMappings: [LLMParameterMappingDescriptor]
@@ -39,7 +39,7 @@ struct LLMModelDescriptor: Codable, Equatable, Identifiable {
         displayName: String? = nil,
         providerID: LLMProviderID,
         contextWindow: Int? = nil,
-        endpointFamilies: [LLMEndpointFamily],
+        adapterIDs: [LLMAdapterID],
         modalities: [LLMModality] = [.text],
         supportedParameters: [String] = [],
         parameterMappings: [LLMParameterMappingDescriptor] = [],
@@ -50,7 +50,7 @@ struct LLMModelDescriptor: Codable, Equatable, Identifiable {
         self.displayName = displayName ?? id
         self.providerID = providerID
         self.contextWindow = contextWindow
-        self.endpointFamilies = endpointFamilies
+        self.adapterIDs = adapterIDs
         self.modalities = modalities
         self.supportedParameters = supportedParameters
         self.parameterMappings = parameterMappings

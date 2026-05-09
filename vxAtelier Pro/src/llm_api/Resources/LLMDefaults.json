@@ -24,7 +24,9 @@
   "rules": [
     {
       "modelDefaults": {
-        "modalities": ["text"],
+        "modalities": [
+          "text"
+        ],
         "supportedParameters": [],
         "schemaFeatures": []
       }
@@ -35,10 +37,34 @@
       },
       "modelDefaults": {
         "contextWindow": 128000,
-        "endpointFamilies": ["responses", "chatCompletions"],
-        "modalities": ["text", "image"],
-        "supportedParameters": ["temperature", "top_p", "max_output_tokens", "max_completion_tokens", "stop", "response_format", "structured_outputs", "tools", "tool_choice", "service_tier"],
-        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "usage", "streaming"]
+        "modalities": [
+          "text",
+          "image"
+        ],
+        "supportedParameters": [
+          "temperature",
+          "top_p",
+          "max_output_tokens",
+          "max_completion_tokens",
+          "stop",
+          "response_format",
+          "structured_outputs",
+          "tools",
+          "tool_choice",
+          "service_tier"
+        ],
+        "schemaFeatures": [
+          "tools",
+          "strictTools",
+          "jsonSchema",
+          "jsonObject",
+          "usage",
+          "streaming"
+        ],
+        "adapterIDs": [
+          "openAIResponses",
+          "openAIChatCompletions"
+        ]
       }
     },
     {
@@ -48,10 +74,34 @@
       },
       "modelDefaults": {
         "contextWindow": 1047576,
-        "endpointFamilies": ["responses", "chatCompletions"],
-        "modalities": ["text", "image", "file"],
-        "supportedParameters": ["temperature", "top_p", "max_output_tokens", "max_completion_tokens", "response_format", "structured_outputs", "tools", "tool_choice", "service_tier"],
-        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "usage", "streaming"]
+        "modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "supportedParameters": [
+          "temperature",
+          "top_p",
+          "max_output_tokens",
+          "max_completion_tokens",
+          "response_format",
+          "structured_outputs",
+          "tools",
+          "tool_choice",
+          "service_tier"
+        ],
+        "schemaFeatures": [
+          "tools",
+          "strictTools",
+          "jsonSchema",
+          "jsonObject",
+          "usage",
+          "streaming"
+        ],
+        "adapterIDs": [
+          "openAIResponses",
+          "openAIChatCompletions"
+        ]
       }
     },
     {
@@ -61,10 +111,34 @@
       },
       "modelDefaults": {
         "contextWindow": 400000,
-        "endpointFamilies": ["responses", "chatCompletions"],
-        "modalities": ["text", "image", "file"],
-        "supportedParameters": ["max_output_tokens", "max_completion_tokens", "reasoning", "response_format", "structured_outputs", "tools", "tool_choice", "service_tier"],
-        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "reasoning", "usage", "streaming"]
+        "modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "supportedParameters": [
+          "max_output_tokens",
+          "max_completion_tokens",
+          "reasoning",
+          "response_format",
+          "structured_outputs",
+          "tools",
+          "tool_choice",
+          "service_tier"
+        ],
+        "schemaFeatures": [
+          "tools",
+          "strictTools",
+          "jsonSchema",
+          "jsonObject",
+          "reasoning",
+          "usage",
+          "streaming"
+        ],
+        "adapterIDs": [
+          "openAIResponses",
+          "openAIChatCompletions"
+        ]
       }
     },
     {
@@ -74,10 +148,34 @@
       },
       "modelDefaults": {
         "contextWindow": 1050000,
-        "endpointFamilies": ["responses", "chatCompletions"],
-        "modalities": ["text", "image", "file"],
-        "supportedParameters": ["max_output_tokens", "max_completion_tokens", "reasoning", "response_format", "structured_outputs", "tools", "tool_choice", "service_tier"],
-        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "reasoning", "usage", "streaming"]
+        "modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "supportedParameters": [
+          "max_output_tokens",
+          "max_completion_tokens",
+          "reasoning",
+          "response_format",
+          "structured_outputs",
+          "tools",
+          "tool_choice",
+          "service_tier"
+        ],
+        "schemaFeatures": [
+          "tools",
+          "strictTools",
+          "jsonSchema",
+          "jsonObject",
+          "reasoning",
+          "usage",
+          "streaming"
+        ],
+        "adapterIDs": [
+          "openAIResponses",
+          "openAIChatCompletions"
+        ]
       }
     },
     {
@@ -86,10 +184,19 @@
       },
       "modelDefaults": {
         "contextWindow": 128000,
-        "endpointFamilies": ["responses"],
-        "modalities": ["text", "image"],
+        "modalities": [
+          "text",
+          "image"
+        ],
         "supportedParameters": [],
-        "schemaFeatures": ["tools", "reasoning", "streaming"]
+        "schemaFeatures": [
+          "tools",
+          "reasoning",
+          "streaming"
+        ],
+        "adapterIDs": [
+          "openAIResponses"
+        ]
       }
     },
     {
@@ -98,10 +205,28 @@
       },
       "modelDefaults": {
         "contextWindow": 200000,
-        "endpointFamilies": ["anthropicMessages"],
-        "modalities": ["text", "image"],
-        "supportedParameters": ["max_tokens", "temperature", "top_p", "stop_sequences", "thinking", "tools", "tool_choice"],
-        "schemaFeatures": ["tools", "reasoning", "usage", "streaming"]
+        "modalities": [
+          "text",
+          "image"
+        ],
+        "supportedParameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop_sequences",
+          "thinking",
+          "tools",
+          "tool_choice"
+        ],
+        "schemaFeatures": [
+          "tools",
+          "reasoning",
+          "usage",
+          "streaming"
+        ],
+        "adapterIDs": [
+          "anthropicMessages"
+        ]
       }
     },
     {
@@ -111,10 +236,28 @@
       },
       "modelDefaults": {
         "contextWindow": 1000000,
-        "endpointFamilies": ["anthropicMessages"],
-        "modalities": ["text", "image"],
-        "supportedParameters": ["max_tokens", "temperature", "top_p", "stop_sequences", "thinking", "tools", "tool_choice"],
-        "schemaFeatures": ["tools", "reasoning", "usage", "streaming"]
+        "modalities": [
+          "text",
+          "image"
+        ],
+        "supportedParameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop_sequences",
+          "thinking",
+          "tools",
+          "tool_choice"
+        ],
+        "schemaFeatures": [
+          "tools",
+          "reasoning",
+          "usage",
+          "streaming"
+        ],
+        "adapterIDs": [
+          "anthropicMessages"
+        ]
       }
     },
     {
@@ -123,10 +266,27 @@
       },
       "modelDefaults": {
         "contextWindow": 128000,
-        "endpointFamilies": ["chatCompletions"],
-        "modalities": ["text"],
-        "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "response_format", "tools", "tool_choice"],
-        "schemaFeatures": ["tools", "jsonObject", "usage", "streaming"]
+        "modalities": [
+          "text"
+        ],
+        "supportedParameters": [
+          "temperature",
+          "top_p",
+          "max_tokens",
+          "stop",
+          "response_format",
+          "tools",
+          "tool_choice"
+        ],
+        "schemaFeatures": [
+          "tools",
+          "jsonObject",
+          "usage",
+          "streaming"
+        ],
+        "adapterIDs": [
+          "openAICompatibleChatCompletions"
+        ]
       }
     },
     {
@@ -136,10 +296,32 @@
       },
       "modelDefaults": {
         "contextWindow": 1047576,
-        "endpointFamilies": ["chatCompletions"],
-        "modalities": ["text", "image", "file"],
-        "supportedParameters": ["max_completion_tokens", "max_tokens", "response_format", "structured_outputs", "temperature", "tools", "tool_choice", "top_p"],
-        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "usage", "streaming"]
+        "modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "supportedParameters": [
+          "max_completion_tokens",
+          "max_tokens",
+          "response_format",
+          "structured_outputs",
+          "temperature",
+          "tools",
+          "tool_choice",
+          "top_p"
+        ],
+        "schemaFeatures": [
+          "tools",
+          "strictTools",
+          "jsonSchema",
+          "jsonObject",
+          "usage",
+          "streaming"
+        ],
+        "adapterIDs": [
+          "openAICompatibleChatCompletions"
+        ]
       }
     },
     {
@@ -149,10 +331,32 @@
       },
       "modelDefaults": {
         "contextWindow": 400000,
-        "endpointFamilies": ["chatCompletions"],
-        "modalities": ["text", "image", "file"],
-        "supportedParameters": ["max_completion_tokens", "max_tokens", "reasoning", "response_format", "structured_outputs", "tools", "tool_choice"],
-        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "reasoning", "usage", "streaming"]
+        "modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "supportedParameters": [
+          "max_completion_tokens",
+          "max_tokens",
+          "reasoning",
+          "response_format",
+          "structured_outputs",
+          "tools",
+          "tool_choice"
+        ],
+        "schemaFeatures": [
+          "tools",
+          "strictTools",
+          "jsonSchema",
+          "jsonObject",
+          "reasoning",
+          "usage",
+          "streaming"
+        ],
+        "adapterIDs": [
+          "openAICompatibleChatCompletions"
+        ]
       }
     },
     {
@@ -162,10 +366,32 @@
       },
       "modelDefaults": {
         "contextWindow": 1050000,
-        "endpointFamilies": ["chatCompletions"],
-        "modalities": ["text", "image", "file"],
-        "supportedParameters": ["max_completion_tokens", "max_tokens", "reasoning", "response_format", "structured_outputs", "tools", "tool_choice"],
-        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "reasoning", "usage", "streaming"]
+        "modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "supportedParameters": [
+          "max_completion_tokens",
+          "max_tokens",
+          "reasoning",
+          "response_format",
+          "structured_outputs",
+          "tools",
+          "tool_choice"
+        ],
+        "schemaFeatures": [
+          "tools",
+          "strictTools",
+          "jsonSchema",
+          "jsonObject",
+          "reasoning",
+          "usage",
+          "streaming"
+        ],
+        "adapterIDs": [
+          "openAICompatibleChatCompletions"
+        ]
       }
     },
     {
@@ -175,10 +401,33 @@
       },
       "modelDefaults": {
         "contextWindow": 1000000,
-        "endpointFamilies": ["chatCompletions"],
-        "modalities": ["text", "image"],
-        "supportedParameters": ["max_tokens", "reasoning", "response_format", "stop", "structured_outputs", "temperature", "tools", "tool_choice", "top_p"],
-        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "reasoning", "usage", "streaming"]
+        "modalities": [
+          "text",
+          "image"
+        ],
+        "supportedParameters": [
+          "max_tokens",
+          "reasoning",
+          "response_format",
+          "stop",
+          "structured_outputs",
+          "temperature",
+          "tools",
+          "tool_choice",
+          "top_p"
+        ],
+        "schemaFeatures": [
+          "tools",
+          "strictTools",
+          "jsonSchema",
+          "jsonObject",
+          "reasoning",
+          "usage",
+          "streaming"
+        ],
+        "adapterIDs": [
+          "openAICompatibleChatCompletions"
+        ]
       }
     },
     {
@@ -188,10 +437,33 @@
       },
       "modelDefaults": {
         "contextWindow": 1000000,
-        "endpointFamilies": ["chatCompletions"],
-        "modalities": ["text", "image", "file"],
-        "supportedParameters": ["max_tokens", "reasoning", "response_format", "structured_outputs", "temperature", "tools", "tool_choice", "top_p"],
-        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "reasoning", "usage", "streaming"]
+        "modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "supportedParameters": [
+          "max_tokens",
+          "reasoning",
+          "response_format",
+          "structured_outputs",
+          "temperature",
+          "tools",
+          "tool_choice",
+          "top_p"
+        ],
+        "schemaFeatures": [
+          "tools",
+          "strictTools",
+          "jsonSchema",
+          "jsonObject",
+          "reasoning",
+          "usage",
+          "streaming"
+        ],
+        "adapterIDs": [
+          "openAICompatibleChatCompletions"
+        ]
       }
     },
     {
@@ -201,10 +473,33 @@
       },
       "modelDefaults": {
         "contextWindow": 2000000,
-        "endpointFamilies": ["chatCompletions"],
-        "modalities": ["text", "image", "file"],
-        "supportedParameters": ["max_tokens", "reasoning", "response_format", "structured_outputs", "temperature", "tools", "tool_choice", "top_p"],
-        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "reasoning", "usage", "streaming"]
+        "modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "supportedParameters": [
+          "max_tokens",
+          "reasoning",
+          "response_format",
+          "structured_outputs",
+          "temperature",
+          "tools",
+          "tool_choice",
+          "top_p"
+        ],
+        "schemaFeatures": [
+          "tools",
+          "strictTools",
+          "jsonSchema",
+          "jsonObject",
+          "reasoning",
+          "usage",
+          "streaming"
+        ],
+        "adapterIDs": [
+          "openAICompatibleChatCompletions"
+        ]
       }
     },
     {
@@ -213,10 +508,27 @@
       },
       "modelDefaults": {
         "contextWindow": 4096,
-        "endpointFamilies": ["chatCompletions"],
-        "modalities": ["text"],
-        "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "response_format", "tools", "tool_choice"],
-        "schemaFeatures": ["tools", "jsonObject", "usage", "streaming"]
+        "modalities": [
+          "text"
+        ],
+        "supportedParameters": [
+          "temperature",
+          "top_p",
+          "max_tokens",
+          "stop",
+          "response_format",
+          "tools",
+          "tool_choice"
+        ],
+        "schemaFeatures": [
+          "tools",
+          "jsonObject",
+          "usage",
+          "streaming"
+        ],
+        "adapterIDs": [
+          "openAICompatibleChatCompletions"
+        ]
       }
     },
     {
@@ -225,10 +537,31 @@
       },
       "modelDefaults": {
         "contextWindow": 1000000,
-        "endpointFamilies": ["chatCompletions"],
-        "modalities": ["text", "image"],
-        "supportedParameters": ["temperature", "top_p", "max_tokens", "response_format", "reasoning", "tools", "tool_choice"],
-        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "reasoning", "usage", "streaming"]
+        "modalities": [
+          "text",
+          "image"
+        ],
+        "supportedParameters": [
+          "temperature",
+          "top_p",
+          "max_tokens",
+          "response_format",
+          "reasoning",
+          "tools",
+          "tool_choice"
+        ],
+        "schemaFeatures": [
+          "tools",
+          "strictTools",
+          "jsonSchema",
+          "jsonObject",
+          "reasoning",
+          "usage",
+          "streaming"
+        ],
+        "adapterIDs": [
+          "openAICompatibleChatCompletions"
+        ]
       }
     },
     {
@@ -238,10 +571,32 @@
       },
       "modelDefaults": {
         "contextWindow": 2000000,
-        "endpointFamilies": ["chatCompletions"],
-        "modalities": ["text", "image", "file"],
-        "supportedParameters": ["temperature", "top_p", "max_tokens", "response_format", "reasoning", "tools", "tool_choice"],
-        "schemaFeatures": ["tools", "strictTools", "jsonSchema", "jsonObject", "reasoning", "usage", "streaming"]
+        "modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "supportedParameters": [
+          "temperature",
+          "top_p",
+          "max_tokens",
+          "response_format",
+          "reasoning",
+          "tools",
+          "tool_choice"
+        ],
+        "schemaFeatures": [
+          "tools",
+          "strictTools",
+          "jsonSchema",
+          "jsonObject",
+          "reasoning",
+          "usage",
+          "streaming"
+        ],
+        "adapterIDs": [
+          "openAICompatibleChatCompletions"
+        ]
       }
     },
     {
@@ -250,10 +605,27 @@
       },
       "modelDefaults": {
         "contextWindow": 1000000,
-        "endpointFamilies": ["chatCompletions"],
-        "modalities": ["text"],
-        "supportedParameters": ["temperature", "top_p", "max_tokens", "stop", "response_format", "tools", "tool_choice"],
-        "schemaFeatures": ["tools", "jsonObject", "usage", "streaming"]
+        "modalities": [
+          "text"
+        ],
+        "supportedParameters": [
+          "temperature",
+          "top_p",
+          "max_tokens",
+          "stop",
+          "response_format",
+          "tools",
+          "tool_choice"
+        ],
+        "schemaFeatures": [
+          "tools",
+          "jsonObject",
+          "usage",
+          "streaming"
+        ],
+        "adapterIDs": [
+          "openAICompatibleChatCompletions"
+        ]
       }
     },
     {
@@ -263,16 +635,32 @@
       },
       "modelDefaults": {
         "contextWindow": 1000000,
-        "endpointFamilies": ["chatCompletions"],
-        "modalities": ["text"],
-        "supportedParameters": ["max_tokens", "response_format", "thinking", "tools", "tool_choice"],
-        "schemaFeatures": ["tools", "jsonObject", "reasoning", "usage", "streaming"]
+        "modalities": [
+          "text"
+        ],
+        "supportedParameters": [
+          "max_tokens",
+          "response_format",
+          "thinking",
+          "tools",
+          "tool_choice"
+        ],
+        "schemaFeatures": [
+          "tools",
+          "jsonObject",
+          "reasoning",
+          "usage",
+          "streaming"
+        ],
+        "adapterIDs": [
+          "openAICompatibleChatCompletions"
+        ]
       }
     },
     {
       "match": {
         "providerRegex": "^openAIPlatform$",
-        "endpointFamily": "responses"
+        "adapterID": "openAIResponses"
       },
       "parameterMappings": [
         {
@@ -311,7 +699,7 @@
       "match": {
         "providerRegex": "^openAIPlatform$",
         "modelRegex": "^gpt-5(\\.|-|$)",
-        "endpointFamily": "responses"
+        "adapterID": "openAIResponses"
       },
       "parameterMappings": [
         {
@@ -326,7 +714,39 @@
     },
     {
       "match": {
-        "endpointFamily": "chatCompletions"
+        "adapterID": "openAIChatCompletions"
+      },
+      "parameterMappings": [
+        {
+          "parameter": "max_output_tokens",
+          "encoding": "scalarKey",
+          "wireKey": "max_tokens"
+        },
+        {
+          "parameter": "temperature",
+          "encoding": "scalarKey",
+          "wireKey": "temperature"
+        },
+        {
+          "parameter": "top_p",
+          "encoding": "scalarKey",
+          "wireKey": "top_p"
+        },
+        {
+          "parameter": "stop_sequences",
+          "encoding": "scalarKey",
+          "wireKey": "stop"
+        },
+        {
+          "parameter": "response_format",
+          "encoding": "structuredPreset",
+          "preset": "openAIChatResponseFormat"
+        }
+      ]
+    },
+    {
+      "match": {
+        "adapterID": "openAICompatibleChatCompletions"
       },
       "parameterMappings": [
         {
@@ -359,7 +779,32 @@
     {
       "match": {
         "modelRegex": "(^|.*/)gpt-5(\\.|-|$)",
-        "endpointFamily": "chatCompletions"
+        "adapterID": "openAIChatCompletions"
+      },
+      "parameterMappings": [
+        {
+          "parameter": "max_output_tokens",
+          "encoding": "scalarKey",
+          "wireKey": "max_completion_tokens"
+        },
+        {
+          "parameter": "temperature",
+          "enabled": false
+        },
+        {
+          "parameter": "top_p",
+          "enabled": false
+        },
+        {
+          "parameter": "stop_sequences",
+          "enabled": false
+        }
+      ]
+    },
+    {
+      "match": {
+        "modelRegex": "(^|.*/)gpt-5(\\.|-|$)",
+        "adapterID": "openAICompatibleChatCompletions"
       },
       "parameterMappings": [
         {
@@ -385,7 +830,7 @@
       "match": {
         "providerRegex": "^openAIPlatform$",
         "modelRegex": "^gpt-5(\\.|-|$)",
-        "endpointFamily": "chatCompletions"
+        "adapterID": "openAIChatCompletions"
       },
       "parameterMappings": [
         {
@@ -398,7 +843,7 @@
     {
       "match": {
         "providerRegex": "^deepSeek$",
-        "endpointFamily": "chatCompletions"
+        "adapterID": "openAICompatibleChatCompletions"
       },
       "parameterMappings": [
         {
@@ -432,7 +877,7 @@
       "match": {
         "providerRegex": "^deepSeek$",
         "modelRegex": "^deepseek-(reasoner|v4-pro)$",
-        "endpointFamily": "chatCompletions"
+        "adapterID": "openAICompatibleChatCompletions"
       },
       "parameterMappings": [
         {
@@ -448,7 +893,7 @@
     {
       "match": {
         "providerRegex": "^anthropic$",
-        "endpointFamily": "anthropicMessages"
+        "adapterID": "anthropicMessages"
       },
       "parameterMappings": [
         {

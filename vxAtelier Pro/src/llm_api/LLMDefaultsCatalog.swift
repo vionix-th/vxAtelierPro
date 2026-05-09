@@ -56,7 +56,7 @@ struct LLMDefaultsCatalog {
     func modelDefaults(providerID: LLMProviderID, modelID: String) -> LLMResolvedModelDefaults? {
         var resolved = LLMResolvedModelDefaults()
         var didMatch = false
-        for rule in rules where rule.matches(providerID: providerID, modelID: modelID, endpointFamily: nil) {
+        for rule in rules where rule.matches(providerID: providerID, modelID: modelID, adapterID: nil) {
             guard let modelDefaults = rule.modelDefaults else { continue }
             resolved.apply(modelDefaults)
             didMatch = true
@@ -69,7 +69,7 @@ struct LLMDefaultsCatalog {
         providerID: LLMProviderID,
         modelID: String,
         displayName: String? = nil,
-        endpointFamilies: [LLMEndpointFamily]? = nil,
+        adapterIDs: [LLMAdapterID]? = nil,
         rawMetadataJSON: String? = nil
     ) -> LLMModelDescriptor {
         let defaults = modelDefaults(providerID: providerID, modelID: modelID)
@@ -78,7 +78,7 @@ struct LLMDefaultsCatalog {
             displayName: displayName,
             providerID: providerID,
             contextWindow: defaults?.contextWindow,
-            endpointFamilies: endpointFamilies ?? defaults?.endpointFamilies ?? [],
+            adapterIDs: adapterIDs ?? defaults?.adapterIDs ?? [],
             modalities: defaults?.modalities ?? [.text],
             supportedParameters: defaults?.supportedParameters ?? [],
             parameterMappings: [],
@@ -87,23 +87,23 @@ struct LLMDefaultsCatalog {
         )
     }
 
-    /// Returns parameter mappings for matching provider/model/endpoint rules.
+    /// Returns parameter mappings for matching provider/model/adapter rules.
     func parameterMappings(
         providerID: LLMProviderID,
-        endpointFamily: LLMEndpointFamily,
+        adapterID: LLMAdapterID,
         modelID: String
     ) -> [LLMParameterMappingDescriptor] {
         var merged: [LLMParameterID: LLMParameterMappingDescriptor] = [:]
         var order: [LLMParameterID] = []
 
         for rule in rules {
-            guard rule.matches(providerID: providerID, modelID: modelID, endpointFamily: endpointFamily),
+            guard rule.matches(providerID: providerID, modelID: modelID, adapterID: adapterID),
                   let parameterMappings = rule.parameterMappings else {
                 continue
             }
 
             for mapping in parameterMappings {
-                let descriptor = mapping.descriptor(endpointFamily: endpointFamily)
+                let descriptor = mapping.descriptor(adapterID: adapterID)
                 if merged[descriptor.semanticParameterID] == nil {
                     order.append(descriptor.semanticParameterID)
                 }
@@ -164,14 +164,14 @@ struct LLMDefaultsCatalog {
 /// Fully resolved model metadata defaults after regex rule application.
 struct LLMResolvedModelDefaults: Equatable {
     var contextWindow: Int?
-    var endpointFamilies: [LLMEndpointFamily]?
+    var adapterIDs: [LLMAdapterID]?
     var modalities: [LLMModality]?
     var supportedParameters: [String]?
     var schemaFeatures: [LLMSchemaFeature]?
 
     mutating func apply(_ defaults: LLMModelDefaultsPayload) {
         if let contextWindow = defaults.contextWindow { self.contextWindow = contextWindow }
-        if let endpointFamilies = defaults.endpointFamilies { self.endpointFamilies = endpointFamilies }
+        if let adapterIDs = defaults.adapterIDs { self.adapterIDs = adapterIDs }
         if let modalities = defaults.modalities { self.modalities = modalities }
         if let supportedParameters = defaults.supportedParameters { self.supportedParameters = supportedParameters }
         if let schemaFeatures = defaults.schemaFeatures { self.schemaFeatures = schemaFeatures }
@@ -208,33 +208,33 @@ private struct LLMDefaultsRule {
     func matches(
         providerID: LLMProviderID,
         modelID: String,
-        endpointFamily: LLMEndpointFamily?
+        adapterID: LLMAdapterID?
     ) -> Bool {
-        match.matches(providerID: providerID, modelID: modelID, endpointFamily: endpointFamily)
+        match.matches(providerID: providerID, modelID: modelID, adapterID: adapterID)
     }
 }
 
 private struct LLMDefaultsRuleMatchPayload: Decodable {
     var providerRegex: String?
     var modelRegex: String?
-    var endpointFamily: LLMEndpointFamily?
+    var adapterID: LLMAdapterID?
 }
 
 private struct LLMDefaultsRuleMatch {
     var providerRegex: LLMCompiledRegex?
     var modelRegex: LLMCompiledRegex?
-    var endpointFamily: LLMEndpointFamily?
+    var adapterID: LLMAdapterID?
 
     init(payload: LLMDefaultsRuleMatchPayload?) throws {
         self.providerRegex = try LLMCompiledRegex.compile(payload?.providerRegex, field: "match.providerRegex")
         self.modelRegex = try LLMCompiledRegex.compile(payload?.modelRegex, field: "match.modelRegex")
-        self.endpointFamily = payload?.endpointFamily
+        self.adapterID = payload?.adapterID
     }
 
     func matches(
         providerID: LLMProviderID,
         modelID: String,
-        endpointFamily requestedEndpointFamily: LLMEndpointFamily?
+        adapterID requestedAdapterID: LLMAdapterID?
     ) -> Bool {
         if let providerRegex, !providerRegex.matches(providerID.rawValue) {
             return false
@@ -242,8 +242,8 @@ private struct LLMDefaultsRuleMatch {
         if let modelRegex, !modelRegex.matches(modelID) {
             return false
         }
-        if let endpointFamily {
-            return endpointFamily == requestedEndpointFamily
+        if let adapterID {
+            return adapterID == requestedAdapterID
         }
         return true
     }
@@ -278,7 +278,7 @@ private struct LLMCompiledRegex {
 
 struct LLMModelDefaultsPayload: Decodable, Equatable {
     var contextWindow: Int?
-    var endpointFamilies: [LLMEndpointFamily]?
+    var adapterIDs: [LLMAdapterID]?
     var modalities: [LLMModality]?
     var supportedParameters: [String]?
     var schemaFeatures: [LLMSchemaFeature]?
@@ -293,9 +293,9 @@ private struct LLMParameterMappingDefault: Decodable {
     var preset: LLMParameterStructuredPreset?
     var defaultValue: JSONValue?
 
-    func descriptor(endpointFamily: LLMEndpointFamily) -> LLMParameterMappingDescriptor {
+    func descriptor(adapterID: LLMAdapterID) -> LLMParameterMappingDescriptor {
         LLMParameterMappingDescriptor(
-            endpointFamily: endpointFamily,
+            adapterID: adapterID,
             semanticParameterID: parameter,
             isEnabled: enabled ?? true,
             isRequired: required ?? false,

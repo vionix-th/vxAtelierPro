@@ -50,7 +50,7 @@ struct ConversationRunStore {
     ) throws -> ResponseRunItem {
         let run = ResponseRunItem(
             providerID: request.providerID,
-            endpointFamily: request.endpointFamily,
+            adapterID: request.adapterID,
             requestedModelID: request.modelID,
             status: .pending,
             turn: turn

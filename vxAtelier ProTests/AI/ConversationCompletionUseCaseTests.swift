@@ -55,7 +55,7 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         let descriptor = LLMModelDescriptor(
             id: "gpt-test",
             providerID: .openAIPlatform,
-            endpointFamilies: [.responses],
+            adapterIDs: [.openAIResponses],
             modalities: [.text],
             schemaFeatures: [.usage]
         )
@@ -91,7 +91,7 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         let descriptor = LLMModelDescriptor(
             id: "gpt-test",
             providerID: .openAIPlatform,
-            endpointFamilies: [.responses],
+            adapterIDs: [.openAIResponses],
             modalities: [.text],
             schemaFeatures: [.usage]
         )

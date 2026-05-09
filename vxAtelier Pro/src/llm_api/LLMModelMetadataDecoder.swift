@@ -6,7 +6,7 @@ enum LLMModelMetadataDecoder {
     static func openAICompatibleDescriptors(
         from data: [JSONValue],
         profile: LLMProviderProfile,
-        endpointFamilies: [LLMEndpointFamily],
+        adapterIDs: [LLMAdapterID],
         defaultsCatalog: LLMDefaultsCatalog = .bundled
     ) -> [LLMModelDescriptor] {
         data.compactMap { item in
@@ -15,7 +15,7 @@ enum LLMModelMetadataDecoder {
                 providerID: profile.id,
                 modelID: id,
                 displayName: object.string("name") ?? object.string("display_name") ?? id,
-                endpointFamilies: endpointFamilies,
+                adapterIDs: adapterIDs,
                 rawMetadataJSON: rawJSONString(from: item)
             )
             applyProviderMetadata(from: object, to: &descriptor)
@@ -35,7 +35,7 @@ enum LLMModelMetadataDecoder {
                 providerID: profile.id,
                 modelID: id,
                 displayName: object.string("display_name") ?? object.string("name") ?? id,
-                endpointFamilies: [.anthropicMessages],
+                adapterIDs: [.anthropicMessages],
                 rawMetadataJSON: rawJSONString(from: item)
             )
             applyProviderMetadata(from: object, to: &descriptor)

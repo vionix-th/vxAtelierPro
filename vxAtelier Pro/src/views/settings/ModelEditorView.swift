@@ -14,7 +14,7 @@ struct ModelEditorView: View {
     @State private var contextSize: Int
     @State private var modalities: [LLMModality]
     @State private var schemaFeatures: [LLMSchemaFeature]
-    @State private var selectedEndpointFamilyRaw: String
+    @State private var selectedAdapterIDRaw: String
     
     init(model: ModelItem) {
         self.model = model
@@ -23,23 +23,23 @@ struct ModelEditorView: View {
         _contextSize = State(initialValue: model.contextSize)
         _modalities = State(initialValue: model.modalityEnums)
         _schemaFeatures = State(initialValue: model.schemaFeatureEnums)
-        _selectedEndpointFamilyRaw = State(
-            initialValue: model.endpointFamiliesRaw.first ?? LLMEndpointFamily.chatCompletions.rawValue
+        _selectedAdapterIDRaw = State(
+            initialValue: model.adapterIDsRaw.first ?? LLMAdapterID.openAIChatCompletions.rawValue
         )
     }
 
-    private var endpointFamilies: [LLMEndpointFamily] {
-        let families = model.endpointFamiliesRaw.compactMap { LLMEndpointFamily(rawValue: $0) }.filter { $0 != .models }
-        return families.isEmpty ? [.chatCompletions] : families
+    private var adapterIDs: [LLMAdapterID] {
+        let adapters = model.adapterIDsRaw.compactMap { LLMAdapterID(rawValue: $0) }
+        return adapters.isEmpty ? [.openAIChatCompletions] : adapters
     }
 
-    private var selectedEndpointFamily: LLMEndpointFamily {
-        LLMEndpointFamily(rawValue: selectedEndpointFamilyRaw) ?? endpointFamilies.first ?? .chatCompletions
+    private var selectedAdapterID: LLMAdapterID {
+        LLMAdapterID(rawValue: selectedAdapterIDRaw) ?? adapterIDs.first ?? .openAIChatCompletions
     }
 
-    private var selectedEndpointMappings: [ModelParameterMappingItem] {
+    private var selectedAdapterMappings: [ModelParameterMappingItem] {
         model.parameterMappings
-            .filter { $0.endpointFamilyEnum == selectedEndpointFamily }
+            .filter { $0.adapterIDEnum == selectedAdapterID }
             .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
     }
 
@@ -48,7 +48,7 @@ struct ModelEditorView: View {
     }
 
     private var addableParameterIDs: [LLMParameterID] {
-        let existing = Set(selectedEndpointMappings.map(\.semanticParameterIDEnum))
+        let existing = Set(selectedAdapterMappings.map(\.semanticParameterIDEnum))
         return LLMParameterID.allCases
             .filter { $0.isProviderMappable && !existing.contains($0) }
     }
@@ -196,8 +196,8 @@ struct ModelEditorView: View {
 
                 Section {
                     VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
-                        Picker("Endpoint", selection: $selectedEndpointFamilyRaw) {
-                            ForEach(endpointFamilies) { family in
+                        Picker("Adapter", selection: $selectedAdapterIDRaw) {
+                            ForEach(adapterIDs) { family in
                                 Text(family.displayName).tag(family.rawValue)
                             }
                         }
@@ -205,9 +205,9 @@ struct ModelEditorView: View {
 
                         HStack {
                             Button {
-                                model.resetDefaultParameterMappings(endpointFamily: selectedEndpointFamily)
+                                model.resetDefaultParameterMappings(adapterID: selectedAdapterID)
                             } label: {
-                                Label("Reset Endpoint Defaults", systemImage: "arrow.counterclockwise")
+                                Label("Reset Adapter Defaults", systemImage: "arrow.counterclockwise")
                             }
                             .buttonStyle(.bordered)
 
@@ -223,15 +223,15 @@ struct ModelEditorView: View {
                             .disabled(addableParameterIDs.isEmpty)
                         }
 
-                        if selectedEndpointMappings.isEmpty {
-                            Text("No parameters configured for this endpoint.")
+                        if selectedAdapterMappings.isEmpty {
+                            Text("No parameters configured for this adapter.")
                                 .foregroundColor(.secondary)
                                 .italic()
                         } else {
                             VStack(spacing: AppDefaults.paddingSmall) {
-                                ForEach(selectedEndpointMappings) { mapping in
+                                ForEach(selectedAdapterMappings) { mapping in
                                     ModelParameterMappingRow(mapping: mapping)
-                                    if mapping.id != selectedEndpointMappings.last?.id {
+                                    if mapping.id != selectedAdapterMappings.last?.id {
                                         Divider()
                                     }
                                 }
@@ -281,8 +281,8 @@ struct ModelEditorView: View {
                     selectedConfigurationID = model.apiConfiguration?.persistentModelID ?? apiConfigurations.first?.persistentModelID
                 }
                 model.materializeDefaultParameterMappings(preserveCustomized: true)
-                if !endpointFamilies.contains(where: { $0.rawValue == selectedEndpointFamilyRaw }) {
-                    selectedEndpointFamilyRaw = endpointFamilies.first?.rawValue ?? LLMEndpointFamily.chatCompletions.rawValue
+                if !adapterIDs.contains(where: { $0.rawValue == selectedAdapterIDRaw }) {
+                    selectedAdapterIDRaw = adapterIDs.first?.rawValue ?? LLMAdapterID.openAIChatCompletions.rawValue
                 }
             }
             .onChange(of: selectedConfigurationID) { _, _ in
@@ -298,7 +298,7 @@ struct ModelEditorView: View {
             providerID: selectedConfiguration.providerIDEnum,
             apiConfiguration: selectedConfiguration,
             modelContext: modelContext,
-            endpointFamilies: [selectedConfiguration.defaultEndpointFamilyEnum]
+            adapterIDs: [selectedConfiguration.defaultAdapterIDEnum]
         )
         model.name = name
         model.modelID = name
@@ -307,8 +307,8 @@ struct ModelEditorView: View {
         model.provider = selectedConfiguration.providerIDEnum.displayName
         model.providerID = selectedConfiguration.providerID
         model.contextSize = contextSize
-        model.endpointFamiliesRaw = defaultDescriptor?.endpointFamilies.map(\.rawValue)
-            ?? [selectedConfiguration.defaultEndpointFamilyEnum.rawValue]
+        model.adapterIDsRaw = defaultDescriptor?.adapterIDs.map(\.rawValue)
+            ?? [selectedConfiguration.defaultAdapterIDEnum.rawValue]
         model.modalitiesRaw = modalities.map(\.rawValue)
         model.schemaFeaturesRaw = schemaFeatures.map(\.rawValue)
         model.materializeDefaultParameterMappings(preserveCustomized: true)
@@ -347,18 +347,18 @@ struct ModelEditorView: View {
             providerID: selectedConfiguration.providerIDEnum,
             apiConfiguration: selectedConfiguration,
             modelContext: modelContext,
-            endpointFamilies: [selectedConfiguration.defaultEndpointFamilyEnum]
+            adapterIDs: [selectedConfiguration.defaultAdapterIDEnum]
         )
         contextSize = descriptor?.contextWindow ?? AppDefaults.ModelContextSizes.defaultSize
         modalities = descriptor?.modalities ?? [.text]
         schemaFeatures = descriptor?.schemaFeatures ?? []
-        selectedEndpointFamilyRaw = descriptor?.endpointFamilies.first?.rawValue
-            ?? selectedConfiguration.defaultEndpointFamilyEnum.rawValue
+        selectedAdapterIDRaw = descriptor?.adapterIDs.first?.rawValue
+            ?? selectedConfiguration.defaultAdapterIDEnum.rawValue
     }
 
     private func addMapping(_ parameterID: LLMParameterID) {
         let mapping = ModelParameterMappingItem(
-            endpointFamily: selectedEndpointFamily,
+            adapterID: selectedAdapterID,
             semanticParameterID: parameterID,
             isEnabled: true,
             isRequired: false,

@@ -30,7 +30,7 @@ final class ConversationRunStoreTests: XCTestCase {
         let turn = try store.startTurn(message: "Hello", in: conversation)
         let request = LLMRequest.runtimeEquivalent(
             providerID: .openAIPlatform,
-            endpointFamily: .responses,
+            adapterID: .openAIResponses,
             modelID: "gpt-test",
             messages: [
                 LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Hello")])
