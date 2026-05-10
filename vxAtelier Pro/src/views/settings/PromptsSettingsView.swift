@@ -67,13 +67,13 @@ struct PromptsSettingsView: View {
         showImportAlert = true
     }
 
-    private var actionBarSecondaryActions: [CurrentSettingsActionBar.ActionItem] {
-        var actions: [CurrentSettingsActionBar.ActionItem] = []
+    private var actionBarSecondaryActions: [CurrentSettingsActionBar.MenuAction] {
+        var actions: [CurrentSettingsActionBar.MenuAction] = []
 
         if selectionMode {
             if selectedTemplateIDs.isEmpty {
                 // Show Cancel button when no items are selected
-                actions.append(CurrentSettingsActionBar.ActionItem(
+                actions.append(CurrentSettingsActionBar.MenuAction(
                     title: "Cancel Export",
                     iconName: "xmark.circle",
                     handler: {
@@ -83,7 +83,7 @@ struct PromptsSettingsView: View {
                 ))
             } else {
                 // Show Export button when items are selected
-                actions.append(CurrentSettingsActionBar.ActionItem(
+                actions.append(CurrentSettingsActionBar.MenuAction(
                     title: "Export Selected",
                     iconName: "square.and.arrow.up",
                     handler: exportSelectedTemplates
@@ -92,7 +92,7 @@ struct PromptsSettingsView: View {
 
             // Always show Select All/None in selection mode
             let allSelected = selectedTemplateIDs.count == promptTemplates.count
-            actions.append(CurrentSettingsActionBar.ActionItem(
+            actions.append(CurrentSettingsActionBar.MenuAction(
                 title: allSelected ? "Select None" : "Select All",
                 iconName: allSelected ? "circle" : "checkmark.circle.fill",
                 handler: {
@@ -105,12 +105,12 @@ struct PromptsSettingsView: View {
             ))
         } else {
             // Show Import and Export buttons
-            actions.append(CurrentSettingsActionBar.ActionItem(
+            actions.append(CurrentSettingsActionBar.MenuAction(
                 title: "Import",
                 iconName: "square.and.arrow.down",
                 handler: { showImporter = true }
             ))
-            actions.append(CurrentSettingsActionBar.ActionItem(
+            actions.append(CurrentSettingsActionBar.MenuAction(
                 title: "Export",
                 iconName: "square.and.arrow.up",
                 handler: { selectionMode = true }
@@ -129,9 +129,7 @@ struct PromptsSettingsView: View {
                 primaryAction: {
                     addTemplate()
                 },
-                secondaryActions: actionBarSecondaryActions,
-                showAddButton: false,
-                addLabel: { EmptyView() }
+                secondaryActions: actionBarSecondaryActions
             )
             .font(.headline)
             .padding(.vertical, AppDefaults.paddingSmall)

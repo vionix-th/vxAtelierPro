@@ -7,27 +7,35 @@ struct SettingsActionBar<PrimaryLabel: View, AddLabel: View>: View {
     let primaryLabel: PrimaryLabel
     
     // Secondary actions
-    let secondaryActions: [ActionItem]
+    let secondaryActions: [MenuAction]
     
-    // Add button (optional)
-    let showAddButton: Bool
     let addAction: (() -> Void)?
     let addLabel: AddLabel?
     
     init(
         @ViewBuilder primaryLabel: () -> PrimaryLabel,
         primaryAction: @escaping () -> Void,
-        secondaryActions: [ActionItem] = [],
-        showAddButton: Bool = false,
-        addAction: (() -> Void)? = nil,
-        @ViewBuilder addLabel: () -> AddLabel? = { nil }
+        secondaryActions: [MenuAction] = [],
+        addAction: @escaping () -> Void,
+        @ViewBuilder addLabel: () -> AddLabel
     ) {
         self.primaryLabel = primaryLabel()
         self.primaryAction = primaryAction
         self.secondaryActions = secondaryActions
-        self.showAddButton = showAddButton
         self.addAction = addAction
         self.addLabel = addLabel()
+    }
+
+    init(
+        @ViewBuilder primaryLabel: () -> PrimaryLabel,
+        primaryAction: @escaping () -> Void,
+        secondaryActions: [MenuAction] = []
+    ) where AddLabel == EmptyView {
+        self.primaryLabel = primaryLabel()
+        self.primaryAction = primaryAction
+        self.secondaryActions = secondaryActions
+        self.addAction = nil
+        self.addLabel = nil
     }
     
     var body: some View {
@@ -63,7 +71,7 @@ struct SettingsActionBar<PrimaryLabel: View, AddLabel: View>: View {
             }
             
             // Add button (optional)
-            if showAddButton, let addAction = addAction, let addLabel = addLabel {
+            if let addAction = addAction, let addLabel = addLabel {
                 Button(action: addAction) {
                     addLabel
                 }
@@ -73,7 +81,7 @@ struct SettingsActionBar<PrimaryLabel: View, AddLabel: View>: View {
     }
     
     // Represents a menu action item
-    struct ActionItem: Identifiable {
+    struct MenuAction: Identifiable {
         let id = UUID()
         let title: String
         let iconName: String
@@ -95,8 +103,9 @@ struct SettingsActionBar<PrimaryLabel: View, AddLabel: View>: View {
             self.handler = handler
         }
         
-        static func separator() -> ActionItem {
-            ActionItem(isSeparator: true)
+        static func separator() -> MenuAction {
+            MenuAction(isSeparator: true)
         }
     }
-} 
+
+}

@@ -75,22 +75,6 @@ struct VoiceConfigurationListView: View {
                                     .lineLimit(1)
                             }
                         }
-                        .settingsRowActions(
-                            onEdit: {
-                                vxAtelierPro.log.debug("🎤 Editing configuration for role '\(config.role)' and language '\(config.language)'")
-                                editingConfig = EditingConfig(config: config, isNew: false)
-                            },
-                            onDelete: {
-                                vxAtelierPro.log.notice("🎤 Deleting configuration for role '\(config.role)' and language '\(config.language)'")
-                                do {
-                                    try queryManager.delete(config)
-                                } catch {
-                                    vxAtelierPro.log.error("🎤 Failed to delete configuration: \(error.localizedDescription)")
-                                    errorMessage = "Failed to delete configuration: \(error.localizedDescription)"
-                                    showError = true
-                                }
-                            }
-                        )
                     }
                 }
             }

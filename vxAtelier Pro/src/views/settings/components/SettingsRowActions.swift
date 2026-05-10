@@ -44,7 +44,7 @@ struct SettingsRowActions: ViewModifier {
 }
 
 extension View {
-    func settingsRowActions(onEdit: (() -> Void)? = nil, onDelete: (() -> Void)? = nil) -> some View {
+    func rowActions(onEdit: (() -> Void)? = nil, onDelete: (() -> Void)? = nil) -> some View {
         self.modifier(SettingsRowActions(onEdit: onEdit, onDelete: onDelete))
     }
-} 
+}

@@ -26,10 +26,6 @@ struct ModelProviderSectionView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
-                    .settingsRowActions(
-                        onEdit: { onEditModel(model) },
-                        onDelete: { onDeleteModel(model) }
-                    )
                 }
             }
         }

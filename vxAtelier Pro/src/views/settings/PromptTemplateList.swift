@@ -82,21 +82,6 @@ struct PromptTemplateList: View {
                                 onTemplateActivated(template)
                             }
                         }
-                        .settingsRowActions(
-                            onEdit: {
-                                editingTemplate = EditingTemplate(template: template, isNew: false)
-                            },
-                            onDelete: {
-                                vxAtelierPro.log.notice("Deleting template '\(template.name)'")
-                                do {
-                                    try queryManager.delete(template)
-                                } catch {
-                                    vxAtelierPro.log.error("Failed to delete template '\(template.name)': \(error.localizedDescription)")
-                                    errorMessage = "Failed to delete template: \(error.localizedDescription)"
-                                    showError = true
-                                }
-                            }
-                        )
                     }
                 }
             }

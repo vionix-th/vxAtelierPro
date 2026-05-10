@@ -77,8 +77,9 @@ struct SettingsListRow<Content: View>: View {
                 }
             }
         }
+        .rowActions(onEdit: onEdit, onDelete: onDelete)
         .padding(AppDefaults.paddingSmall)
         .background(Color.secondary.opacity(AppDefaults.sectionBackgroundOpacity))
         .clipShape(RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium))
     }
-} 
+}

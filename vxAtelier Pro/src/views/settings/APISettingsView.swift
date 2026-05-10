@@ -50,9 +50,7 @@ struct APISettingsView: View {
                 primaryAction: {
                     startNewConfiguration()
                 },
-                secondaryActions: [],
-                showAddButton: false,
-                addLabel: { EmptyView() }
+                secondaryActions: []
             )
             .padding(.vertical, AppDefaults.paddingSmall)
             .padding(.horizontal, AppDefaults.paddingSmall)
@@ -84,14 +82,6 @@ struct APISettingsView: View {
                                     .foregroundColor(.gray)
                             }
                         }
-                        .settingsRowActions(
-                            onEdit: {
-                                editingConfig = EditingConfig(config: config, isNew: false)
-                            },
-                            onDelete: {
-                                deleteAPIConfiguration(config)
-                            }
-                        )
                     }
                 }
             }

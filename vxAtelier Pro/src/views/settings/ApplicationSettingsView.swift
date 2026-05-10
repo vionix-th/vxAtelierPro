@@ -1,20 +1,7 @@
 import SwiftUI
-import SwiftData
-import AVFoundation
-import os
-
-// MARK: - OSLogType Extension
-extension OSLogType {
-    static let notice = OSLogType(rawValue: 2) // Add notice level which is between info and debug
-}
 
 // MARK: - Application Settings View
 struct ApplicationSettingsView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
-    @Environment(QueryManager.self) private var queryManager
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-
     enum SettingsTab: CaseIterable, Identifiable {
         case general
         case api
@@ -60,7 +47,7 @@ struct ApplicationSettingsView: View {
         }
     }
 
-    @State private var selectedTab: SettingsTab?
+    @State private var selectedTab: SettingsTab
     private let initialTab: SettingsTab?
 
     init(initialTab: SettingsTab? = nil) {
@@ -110,11 +97,6 @@ struct ApplicationSettingsView: View {
                 case .logSources:
                     LogSourcesSettingsView()
                         .padding(AppDefaults.paddingLarge)
-                case nil:
-                    Text("Select a category from the sidebar.")
-                        .font(.title)
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }
@@ -122,14 +104,7 @@ struct ApplicationSettingsView: View {
             vxAtelierPro.log.debug("ApplicationSettingsView appeared")
             if let initialTab = initialTab {
                 selectedTab = initialTab
-            } else if selectedTab == nil {
-                selectedTab = .general
             }
-        }
-        .onChange(of: initialTab) { _, newValue in
-            if let newValue {
-                selectedTab = newValue
-            } 
         }
     }
 }

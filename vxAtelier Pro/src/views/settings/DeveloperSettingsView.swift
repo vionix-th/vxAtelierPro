@@ -5,7 +5,6 @@ struct DeveloperSettingsView: View {
     @AppStorage(AppSettings.Keys.isMarkdownTextSelectable) private var isMarkdownTextSelectable: Bool = AppDefaults.isMarkdownTextSelectable
     @AppStorage(AppSettings.Keys.showSystemConversations) private var showSystemConversations: Bool = AppDefaults.showSystemConversations
     @AppStorage(AppSettings.Keys.makeKeyAndOrderFront) private var makeKeyAndOrderFront: Bool = false
-    // New debug/streaming/scrolling flags
     @AppStorage(AppSettings.Keys.autoScrollDebugEnabled) private var autoScrollDebugEnabled: Bool = false
     @AppStorage(AppSettings.Keys.autoScrollGateEnabled) private var autoScrollGateEnabled: Bool = false
     @AppStorage(AppSettings.Keys.streamingThrottleEnabled) private var streamingThrottleEnabled: Bool = false
@@ -13,19 +12,6 @@ struct DeveloperSettingsView: View {
     @AppStorage(AppSettings.Keys.streamingDebugEnabled) private var streamingDebugEnabled: Bool = false
     @AppStorage(AppSettings.Keys.markdownStreamFinalizeOnly) private var markdownStreamFinalizeOnly: Bool = false
     @AppStorage(AppSettings.Keys.showToolCallChips) private var showToolCallChips: Bool = true
-    @AppStorage(AppSettings.Keys.selfSignedCertWhitelist) private var selfSignedCertWhitelistJSON: String = "[]"
-    @State private var selfSignedCertWhitelist: [String] = []
-
-    private func decodeWhitelist(from json: String) -> [String] {
-        guard let data = json.data(using: .utf8) else { return [] }
-        return (try? JSONDecoder().decode([String].self, from: data)) ?? []
-    }
-    private func encodeWhitelist(_ whitelist: [String]) -> String {
-        if let data = try? JSONEncoder().encode(whitelist), let json = String(data: data, encoding: .utf8) {
-            return json
-        }
-        return "[]"
-    }
 
     var body: some View {
         ScrollView {
@@ -56,11 +42,5 @@ struct DeveloperSettingsView: View {
             .padding(.vertical, AppDefaults.paddingLarge)
         }
         .navigationTitle("Developer")
-        .onAppear {
-            selfSignedCertWhitelist = decodeWhitelist(from: selfSignedCertWhitelistJSON)
-        }
-        .onChange(of: selfSignedCertWhitelist) {
-            selfSignedCertWhitelistJSON = encodeWhitelist(selfSignedCertWhitelist)
-        }
     }
-} 
+}

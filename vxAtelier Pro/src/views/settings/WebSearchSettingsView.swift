@@ -38,9 +38,7 @@ struct WebSearchSettingsView: View {
                         provider: WebSearchProvider.google.rawValue
                     ), isNew: true)
                 },
-                secondaryActions: [],
-                showAddButton: false,
-                addLabel: { EmptyView() }
+                secondaryActions: []
             )
             .padding(.vertical, AppDefaults.paddingSmall)
             .padding(.horizontal, AppDefaults.paddingSmall)
@@ -77,14 +75,6 @@ struct WebSearchSettingsView: View {
                                     .foregroundColor(.gray)
                             }
                         }
-                        .settingsRowActions(
-                            onEdit: {
-                                editingConfig = EditingConfig(config: config, isNew: false)
-                            },
-                            onDelete: {
-                                deleteWebSearchConfiguration(config)
-                            }
-                        )
                     }
                 }
             }
