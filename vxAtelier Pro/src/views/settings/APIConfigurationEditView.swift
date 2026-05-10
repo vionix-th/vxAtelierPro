@@ -12,13 +12,13 @@ import SwiftUI
 struct APIConfigurationEditView: View {
     // MARK: - Environment & Properties
 
-    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(QueryManager.self) private var queryManager
     @Query(sort: [SortDescriptor(\APIConfigurationItem.name)]) private var apiConfigurations: [APIConfigurationItem]
 
     let configuration: APIConfigurationItem
     var isNewConfiguration: Bool
+    let onSaveCompleted: ((String) -> Void)?
 
     // MARK: - State
 
@@ -33,8 +33,6 @@ struct APIConfigurationEditView: View {
 
     // UI state
     @State private var isAPIKeyVisible = false
-    @State private var selectedPreset: APIPreset?
-    @State private var showPresetConfirmation = false
     @State private var showValidationError = false
     @State private var validationErrorMessage = ""
     @State private var isModelPickerPresented = false
@@ -42,12 +40,18 @@ struct APIConfigurationEditView: View {
     @State private var isValidating = false
     @State private var isRefreshingModels = false
     @State private var fetchedModelDescriptors: [LLMModelDescriptor]?
+    @State private var selectedPreset: APIPreset
 
     // MARK: - Initialization
 
-    init(configuration: APIConfigurationItem, isNewConfiguration: Bool = false) {
+    init(
+        configuration: APIConfigurationItem,
+        isNewConfiguration: Bool = false,
+        onSaveCompleted: ((String) -> Void)? = nil
+    ) {
         self.configuration = configuration
         self.isNewConfiguration = isNewConfiguration
+        self.onSaveCompleted = onSaveCompleted
         _name = State(initialValue: configuration.name)
         _apiKey = State(initialValue: configuration.apiKey)
         _baseURL = State(initialValue: configuration.baseURL)
@@ -57,6 +61,7 @@ struct APIConfigurationEditView: View {
         let initialDefaultModel = (configuration.defaultModel?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { !$0.isEmpty ? $0 : nil }
             ?? APIConfigurationEditView.suggestedDefaultModel(for: configuration.providerIDEnum)
         _defaultModel = State(initialValue: initialDefaultModel)
+        _selectedPreset = State(initialValue: APIPreset.preset(for: configuration.providerIDEnum))
     }
 
     private var currentProfile: LLMProviderProfile {
@@ -65,6 +70,21 @@ struct APIConfigurationEditView: View {
 
     private var selectableAdapterIDs: [LLMAdapterID] {
         currentProfile.supportedAdapterIDs
+    }
+
+    private var shouldRequireAPIKeyToBrowseModels: Bool {
+        switch currentProfile.authKind {
+        case .none:
+            return false
+        case .bearerToken, .xAPIKey:
+            return true
+        case .customHeaders, .chatGPTOAuth, .chatGPTDeviceCode, .chatGPTCodexToken:
+            return false
+        }
+    }
+
+    private var canBrowseModels: Bool {
+        !shouldRequireAPIKeyToBrowseModels || !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     // MARK: - View Body
@@ -90,7 +110,6 @@ struct APIConfigurationEditView: View {
                                 .textFieldStyle(.roundedBorder)
                                 .padding(.horizontal, AppDefaults.paddingSmall)
                         }
-                        // Default Configuration Toggle
                         VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
                             let configsCount = apiConfigurations.count
                             let toggleDisabled: Bool = {
@@ -100,12 +119,7 @@ struct APIConfigurationEditView: View {
                             }()
 
                             Toggle(isOn: $isDefault) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "star.fill")
-                                        .foregroundColor(.yellow)
-                                    Text("Use as Default Configuration")
-                                        .foregroundColor(.primary)
-                                }
+                                Label("Use as Default Configuration", systemImage: "star.fill")
                             }
                             .toggleStyle(.switch)
                             .padding(.horizontal, AppDefaults.paddingSmall)
@@ -117,7 +131,6 @@ struct APIConfigurationEditView: View {
                                     .foregroundColor(.secondary)
                             }
                         }
-                        // Default Model Selector
                         VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
                             Text("Default Model")
                                 .font(.subheadline)
@@ -136,11 +149,11 @@ struct APIConfigurationEditView: View {
                                             .scaleEffect(0.8)
                                             .frame(width: 20, height: 20)
                                     } else {
-                                        Image(systemName: "chevron.right")
-                                            .foregroundColor(.secondary)
+                                        Text("Browse Models")
                                     }
                                 }
-                                .disabled(isValidating || isRefreshingModels)
+                                .buttonStyle(.bordered)
+                                .disabled(isValidating || isRefreshingModels || !canBrowseModels)
                             }
                             .padding(.vertical, 8)
                             .padding(.horizontal, 12)
@@ -158,11 +171,9 @@ struct APIConfigurationEditView: View {
                                     fallbackModelDescriptors: fetchedModelDescriptors
                                 )
                             }
-                            Text(
-                                "This model will be used by default for new conversations using this configuration."
-                            )
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            Text(canBrowseModels ? "Browse provider models and pick a default." : "Enter an API key before browsing provider models.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
                     }
                     .padding(AppDefaults.paddingLarge)
@@ -237,51 +248,23 @@ struct APIConfigurationEditView: View {
                         .padding(.horizontal, AppDefaults.paddingLarge)
 
                     VStack(spacing: AppDefaults.paddingMedium) {
-                        // Presets Selector (moved here)
                         VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
-                            Text("Presets")
+                            Text("Provider Preset")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
-                            LazyVGrid(
-                                columns: [
-                                    GridItem(
-                                        .adaptive(minimum: 100), spacing: AppDefaults.paddingSmall)
-                                ], spacing: AppDefaults.paddingSmall
-                            ) {
+                            Picker("Provider Preset", selection: $selectedPreset) {
                                 ForEach(APIPreset.allCases, id: \.self) { preset in
-                                    Button {
-                                        selectedPreset = preset
-                                        applySelectedPreset()
-                                    } label: {
-                                        HStack(spacing: 6) {
-                                            Image(systemName: preset.iconName)
-                                                .foregroundColor(preset.color)
-                                                .font(.caption)
-                                            Text(preset.displayName)
-                                                .font(.caption)
-                                                .foregroundColor(.primary)
-                                                .lineLimit(1)
-                                        }
-                                        .padding(.vertical, 6)
-                                        .padding(.horizontal, 8)
-                                        .frame(maxWidth: .infinity)
-                                        .background(
-                                            RoundedRectangle(
-                                                cornerRadius: AppDefaults.cornerRadiusSmall
-                                            )
-                                            .fill(preset.color.opacity(0.1))
-                                            .overlay(
-                                                RoundedRectangle(
-                                                    cornerRadius: AppDefaults.cornerRadiusSmall
-                                                )
-                                                .stroke(preset.color.opacity(0.3), lineWidth: 1)
-                                            )
-                                        )
-                                    }
-                                    .buttonStyle(.plain)
+                                    Label(preset.displayName, systemImage: preset.iconName)
+                                        .tag(preset)
                                 }
                             }
-                            .padding(.horizontal, AppDefaults.paddingSmall)
+                            .pickerStyle(.menu)
+                            .onChange(of: selectedPreset) { _, _ in
+                                applySelectedPreset()
+                            }
+                            Text("New configurations start from OpenAI Platform defaults.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
                         VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
                             Text("Default API Mode")
@@ -293,7 +276,7 @@ struct APIConfigurationEditView: View {
                                         Text(family.displayName).tag(family)
                                     }
                                 }
-                                .pickerStyle(.segmented)
+                                .pickerStyle(.menu)
                             } else {
                                 Text(selectableAdapterIDs.first?.displayName ?? currentProfile.defaultAdapterID.displayName)
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -346,16 +329,6 @@ struct APIConfigurationEditView: View {
                         "🔑 APIConfigurationListView: Configuration edit cancelled")
                     dismiss()
                 }
-            }
-        }
-        .onChange(of: providerID) { _, newValue in
-            if !hasUserEditedDefaultModel || defaultModel.isEmpty {
-                defaultModel = APIConfigurationEditView.suggestedDefaultModel(for: newValue)
-            }
-            fetchedModelDescriptors = nil
-            let profile = LLMProviderRegistry.shared.profile(for: newValue)
-            if !profile.supportedAdapterIDs.contains(defaultAdapterID) {
-                defaultAdapterID = profile.defaultAdapterID
             }
         }
         .onAppear {
@@ -448,11 +421,12 @@ struct APIConfigurationEditView: View {
                 "🔑 Saved configuration and refreshed models: \(configuration.name), isDefault: \(configuration.isDefault), inserted: \(shouldInsert), updated: \(refreshSummary.updated), added: \(refreshSummary.added)"
             )
             if let failure = refreshSummary.failures.first {
-                validationErrorMessage = "Saved configuration, but model refresh failed: \(failure.message)"
-                showValidationError = true
+                let message = "Saved configuration, but model refresh failed: \(failure.message)"
+                onSaveCompleted?(message)
                 vxAtelierPro.log.warning(
                     "🔑 Saved configuration \(configuration.name), but model refresh failed: \(failure.message)"
                 )
+                dismiss()
                 return
             }
             dismiss()
@@ -532,7 +506,7 @@ struct APIConfigurationEditView: View {
 
     /// Applies the selected preset to the configuration
     private func applySelectedPreset() {
-        guard let preset = selectedPreset else { return }
+        let preset = selectedPreset
 
         let allow_new_name_for =
             APIPreset.allCases.map { $0.displayName } + [AppDefaults.newApiConfigurationName, ""]
@@ -549,7 +523,6 @@ struct APIConfigurationEditView: View {
         hasUserEditedDefaultModel = false
 
         vxAtelierPro.log.info("🔑 Applied \(preset.displayName) preset")
-        selectedPreset = nil
     }
 }
 
@@ -606,6 +579,29 @@ enum APIPreset: String, CaseIterable {
         case .lmStudio: return .lmStudio
         case .ollama: return .ollama
         case .customOpenAICompatible: return .customOpenAICompatible
+        }
+    }
+
+    static func preset(for providerID: LLMProviderID) -> APIPreset {
+        switch providerID {
+        case .openAIPlatform:
+            return .openAI
+        case .anthropic:
+            return .anthropic
+        case .xAI:
+            return .xAI
+        case .deepSeek:
+            return .deepSeek
+        case .openRouter:
+            return .openRouter
+        case .lmStudio:
+            return .lmStudio
+        case .ollama:
+            return .ollama
+        case .customOpenAICompatible:
+            return .customOpenAICompatible
+        case .openAIChatGPTSubscription:
+            return .openAI
         }
     }
 

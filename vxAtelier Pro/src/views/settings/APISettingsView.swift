@@ -7,6 +7,8 @@ struct APISettingsView: View {
     @State private var editingConfig: EditingConfig?
     @State private var showApiConfigError = false
     @State private var apiConfigErrorMessage = ""
+    @State private var showSaveWarning = false
+    @State private var saveWarningMessage = ""
     @State private var didPresentInitialEditor = false
 
     init() {}
@@ -100,12 +102,22 @@ struct APISettingsView: View {
         } message: {
             Text(apiConfigErrorMessage)
         }
+        .alert("Model Refresh Failed", isPresented: $showSaveWarning) {
+            Button("OK") {
+                showSaveWarning = false
+            }
+        } message: {
+            Text(saveWarningMessage)
+        }
         .sheet(item: $editingConfig) { editing in
             NavigationStack {
                 APIConfigurationEditView(
                     configuration: editing.config,
                     isNewConfiguration: editing.isNew
-                )
+                ) { warningMessage in
+                    saveWarningMessage = warningMessage
+                    showSaveWarning = true
+                }
             }
         }
     }
