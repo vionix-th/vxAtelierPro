@@ -513,72 +513,92 @@ final class QueryManager {
     }
 
     // MARK: - Models
+    func fetchModelDescriptors(
+        providerID: LLMProviderID,
+        adapterID: LLMAdapterID,
+        configuration: LLMProviderConfiguration
+    ) async throws -> [LLMModelDescriptor] {
+        let adapter = LLMProviderRegistry.shared.adapter(
+            for: adapterID,
+            providerID: providerID
+        )
+        return try await adapter.fetchModels(configuration: configuration)
+    }
+
     @discardableResult
-    func fetchModelsFromProviders() async -> ModelProviderFetchSummary {
-        let apiConfigurations = fetchApiConfigurations()
+    func refreshModels(for apiConfiguration: APIConfigurationItem) async -> ModelProviderFetchSummary {
+        let providerID = apiConfiguration.providerIDEnum
+        let adapterID = apiConfiguration.defaultAdapterIDEnum
+        let providerConfiguration = apiConfiguration.makeLLMProviderConfiguration()
+        let credentialState: String
+        if case .secret = providerConfiguration.credential {
+            credentialState = "present"
+        } else {
+            credentialState = "missing"
+        }
+
+        vxAtelierPro.log.debug(
+            "Refreshing models for provider \(apiConfiguration.name): providerID=\(providerID.rawValue), authKind=\(apiConfiguration.authKind), adapter=\(apiConfiguration.defaultAdapterID), baseURL=\(providerConfiguration.baseURL), apiKeyLength=\(apiConfiguration.apiKey.count), credential=\(credentialState)"
+        )
+
         var summary = ModelProviderFetchSummary()
 
-        for config in apiConfigurations {
-            let providerID = config.providerIDEnum
-            let adapter = LLMProviderRegistry.shared.defaultAdapter(for: providerID)
-            let providerConfiguration = config.makeLLMProviderConfiguration()
-            let fetchedModels: [LLMModelDescriptor]
-            let credentialState: String
-            if case .secret = providerConfiguration.credential {
-                credentialState = "present"
-            } else {
-                credentialState = "missing"
-            }
-            vxAtelierPro.log.debug(
-                "Fetching models from provider \(config.name): providerID=\(providerID.rawValue), authKind=\(config.authKind), adapter=\(config.defaultAdapterID), baseURL=\(providerConfiguration.baseURL), apiKeyLength=\(config.apiKey.count), credential=\(credentialState)"
+        do {
+            let fetchedModels = try await fetchModelDescriptors(
+                providerID: providerID,
+                adapterID: adapterID,
+                configuration: providerConfiguration
             )
-
-            do {
-                fetchedModels = try await adapter.fetchModels(configuration: providerConfiguration)
-            } catch {
-                let message = Self.errorMessage(from: error)
-                vxAtelierPro.log.error(
-                    "Failed to fetch models from provider \(config.name): \(message)")
-                summary.failures.append(ModelProviderFetchFailure(
-                    configurationName: config.name,
-                    providerID: providerID,
-                    message: message
-                ))
-                continue
-            }
-
-            let existingModels = models(for: config)
+            let existingModels = models(for: apiConfiguration)
             for fetchedModel in fetchedModels {
-                if let existing = existingModels.first(where: {
-                    $0.modelID == fetchedModel.id
-                }) {
+                if let existing = existingModels.first(where: { $0.modelID == fetchedModel.id }) {
                     existing.descriptor = fetchedModel
-                    existing.apiConfiguration = config
+                    existing.apiConfiguration = apiConfiguration
                     existing.materializeDefaultParameterMappings(preserveCustomized: true)
                     summary.updated += 1
                     vxAtelierPro.log.debug("Overwrote model: \(fetchedModel.id)")
                 } else {
-                    let modelItem = ModelItem(descriptor: fetchedModel, apiConfiguration: config)
+                    let modelItem = ModelItem(descriptor: fetchedModel, apiConfiguration: apiConfiguration)
                     modelItem.materializeDefaultParameterMappings(preserveCustomized: true)
                     modelContext.insert(modelItem)
                     summary.added += 1
                     vxAtelierPro.log.debug("Added new model: \(fetchedModel.id)")
                 }
             }
-        }
 
-        do {
-            try self.saveContext()
+            try saveContext()
             vxAtelierPro.log.info(
-                "fetchModelsFromProviders: Updated \(summary.updated), added \(summary.added) models, failures \(summary.failures.count).")
+                "refreshModels(for: \(apiConfiguration.name)): Updated \(summary.updated), added \(summary.added) models."
+            )
         } catch {
-            vxAtelierPro.log.error("fetchModelsFromProviders failed: \(error.localizedDescription)")
+            let message = Self.errorMessage(from: error)
+            vxAtelierPro.log.error(
+                "Failed to refresh models for provider \(apiConfiguration.name): \(message)"
+            )
             summary.failures.append(ModelProviderFetchFailure(
-                configurationName: "ModelContext",
-                providerID: .customOpenAICompatible,
-                message: error.localizedDescription
+                configurationName: apiConfiguration.name,
+                providerID: providerID,
+                message: message
             ))
         }
+
+        return summary
+    }
+
+    @discardableResult
+    func fetchModelsFromProviders() async -> ModelProviderFetchSummary {
+        let apiConfigurations = fetchApiConfigurations()
+        var summary = ModelProviderFetchSummary()
+
+        for config in apiConfigurations {
+            let result = await refreshModels(for: config)
+            summary.updated += result.updated
+            summary.added += result.added
+            summary.failures.append(contentsOf: result.failures)
+        }
+
+        vxAtelierPro.log.info(
+            "fetchModelsFromProviders: Updated \(summary.updated), added \(summary.added) models, failures \(summary.failures.count).")
         return summary
     }
 

@@ -93,14 +93,31 @@ final class APIConfigurationItem {
     }
 
     func makeLLMProviderConfiguration() -> LLMProviderConfiguration {
-        let profile = LLMProviderRegistry.shared.profile(for: providerIDEnum)
-        let options = decodedOptions
-        return LLMProviderConfiguration(
+        Self.makeLLMProviderConfiguration(
             providerID: providerIDEnum,
             authKind: authKindEnum,
+            apiKey: apiKey,
+            baseURL: baseURL,
+            headers: decodedHeaders,
+            options: decodedOptions
+        )
+    }
+
+    static func makeLLMProviderConfiguration(
+        providerID: LLMProviderID,
+        authKind: LLMAuthKind,
+        apiKey: String,
+        baseURL: String,
+        headers: [String: String] = [:],
+        options: [String: String] = [:]
+    ) -> LLMProviderConfiguration {
+        let profile = LLMProviderRegistry.shared.profile(for: providerID)
+        return LLMProviderConfiguration(
+            providerID: providerID,
+            authKind: authKind,
             baseURL: baseURL.isEmpty ? profile.defaultBaseURL : baseURL,
             credential: apiKey.isEmpty ? .none : .secret(apiKey),
-            customHeaders: decodedHeaders,
+            customHeaders: headers,
             requestTimeout: Self.secondsOption("request_timeout_seconds", in: options, defaultValue: 60),
             streamIdleTimeout: Self.secondsOption("sse_idle_timeout_seconds", in: options, defaultValue: 120),
             maxResponseBodyBytes: Self.intOption("max_response_body_bytes", in: options, defaultValue: 10 * 1024 * 1024),

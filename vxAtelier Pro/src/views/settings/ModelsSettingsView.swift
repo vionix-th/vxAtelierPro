@@ -72,8 +72,17 @@ struct ModelsSettingsView: View {
                         isUpdatingModels = true
                         updateError = nil
                         defer { isUpdatingModels = false }
-                        await queryManager.fetchModelsFromProviders()
-                        showCompletion(message: "Model list updated successfully.")
+                        let summary = await queryManager.fetchModelsFromProviders()
+                        if summary.failures.isEmpty {
+                            showCompletion(message: "Model list updated: \(summary.updated) updated, \(summary.added) added.")
+                        } else {
+                            let failures = summary.failures
+                                .map { "\($0.configurationName): \($0.message)" }
+                                .joined(separator: "\n")
+                            showCompletion(
+                                message: "Model list update failed for \(summary.failures.count) provider(s).\n\(failures)"
+                            )
+                        }
                     }
                 },
                 secondaryActions: [

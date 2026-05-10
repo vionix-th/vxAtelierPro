@@ -17,12 +17,12 @@ struct APIConfigurationEditView: View {
     @Environment(QueryManager.self) private var queryManager
     @Query(sort: [SortDescriptor(\APIConfigurationItem.name)]) private var apiConfigurations: [APIConfigurationItem]
 
-    @Bindable var configuration: APIConfigurationItem
+    let configuration: APIConfigurationItem
     var isNewConfiguration: Bool
 
     // MARK: - State
 
-    // Local state to avoid constant model updates
+    // Draft form state. Copy into the SwiftData model only when the user saves.
     @State private var name: String
     @State private var apiKey: String
     @State private var baseURL: String
@@ -40,9 +40,8 @@ struct APIConfigurationEditView: View {
     @State private var isModelPickerPresented = false
     @State private var hasUserEditedDefaultModel = false
     @State private var isValidating = false
-    @State private var isFetchingModels = false
-    @State private var modelFetchError: String?
-    @State private var fetchedFallbackModels: [ModelItem]?
+    @State private var isRefreshingModels = false
+    @State private var fetchedModelDescriptors: [LLMModelDescriptor]?
 
     // MARK: - Initialization
 
@@ -130,9 +129,9 @@ struct APIConfigurationEditView: View {
                                         hasUserEditedDefaultModel = true
                                     }
                                 Button {
-                                    Task { await fetchModelsAndOpenPicker() }
+                                    Task { await loadModelsForPicker() }
                                 } label: {
-                                    if isFetchingModels {
+                                    if isRefreshingModels {
                                         ProgressView()
                                             .scaleEffect(0.8)
                                             .frame(width: 20, height: 20)
@@ -141,7 +140,7 @@ struct APIConfigurationEditView: View {
                                             .foregroundColor(.secondary)
                                     }
                                 }
-                                .disabled(isFetchingModels)
+                                .disabled(isValidating || isRefreshingModels)
                             }
                             .padding(.vertical, 8)
                             .padding(.horizontal, 12)
@@ -155,7 +154,8 @@ struct APIConfigurationEditView: View {
                                         hasUserEditedDefaultModel = true
                                     },
                                     apiConfiguration: configuration,
-                                    fallbackModels: fetchedFallbackModels
+                                    fallbackModels: nil,
+                                    fallbackModelDescriptors: fetchedModelDescriptors
                                 )
                             }
                             Text(
@@ -251,7 +251,7 @@ struct APIConfigurationEditView: View {
                                 ForEach(APIPreset.allCases, id: \.self) { preset in
                                     Button {
                                         selectedPreset = preset
-                                        applyPreset()
+                                        applySelectedPreset()
                                     } label: {
                                         HStack(spacing: 6) {
                                             Image(systemName: preset.iconName)
@@ -320,27 +320,17 @@ struct APIConfigurationEditView: View {
         .navigationTitle(
             isNewConfiguration ? AppDefaults.newApiConfigurationName : "Edit Configuration"
         )
-        .alert("Validation Error", isPresented: $showValidationError) {
+        .alert("Configuration Error", isPresented: $showValidationError) {
             Button("OK") {
                 showValidationError = false
             }
         } message: {
             Text(validationErrorMessage)
         }
-        .alert("Model Fetch Error", isPresented: .init(
-            get: { modelFetchError != nil },
-            set: { if !$0 { modelFetchError = nil } }
-        )) {
-            Button("OK") { modelFetchError = nil }
-        } message: {
-            if let error = modelFetchError {
-                Text(error)
-            }
-        }
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button {
-                    Task { await saveConfigurationAsync() }
+                    Task { await save() }
                 } label: {
                     if isValidating {
                         ProgressView()
@@ -348,7 +338,7 @@ struct APIConfigurationEditView: View {
                         Text("Save")
                     }
                 }
-                .disabled(isValidating)
+                .disabled(isValidating || isRefreshingModels)
             }
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") {
@@ -362,12 +352,11 @@ struct APIConfigurationEditView: View {
             if !hasUserEditedDefaultModel || defaultModel.isEmpty {
                 defaultModel = APIConfigurationEditView.suggestedDefaultModel(for: newValue)
             }
+            fetchedModelDescriptors = nil
             let profile = LLMProviderRegistry.shared.profile(for: newValue)
             if !profile.supportedAdapterIDs.contains(defaultAdapterID) {
                 defaultAdapterID = profile.defaultAdapterID
             }
-            fetchedFallbackModels = nil
-            modelFetchError = nil
         }
         .onAppear {
             if !currentProfile.supportedAdapterIDs.contains(defaultAdapterID) {
@@ -421,7 +410,7 @@ struct APIConfigurationEditView: View {
 
     /// Validates all input fields before saving
     /// - Returns: True if all inputs are valid
-    private func validateInputs() -> Bool {
+    private func validateDraft() -> Bool {
         // Check for empty name
         if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             validationErrorMessage = "Configuration name cannot be empty."
@@ -439,9 +428,9 @@ struct APIConfigurationEditView: View {
         return true
     }
 
-    /// Saves the configuration changes without fetching models.
-    private func saveConfigurationAsync() async {
-        guard validateInputs() else {
+    /// Saves the configuration changes and refreshes model metadata when possible.
+    private func save() async {
+        guard validateDraft() else {
             showValidationError = true
             return
         }
@@ -449,90 +438,100 @@ struct APIConfigurationEditView: View {
         isValidating = true
         defer { isValidating = false }
 
-        let configToSave = configuration
-        let shouldInsert = isNewConfiguration
-
-        configToSave.name = name
-        configToSave.apiKey = apiKey
-        configToSave.baseURL = baseURL
-        let profile = LLMProviderRegistry.shared.profile(for: providerID)
-        configToSave.providerID = providerID.rawValue
-        configToSave.authKind = profile.authKind.rawValue
-        configToSave.defaultAdapterID = defaultAdapterID.rawValue
-
-        let configsCount = apiConfigurations.count
-        if configsCount == 0 || configsCount == 1 && !isNewConfiguration {
-            isDefault = true
-        }
-        configToSave.isDefault = isDefault
-
-        let trimmedDefaultModel = defaultModel.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmedDefaultModel.isEmpty {
-            let suggested = APIConfigurationEditView.suggestedDefaultModel(for: providerID)
-            configToSave.defaultModel = suggested
-            vxAtelierPro.log.info("🔑 Set default model to computed default: \(suggested)")
-        } else {
-            configToSave.defaultModel = trimmedDefaultModel
-        }
-
         do {
-            try queryManager.upsertAPIConfiguration(configToSave, makeDefault: isDefault)
+            let shouldInsert = isNewConfiguration
+            applyDraftToConfiguration()
+            try saveConfigurationToStore()
+            let refreshSummary = await queryManager.refreshModels(for: configuration)
+
             vxAtelierPro.log.info(
-                "🔑 Saved configuration: \(configToSave.name), isDefault: \(configToSave.isDefault), inserted: \(shouldInsert)"
+                "🔑 Saved configuration and refreshed models: \(configuration.name), isDefault: \(configuration.isDefault), inserted: \(shouldInsert), updated: \(refreshSummary.updated), added: \(refreshSummary.added)"
             )
+            if let failure = refreshSummary.failures.first {
+                validationErrorMessage = "Saved configuration, but model refresh failed: \(failure.message)"
+                showValidationError = true
+                vxAtelierPro.log.warning(
+                    "🔑 Saved configuration \(configuration.name), but model refresh failed: \(failure.message)"
+                )
+                return
+            }
             dismiss()
         } catch {
             validationErrorMessage = "Failed to save configuration: \(error.localizedDescription)"
             showValidationError = true
             vxAtelierPro.log.error(
-                "🔑 Failed to save configuration \(configToSave.name): \(error.localizedDescription)"
+                "🔑 Failed to save configuration \(name): \(error.localizedDescription)"
             )
         }
     }
 
-    private func fetchModelsAndOpenPicker() async {
-        guard !baseURL.isEmpty, baseURL.hasPrefix("http") else {
-            isModelPickerPresented = true
+    private func loadModelsForPicker() async {
+        guard validateDraft() else {
+            showValidationError = true
             return
         }
 
-        let existingModels = queryManager.models(for: configuration)
-        if !existingModels.isEmpty {
-            isModelPickerPresented = true
-            return
-        }
-
-        isFetchingModels = true
-        defer { isFetchingModels = false }
-
-        let adapter = LLMProviderRegistry.shared.adapter(for: defaultAdapterID, providerID: providerID)
-        let tempConfig = APIConfigurationItem(
-            name: "_temp",
-            apiKey: apiKey,
-            baseURL: baseURL,
-            isDefault: false,
-            providerID: providerID
-        )
-        let providerConfig = tempConfig.makeLLMProviderConfiguration()
+        isRefreshingModels = true
+        defer { isRefreshingModels = false }
 
         do {
-            let descriptors = try await adapter.fetchModels(configuration: providerConfig)
-            if descriptors.isEmpty {
-                fetchedFallbackModels = []
-            } else {
-                fetchedFallbackModels = descriptors.map {
-                    ModelItem(descriptor: $0, apiConfiguration: configuration)
-                }
-            }
+            fetchedModelDescriptors = try await queryManager.fetchModelDescriptors(
+                providerID: providerID,
+                adapterID: defaultAdapterID,
+                configuration: makeProviderConfigurationFromDraft()
+            )
             isModelPickerPresented = true
         } catch {
-            modelFetchError = "Failed to fetch models: \(error.localizedDescription)"
-            vxAtelierPro.log.error("🔑 Model fetch failed for '\(name)': \(error.localizedDescription)")
+            validationErrorMessage = "Failed to fetch models: \(error.localizedDescription)"
+            showValidationError = true
+            vxAtelierPro.log.error(
+                "🔑 Failed to fetch models for configuration \(name): \(error.localizedDescription)"
+            )
         }
     }
 
+    private func makeProviderConfigurationFromDraft() -> LLMProviderConfiguration {
+        return APIConfigurationItem.makeLLMProviderConfiguration(
+            providerID: providerID,
+            authKind: currentProfile.authKind,
+            apiKey: apiKey,
+            baseURL: baseURL,
+            headers: configuration.decodedHeaders,
+            options: configuration.decodedOptions
+        )
+    }
+
+    private func applyDraftToConfiguration() {
+        configuration.name = name
+        configuration.apiKey = apiKey
+        configuration.baseURL = baseURL
+        let profile = LLMProviderRegistry.shared.profile(for: providerID)
+        configuration.providerID = providerID.rawValue
+        configuration.authKind = profile.authKind.rawValue
+        configuration.defaultAdapterID = defaultAdapterID.rawValue
+
+        let configsCount = apiConfigurations.count
+        if configsCount == 0 || configsCount == 1 && !isNewConfiguration {
+            isDefault = true
+        }
+        configuration.isDefault = isDefault
+
+        let trimmedDefaultModel = defaultModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedDefaultModel.isEmpty {
+            let suggested = APIConfigurationEditView.suggestedDefaultModel(for: providerID)
+            configuration.defaultModel = suggested
+            vxAtelierPro.log.info("🔑 Set default model to computed default: \(suggested)")
+        } else {
+            configuration.defaultModel = trimmedDefaultModel
+        }
+    }
+
+    private func saveConfigurationToStore() throws {
+        try queryManager.upsertAPIConfiguration(configuration, makeDefault: isDefault)
+    }
+
     /// Applies the selected preset to the configuration
-    private func applyPreset() {
+    private func applySelectedPreset() {
         guard let preset = selectedPreset else { return }
 
         let allow_new_name_for =

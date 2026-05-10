@@ -17,6 +17,7 @@ struct ModelSelectionView: View {
     let apiConfiguration: APIConfigurationItem?
 
     var fallbackModels: [ModelItem]? = nil
+    var fallbackModelDescriptors: [LLMModelDescriptor]? = nil
     
     /// Toggle to show all models or just those from the current provider
     @State private var showAllModels = false
@@ -29,25 +30,29 @@ struct ModelSelectionView: View {
     @State private var selectedSchemaFeatures: Set<LLMSchemaFeature> = []
     
     /// Filtered models based on current provider, showAllModels setting, and search text
-    private var filteredModels: [ModelItem] {
-        var models = allModels
+    private var filteredModels: [ModelSelectionOption] {
+        var models = allModels.map { ModelSelectionOption(model: $0) }
 
         if let apiConfiguration {
             if !showAllModels {
-                models = models.filter { $0.apiConfiguration?.id == apiConfiguration.id }
-                if models.isEmpty, let fallback = fallbackModels {
-                    models = fallback
+                models = models.filter { $0.apiConfigurationID == apiConfiguration.id }
+                if let fallbackModelDescriptors {
+                    models = fallbackModelDescriptors.map {
+                        ModelSelectionOption(descriptor: $0, groupName: apiConfiguration.name)
+                    }
+                } else if models.isEmpty, let fallback = fallbackModels {
+                    models = fallback.map { ModelSelectionOption(model: $0) }
                 }
             }
         } else if !showAllModels {
-            models = models.filter { $0.apiConfiguration == nil }
+            models = models.filter { $0.apiConfigurationID == nil }
         }
         
         // Filter by selected metadata values; all selected filters must match.
         if !selectedModalities.isEmpty || !selectedSchemaFeatures.isEmpty {
             models = models.filter { model in
-                selectedModalities.isSubset(of: Set(model.modalityEnums))
-                    && selectedSchemaFeatures.isSubset(of: Set(model.schemaFeatureEnums))
+                selectedModalities.isSubset(of: Set(model.modalities))
+                    && selectedSchemaFeatures.isSubset(of: Set(model.schemaFeatures))
             }
         }
         
@@ -65,12 +70,9 @@ struct ModelSelectionView: View {
     }
     
     /// Group models by provider for better organization
-    private var groupedModels: [String: [ModelItem]] {
+    private var groupedModels: [String: [ModelSelectionOption]] {
         Dictionary(grouping: filteredModels) { model in
-            if let config = model.apiConfiguration {
-                return config.name
-            }
-            return "\(model.provider.capitalized) (Unassigned)"
+            model.groupName
         }
     }
     
@@ -240,9 +242,45 @@ struct ModelSelectionView: View {
     }
 }
 
+private struct ModelSelectionOption: Identifiable {
+    let id: String
+    let name: String
+    let provider: String
+    let contextSize: Int
+    let modalities: [LLMModality]
+    let schemaFeatures: [LLMSchemaFeature]
+    let metadataSearchTerms: [String]
+    let groupName: String
+    let apiConfigurationID: PersistentIdentifier?
+
+    init(model: ModelItem) {
+        self.id = String(describing: model.persistentModelID)
+        self.name = model.name
+        self.provider = model.provider
+        self.contextSize = model.contextSize
+        self.modalities = model.modalityEnums
+        self.schemaFeatures = model.schemaFeatureEnums
+        self.metadataSearchTerms = model.metadataSearchTerms
+        self.groupName = model.apiConfiguration?.name ?? "\(model.provider.capitalized) (Unassigned)"
+        self.apiConfigurationID = model.apiConfiguration?.id
+    }
+
+    init(descriptor: LLMModelDescriptor, groupName: String) {
+        self.id = "descriptor-\(descriptor.providerID.rawValue)-\(descriptor.id)"
+        self.name = descriptor.id
+        self.provider = descriptor.providerID.displayName
+        self.contextSize = descriptor.contextWindow ?? 0
+        self.modalities = descriptor.modalities
+        self.schemaFeatures = descriptor.schemaFeatures
+        self.metadataSearchTerms = descriptor.modalities.map(\.displayName) + descriptor.schemaFeatures.map(\.displayName)
+        self.groupName = groupName
+        self.apiConfigurationID = nil
+    }
+}
+
 /// Individual row view for a model
-struct ModelRowView: View {
-    let model: ModelItem
+private struct ModelRowView: View {
+    let model: ModelSelectionOption
     let isSelected: Bool
     let onSelect: () -> Void
     
@@ -268,7 +306,7 @@ struct ModelRowView: View {
             }
             
             // Metadata row
-            if model.contextSize > 0 || !model.modalityEnums.isEmpty || !model.schemaFeatureEnums.isEmpty {
+            if model.contextSize > 0 || !model.modalities.isEmpty || !model.schemaFeatures.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         // Context size info if available
@@ -287,7 +325,7 @@ struct ModelRowView: View {
                             .cornerRadius(4)
                             .help("Context window size")
                         }
-                        ForEach(model.modalityEnums, id: \.self) { modality in
+                        ForEach(model.modalities, id: \.self) { modality in
                             HStack(spacing: 4) {
                                 Image(systemName: modality.systemName)
                                     .foregroundColor(.blue)
@@ -302,7 +340,7 @@ struct ModelRowView: View {
                             .cornerRadius(4)
                             .help(modality.displayName)
                         }
-                        ForEach(model.schemaFeatureEnums, id: \.self) { feature in
+                        ForEach(model.schemaFeatures, id: \.self) { feature in
                             HStack(spacing: 4) {
                                 Image(systemName: feature.systemName)
                                     .foregroundColor(.blue)
