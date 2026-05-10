@@ -16,7 +16,7 @@ struct LLMCapabilityValidator {
 
     /// Resolves `.auto` streaming behavior and rejects unsupported forced streaming.
     static func resolveStreamEnabled(for request: LLMRequest, profile: LLMProviderProfile) throws -> Bool {
-        let supportsStreaming = hasSchemaFeature(.streaming, request: request)
+        let supportsStreaming = supportsCapability(.streaming, request: request)
         switch request.options.streamMode {
         case .disabled:
             return false
@@ -35,20 +35,15 @@ struct LLMCapabilityValidator {
         guard profile.supportedAdapterIDs.contains(request.adapterID) else {
             throw LLMProviderError.unsupportedCapability("\(profile.name) does not support \(request.adapterID.rawValue).")
         }
-        guard let model = request.modelDescriptor, !model.adapterIDs.isEmpty else { return }
-        guard model.adapterIDs.contains(request.adapterID) else {
-            throw LLMProviderError.unsupportedCapability("\(request.modelID) does not support \(request.adapterID.rawValue).")
-        }
+        // APIConfigurationItem owns adapter selection; ModelItem owns capabilities and mappings.
     }
 
     /// Confirms requested generation options are mapped and supported by the provider/model pair.
     private static func validateParameters(_ request: LLMRequest, profile: LLMProviderProfile) throws {
         let options = request.options
         let mappings = LLMParameterMappingResolver.resolve(
-            providerID: request.providerID,
             adapterID: request.adapterID,
-            modelID: request.modelID,
-            modelDescriptor: request.modelDescriptor
+            mappings: request.parameterMappings
         )
         if options.temperature != nil { try requireMapping(.temperature, mappings: mappings, request: request, profile: profile) }
         if options.topP != nil { try requireMapping(.topP, mappings: mappings, request: request, profile: profile) }
@@ -56,7 +51,7 @@ struct LLMCapabilityValidator {
         if !options.stop.isEmpty { try requireMapping(.stopSequences, mappings: mappings, request: request, profile: profile) }
         if options.reasoning != nil {
             try requireMapping(.reasoningEffort, mappings: mappings, request: request, profile: profile)
-            guard hasSchemaFeature(.reasoning, request: request) else {
+            guard supportsCapability(.reasoning, request: request) else {
                 throw LLMProviderError.unsupportedParameter("\(profile.name) does not support reasoning for \(request.modelID).")
             }
         }
@@ -66,12 +61,12 @@ struct LLMCapabilityValidator {
             break
         case .jsonObject:
             try requireMapping(.responseFormat, mappings: mappings, request: request, profile: profile)
-            guard hasSchemaFeature(.jsonObject, request: request) else {
+            guard supportsCapability(.jsonObject, request: request) else {
                 throw LLMProviderError.unsupportedParameter("\(profile.name) does not support JSON object response format for \(request.modelID).")
             }
         case .jsonSchema:
             try requireMapping(.responseFormat, mappings: mappings, request: request, profile: profile)
-            guard hasSchemaFeature(.jsonSchema, request: request) else {
+            guard supportsCapability(.jsonSchema, request: request) else {
                 throw LLMProviderError.unsupportedParameter("\(profile.name) does not support JSON schema response format for \(request.modelID).")
             }
             guard request.options.providerExtras["json_schema"]?.objectValue != nil else {
@@ -79,7 +74,7 @@ struct LLMCapabilityValidator {
             }
         }
         if !request.tools.isEmpty {
-            guard hasSchemaFeature(.tools, request: request) else {
+            guard supportsCapability(.tools, request: request) else {
                 throw LLMProviderError.unsupportedCapability("\(profile.name) does not support tools for \(request.modelID).")
             }
         }
@@ -98,16 +93,18 @@ struct LLMCapabilityValidator {
                 case .text, .toolResult, .reasoning:
                     continue
                 case .image:
-                    guard supportsModality(.image, request: request) else {
+                    guard supportsCapability(.image, request: request) else {
                         throw LLMProviderError.unsupportedCapability("\(profile.name) does not support image content for \(request.modelID).")
                     }
                 case .file:
                     guard request.adapterID == .openAIResponses,
-                          supportsModality(.file, request: request) else {
+                          supportsCapability(.file, request: request) else {
                         throw LLMProviderError.unsupportedCapability("\(profile.name) does not support file content for \(request.adapterID.rawValue).")
                     }
                 case .audio:
-                    throw LLMProviderError.unsupportedCapability("\(profile.name) does not support audio content.")
+                    guard supportsCapability(.audio, request: request) else {
+                        throw LLMProviderError.unsupportedCapability("\(profile.name) does not support audio content.")
+                    }
                 }
             }
         }
@@ -182,13 +179,8 @@ struct LLMCapabilityValidator {
         }
     }
 
-    /// Resolves a schema feature against model metadata.
-    private static func hasSchemaFeature(_ feature: LLMSchemaFeature, request: LLMRequest) -> Bool {
-        request.modelDescriptor?.schemaFeatures.contains(feature) ?? false
-    }
-
-    /// Resolves a modality against model metadata.
-    private static func supportsModality(_ modality: LLMModality, request: LLMRequest) -> Bool {
-        request.modelDescriptor?.modalities.contains(modality) ?? false
+    /// Resolves a capability against persisted model metadata.
+    private static func supportsCapability(_ capability: LLMModelCapability, request: LLMRequest) -> Bool {
+        request.modelCapabilities.contains(capability)
     }
 }

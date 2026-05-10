@@ -89,20 +89,16 @@ enum LLMParameterMappingCatalog {
     }
 }
 
-/// Resolves model-specific mappings with built-in defaults as the fallback.
+/// Resolves persisted model-specific mappings.
 struct LLMParameterMappingResolver {
     /// Returns active mappings keyed by semantic parameter.
     static func resolve(
-        providerID: LLMProviderID,
         adapterID: LLMAdapterID,
-        modelID: String,
-        modelDescriptor: LLMModelDescriptor?
+        mappings: [LLMParameterMappingDescriptor]
     ) -> [LLMParameterID: LLMParameterMappingDescriptor] {
-        let persisted = modelDescriptor?.parameterMappings.filter { $0.adapterID == adapterID } ?? []
-        let source = persisted.isEmpty
-            ? LLMParameterMappingCatalog.defaults(providerID: providerID, adapterID: adapterID, modelID: modelID)
-            : persisted
-        return Dictionary(uniqueKeysWithValues: source.map { ($0.semanticParameterID, $0) })
+        Dictionary(uniqueKeysWithValues: mappings
+            .filter { $0.adapterID == adapterID }
+            .map { ($0.semanticParameterID, $0) })
     }
 }
 

@@ -28,14 +28,14 @@ struct LLMStreamCompletionPolicy {
 /// - Emit `.responseMetadata` when HTTP response metadata is available.
 /// - Emit `.runCompleted` exactly once for complete provider responses, or throw if the provider stream ends before a required completion event.
 /// - Emit tool-call deltas and completed calls using provider order indexes so `LLMToolCallAssembler` can merge fragments deterministically.
-/// - Return model descriptors using provider metadata and bundled model defaults; throw for unsupported model listing instead of fabricating models.
+/// - Return model candidates using provider metadata and bundled model defaults; throw for unsupported model listing instead of fabricating models.
 protocol LLMProviderAdapter {
     var profile: LLMProviderProfile { get }
 
     /// Sends a request and emits normalized events regardless of provider wire format.
     func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration) -> AsyncThrowingStream<LLMStreamEvent, Error>
 
-    /// Fetches provider model metadata and maps it into normalized descriptors.
+    /// Fetches provider model metadata and maps it into normalized candidates.
     func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor]
 }
 

@@ -5,17 +5,14 @@ import SwiftData
 struct ConversationRunContextResolver {
     let registry: LLMProviderRegistry
     let toolCatalog: LLMToolCatalog
-    let modelDescriptorResolver: LLMModelDescriptorResolver
 
     /// Creates a resolver with injectable provider and tool registries.
     init(
         registry: LLMProviderRegistry = .shared,
-        toolCatalog: LLMToolCatalog = LLMToolRegistry.shared,
-        modelDescriptorResolver: LLMModelDescriptorResolver = LLMModelDescriptorResolver()
+        toolCatalog: LLMToolCatalog = LLMToolRegistry.shared
     ) {
         self.registry = registry
         self.toolCatalog = toolCatalog
-        self.modelDescriptorResolver = modelDescriptorResolver
     }
 
     /// Resolves model, adapter, tools, options, and message history for one run.
@@ -31,24 +28,17 @@ struct ConversationRunContextResolver {
             throw LLMProviderError.unsupportedCapability("\(profile.name) does not support \(adapterID.rawValue).")
         }
 
-        let modelID = conversation.options.selectedModelID
-            ?? modelDescriptorResolver.defaultModelID(for: providerID, apiConfiguration: apiConfig)
+        let modelID = conversation.options.selectedModelID ?? apiConfig.defaultModelID
         guard let modelID, !modelID.isEmpty else {
             throw LLMProviderError.invalidConfiguration("No model configured for \(profile.name).")
         }
 
-        let descriptor = try modelDescriptorResolver.descriptor(
-            for: modelID,
-            providerID: providerID,
-            apiConfiguration: apiConfig,
-            modelContext: conversation.modelContext,
-            adapterIDs: [adapterID]
-        )
+        guard let model = apiConfig.models.first(where: { $0.modelID == modelID }) else {
+            throw LLMProviderError.invalidConfiguration("Model \(modelID) is not available for \(apiConfig.name).")
+        }
         let mappings = LLMParameterMappingResolver.resolve(
-            providerID: providerID,
             adapterID: adapterID,
-            modelID: modelID,
-            modelDescriptor: descriptor
+            mappings: model.parameterMappings.map(\.descriptor)
         )
         let options = conversation.options.generationOptions(
             resolvedModelID: modelID,
@@ -66,7 +56,8 @@ struct ConversationRunContextResolver {
             providerID: providerID,
             adapterID: adapterID,
             modelID: modelID,
-            modelDescriptor: descriptor,
+            modelCapabilities: model.capabilities,
+            parameterMappings: Array(mappings.values),
             messages: orderedMessages(in: conversation).map { $0.asDomainMessage() },
             tools: tools,
             options: options
@@ -93,7 +84,8 @@ struct LLMRequestFactory {
             providerID: context.providerID,
             adapterID: context.adapterID,
             modelID: context.modelID,
-            modelDescriptor: context.modelDescriptor,
+            modelCapabilities: context.modelCapabilities,
+            parameterMappings: context.parameterMappings,
             messages: context.messages,
             tools: context.tools,
             options: context.options

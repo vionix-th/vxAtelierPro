@@ -4,7 +4,7 @@ import SwiftData
 struct ModelsSettingsView: View {
     @Environment(QueryManager.self) private var queryManager
     @Query(sort: [SortDescriptor(\APIConfigurationItem.name)]) private var apiConfigurations: [APIConfigurationItem]
-    @Query(sort: [SortDescriptor(\ModelItem.name)]) private var models: [ModelItem]
+    @Query(sort: [SortDescriptor(\ModelItem.modelID)]) private var models: [ModelItem]
     @State private var isUpdatingModels = false
     @State private var editingModel: EditingModel?
     @State private var showCompletionAlert = false
@@ -95,9 +95,8 @@ struct ModelsSettingsView: View {
                                     addAction: {
                                         editingModel = EditingModel(
                                             model: ModelItem(
-                                                name: "New Model",
+                                                modelID: "New Model",
                                                 contextSize: AppDefaults.ModelContextSizes.defaultSize,
-                                                provider: apiConfigurations.first?.providerIDEnum.displayName ?? "Custom",
                                                 apiConfiguration: apiConfigurations.first
                                             ),
                                             isNew: true
@@ -135,7 +134,7 @@ struct ModelsSettingsView: View {
                             ForEach(entry.models) { model in
                                 SettingsListRow(
                                     title: model.name,
-                                    subtitle: model.apiConfiguration?.providerIDEnum.displayName ?? model.provider,
+                                    subtitle: model.apiConfiguration?.providerIDEnum.displayName ?? "No API Configuration",
                                     icons: model.metadataIconSystemNames.map { Image(systemName: $0) },
                                     onEdit: {
                                         editingModel = EditingModel(model: model, isNew: false)

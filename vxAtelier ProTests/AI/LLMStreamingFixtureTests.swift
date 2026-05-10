@@ -156,33 +156,30 @@ final class LLMStreamingFixtureTests: LLMTestCase {
     func testOpenAICompatibleModelMetadataFixtures() throws {
         let openRouterData = try fixtureJSON(name: "openrouter_models").objectValue?.array("data") ?? []
         let openRouterProfile = LLMProviderRegistry.shared.profile(for: .openRouter)
-        let openRouterModels = LLMModelMetadataDecoder.openAICompatibleDescriptors(
+        let openRouterModels = LLMModelMetadataDecoder.openAICompatibleCandidates(
             from: openRouterData,
-            profile: openRouterProfile,
-            adapterIDs: [.openAICompatibleChatCompletions]
+            profile: openRouterProfile
         )
         XCTAssertEqual(openRouterModels.first?.id, "openai/gpt-4o-mini")
         XCTAssertEqual(openRouterModels.first?.displayName, "GPT-4o Mini")
         XCTAssertEqual(openRouterModels.first?.contextWindow, 128000)
-        XCTAssertEqual(openRouterModels.first?.modalities, [.text])
+        XCTAssertEqual(openRouterModels.first?.capabilities, [.text])
 
         let lmStudioData = try fixtureJSON(name: "lmstudio_models").objectValue?.array("data") ?? []
-        let lmStudioModels = LLMModelMetadataDecoder.openAICompatibleDescriptors(
+        let lmStudioModels = LLMModelMetadataDecoder.openAICompatibleCandidates(
             from: lmStudioData,
-            profile: LLMProviderRegistry.shared.profile(for: .lmStudio),
-            adapterIDs: [.openAICompatibleChatCompletions]
+            profile: LLMProviderRegistry.shared.profile(for: .lmStudio)
         )
         XCTAssertEqual(lmStudioModels.first?.id, "local-model")
-        XCTAssertEqual(lmStudioModels.first?.modalities, [.text])
+        XCTAssertEqual(lmStudioModels.first?.capabilities, [.text])
 
         let ollamaData = try fixtureJSON(name: "ollama_models").objectValue?.array("data") ?? []
-        let ollamaModels = LLMModelMetadataDecoder.openAICompatibleDescriptors(
+        let ollamaModels = LLMModelMetadataDecoder.openAICompatibleCandidates(
             from: ollamaData,
-            profile: LLMProviderRegistry.shared.profile(for: .ollama),
-            adapterIDs: [.openAICompatibleChatCompletions]
+            profile: LLMProviderRegistry.shared.profile(for: .ollama)
         )
         XCTAssertEqual(ollamaModels.first?.id, "llama3.2")
-        XCTAssertEqual(ollamaModels.first?.adapterIDs, [.openAICompatibleChatCompletions])
+        XCTAssertTrue(ollamaModels.first?.capabilities.contains(.text) ?? false)
     }
 
     func testMessageExportRoundtripPreservesPartsAndToolCalls() {

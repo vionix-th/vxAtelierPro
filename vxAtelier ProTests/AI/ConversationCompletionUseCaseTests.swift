@@ -52,15 +52,10 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         options.selectedModelID = "gpt-test"
         options.streamMode = .auto
         let conversation = ConversationItem("Auto stream", options: options)
-        let descriptor = LLMModelDescriptor(
-            id: "gpt-test",
-            providerID: .openAIPlatform,
-            adapterIDs: [.openAIResponses],
-            modalities: [.text],
-            schemaFeatures: [.usage]
-        )
+        let model = ModelItem(modelID: "gpt-test", apiConfiguration: config)
+        model.capabilitiesRaw = [LLMModelCapability.text.rawValue, LLMModelCapability.usage.rawValue]
         env.modelContext.insert(config)
-        env.modelContext.insert(ModelItem(descriptor: descriptor, apiConfiguration: config))
+        env.modelContext.insert(model)
         env.modelContext.insert(conversation)
 
         try await ConversationCompletionUseCase.shared.complete(
@@ -88,15 +83,10 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         options.selectedModelID = "gpt-test"
         options.streamMode = .enabled
         let conversation = ConversationItem("Stream required", options: options)
-        let descriptor = LLMModelDescriptor(
-            id: "gpt-test",
-            providerID: .openAIPlatform,
-            adapterIDs: [.openAIResponses],
-            modalities: [.text],
-            schemaFeatures: [.usage]
-        )
+        let model = ModelItem(modelID: "gpt-test", apiConfiguration: config)
+        model.capabilitiesRaw = [LLMModelCapability.text.rawValue, LLMModelCapability.usage.rawValue]
         env.modelContext.insert(config)
-        env.modelContext.insert(ModelItem(descriptor: descriptor, apiConfiguration: config))
+        env.modelContext.insert(model)
         env.modelContext.insert(conversation)
 
         await assertThrowsAsyncError(try await ConversationCompletionUseCase.shared.complete(

@@ -8,61 +8,46 @@ import SwiftUI
     import AppKit
 #endif
 
-/// Represents an AI model with model metadata and provider information.
+/// Represents an AI model for one API configuration.
 ///
 /// This model stores information about AI models including:
 /// - Base model name (e.g., "gpt-4", "claude-3")
 /// - Context window size for token limits
-/// - Provider identification (e.g., OpenAI, Anthropic)
-/// - Model modalities and schema features
+/// - Model capabilities
 @Model
 final class ModelItem {
-    /// The name of the model (e.g., "gpt-4", "claude-3-opus")
-    var name: String
-
     /// Maximum context size in tokens that this model supports
     var contextSize: Int
 
-    /// The provider/company that created this model (e.g., "OpenAI", "Anthropic")
-    var provider: String
-
     var modelID: String
     var displayName: String
-    var providerID: String
     var apiConfiguration: APIConfigurationItem?
-    var adapterIDsRaw: [String]
-    var modalitiesRaw: [String]
-    var supportedParameters: [String]
-    var schemaFeaturesRaw: [String]
+    var capabilitiesRaw: [String]
     var rawMetadataJSON: String?
     @Relationship(deleteRule: .cascade) var parameterMappings: [ModelParameterMappingItem] = []
+
+    var name: String { modelID }
+
+    var capabilities: [LLMModelCapability] {
+        capabilitiesRaw.compactMap(LLMModelCapability.init(rawValue:))
+    }
 
     var descriptor: LLMModelDescriptor {
         get {
             LLMModelDescriptor(
                 id: modelID,
                 displayName: displayName,
-                providerID: LLMProviderID(rawValue: providerID) ?? .customOpenAICompatible,
+                providerID: apiConfiguration?.providerIDEnum ?? .customOpenAICompatible,
                 contextWindow: contextSize,
-                adapterIDs: adapterIDsRaw.compactMap { LLMAdapterID(rawValue: $0) },
-                modalities: modalitiesRaw.compactMap { LLMModality(rawValue: $0) },
-                supportedParameters: supportedParameters,
-                parameterMappings: parameterMappings.map(\.descriptor),
-                schemaFeatures: schemaFeaturesRaw.compactMap { LLMSchemaFeature(rawValue: $0) },
+                capabilities: capabilities,
                 rawMetadataJSON: rawMetadataJSON
             )
         }
         set {
             modelID = newValue.id
-            name = newValue.id
             displayName = newValue.displayName
-            providerID = newValue.providerID.rawValue
-            provider = newValue.providerID.displayName
             contextSize = newValue.contextWindow ?? AppDefaults.ModelContextSizes.defaultSize
-            adapterIDsRaw = newValue.adapterIDs.map(\.rawValue)
-            modalitiesRaw = newValue.modalities.map(\.rawValue)
-            supportedParameters = newValue.supportedParameters
-            schemaFeaturesRaw = newValue.schemaFeatures.map(\.rawValue)
+            capabilitiesRaw = newValue.capabilities.map(\.rawValue)
             rawMetadataJSON = newValue.rawMetadataJSON
             self.materializeDefaultParameterMappings(preserveCustomized: true)
         }
@@ -71,71 +56,52 @@ final class ModelItem {
     /// Creates a new model item with the specified properties.
     ///
     /// - Parameters:
-    ///   - name: The name of the model
+    ///   - modelID: The provider-facing model identifier
     ///   - contextSize: Maximum context size in tokens, defaults to app's default size
-    ///   - provider: The provider name, auto-detected from model name if nil
     init(
-        name: String, contextSize: Int = AppDefaults.ModelContextSizes.defaultSize,
-        provider: String? = nil,
+        modelID: String,
+        contextSize: Int = AppDefaults.ModelContextSizes.defaultSize,
         apiConfiguration: APIConfigurationItem? = nil
     ) {
-        let resolvedProvider = apiConfiguration?.providerIDEnum.displayName
-            ?? provider
-            ?? LLMModelProviderUtils.detectProvider(from: name)
-        self.name = name
-        self.modelID = name
-        self.displayName = name
+        self.modelID = modelID
+        self.displayName = modelID
         self.contextSize = contextSize
-        self.provider = resolvedProvider
-        self.providerID = apiConfiguration?.providerID ?? LLMProviderRegistry.providerID(fromProviderName: resolvedProvider).rawValue
         self.apiConfiguration = apiConfiguration
-        self.adapterIDsRaw = []
-        self.modalitiesRaw = []
-        self.supportedParameters = []
-        self.schemaFeaturesRaw = []
+        self.capabilitiesRaw = []
         self.rawMetadataJSON = nil
         self.parameterMappings = []
 
-        let defaultDescriptor = LLMModelDescriptorResolver().catalogDescriptor(
-            for: name,
-            providerID: LLMProviderID(rawValue: self.providerID) ?? .customOpenAICompatible
+        let defaultCandidate = LLMModelDescriptorResolver().catalogDescriptor(
+            for: modelID,
+            providerID: apiConfiguration?.providerIDEnum ?? .customOpenAICompatible
         )
-        self.contextSize = defaultDescriptor.contextWindow ?? contextSize
-        self.adapterIDsRaw = defaultDescriptor.adapterIDs.map(\.rawValue)
-        self.modalitiesRaw = defaultDescriptor.modalities.map(\.rawValue)
-        self.supportedParameters = defaultDescriptor.supportedParameters
-        self.schemaFeaturesRaw = defaultDescriptor.schemaFeatures.map(\.rawValue)
+        self.contextSize = defaultCandidate.contextWindow ?? contextSize
+        self.capabilitiesRaw = defaultCandidate.capabilities.map(\.rawValue)
         self.materializeDefaultParameterMappings(preserveCustomized: true)
     }
 
     func materializeDefaultParameterMappings(preserveCustomized: Bool = true) {
-        let providerID = LLMProviderID(rawValue: providerID) ?? .customOpenAICompatible
-        let adapterIDs = adapterIDsRaw
-            .compactMap { LLMAdapterID(rawValue: $0) }
-
-        for adapterID in adapterIDs {
-            materializeDefaultParameterMappings(
-                adapterID: adapterID,
-                providerID: providerID,
-                preserveCustomized: preserveCustomized
-            )
-        }
+        guard let apiConfiguration else { return }
+        materializeDefaultParameterMappings(
+            adapterID: apiConfiguration.defaultAdapterIDEnum,
+            providerID: apiConfiguration.providerIDEnum,
+            preserveCustomized: preserveCustomized
+        )
     }
 
     func resetDefaultParameterMappings(adapterID: LLMAdapterID) {
-        let providerID = LLMProviderID(rawValue: providerID) ?? .customOpenAICompatible
+        guard let apiConfiguration else { return }
         materializeDefaultParameterMappings(
             adapterID: adapterID,
-            providerID: providerID,
+            providerID: apiConfiguration.providerIDEnum,
             preserveCustomized: false
         )
     }
 
     convenience init(descriptor: LLMModelDescriptor, apiConfiguration: APIConfigurationItem? = nil) {
         self.init(
-            name: descriptor.id,
+            modelID: descriptor.id,
             contextSize: descriptor.contextWindow ?? AppDefaults.ModelContextSizes.defaultSize,
-            provider: descriptor.providerID.displayName,
             apiConfiguration: apiConfiguration
         )
         self.descriptor = descriptor

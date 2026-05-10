@@ -95,8 +95,7 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
 
         let controls = ConversationParameterProjection.controls(
             for: options,
-            apiConfiguration: config,
-            modelContext: nil
+            apiConfiguration: config
         )
         let temperature = controls.first { $0.parameterID == .temperature }
 

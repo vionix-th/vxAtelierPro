@@ -1,5 +1,4 @@
 import Foundation
-import SwiftData
 
 /// Non-persistent parameter row rendered from typed conversation options and model mappings.
 struct ConversationParameterControl: Identifiable, Equatable {
@@ -22,29 +21,18 @@ enum ConversationParameterProjection {
     @MainActor
     static func controls(
         for options: ConversationOptions,
-        apiConfiguration: APIConfigurationItem?,
-        modelContext: ModelContext?,
-        resolver: LLMModelDescriptorResolver = LLMModelDescriptorResolver()
+        apiConfiguration: APIConfigurationItem?
     ) -> [ConversationParameterControl] {
         guard let apiConfiguration else { return [] }
 
-        let providerID = apiConfiguration.providerIDEnum
         let adapterID = apiConfiguration.defaultAdapterIDEnum
         let modelID = options.selectedModelID
-            ?? resolver.defaultModelID(for: providerID, apiConfiguration: apiConfiguration)
+            ?? apiConfiguration.defaultModelID
             ?? ""
-        let descriptor = try? resolver.descriptor(
-            for: modelID,
-            providerID: providerID,
-            apiConfiguration: apiConfiguration,
-            modelContext: modelContext,
-            adapterIDs: [adapterID]
-        )
+        let model = apiConfiguration.models.first { $0.modelID == modelID }
         let mappings = LLMParameterMappingResolver.resolve(
-            providerID: providerID,
             adapterID: adapterID,
-            modelID: modelID,
-            modelDescriptor: descriptor
+            mappings: model?.parameterMappings.map(\.descriptor) ?? []
         )
 
         var controls = [

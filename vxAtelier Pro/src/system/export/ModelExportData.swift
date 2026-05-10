@@ -6,14 +6,9 @@ import SwiftData
 struct ModelExportData: Codable {
     let name: String
     let contextSize: Int
-    let provider: String
     let modelID: String?
     let displayName: String?
-    let providerID: String?
-    let adapterIDs: [String]?
-    let modalities: [String]?
-    let supportedParameters: [String]?
-    let schemaFeatures: [String]?
+    let capabilities: [String]?
     let rawMetadataJSON: String?
     let parameterMappings: [ModelParameterMappingExportData]?
     let apiConfigurationName: String?
@@ -23,14 +18,9 @@ struct ModelExportData: Codable {
     init(_ model: ModelItem) {
         self.name = model.name
         self.contextSize = model.contextSize
-        self.provider = model.provider
         self.modelID = model.modelID
         self.displayName = model.displayName
-        self.providerID = model.providerID
-        self.adapterIDs = model.adapterIDsRaw
-        self.modalities = model.modalitiesRaw
-        self.supportedParameters = model.supportedParameters
-        self.schemaFeatures = model.schemaFeaturesRaw
+        self.capabilities = model.capabilitiesRaw
         self.rawMetadataJSON = model.rawMetadataJSON
         self.parameterMappings = model.parameterMappings.map { ModelParameterMappingExportData($0) }
         self.apiConfigurationName = model.apiConfiguration?.name
@@ -45,26 +35,17 @@ struct ModelExportData: Codable {
                 && $0.baseURL == apiConfigurationBaseURL
         }
         let model = ModelItem(
-            name: name,
+            modelID: modelID ?? name,
             contextSize: contextSize,
-            provider: provider,
             apiConfiguration: apiConfiguration
         )
-        model.modelID = modelID ?? name
         model.displayName = displayName ?? name
-        model.providerID = providerID ?? LLMProviderRegistry.providerID(fromProviderName: provider).rawValue
-        let defaultDescriptor = LLMModelDescriptorResolver().catalogDescriptor(
+        let defaultCandidate = LLMModelDescriptorResolver().catalogDescriptor(
             for: model.modelID,
-            providerID: LLMProviderID(rawValue: model.providerID) ?? .customOpenAICompatible
+            providerID: apiConfiguration?.providerIDEnum ?? .customOpenAICompatible
         )
-        model.adapterIDsRaw = defaultDescriptor.adapterIDs.map(\.rawValue)
-        model.modalitiesRaw = defaultDescriptor.modalities.map(\.rawValue)
-        model.supportedParameters = defaultDescriptor.supportedParameters
-        model.schemaFeaturesRaw = defaultDescriptor.schemaFeatures.map(\.rawValue)
-        if let adapterIDs { model.adapterIDsRaw = adapterIDs }
-        if let modalities { model.modalitiesRaw = modalities }
-        if let supportedParameters { model.supportedParameters = supportedParameters }
-        if let schemaFeatures { model.schemaFeaturesRaw = schemaFeatures }
+        model.capabilitiesRaw = defaultCandidate.capabilities.map(\.rawValue)
+        if let capabilities { model.capabilitiesRaw = capabilities }
         model.rawMetadataJSON = rawMetadataJSON
         model.parameterMappings = parameterMappings?.map { $0.toDataItem() } ?? []
         model.materializeDefaultParameterMappings(preserveCustomized: true)

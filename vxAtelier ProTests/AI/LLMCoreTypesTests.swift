@@ -29,10 +29,11 @@ final class LLMCoreTypesTests: XCTestCase {
         XCTAssertNil(defaults.defaultModelID(for: .customOpenAICompatible))
     }
 
-    func testModalityTaxonomyIsMediaOnly() {
-        XCTAssertEqual(Set(LLMModality.allCases), [.text, .image, .audio, .file, .video])
-        XCTAssertTrue(LLMSchemaFeature.allCases.contains(.tools))
-        XCTAssertTrue(LLMSchemaFeature.allCases.contains(.reasoning))
+    func testCapabilityTaxonomyCoversContentAndRuntimeFeatures() {
+        XCTAssertTrue(LLMModelCapability.allCases.contains(.text))
+        XCTAssertTrue(LLMModelCapability.allCases.contains(.image))
+        XCTAssertTrue(LLMModelCapability.allCases.contains(.tools))
+        XCTAssertTrue(LLMModelCapability.allCases.contains(.reasoning))
     }
 
     func testBundledDefaultsProvideCurrentModelMetadata() {
@@ -40,36 +41,36 @@ final class LLMCoreTypesTests: XCTestCase {
 
         let openAI = defaults.modelDefaults(providerID: .openAIPlatform, modelID: "gpt-5.4-nano")
         XCTAssertEqual(openAI?.contextWindow, 400000)
-        XCTAssertEqual(openAI?.modalities, [.text, .image, .file])
-        XCTAssertFalse(openAI?.supportedParameters?.contains("temperature") ?? true)
-        XCTAssertTrue(openAI?.schemaFeatures?.contains(.reasoning) ?? false)
+        XCTAssertTrue(openAI?.capabilities?.contains(.text) ?? false)
+        XCTAssertTrue(openAI?.capabilities?.contains(.image) ?? false)
+        XCTAssertTrue(openAI?.capabilities?.contains(.file) ?? false)
+        XCTAssertTrue(openAI?.capabilities?.contains(.reasoning) ?? false)
 
         let anthropic = defaults.modelDefaults(providerID: .anthropic, modelID: "claude-sonnet-4-6")
         XCTAssertEqual(anthropic?.contextWindow, 1000000)
-        XCTAssertEqual(anthropic?.modalities, [.text, .image])
+        XCTAssertTrue(anthropic?.capabilities?.contains(.text) ?? false)
+        XCTAssertTrue(anthropic?.capabilities?.contains(.image) ?? false)
 
         let xAI = defaults.modelDefaults(providerID: .xAI, modelID: "grok-4.3")
         XCTAssertEqual(xAI?.contextWindow, 1000000)
-        XCTAssertTrue(xAI?.schemaFeatures?.contains(.jsonSchema) ?? false)
+        XCTAssertTrue(xAI?.capabilities?.contains(.jsonSchema) ?? false)
 
         let deepSeek = defaults.modelDefaults(providerID: .deepSeek, modelID: "deepseek-v4-flash")
         XCTAssertEqual(deepSeek?.contextWindow, 1000000)
-        XCTAssertTrue(deepSeek?.supportedParameters?.contains("tools") ?? false)
+        XCTAssertTrue(deepSeek?.capabilities?.contains(.tools) ?? false)
     }
 
-    func testBundledDefaultsProvideConservativeFallbackDescriptor() {
+    func testBundledDefaultsProvideConservativeFallbackCandidate() {
         let catalog = try! LLMDefaultsCatalog(data: Data("""
         {
           "providerDefaults": [],
           "rules": []
         }
         """.utf8))
-        let descriptor = catalog.modelDescriptor(providerID: .customOpenAICompatible, modelID: "unknown-model")
+        let candidate = catalog.modelDescriptor(providerID: .customOpenAICompatible, modelID: "unknown-model")
 
-        XCTAssertEqual(descriptor.modalities, [.text])
-        XCTAssertTrue(descriptor.supportedParameters.isEmpty)
-        XCTAssertTrue(descriptor.schemaFeatures.isEmpty)
-        XCTAssertEqual(descriptor.displayName, "unknown-model")
+        XCTAssertEqual(candidate.capabilities, [.text])
+        XCTAssertEqual(candidate.displayName, "unknown-model")
     }
 
     func testCatalogCanProvideMinimalUnknownModelDefaults() throws {
@@ -79,22 +80,18 @@ final class LLMCoreTypesTests: XCTestCase {
           "rules": [
             {
               "modelDefaults": {
-                "modalities": ["text"],
-                "supportedParameters": [],
-                "schemaFeatures": []
+                "capabilities": ["text"]
               }
             }
           ]
         }
         """.utf8))
-        let descriptor = defaults.modelDescriptor(
+        let candidate = defaults.modelDescriptor(
             providerID: .openAIPlatform,
             modelID: "unknown-future-model"
         )
 
-        XCTAssertEqual(descriptor.modalities, [.text])
-        XCTAssertTrue(descriptor.supportedParameters.isEmpty)
-        XCTAssertTrue(descriptor.schemaFeatures.isEmpty)
+        XCTAssertEqual(candidate.capabilities, [.text])
     }
 
     func testDefaultsCatalogDecodesValidJSON() throws {
@@ -113,9 +110,7 @@ final class LLMCoreTypesTests: XCTestCase {
                 "modelRegex": "^unit-"
               },
               "modelDefaults": {
-                "adapterIDs": ["openAIResponses"],
-                "modalities": ["text"],
-                "schemaFeatures": ["streaming"]
+                "capabilities": ["text", "streaming"]
               }
             }
           ]
@@ -123,7 +118,7 @@ final class LLMCoreTypesTests: XCTestCase {
         """.utf8))
 
         XCTAssertEqual(catalog.defaultModelID(for: .openAIPlatform), "unit-model")
-        XCTAssertEqual(catalog.modelDefaults(providerID: .openAIPlatform, modelID: "unit-anything")?.modalities, [.text])
+        XCTAssertEqual(catalog.modelDefaults(providerID: .openAIPlatform, modelID: "unit-anything")?.capabilities, [.text, .streaming])
     }
 
     func testDefaultsCatalogRejectsInvalidEnumValues() {
@@ -170,7 +165,7 @@ final class LLMCoreTypesTests: XCTestCase {
                 "providerRegex": "["
               },
               "modelDefaults": {
-                "modalities": ["text"]
+                "capabilities": ["text"]
               }
             }
           ]
@@ -194,7 +189,7 @@ final class LLMCoreTypesTests: XCTestCase {
                 "modelRegex": ""
               },
               "modelDefaults": {
-                "modalities": ["text"]
+                "capabilities": ["text"]
               }
             }
           ]
@@ -217,8 +212,7 @@ final class LLMCoreTypesTests: XCTestCase {
                 "providerRegex": "^openAIPlatform$"
               },
               "modelDefaults": {
-                  "modalities": ["text"],
-                  "schemaFeatures": ["streaming"]
+                  "capabilities": ["text", "streaming"]
               }
             },
             {
@@ -227,8 +221,7 @@ final class LLMCoreTypesTests: XCTestCase {
                 "modelRegex": "^vision-"
               },
               "modelDefaults": {
-                  "modalities": ["image"],
-                  "schemaFeatures": ["jsonObject"]
+                  "capabilities": ["image", "jsonObject"]
               }
             },
             {
@@ -286,8 +279,7 @@ final class LLMCoreTypesTests: XCTestCase {
         """.utf8))
 
         let modelDefaults = catalog.modelDefaults(providerID: .openAIPlatform, modelID: "vision-large")
-        XCTAssertEqual(modelDefaults?.modalities, [.image])
-        XCTAssertEqual(modelDefaults?.schemaFeatures, [.jsonObject])
+        XCTAssertEqual(modelDefaults?.capabilities, [.image, .jsonObject])
 
         let mapping = catalog.parameterMappings(
             providerID: .openAIPlatform,
@@ -306,36 +298,33 @@ final class LLMCoreTypesTests: XCTestCase {
 
     func testModelMetadataDecoderUsesProviderMetadataOverDefaults() {
         let profile = LLMProviderRegistry.shared.profile(for: .openRouter)
-        let models = LLMModelMetadataDecoder.openAICompatibleDescriptors(
+        let models = LLMModelMetadataDecoder.openAICompatibleCandidates(
             from: [
                 .object([
                     "id": .string("vision-model"),
                     "context_window": .integer(999),
                     "modalities": .array([.string("image")]),
-                    "supported_parameters": .array([.string("tools")])
+                    "capabilities": .array([.string("tools")])
                 ])
             ],
-            profile: profile,
-            adapterIDs: [.openAICompatibleChatCompletions]
+            profile: profile
         )
 
         XCTAssertEqual(models.first?.contextWindow, 999)
-        XCTAssertEqual(models.first?.modalities, [.image])
-        XCTAssertEqual(models.first?.supportedParameters, ["tools"])
-        XCTAssertEqual(models.first?.schemaFeatures.contains(.streaming), true)
+        XCTAssertTrue(models.first?.capabilities.contains(.image) ?? false)
+        XCTAssertTrue(models.first?.capabilities.contains(.tools) ?? false)
     }
 
     func testModelMetadataDecoderFillsMissingFieldsFromDefaults() {
         let profile = LLMProviderRegistry.shared.profile(for: .openRouter)
-        let models = LLMModelMetadataDecoder.openAICompatibleDescriptors(
+        let models = LLMModelMetadataDecoder.openAICompatibleCandidates(
             from: [.object(["id": .string("fallback-model")])],
-            profile: profile,
-            adapterIDs: [.openAICompatibleChatCompletions]
+            profile: profile
         )
 
         XCTAssertEqual(models.first?.contextWindow, 128000)
-        XCTAssertEqual(models.first?.modalities, [.text])
-        XCTAssertTrue(models.first?.schemaFeatures.contains(.streaming) ?? false)
+        XCTAssertTrue(models.first?.capabilities.contains(.text) ?? false)
+        XCTAssertTrue(models.first?.capabilities.contains(.streaming) ?? false)
     }
 
     func testLLMToolSettingsRegistryUsesAppSettingsDescriptors() {

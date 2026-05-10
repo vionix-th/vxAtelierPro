@@ -169,21 +169,20 @@ extension LLMRequest {
         tools: [LLMToolDefinition] = [],
         options: LLMGenerationOptions = LLMGenerationOptions()
     ) -> LLMRequest {
-        var descriptor = LLMDefaultsCatalog.bundled.modelDescriptor(
+        let candidate = LLMDefaultsCatalog.bundled.modelDescriptor(
             providerID: providerID,
-            modelID: modelID,
-            adapterIDs: [adapterID]
-        )
-        descriptor.parameterMappings = LLMParameterMappingCatalog.defaults(
-            providerID: providerID,
-            adapterID: adapterID,
             modelID: modelID
         )
         return LLMRequest(
             providerID: providerID,
             adapterID: adapterID,
             modelID: modelID,
-            modelDescriptor: descriptor,
+            modelCapabilities: candidate.capabilities,
+            parameterMappings: LLMParameterMappingCatalog.defaults(
+                providerID: providerID,
+                adapterID: adapterID,
+                modelID: modelID
+            ),
             messages: messages,
             tools: tools,
             options: options

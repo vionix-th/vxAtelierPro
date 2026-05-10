@@ -1,106 +1,80 @@
 import SwiftData
 import SwiftUI
 
-/// A sheet view for selecting AI models from a list of available models.
-/// Designed to be reused across the application where model selection is needed.
+/// Selects a persisted model for runtime flows or a draft candidate for API configuration editing.
 struct ModelSelectionView: View {
     @Environment(\.dismiss) private var dismiss
-    @Query(sort: [SortDescriptor(\ModelItem.name)]) private var allModels: [ModelItem]
-    
-    /// The currently selected model (used for display purposes)
+    @Query(sort: [SortDescriptor(\ModelItem.modelID)]) private var allModels: [ModelItem]
+
     let selectedModel: String
-    
-    /// Callback that will be invoked when a model is selected
     let onModelSelected: (String) -> Void
-    
-    /// The current API configuration to filter models by
     let apiConfiguration: APIConfigurationItem?
+    var draftModelCandidates: [LLMModelDescriptor]? = nil
 
-    var fallbackModels: [ModelItem]? = nil
-    var fallbackModelDescriptors: [LLMModelDescriptor]? = nil
-    
-    /// Toggle to show all models or just those from the current provider
     @State private var showAllModels = false
-    
-    /// Search text for filtering models
     @State private var searchText = ""
-    
-    /// Selected model metadata filters.
-    @State private var selectedModalities: Set<LLMModality> = []
-    @State private var selectedSchemaFeatures: Set<LLMSchemaFeature> = []
-    
-    /// Filtered models based on current provider, showAllModels setting, and search text
-    private var filteredModels: [ModelSelectionOption] {
-        var models = allModels.map { ModelSelectionOption(model: $0) }
+    @State private var selectedCapabilities: Set<LLMModelCapability> = []
 
-        if let apiConfiguration {
-            if !showAllModels {
-                models = models.filter { $0.apiConfigurationID == apiConfiguration.id }
-                if let fallbackModelDescriptors {
-                    models = fallbackModelDescriptors.map {
-                        ModelSelectionOption(descriptor: $0, groupName: apiConfiguration.name)
-                    }
-                } else if models.isEmpty, let fallback = fallbackModels {
-                    models = fallback.map { ModelSelectionOption(model: $0) }
-                }
+    private var isDraftMode: Bool {
+        draftModelCandidates != nil
+    }
+
+    private var filteredModels: [ModelSelectionOption] {
+        var models: [ModelSelectionOption]
+        if let draftModelCandidates {
+            models = draftModelCandidates.map {
+                ModelSelectionOption(descriptor: $0, groupName: apiConfiguration?.name ?? $0.providerID.displayName)
             }
-        } else if !showAllModels {
-            models = models.filter { $0.apiConfigurationID == nil }
+        } else if let apiConfiguration, !showAllModels {
+            models = allModels
+                .filter { $0.apiConfiguration?.id == apiConfiguration.id }
+                .map(ModelSelectionOption.init(model:))
+        } else {
+            models = allModels.map(ModelSelectionOption.init(model:))
         }
-        
-        // Filter by selected metadata values; all selected filters must match.
-        if !selectedModalities.isEmpty || !selectedSchemaFeatures.isEmpty {
-            models = models.filter { model in
-                selectedModalities.isSubset(of: Set(model.modalities))
-                    && selectedSchemaFeatures.isSubset(of: Set(model.schemaFeatures))
-            }
+
+        if !selectedCapabilities.isEmpty {
+            models = models.filter { selectedCapabilities.isSubset(of: Set($0.capabilities)) }
         }
-        
-        // Fulltext search: name, provider, modalities, and schema features.
+
         if !searchText.isEmpty {
             let lowercasedSearch = searchText.lowercased()
             models = models.filter { model in
-                model.name.lowercased().contains(lowercasedSearch) ||
-                model.provider.lowercased().contains(lowercasedSearch) ||
-                model.metadataSearchTerms.map { $0.lowercased() }.contains(where: { $0.contains(lowercasedSearch) })
+                model.name.lowercased().contains(lowercasedSearch)
+                    || model.groupName.lowercased().contains(lowercasedSearch)
+                    || model.metadataSearchTerms.map { $0.lowercased() }.contains { $0.contains(lowercasedSearch) }
             }
         }
-        
+
         return models
     }
-    
-    /// Group models by provider for better organization
+
     private var groupedModels: [String: [ModelSelectionOption]] {
-        Dictionary(grouping: filteredModels) { model in
-            model.groupName
-        }
+        Dictionary(grouping: filteredModels) { $0.groupName }
     }
-    
-    /// Sorted provider keys to ensure consistent order
-    private var sortedProviders: [String] {
+
+    private var sortedGroups: [String] {
         groupedModels.keys.sorted()
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header with title and search
             VStack(spacing: 12) {
                 Text("Select Model")
                     .font(.headline)
                     .padding(.top)
-                
-                // Search field
+
                 HStack {
                     Image(systemName: "magnifyingglass")
                         .foregroundColor(.secondary)
-                    
+
                     TextField("Search models", text: $searchText)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                    
+                        .textFieldStyle(.roundedBorder)
+
                     if !searchText.isEmpty {
-                        Button(action: {
+                        Button {
                             searchText = ""
-                        }) {
+                        } label: {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundColor(.secondary)
                         }
@@ -108,51 +82,36 @@ struct ModelSelectionView: View {
                     }
                 }
                 .padding(.horizontal)
-                
-                // Model metadata filter chips
+
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(LLMModality.allCases.sorted(by: { $0.displayName < $1.displayName }), id: \.self) { modality in
+                        ForEach(LLMModelCapability.allCases.sorted(by: { $0.displayName < $1.displayName })) { capability in
                             MetadataChip(
-                                title: modality.displayName,
-                                systemName: modality.systemName,
-                                isSelected: selectedModalities.contains(modality),
-                                onTap: {
-                                    if selectedModalities.contains(modality) {
-                                        selectedModalities.remove(modality)
-                                    } else {
-                                        selectedModalities.insert(modality)
-                                    }
+                                title: capability.displayName,
+                                systemName: capability.systemName,
+                                isSelected: selectedCapabilities.contains(capability)
+                            ) {
+                                if selectedCapabilities.contains(capability) {
+                                    selectedCapabilities.remove(capability)
+                                } else {
+                                    selectedCapabilities.insert(capability)
                                 }
-                            )
-                        }
-                        ForEach(LLMSchemaFeature.allCases.sorted(by: { $0.displayName < $1.displayName }), id: \.self) { feature in
-                            MetadataChip(
-                                title: feature.displayName,
-                                systemName: feature.systemName,
-                                isSelected: selectedSchemaFeatures.contains(feature),
-                                onTap: {
-                                    if selectedSchemaFeatures.contains(feature) {
-                                        selectedSchemaFeatures.remove(feature)
-                                    } else {
-                                        selectedSchemaFeatures.insert(feature)
-                                    }
-                                }
-                            )
+                            }
                         }
                     }
                     .padding(.horizontal)
                     .padding(.vertical, 4)
                 }
-                
-                Toggle("Show All Models", isOn: $showAllModels)
-                    .padding(.horizontal)
-                    .padding(.bottom, 4)
-                
+
+                if !isDraftMode {
+                    Toggle("Show All Models", isOn: $showAllModels)
+                        .padding(.horizontal)
+                        .padding(.bottom, 4)
+                }
+
                 Divider()
             }
-            
-            // Models list
+
             if filteredModels.isEmpty {
                 VStack(spacing: 16) {
                     Spacer()
@@ -171,21 +130,19 @@ struct ModelSelectionView: View {
             } else {
                 ScrollView {
                     VStack(spacing: 0) {
-                        // Group models by provider
-                        ForEach(sortedProviders, id: \.self) { provider in
-                            if let models = groupedModels[provider] {
+                        ForEach(sortedGroups, id: \.self) { group in
+                            if let models = groupedModels[group] {
                                 VStack(alignment: .leading, spacing: 0) {
-                                    // Provider header
-                                    if showAllModels {
+                                    if showAllModels || isDraftMode {
                                         HStack {
-                                            Text(provider)
+                                            Text(group)
                                                 .font(.headline)
                                                 .foregroundColor(.secondary)
                                                 .padding(.horizontal)
                                                 .padding(.vertical, 8)
-                                            
+
                                             Spacer()
-                                            
+
                                             Text("\(models.count)")
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
@@ -193,8 +150,7 @@ struct ModelSelectionView: View {
                                         }
                                         .background(Color.secondary.opacity(0.1))
                                     }
-                                    
-                                    // Models in this provider group
+
                                     ForEach(models) { model in
                                         ModelRowView(
                                             model: model,
@@ -205,15 +161,15 @@ struct ModelSelectionView: View {
                                                 dismiss()
                                             }
                                         )
-                                        
+
                                         if model.id != models.last?.id {
                                             Divider()
                                                 .padding(.leading, 16)
                                         }
                                     }
                                 }
-                                
-                                if provider != sortedProviders.last {
+
+                                if group != sortedGroups.last {
                                     Divider()
                                         .padding(.vertical, 8)
                                 }
@@ -223,11 +179,10 @@ struct ModelSelectionView: View {
                     .padding(.vertical, 8)
                 }
             }
-            
-            // Footer with cancel button
+
             VStack {
                 Divider()
-                
+
                 Button("Cancel") {
                     vxAtelierPro.log.debug("Cancelled model selection")
                     dismiss()
@@ -247,21 +202,19 @@ private struct ModelSelectionOption: Identifiable {
     let name: String
     let provider: String
     let contextSize: Int
-    let modalities: [LLMModality]
-    let schemaFeatures: [LLMSchemaFeature]
+    let capabilities: [LLMModelCapability]
     let metadataSearchTerms: [String]
     let groupName: String
     let apiConfigurationID: PersistentIdentifier?
 
     init(model: ModelItem) {
         self.id = String(describing: model.persistentModelID)
-        self.name = model.name
-        self.provider = model.provider
+        self.name = model.modelID
+        self.provider = model.apiConfiguration?.providerIDEnum.displayName ?? "Unknown Provider"
         self.contextSize = model.contextSize
-        self.modalities = model.modalityEnums
-        self.schemaFeatures = model.schemaFeatureEnums
+        self.capabilities = model.capabilities
         self.metadataSearchTerms = model.metadataSearchTerms
-        self.groupName = model.apiConfiguration?.name ?? "\(model.provider.capitalized) (Unassigned)"
+        self.groupName = model.apiConfiguration?.name ?? "Unassigned"
         self.apiConfigurationID = model.apiConfiguration?.id
     }
 
@@ -270,46 +223,41 @@ private struct ModelSelectionOption: Identifiable {
         self.name = descriptor.id
         self.provider = descriptor.providerID.displayName
         self.contextSize = descriptor.contextWindow ?? 0
-        self.modalities = descriptor.modalities
-        self.schemaFeatures = descriptor.schemaFeatures
-        self.metadataSearchTerms = descriptor.modalities.map(\.displayName) + descriptor.schemaFeatures.map(\.displayName)
+        self.capabilities = descriptor.capabilities
+        self.metadataSearchTerms = descriptor.capabilities.map(\.displayName)
         self.groupName = groupName
         self.apiConfigurationID = nil
     }
 }
 
-/// Individual row view for a model
 private struct ModelRowView: View {
     let model: ModelSelectionOption
     let isSelected: Bool
     let onSelect: () -> Void
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(model.name)
                         .font(.headline)
-                    
-                    // Provider info as subtitle
+
                     Text(model.provider)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                
+
                 Spacer()
-                
+
                 if isSelected {
                     Image(systemName: "checkmark")
                         .foregroundColor(.blue)
                 }
             }
-            
-            // Metadata row
-            if model.contextSize > 0 || !model.modalities.isEmpty || !model.schemaFeatures.isEmpty {
+
+            if model.contextSize > 0 || !model.capabilities.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        // Context size info if available
                         if model.contextSize > 0 {
                             HStack(spacing: 4) {
                                 Image(systemName: "character.textbox")
@@ -325,12 +273,13 @@ private struct ModelRowView: View {
                             .cornerRadius(4)
                             .help("Context window size")
                         }
-                        ForEach(model.modalities, id: \.self) { modality in
+
+                        ForEach(model.capabilities) { capability in
                             HStack(spacing: 4) {
-                                Image(systemName: modality.systemName)
+                                Image(systemName: capability.systemName)
                                     .foregroundColor(.blue)
                                     .font(.caption)
-                                Text(modality.displayName)
+                                Text(capability.displayName)
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -338,22 +287,7 @@ private struct ModelRowView: View {
                             .padding(.vertical, 2)
                             .background(Color.secondary.opacity(0.1))
                             .cornerRadius(4)
-                            .help(modality.displayName)
-                        }
-                        ForEach(model.schemaFeatures, id: \.self) { feature in
-                            HStack(spacing: 4) {
-                                Image(systemName: feature.systemName)
-                                    .foregroundColor(.blue)
-                                    .font(.caption)
-                                Text(feature.displayName)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.secondary.opacity(0.1))
-                            .cornerRadius(4)
-                            .help(feature.displayName)
+                            .help(capability.displayName)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -367,24 +301,18 @@ private struct ModelRowView: View {
         .background(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
         .onTapGesture(perform: onSelect)
     }
-    
-    /// Format token count in a readable way (e.g., "8K", "32K", etc.)
+
     private func formatTokenCount(_ count: Int) -> String {
-        if count >= 1000 {
-            return "\(count / 1000)K"
-        } else {
-            return "\(count)"
-        }
+        count >= 1000 ? "\(count / 1000)K" : "\(count)"
     }
 }
 
-/// A chip-style button for selecting model metadata filters.
 private struct MetadataChip: View {
     let title: String
     let systemName: String
     let isSelected: Bool
     let onTap: () -> Void
-    
+
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 4) {

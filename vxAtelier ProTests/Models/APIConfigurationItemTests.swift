@@ -40,7 +40,7 @@ final class APIConfigurationItemTests: XCTestCase {
 
     func testRelationshipWithModelItem() throws {
         let config = APIConfigurationItem(name: "TestAPI", apiKey: "key", baseURL: "https://api.test.com/v1")
-        let model = ModelItem(name: "gpt-4", contextSize: 8192, provider: "OpenAI", apiConfiguration: config)
+        let model = ModelItem(modelID: "gpt-4", contextSize: 8192, apiConfiguration: config)
         config.defaultModel = model.name
         context.insert(config)
         context.insert(model)

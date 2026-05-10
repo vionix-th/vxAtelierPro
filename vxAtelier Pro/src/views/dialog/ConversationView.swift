@@ -18,7 +18,7 @@ struct ConversationView: View {
         self.scrollHint = scrollHint
         self.onRequestOptions = onRequestOptions
     }
-
+    
     var body: some View {
         VStack(spacing: 0) {
             ScrollViewReader { proxy in

@@ -90,12 +90,7 @@ final class ConversationOptions: Equatable {
 
     func applyAPIConfigurationDefaults(replaceSelectedModel: Bool) {
         guard let apiConfiguration else { return }
-        let providerID = apiConfiguration.providerIDEnum
-
-        let defaultModel = LLMModelDescriptorResolver().defaultModelID(
-            for: providerID,
-            apiConfiguration: apiConfiguration
-        )
+        let defaultModel = apiConfiguration.defaultModelID
         let currentModel = selectedModelID?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if replaceSelectedModel || currentModel.isEmpty {
             selectedModelID = defaultModel

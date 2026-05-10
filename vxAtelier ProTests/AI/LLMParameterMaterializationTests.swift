@@ -9,13 +9,9 @@ import XCTest
 @MainActor
 final class LLMParameterMaterializationTests: XCTestCase {
     func testCustomizedModelMappingSurvivesDefaultMaterialization() {
-        let model = ModelItem(descriptor: LLMModelDescriptor(
-            id: "gpt-5.4-nano",
-            providerID: .openAIPlatform,
-            adapterIDs: [.openAIChatCompletions],
-            modalities: [.text],
-            schemaFeatures: [.streaming]
-        ))
+        let config = APIConfigurationItem(name: "OpenAI", baseURL: "https://unit.test", providerID: .openAIPlatform)
+        config.defaultAdapterIDEnum = .openAIChatCompletions
+        let model = ModelItem(modelID: "gpt-5.4-nano", apiConfiguration: config)
         let mapping = model.parameterMappings.first {
             $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
         }
@@ -28,13 +24,9 @@ final class LLMParameterMaterializationTests: XCTestCase {
     }
 
     func testModelMaterializesDefaultParameterMappingsFromCatalog() {
-        let model = ModelItem(descriptor: LLMModelDescriptor(
-            id: "gpt-4.1-nano",
-            providerID: .openAIPlatform,
-            adapterIDs: [.openAIChatCompletions],
-            modalities: [.text],
-            schemaFeatures: [.streaming]
-        ))
+        let config = APIConfigurationItem(name: "OpenAI", baseURL: "https://unit.test", providerID: .openAIPlatform)
+        config.defaultAdapterIDEnum = .openAIChatCompletions
+        let model = ModelItem(modelID: "gpt-4.1-nano", apiConfiguration: config)
 
         let mapping = model.parameterMappings.first {
             $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
@@ -46,13 +38,9 @@ final class LLMParameterMaterializationTests: XCTestCase {
     }
 
     func testResetDefaultParameterMappingsRestoresAdapterDefaults() {
-        let model = ModelItem(descriptor: LLMModelDescriptor(
-            id: "gpt-5.4-nano",
-            providerID: .openAIPlatform,
-            adapterIDs: [.openAIChatCompletions],
-            modalities: [.text],
-            schemaFeatures: [.streaming]
-        ))
+        let config = APIConfigurationItem(name: "OpenAI", baseURL: "https://unit.test", providerID: .openAIPlatform)
+        config.defaultAdapterIDEnum = .openAIChatCompletions
+        let model = ModelItem(modelID: "gpt-5.4-nano", apiConfiguration: config)
         let maxTokens = model.parameterMappings.first {
             $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
         }
@@ -93,8 +81,7 @@ final class LLMParameterMaterializationTests: XCTestCase {
 
         let controls = ConversationParameterProjection.controls(
             for: options,
-            apiConfiguration: config,
-            modelContext: nil
+            apiConfiguration: config
         )
 
         let temperature = controls.first { $0.parameterID == .temperature }

@@ -28,18 +28,19 @@ final class ModelItemExportTests: XCTestCase {
             baseURL: "https://api.test.com/v1",
             providerID: .openAIPlatform
         )
-        let original = ModelItem(name: "gpt-4", contextSize: 8192, provider: "OpenAI", apiConfiguration: config)
-        original.modalitiesRaw = [LLMModality.text.rawValue, LLMModality.image.rawValue]
-        original.schemaFeaturesRaw = [LLMSchemaFeature.streaming.rawValue]
+        let original = ModelItem(modelID: "gpt-4", contextSize: 8192, apiConfiguration: config)
+        original.capabilitiesRaw = [
+            LLMModelCapability.text.rawValue,
+            LLMModelCapability.image.rawValue,
+            LLMModelCapability.streaming.rawValue
+        ]
         let exportData = ModelExportData(original)
         let encoded = try JSONEncoder().encode(exportData)
         let decoded = try JSONDecoder().decode(ModelExportData.self, from: encoded)
         let restored = decoded.toDataItem(apiConfigurations: [config])
         XCTAssertEqual(restored.name, original.name)
         XCTAssertEqual(restored.contextSize, original.contextSize)
-        XCTAssertEqual(restored.provider, original.provider)
-        XCTAssertEqual(Set(restored.modalitiesRaw), Set(original.modalitiesRaw))
-        XCTAssertEqual(Set(restored.schemaFeaturesRaw), Set(original.schemaFeaturesRaw))
+        XCTAssertEqual(Set(restored.capabilitiesRaw), Set(original.capabilitiesRaw))
         XCTAssertEqual(restored.apiConfiguration?.name, config.name)
         let restoredMaxTokens = restored.parameterMappings.first {
             $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
@@ -58,15 +59,14 @@ final class ModelItemExportTests: XCTestCase {
         try context.save()
 
         let original = ModelItem(
-            name: "gpt-4.1",
+            modelID: "gpt-4.1",
             contextSize: 128000,
-            provider: "OpenAI",
             apiConfiguration: config
         )
         let data = try JsonSerializer.exportModel(original)
         let restored = try JsonSerializer.importModel(from: data, context: context)
 
         XCTAssertEqual(restored.apiConfiguration?.id, config.id)
-        XCTAssertEqual(restored.providerID, LLMProviderID.openAIPlatform.rawValue)
+        XCTAssertEqual(restored.apiConfiguration?.providerIDEnum, .openAIPlatform)
     }
 }

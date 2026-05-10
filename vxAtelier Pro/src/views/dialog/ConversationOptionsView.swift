@@ -31,8 +31,7 @@ struct ConversationOptionsView: View {
     private var parameterControls: [ConversationParameterControl] {
         ConversationParameterProjection.controls(
             for: options,
-            apiConfiguration: options.apiConfiguration,
-            modelContext: modelContext
+            apiConfiguration: options.apiConfiguration
         )
     }
 

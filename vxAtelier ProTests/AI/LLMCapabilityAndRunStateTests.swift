@@ -30,13 +30,7 @@ final class LLMCapabilityAndRunStateTests: XCTestCase {
             providerID: .openRouter,
             adapterID: .openAIChatCompletions,
             modelID: "vision-model",
-            modelDescriptor: LLMModelDescriptor(
-                id: "vision-model",
-                providerID: .openRouter,
-                adapterIDs: [.openAIChatCompletions],
-                modalities: [.text, .image],
-                schemaFeatures: [.streaming]
-            ),
+            modelCapabilities: [.text, .image, .streaming],
             messages: [
                 LLMMessage(role: "user", content: [LLMContentPart(kind: .image, dataBase64: "aW1n")])
             ]

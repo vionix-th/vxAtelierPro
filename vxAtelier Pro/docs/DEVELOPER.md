@@ -331,7 +331,7 @@ This is a non-persistent value type that represents one configurable generation 
 
 *   **Dynamic UI Generation**: It combines semantic parameter definitions, presentation metadata, resolved model parameter mappings, and typed values from `ConversationOptions`.
 *   **No Value Ownership**: It does not persist values. `ConversationOptions` owns generation values and parameter enablement overrides.
-*   **Descriptor-Backed Availability**: It is materialized from `LLMModelDescriptorResolver`, so UI and runtime use the same model metadata path.
+*   **Persisted Model Availability**: It is materialized from `ModelItem` parameter mappings, so UI and runtime use the same persisted model metadata path.
 
 #### API Configuration (`APIConfigurationItem.swift`)
 
@@ -385,7 +385,7 @@ This SwiftData `@Model` is a comprehensive container for all settings that gover
 This SwiftData `@Model` represents a specific, selectable AI model from a provider.
 
 *   **Catalog Defaults**: Its initializer seeds model metadata from `LLMDefaultsCatalog` and materializes default parameter mappings from `LLMParameterMappingCatalog`.
-*   **Descriptor Bridge**: `descriptor` is a computed property that bridges between persisted fields (`modelID`, `providerID`, `adapterIDsRaw`, `modalitiesRaw`, `supportedParameters`, `schemaFeaturesRaw`, `parameterMappings`, `rawMetadataJSON`) and the domain `LLMModelDescriptor` struct used by adapters, validators, and resolvers.
+*   **Persisted Metadata**: It stores final `capabilities`, raw provider metadata, and adapter-scoped parameter mappings. Runtime reads this persisted state and does not resolve model defaults again.
 *   **API Configuration Scoping**: `apiConfiguration` links a model to a specific `APIConfigurationItem`, so two configurations with the same model name can carry different parameter mappings.
 
 #### Project (`ProjectItem.swift`)

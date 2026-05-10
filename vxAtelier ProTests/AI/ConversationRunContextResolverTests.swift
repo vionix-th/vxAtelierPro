@@ -26,16 +26,8 @@ final class ConversationRunContextResolverTests: XCTestCase {
         )
         configA.defaultAdapterIDEnum = .openAIChatCompletions
         configB.defaultAdapterIDEnum = .openAIChatCompletions
-        let descriptor = LLMModelDescriptor(
-            id: "gpt-test",
-            providerID: .openAIPlatform,
-            adapterIDs: [.openAIChatCompletions],
-            modalities: [.text],
-            parameterMappings: [],
-            schemaFeatures: [.streaming]
-        )
-        let modelA = ModelItem(descriptor: descriptor, apiConfiguration: configA)
-        let modelB = ModelItem(descriptor: descriptor, apiConfiguration: configB)
+        let modelA = ModelItem(modelID: "gpt-test", apiConfiguration: configA)
+        let modelB = ModelItem(modelID: "gpt-test", apiConfiguration: configB)
         let mappingA = modelA.parameterMappings.first {
             $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
         }
@@ -65,17 +57,17 @@ final class ConversationRunContextResolverTests: XCTestCase {
         )
         let request = try LLMRequestFactory().makeRequest(from: context)
 
-        let maxOutputMapping = request.modelDescriptor?.parameterMappings.first {
+        let maxOutputMapping = request.parameterMappings.first {
             $0.adapterID == .openAIChatCompletions && $0.semanticParameterID == .maxOutputTokens
         }
         XCTAssertEqual(
             maxOutputMapping?.wireKey,
             "max_tokens_b",
-            "Resolved wire key: \(maxOutputMapping?.wireKey ?? "nil"), descriptor config provider: \(request.modelDescriptor?.providerID.rawValue ?? "nil")"
+            "Resolved wire key: \(maxOutputMapping?.wireKey ?? "nil")"
         )
     }
 
-    func testResolverSynthesizesDefaultDescriptorWhenNoMatchingModelExists() throws {
+    func testResolverFailsWhenNoPersistedModelExists() throws {
         let env = TestEnvironment()
         let config = APIConfigurationItem(
             name: "OpenAI",
@@ -90,16 +82,14 @@ final class ConversationRunContextResolverTests: XCTestCase {
         env.modelContext.insert(config)
         env.modelContext.insert(conversation)
 
-        let context = try ConversationRunContextResolver(
+        XCTAssertThrowsError(try ConversationRunContextResolver(
             toolCatalog: StaticLLMToolCatalog([])
         ).resolve(
             conversation: conversation,
             apiConfig: config
-        )
-
-        XCTAssertEqual(context.modelDescriptor?.id, "gpt-missing")
-        XCTAssertEqual(context.modelDescriptor?.providerID, .openAIPlatform)
-        XCTAssertTrue(context.modelDescriptor?.schemaFeatures.contains(.streaming) ?? false)
+        )) { error in
+            XCTAssertEqual(error as? LLMProviderError, .invalidConfiguration("Model gpt-missing is not available for OpenAI."))
+        }
     }
 
     func testRequestFactoryProducesStableRequestFromFixedContext() throws {
@@ -120,17 +110,11 @@ final class ConversationRunContextResolverTests: XCTestCase {
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
             modelID: "gpt-test",
-            modelDescriptor: LLMModelDescriptor(
-                id: "gpt-test",
+            modelCapabilities: [.text, .tools, .strictTools, .jsonSchema, .jsonObject, .reasoning, .usage, .streaming],
+            parameterMappings: LLMParameterMappingCatalog.defaults(
                 providerID: .openAIPlatform,
-                adapterIDs: [.openAIResponses],
-                modalities: [.text],
-                parameterMappings: LLMParameterMappingCatalog.defaults(
-                    providerID: .openAIPlatform,
-                    adapterID: .openAIResponses,
-                    modelID: "gpt-test"
-                ),
-                schemaFeatures: [.tools, .strictTools, .jsonSchema, .jsonObject, .reasoning, .usage, .streaming]
+                adapterID: .openAIResponses,
+                modelID: "gpt-test"
             ),
             messages: [
                 LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Hello")])

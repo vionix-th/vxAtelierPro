@@ -35,14 +35,10 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
         )
     }
 
-    /// Reuses Chat Completions model listing and broadens descriptors to Responses support.
+    /// Reuses Chat Completions model listing for Responses-capable configurations.
     func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
         let chatFallback = OpenAIChatCompletionsAdapter(profile: profile)
-        return try await chatFallback.fetchModels(configuration: configuration).map { descriptor in
-            var copy = descriptor
-            copy.adapterIDs = [.openAIResponses, .openAIChatCompletions]
-            return copy
-        }
+        return try await chatFallback.fetchModels(configuration: configuration)
     }
 
     /// Encodes a provider-neutral request into a Responses JSON body.
@@ -56,10 +52,8 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
             body["instructions"] = .string(request.options.systemPrompt)
         }
         let mappings = LLMParameterMappingResolver.resolve(
-            providerID: request.providerID,
             adapterID: request.adapterID,
-            modelID: request.modelID,
-            modelDescriptor: request.modelDescriptor
+            mappings: request.parameterMappings
         )
         try OpenAICompatibleEncoding.applyMappedOptions(
             request.options,

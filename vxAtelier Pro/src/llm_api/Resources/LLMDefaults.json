@@ -24,11 +24,9 @@
   "rules": [
     {
       "modelDefaults": {
-        "modalities": [
+        "capabilities": [
           "text"
-        ],
-        "supportedParameters": [],
-        "schemaFeatures": []
+        ]
       }
     },
     {
@@ -37,33 +35,15 @@
       },
       "modelDefaults": {
         "contextWindow": 128000,
-        "modalities": [
+        "capabilities": [
           "text",
-          "image"
-        ],
-        "supportedParameters": [
-          "temperature",
-          "top_p",
-          "max_output_tokens",
-          "max_completion_tokens",
-          "stop",
-          "response_format",
-          "structured_outputs",
-          "tools",
-          "tool_choice",
-          "service_tier"
-        ],
-        "schemaFeatures": [
+          "image",
           "tools",
           "strictTools",
           "jsonSchema",
           "jsonObject",
           "usage",
           "streaming"
-        ],
-        "adapterIDs": [
-          "openAIResponses",
-          "openAIChatCompletions"
         ]
       }
     },
@@ -74,33 +54,16 @@
       },
       "modelDefaults": {
         "contextWindow": 1047576,
-        "modalities": [
+        "capabilities": [
           "text",
           "image",
-          "file"
-        ],
-        "supportedParameters": [
-          "temperature",
-          "top_p",
-          "max_output_tokens",
-          "max_completion_tokens",
-          "response_format",
-          "structured_outputs",
-          "tools",
-          "tool_choice",
-          "service_tier"
-        ],
-        "schemaFeatures": [
+          "file",
           "tools",
           "strictTools",
           "jsonSchema",
           "jsonObject",
           "usage",
           "streaming"
-        ],
-        "adapterIDs": [
-          "openAIResponses",
-          "openAIChatCompletions"
         ]
       }
     },
@@ -111,22 +74,10 @@
       },
       "modelDefaults": {
         "contextWindow": 400000,
-        "modalities": [
+        "capabilities": [
           "text",
           "image",
-          "file"
-        ],
-        "supportedParameters": [
-          "max_output_tokens",
-          "max_completion_tokens",
-          "reasoning",
-          "response_format",
-          "structured_outputs",
-          "tools",
-          "tool_choice",
-          "service_tier"
-        ],
-        "schemaFeatures": [
+          "file",
           "tools",
           "strictTools",
           "jsonSchema",
@@ -134,10 +85,6 @@
           "reasoning",
           "usage",
           "streaming"
-        ],
-        "adapterIDs": [
-          "openAIResponses",
-          "openAIChatCompletions"
         ]
       }
     },
@@ -148,22 +95,10 @@
       },
       "modelDefaults": {
         "contextWindow": 1050000,
-        "modalities": [
+        "capabilities": [
           "text",
           "image",
-          "file"
-        ],
-        "supportedParameters": [
-          "max_output_tokens",
-          "max_completion_tokens",
-          "reasoning",
-          "response_format",
-          "structured_outputs",
-          "tools",
-          "tool_choice",
-          "service_tier"
-        ],
-        "schemaFeatures": [
+          "file",
           "tools",
           "strictTools",
           "jsonSchema",
@@ -171,10 +106,6 @@
           "reasoning",
           "usage",
           "streaming"
-        ],
-        "adapterIDs": [
-          "openAIResponses",
-          "openAIChatCompletions"
         ]
       }
     },
@@ -184,18 +115,12 @@
       },
       "modelDefaults": {
         "contextWindow": 128000,
-        "modalities": [
+        "capabilities": [
           "text",
-          "image"
-        ],
-        "supportedParameters": [],
-        "schemaFeatures": [
+          "image",
           "tools",
           "reasoning",
           "streaming"
-        ],
-        "adapterIDs": [
-          "openAIResponses"
         ]
       }
     },
@@ -205,27 +130,13 @@
       },
       "modelDefaults": {
         "contextWindow": 200000,
-        "modalities": [
+        "capabilities": [
           "text",
-          "image"
-        ],
-        "supportedParameters": [
-          "max_tokens",
-          "temperature",
-          "top_p",
-          "stop_sequences",
-          "thinking",
-          "tools",
-          "tool_choice"
-        ],
-        "schemaFeatures": [
+          "image",
           "tools",
           "reasoning",
           "usage",
           "streaming"
-        ],
-        "adapterIDs": [
-          "anthropicMessages"
         ]
       }
     },
@@ -236,27 +147,13 @@
       },
       "modelDefaults": {
         "contextWindow": 1000000,
-        "modalities": [
+        "capabilities": [
           "text",
-          "image"
-        ],
-        "supportedParameters": [
-          "max_tokens",
-          "temperature",
-          "top_p",
-          "stop_sequences",
-          "thinking",
-          "tools",
-          "tool_choice"
-        ],
-        "schemaFeatures": [
+          "image",
           "tools",
           "reasoning",
           "usage",
           "streaming"
-        ],
-        "adapterIDs": [
-          "anthropicMessages"
         ]
       }
     },
@@ -266,26 +163,12 @@
       },
       "modelDefaults": {
         "contextWindow": 128000,
-        "modalities": [
-          "text"
-        ],
-        "supportedParameters": [
-          "temperature",
-          "top_p",
-          "max_tokens",
-          "stop",
-          "response_format",
-          "tools",
-          "tool_choice"
-        ],
-        "schemaFeatures": [
+        "capabilities": [
+          "text",
           "tools",
           "jsonObject",
           "usage",
           "streaming"
-        ],
-        "adapterIDs": [
-          "openAICompatibleChatCompletions"
         ]
       }
     },
@@ -296,31 +179,16 @@
       },
       "modelDefaults": {
         "contextWindow": 1047576,
-        "modalities": [
+        "capabilities": [
           "text",
           "image",
-          "file"
-        ],
-        "supportedParameters": [
-          "max_completion_tokens",
-          "max_tokens",
-          "response_format",
-          "structured_outputs",
-          "temperature",
-          "tools",
-          "tool_choice",
-          "top_p"
-        ],
-        "schemaFeatures": [
+          "file",
           "tools",
           "strictTools",
           "jsonSchema",
           "jsonObject",
           "usage",
           "streaming"
-        ],
-        "adapterIDs": [
-          "openAICompatibleChatCompletions"
         ]
       }
     },
@@ -331,21 +199,10 @@
       },
       "modelDefaults": {
         "contextWindow": 400000,
-        "modalities": [
+        "capabilities": [
           "text",
           "image",
-          "file"
-        ],
-        "supportedParameters": [
-          "max_completion_tokens",
-          "max_tokens",
-          "reasoning",
-          "response_format",
-          "structured_outputs",
-          "tools",
-          "tool_choice"
-        ],
-        "schemaFeatures": [
+          "file",
           "tools",
           "strictTools",
           "jsonSchema",
@@ -353,9 +210,6 @@
           "reasoning",
           "usage",
           "streaming"
-        ],
-        "adapterIDs": [
-          "openAICompatibleChatCompletions"
         ]
       }
     },
@@ -366,21 +220,10 @@
       },
       "modelDefaults": {
         "contextWindow": 1050000,
-        "modalities": [
+        "capabilities": [
           "text",
           "image",
-          "file"
-        ],
-        "supportedParameters": [
-          "max_completion_tokens",
-          "max_tokens",
-          "reasoning",
-          "response_format",
-          "structured_outputs",
-          "tools",
-          "tool_choice"
-        ],
-        "schemaFeatures": [
+          "file",
           "tools",
           "strictTools",
           "jsonSchema",
@@ -388,9 +231,6 @@
           "reasoning",
           "usage",
           "streaming"
-        ],
-        "adapterIDs": [
-          "openAICompatibleChatCompletions"
         ]
       }
     },
@@ -401,22 +241,9 @@
       },
       "modelDefaults": {
         "contextWindow": 1000000,
-        "modalities": [
+        "capabilities": [
           "text",
-          "image"
-        ],
-        "supportedParameters": [
-          "max_tokens",
-          "reasoning",
-          "response_format",
-          "stop",
-          "structured_outputs",
-          "temperature",
-          "tools",
-          "tool_choice",
-          "top_p"
-        ],
-        "schemaFeatures": [
+          "image",
           "tools",
           "strictTools",
           "jsonSchema",
@@ -424,9 +251,6 @@
           "reasoning",
           "usage",
           "streaming"
-        ],
-        "adapterIDs": [
-          "openAICompatibleChatCompletions"
         ]
       }
     },
@@ -437,22 +261,10 @@
       },
       "modelDefaults": {
         "contextWindow": 1000000,
-        "modalities": [
+        "capabilities": [
           "text",
           "image",
-          "file"
-        ],
-        "supportedParameters": [
-          "max_tokens",
-          "reasoning",
-          "response_format",
-          "structured_outputs",
-          "temperature",
-          "tools",
-          "tool_choice",
-          "top_p"
-        ],
-        "schemaFeatures": [
+          "file",
           "tools",
           "strictTools",
           "jsonSchema",
@@ -460,9 +272,6 @@
           "reasoning",
           "usage",
           "streaming"
-        ],
-        "adapterIDs": [
-          "openAICompatibleChatCompletions"
         ]
       }
     },
@@ -473,22 +282,10 @@
       },
       "modelDefaults": {
         "contextWindow": 2000000,
-        "modalities": [
+        "capabilities": [
           "text",
           "image",
-          "file"
-        ],
-        "supportedParameters": [
-          "max_tokens",
-          "reasoning",
-          "response_format",
-          "structured_outputs",
-          "temperature",
-          "tools",
-          "tool_choice",
-          "top_p"
-        ],
-        "schemaFeatures": [
+          "file",
           "tools",
           "strictTools",
           "jsonSchema",
@@ -496,9 +293,6 @@
           "reasoning",
           "usage",
           "streaming"
-        ],
-        "adapterIDs": [
-          "openAICompatibleChatCompletions"
         ]
       }
     },
@@ -508,26 +302,12 @@
       },
       "modelDefaults": {
         "contextWindow": 4096,
-        "modalities": [
-          "text"
-        ],
-        "supportedParameters": [
-          "temperature",
-          "top_p",
-          "max_tokens",
-          "stop",
-          "response_format",
-          "tools",
-          "tool_choice"
-        ],
-        "schemaFeatures": [
+        "capabilities": [
+          "text",
           "tools",
           "jsonObject",
           "usage",
           "streaming"
-        ],
-        "adapterIDs": [
-          "openAICompatibleChatCompletions"
         ]
       }
     },
@@ -537,20 +317,9 @@
       },
       "modelDefaults": {
         "contextWindow": 1000000,
-        "modalities": [
+        "capabilities": [
           "text",
-          "image"
-        ],
-        "supportedParameters": [
-          "temperature",
-          "top_p",
-          "max_tokens",
-          "response_format",
-          "reasoning",
-          "tools",
-          "tool_choice"
-        ],
-        "schemaFeatures": [
+          "image",
           "tools",
           "strictTools",
           "jsonSchema",
@@ -558,9 +327,6 @@
           "reasoning",
           "usage",
           "streaming"
-        ],
-        "adapterIDs": [
-          "openAICompatibleChatCompletions"
         ]
       }
     },
@@ -571,21 +337,10 @@
       },
       "modelDefaults": {
         "contextWindow": 2000000,
-        "modalities": [
+        "capabilities": [
           "text",
           "image",
-          "file"
-        ],
-        "supportedParameters": [
-          "temperature",
-          "top_p",
-          "max_tokens",
-          "response_format",
-          "reasoning",
-          "tools",
-          "tool_choice"
-        ],
-        "schemaFeatures": [
+          "file",
           "tools",
           "strictTools",
           "jsonSchema",
@@ -593,9 +348,6 @@
           "reasoning",
           "usage",
           "streaming"
-        ],
-        "adapterIDs": [
-          "openAICompatibleChatCompletions"
         ]
       }
     },
@@ -605,26 +357,12 @@
       },
       "modelDefaults": {
         "contextWindow": 1000000,
-        "modalities": [
-          "text"
-        ],
-        "supportedParameters": [
-          "temperature",
-          "top_p",
-          "max_tokens",
-          "stop",
-          "response_format",
-          "tools",
-          "tool_choice"
-        ],
-        "schemaFeatures": [
+        "capabilities": [
+          "text",
           "tools",
           "jsonObject",
           "usage",
           "streaming"
-        ],
-        "adapterIDs": [
-          "openAICompatibleChatCompletions"
         ]
       }
     },
@@ -635,25 +373,13 @@
       },
       "modelDefaults": {
         "contextWindow": 1000000,
-        "modalities": [
-          "text"
-        ],
-        "supportedParameters": [
-          "max_tokens",
-          "response_format",
-          "thinking",
-          "tools",
-          "tool_choice"
-        ],
-        "schemaFeatures": [
+        "capabilities": [
+          "text",
           "tools",
           "jsonObject",
           "reasoning",
           "usage",
           "streaming"
-        ],
-        "adapterIDs": [
-          "openAICompatibleChatCompletions"
         ]
       }
     },

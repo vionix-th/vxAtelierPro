@@ -280,10 +280,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
             activity.add(XCTAttachment(string: [
                 "modelID=\(descriptor.id)",
                 "context=\(descriptor.contextWindow.map(String.init) ?? "nil")",
-                "adapterIDs=\(descriptor.adapterIDs.map(\.rawValue).joined(separator: ","))",
-                "modalities=\(descriptor.modalities.map(\.rawValue).joined(separator: ","))",
-                "supportedParameters=\(descriptor.supportedParameters.joined(separator: ","))",
-                "schemaFeatures=\(descriptor.schemaFeatures.map(\.rawValue).joined(separator: ","))",
+                "capabilities=\(descriptor.capabilities.map(\.rawValue).joined(separator: ","))",
                 "rawMetadata=\(descriptor.rawMetadataJSON == nil ? "missing" : "present")"
             ].joined(separator: "\n")))
         }
@@ -291,20 +288,8 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         if let contextWindow = defaults.contextWindow {
             XCTAssertEqual(descriptor.contextWindow, contextWindow)
         }
-        if let adapterIDs = defaults.adapterIDs, adapterID != .openAIResponses {
-            XCTAssertEqual(Set(descriptor.adapterIDs), Set(adapterIDs))
-        }
-        if adapterID == .openAIResponses {
-            XCTAssertEqual(Set(descriptor.adapterIDs), Set([.openAIResponses, .openAIChatCompletions]))
-        }
-        if let modalities = defaults.modalities {
-            XCTAssertEqual(Set(descriptor.modalities), Set(modalities))
-        }
-        if let supportedParameters = defaults.supportedParameters {
-            XCTAssertEqual(Set(descriptor.supportedParameters), Set(supportedParameters))
-        }
-        if let schemaFeatures = defaults.schemaFeatures {
-            XCTAssertEqual(Set(descriptor.schemaFeatures), Set(schemaFeatures))
+        if let capabilities = defaults.capabilities {
+            XCTAssertEqual(Set(descriptor.capabilities), Set(capabilities))
         }
         XCTAssertNotNil(descriptor.rawMetadataJSON)
     }

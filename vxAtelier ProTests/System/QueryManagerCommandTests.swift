@@ -183,13 +183,8 @@ final class QueryManagerCommandTests: XCTestCase {
     func testModelsForConfigurationReturnsOnlyScopedModels() throws {
         let configA = APIConfigurationItem(name: "A", baseURL: "https://a.example.com")
         let configB = APIConfigurationItem(name: "B", baseURL: "https://b.example.com")
-        let descriptor = LLMModelDescriptor(
-            id: "unit-model",
-            providerID: .openAIPlatform,
-            adapterIDs: [.openAIChatCompletions]
-        )
-        let modelA = ModelItem(descriptor: descriptor, apiConfiguration: configA)
-        let modelB = ModelItem(descriptor: descriptor, apiConfiguration: configB)
+        let modelA = ModelItem(modelID: "unit-model", apiConfiguration: configA)
+        let modelB = ModelItem(modelID: "unit-model", apiConfiguration: configB)
 
         try queryManager.insert(configA)
         try queryManager.insert(configB)

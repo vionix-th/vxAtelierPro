@@ -1,45 +1,42 @@
 import Foundation
 
-/// Decodes provider model-list payloads into normalized model descriptors.
+/// Decodes provider model-list payloads into normalized draft model candidates.
 enum LLMModelMetadataDecoder {
     /// Maps OpenAI-compatible model objects using provider metadata plus bundled model defaults.
-    static func openAICompatibleDescriptors(
+    static func openAICompatibleCandidates(
         from data: [JSONValue],
         profile: LLMProviderProfile,
-        adapterIDs: [LLMAdapterID],
         defaultsCatalog: LLMDefaultsCatalog = .bundled
     ) -> [LLMModelDescriptor] {
         data.compactMap { item in
             guard let object = item.objectValue, let id = object.string("id") else { return nil }
-            var descriptor = defaultsCatalog.modelDescriptor(
+            var candidate = defaultsCatalog.modelDescriptor(
                 providerID: profile.id,
                 modelID: id,
                 displayName: object.string("name") ?? object.string("display_name") ?? id,
-                adapterIDs: adapterIDs,
                 rawMetadataJSON: rawJSONString(from: item)
             )
-            applyProviderMetadata(from: object, to: &descriptor)
-            return descriptor
+            applyProviderMetadata(from: object, to: &candidate)
+            return candidate
         }
     }
 
     /// Maps Anthropic model objects using provider metadata plus bundled model defaults.
-    static func anthropicDescriptors(
+    static func anthropicCandidates(
         from data: [JSONValue],
         profile: LLMProviderProfile,
         defaultsCatalog: LLMDefaultsCatalog = .bundled
     ) -> [LLMModelDescriptor] {
         data.compactMap { item in
             guard let object = item.objectValue, let id = object.string("id") else { return nil }
-            var descriptor = defaultsCatalog.modelDescriptor(
+            var candidate = defaultsCatalog.modelDescriptor(
                 providerID: profile.id,
                 modelID: id,
                 displayName: object.string("display_name") ?? object.string("name") ?? id,
-                adapterIDs: [.anthropicMessages],
                 rawMetadataJSON: rawJSONString(from: item)
             )
-            applyProviderMetadata(from: object, to: &descriptor)
-            return descriptor
+            applyProviderMetadata(from: object, to: &candidate)
+            return candidate
         }
     }
 
@@ -58,72 +55,53 @@ enum LLMModelMetadataDecoder {
     }
 
     /// Applies direct provider metadata over already-resolved bundled defaults.
-    private static func applyProviderMetadata(from object: [String: JSONValue], to descriptor: inout LLMModelDescriptor) {
+    private static func applyProviderMetadata(from object: [String: JSONValue], to candidate: inout LLMModelDescriptor) {
         if let contextWindow = contextWindow(from: object) {
-            descriptor.contextWindow = contextWindow
+            candidate.contextWindow = contextWindow
         }
 
-        let directModalities = explicitModalities(from: object)
-        if !directModalities.isEmpty {
-            descriptor.modalities = directModalities
-        }
-
-        let directParameters = supportedParameters(from: object)
-        if !directParameters.isEmpty {
-            descriptor.supportedParameters = directParameters
-        }
-
-        let directFeatures = explicitSchemaFeatures(from: object)
-        if !directFeatures.isEmpty {
-            descriptor.schemaFeatures = directFeatures
+        let directCapabilities = explicitCapabilities(from: object)
+        if !directCapabilities.isEmpty {
+            candidate.capabilities = directCapabilities
         }
     }
 
-    /// Reads provider-advertised parameter names.
-    private static func supportedParameters(from object: [String: JSONValue]) -> [String] {
-        let direct = stringArray(object["supported_parameters"])
-            + stringArray(object["parameters"])
-        return Array(Set(direct)).sorted()
-    }
-
-    /// Reads explicit schema/runtime feature fields from provider metadata.
-    private static func explicitSchemaFeatures(from object: [String: JSONValue]) -> [LLMSchemaFeature] {
-        var features = Set<LLMSchemaFeature>()
-        for key in ["schema_features", "features"] {
+    /// Reads explicit provider capability fields.
+    private static func explicitCapabilities(from object: [String: JSONValue]) -> [LLMModelCapability] {
+        var capabilities = Set<LLMModelCapability>()
+        for key in ["capabilities", "schema_features", "features"] {
             for value in stringArray(object[key]) {
-                if let feature = LLMSchemaFeature(rawValue: value) {
-                    features.insert(feature)
+                if let capability = LLMModelCapability(rawValue: value) {
+                    capabilities.insert(capability)
                 }
             }
         }
+        appendContentCapabilities(from: object, to: &capabilities)
         if object.bool("supports_streaming") == true || object.bool("streaming") == true {
-            features.insert(.streaming)
+            capabilities.insert(.streaming)
         }
-        return Array(features).sorted { $0.rawValue < $1.rawValue }
+        return Array(capabilities).sorted { $0.rawValue < $1.rawValue }
     }
 
-    /// Reads explicit modality arrays from provider metadata.
-    private static func explicitModalities(from object: [String: JSONValue]) -> [LLMModality] {
-        var modalities = Set<LLMModality>()
+    /// Reads explicit content capability arrays from provider metadata.
+    private static func appendContentCapabilities(from object: [String: JSONValue], to capabilities: inout Set<LLMModelCapability>) {
         for value in stringArray(object["modalities"]) {
-            appendModality(value, to: &modalities)
+            appendCapability(value, to: &capabilities)
         }
 
         if let architecture = object.object("architecture") {
             for key in ["input_modalities", "output_modalities"] {
                 for value in stringArray(architecture[key]) {
-                    appendModality(value, to: &modalities)
+                    appendCapability(value, to: &capabilities)
                 }
             }
         }
-
-        return Array(modalities).sorted { $0.rawValue < $1.rawValue }
     }
 
-    /// Adds one exact modality token from provider metadata.
-    private static func appendModality(_ value: String, to modalities: inout Set<LLMModality>) {
-        if let modality = LLMModality(rawValue: value.lowercased()) {
-            modalities.insert(modality)
+    /// Adds one exact capability token from provider metadata.
+    private static func appendCapability(_ value: String, to capabilities: inout Set<LLMModelCapability>) {
+        if let capability = LLMModelCapability(rawValue: value.lowercased()) {
+            capabilities.insert(capability)
         }
     }
 

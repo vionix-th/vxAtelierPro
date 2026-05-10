@@ -60,7 +60,7 @@ final class QueryManager {
     }
 
     private var modelSort: [SortDescriptor<ModelItem>] {
-        [SortDescriptor(\ModelItem.name)]
+        [SortDescriptor(\ModelItem.modelID)]
     }
 
     private var webSearchConfigurationSort: [SortDescriptor<WebSearchConfigurationItem>] {
@@ -131,6 +131,19 @@ final class QueryManager {
     func models(for apiConfiguration: APIConfigurationItem?) -> [ModelItem] {
         guard let apiConfiguration else { return [] }
         return fetchModels().filter { $0.apiConfiguration?.id == apiConfiguration.id }
+    }
+
+    func model(with modelID: String, for apiConfiguration: APIConfigurationItem) -> ModelItem? {
+        models(for: apiConfiguration).first { $0.modelID == modelID }
+    }
+
+    func selectedModel(for conversation: ConversationItem) -> ModelItem? {
+        guard let apiConfiguration = conversation.options.apiConfiguration else { return nil }
+        let modelID = conversation.options.selectedModelID ?? apiConfiguration.defaultModelID
+        guard let modelID, !modelID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        return model(with: modelID, for: apiConfiguration)
     }
 
     // MARK: - Defaults
@@ -438,24 +451,6 @@ final class QueryManager {
         vxAtelierPro.log.info("Updated model to \(model) for \(conversation.title)")
     }
 
-    func modelDescriptor(for conversation: ConversationItem) -> LLMModelDescriptor? {
-        guard let apiConfiguration = conversation.options.apiConfiguration else { return nil }
-        let providerID = apiConfiguration.providerIDEnum
-        let adapterID = apiConfiguration.defaultAdapterIDEnum
-        let resolver = LLMModelDescriptorResolver()
-        guard let modelID = conversation.options.selectedModelID
-            ?? resolver.defaultModelID(for: providerID, apiConfiguration: apiConfiguration) else {
-            return nil
-        }
-        return try? resolver.descriptor(
-            for: modelID,
-            providerID: providerID,
-            apiConfiguration: apiConfiguration,
-            modelContext: modelContext,
-            adapterIDs: [adapterID]
-        )
-    }
-
     // MARK: - Reference Cleanup
     func cleanupReferences(for config: APIConfigurationItem) throws {
         let conversations = fetchConversations()
@@ -513,7 +508,7 @@ final class QueryManager {
     }
 
     // MARK: - Models
-    func fetchModelDescriptors(
+    func fetchModelCandidates(
         providerID: LLMProviderID,
         adapterID: LLMAdapterID,
         configuration: LLMProviderConfiguration
@@ -523,6 +518,32 @@ final class QueryManager {
             providerID: providerID
         )
         return try await adapter.fetchModels(configuration: configuration)
+    }
+
+    @discardableResult
+    func upsertModelCandidates(
+        _ candidates: [LLMModelDescriptor],
+        for apiConfiguration: APIConfigurationItem
+    ) throws -> ModelProviderFetchSummary {
+        let existingModels = models(for: apiConfiguration)
+        var summary = ModelProviderFetchSummary()
+
+        for candidate in candidates {
+            if let existing = existingModels.first(where: { $0.modelID == candidate.id }) {
+                existing.apiConfiguration = apiConfiguration
+                existing.descriptor = candidate
+                summary.updated += 1
+                vxAtelierPro.log.debug("Overwrote model: \(candidate.id)")
+            } else {
+                let modelItem = ModelItem(descriptor: candidate, apiConfiguration: apiConfiguration)
+                modelContext.insert(modelItem)
+                summary.added += 1
+                vxAtelierPro.log.debug("Added new model: \(candidate.id)")
+            }
+        }
+
+        try saveContext()
+        return summary
     }
 
     @discardableResult
@@ -544,29 +565,12 @@ final class QueryManager {
         var summary = ModelProviderFetchSummary()
 
         do {
-            let fetchedModels = try await fetchModelDescriptors(
+            let fetchedModels = try await fetchModelCandidates(
                 providerID: providerID,
                 adapterID: adapterID,
                 configuration: providerConfiguration
             )
-            let existingModels = models(for: apiConfiguration)
-            for fetchedModel in fetchedModels {
-                if let existing = existingModels.first(where: { $0.modelID == fetchedModel.id }) {
-                    existing.descriptor = fetchedModel
-                    existing.apiConfiguration = apiConfiguration
-                    existing.materializeDefaultParameterMappings(preserveCustomized: true)
-                    summary.updated += 1
-                    vxAtelierPro.log.debug("Overwrote model: \(fetchedModel.id)")
-                } else {
-                    let modelItem = ModelItem(descriptor: fetchedModel, apiConfiguration: apiConfiguration)
-                    modelItem.materializeDefaultParameterMappings(preserveCustomized: true)
-                    modelContext.insert(modelItem)
-                    summary.added += 1
-                    vxAtelierPro.log.debug("Added new model: \(fetchedModel.id)")
-                }
-            }
-
-            try saveContext()
+            summary = try upsertModelCandidates(fetchedModels, for: apiConfiguration)
             vxAtelierPro.log.info(
                 "refreshModels(for: \(apiConfiguration.name)): Updated \(summary.updated), added \(summary.added) models."
             )

@@ -1,16 +1,12 @@
 import Foundation
 
-/// Input/output capability advertised by a provider or model.
-enum LLMModality: String, Codable, CaseIterable {
+/// Capability advertised by a provider or model.
+enum LLMModelCapability: String, Codable, CaseIterable, Identifiable {
     case text
     case image
     case audio
     case file
     case video
-}
-
-/// Structured-output and runtime feature advertised by a provider or model.
-enum LLMSchemaFeature: String, Codable, CaseIterable {
     case tools
     case strictTools
     case jsonSchema
@@ -18,43 +14,47 @@ enum LLMSchemaFeature: String, Codable, CaseIterable {
     case reasoning
     case usage
     case streaming
+
+    var id: String { rawValue }
+
+    var kind: Kind {
+        switch self {
+        case .text, .image, .audio, .file, .video:
+            return .content
+        case .tools, .strictTools, .jsonSchema, .jsonObject, .reasoning, .usage, .streaming:
+            return .feature
+        }
+    }
+
+    enum Kind {
+        case content
+        case feature
+    }
 }
 
-/// Provider-neutral model metadata used for validation and UI materialization.
+/// Temporary model metadata candidate used during fetch/enrichment before persistence.
 struct LLMModelDescriptor: Codable, Equatable, Identifiable {
     var id: String
     var displayName: String
     var providerID: LLMProviderID
     var contextWindow: Int?
-    var adapterIDs: [LLMAdapterID]
-    var modalities: [LLMModality]
-    var supportedParameters: [String]
-    var parameterMappings: [LLMParameterMappingDescriptor]
-    var schemaFeatures: [LLMSchemaFeature]
+    var capabilities: [LLMModelCapability]
     var rawMetadataJSON: String?
 
-    /// Creates normalized model metadata from provider defaults plus optional model-list details.
+    /// Creates normalized candidate metadata from provider defaults plus optional model-list details.
     init(
         id: String,
         displayName: String? = nil,
         providerID: LLMProviderID,
         contextWindow: Int? = nil,
-        adapterIDs: [LLMAdapterID],
-        modalities: [LLMModality] = [.text],
-        supportedParameters: [String] = [],
-        parameterMappings: [LLMParameterMappingDescriptor] = [],
-        schemaFeatures: [LLMSchemaFeature] = [],
+        capabilities: [LLMModelCapability] = [.text],
         rawMetadataJSON: String? = nil
     ) {
         self.id = id
         self.displayName = displayName ?? id
         self.providerID = providerID
         self.contextWindow = contextWindow
-        self.adapterIDs = adapterIDs
-        self.modalities = modalities
-        self.supportedParameters = supportedParameters
-        self.parameterMappings = parameterMappings
-        self.schemaFeatures = schemaFeatures
+        self.capabilities = capabilities
         self.rawMetadataJSON = rawMetadataJSON
     }
 }

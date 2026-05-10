@@ -1,6 +1,6 @@
 import SwiftUI
 
-extension LLMModality {
+extension LLMModelCapability {
     var displayName: String {
         switch self {
         case .text: return "Text"
@@ -8,23 +8,6 @@ extension LLMModality {
         case .audio: return "Audio"
         case .file: return "File"
         case .video: return "Video"
-        }
-    }
-
-    var systemName: String {
-        switch self {
-        case .text: return "text.justify"
-        case .image: return "photo"
-        case .audio: return "waveform"
-        case .file: return "doc"
-        case .video: return "video"
-        }
-    }
-}
-
-extension LLMSchemaFeature {
-    var displayName: String {
-        switch self {
         case .tools: return "Tools"
         case .strictTools: return "Strict Tools"
         case .jsonSchema: return "JSON Schema"
@@ -37,6 +20,11 @@ extension LLMSchemaFeature {
 
     var systemName: String {
         switch self {
+        case .text: return "text.justify"
+        case .image: return "photo"
+        case .audio: return "waveform"
+        case .file: return "doc"
+        case .video: return "video"
         case .tools: return "function"
         case .strictTools: return "checkmark.shield"
         case .jsonSchema: return "curlybraces.square"
@@ -49,16 +37,8 @@ extension LLMSchemaFeature {
 }
 
 extension ModelItem {
-    var modalityEnums: [LLMModality] {
-        modalitiesRaw.compactMap(LLMModality.init(rawValue:))
-    }
-
-    var schemaFeatureEnums: [LLMSchemaFeature] {
-        schemaFeaturesRaw.compactMap(LLMSchemaFeature.init(rawValue:))
-    }
-
     var metadataIconSystemNames: [String] {
-        (modalityEnums.map(\.systemName) + schemaFeatureEnums.map(\.systemName))
+        capabilities.map(\.systemName)
             .reduce(into: [String]()) { result, symbol in
                 if !result.contains(symbol) {
                     result.append(symbol)
@@ -67,6 +47,6 @@ extension ModelItem {
     }
 
     var metadataSearchTerms: [String] {
-        modalityEnums.map(\.displayName) + schemaFeatureEnums.map(\.displayName)
+        capabilities.map(\.displayName)
     }
 }

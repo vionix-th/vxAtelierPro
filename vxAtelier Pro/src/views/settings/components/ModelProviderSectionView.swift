@@ -17,7 +17,7 @@ struct ModelProviderSectionView: View {
                 ForEach(models.sorted(by: { $0.name < $1.name })) { model in
                     SettingsListRow(
                         title: model.name,
-                        subtitle: model.provider,
+                        subtitle: model.apiConfiguration?.providerIDEnum.displayName ?? "No API Configuration",
                         icons: model.metadataIconSystemNames.map { Image(systemName: $0) },
                         onEdit: { onEditModel(model) },
                         onDelete: { onDeleteModel(model) }
@@ -48,7 +48,7 @@ struct ModelContextSizeRow: View {
                     Text(model.name)
                         .font(.system(.body, design: .monospaced))
                     HStack(spacing: AppDefaults.paddingMedium) {
-                        Text(model.provider)
+                        Text(model.apiConfiguration?.providerIDEnum.displayName ?? "No API Configuration")
                             .font(.caption)
                             .foregroundColor(.secondary)
                         

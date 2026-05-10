@@ -45,15 +45,14 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
         }
     }
 
-    /// Fetches OpenAI-compatible model metadata and marks descriptors as chat-capable.
+    /// Fetches OpenAI-compatible model metadata and maps it into candidates.
     func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
         let httpConfig = httpClient.makeConfiguration(for: configuration)
         let response: JSONValue = try await httpClient.getJSON(path: Self.modelsPath, configuration: httpConfig, responseType: JSONValue.self)
         guard let data = response.objectValue?.array("data") else { return [] }
-        return LLMModelMetadataDecoder.openAICompatibleDescriptors(
+        return LLMModelMetadataDecoder.openAICompatibleCandidates(
             from: data,
-            profile: profile,
-            adapterIDs: [adapterID]
+            profile: profile
         )
     }
 
@@ -72,10 +71,8 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
             "stream": .boolean(stream)
         ]
         let mappings = LLMParameterMappingResolver.resolve(
-            providerID: request.providerID,
             adapterID: request.adapterID,
-            modelID: request.modelID,
-            modelDescriptor: request.modelDescriptor
+            mappings: request.parameterMappings
         )
         try OpenAICompatibleEncoding.applyMappedOptions(
             request.options,
@@ -211,7 +208,7 @@ struct OpenAICompatibleChatCompletionsAdapter: LLMProviderAdapter {
         chatAdapter.stream(request, configuration: configuration)
     }
 
-    /// Fetches OpenAI-compatible model metadata and marks descriptors as compatible-chat-capable.
+    /// Fetches OpenAI-compatible model metadata and maps it into candidates.
     func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
         try await chatAdapter.fetchModels(configuration: configuration)
     }

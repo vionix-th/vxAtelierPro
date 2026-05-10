@@ -64,12 +64,11 @@ struct LLMDefaultsCatalog {
         return didMatch ? resolved : nil
     }
 
-    /// Builds a model descriptor from bundled defaults for model-list fallbacks and missing persisted descriptors.
+    /// Builds a model candidate from bundled defaults for draft fetch/create flows.
     func modelDescriptor(
         providerID: LLMProviderID,
         modelID: String,
         displayName: String? = nil,
-        adapterIDs: [LLMAdapterID]? = nil,
         rawMetadataJSON: String? = nil
     ) -> LLMModelDescriptor {
         let defaults = modelDefaults(providerID: providerID, modelID: modelID)
@@ -78,11 +77,7 @@ struct LLMDefaultsCatalog {
             displayName: displayName,
             providerID: providerID,
             contextWindow: defaults?.contextWindow,
-            adapterIDs: adapterIDs ?? defaults?.adapterIDs ?? [],
-            modalities: defaults?.modalities ?? [.text],
-            supportedParameters: defaults?.supportedParameters ?? [],
-            parameterMappings: [],
-            schemaFeatures: defaults?.schemaFeatures ?? [],
+            capabilities: defaults?.capabilities ?? [.text],
             rawMetadataJSON: rawMetadataJSON
         )
     }
@@ -164,17 +159,11 @@ struct LLMDefaultsCatalog {
 /// Fully resolved model metadata defaults after regex rule application.
 struct LLMResolvedModelDefaults: Equatable {
     var contextWindow: Int?
-    var adapterIDs: [LLMAdapterID]?
-    var modalities: [LLMModality]?
-    var supportedParameters: [String]?
-    var schemaFeatures: [LLMSchemaFeature]?
+    var capabilities: [LLMModelCapability]?
 
     mutating func apply(_ defaults: LLMModelDefaultsPayload) {
         if let contextWindow = defaults.contextWindow { self.contextWindow = contextWindow }
-        if let adapterIDs = defaults.adapterIDs { self.adapterIDs = adapterIDs }
-        if let modalities = defaults.modalities { self.modalities = modalities }
-        if let supportedParameters = defaults.supportedParameters { self.supportedParameters = supportedParameters }
-        if let schemaFeatures = defaults.schemaFeatures { self.schemaFeatures = schemaFeatures }
+        if let capabilities = defaults.capabilities { self.capabilities = capabilities }
     }
 }
 
@@ -278,10 +267,7 @@ private struct LLMCompiledRegex {
 
 struct LLMModelDefaultsPayload: Decodable, Equatable {
     var contextWindow: Int?
-    var adapterIDs: [LLMAdapterID]?
-    var modalities: [LLMModality]?
-    var supportedParameters: [String]?
-    var schemaFeatures: [LLMSchemaFeature]?
+    var capabilities: [LLMModelCapability]?
 }
 
 private struct LLMParameterMappingDefault: Decodable {

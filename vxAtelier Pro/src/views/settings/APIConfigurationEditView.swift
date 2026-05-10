@@ -39,7 +39,8 @@ struct APIConfigurationEditView: View {
     @State private var hasUserEditedDefaultModel = false
     @State private var isValidating = false
     @State private var isRefreshingModels = false
-    @State private var fetchedModelDescriptors: [LLMModelDescriptor]?
+    @State private var fetchedModelCandidates: [LLMModelDescriptor]?
+    @State private var fetchedModelCandidateSignature: String?
     @State private var selectedPreset: APIPreset
 
     // MARK: - Initialization
@@ -117,6 +118,10 @@ struct APIConfigurationEditView: View {
                 defaultAdapterID = currentProfile.defaultAdapterID
             }
         }
+        .onChange(of: apiKey) { _, _ in invalidateFetchedModelCandidates() }
+        .onChange(of: baseURL) { _, _ in invalidateFetchedModelCandidates() }
+        .onChange(of: providerID) { _, _ in invalidateFetchedModelCandidates() }
+        .onChange(of: defaultAdapterID) { _, _ in invalidateFetchedModelCandidates() }
     }
 
     private var configurationPanel: some View {
@@ -149,6 +154,7 @@ struct APIConfigurationEditView: View {
             panelRow("API URL") {
                 TextField("https://api.example.com", text: $baseURL)
                     .textFieldStyle(.roundedBorder)
+                    .onChange(of: baseURL) { _, _ in invalidateFetchedModelCandidates() }
             }
 
             if selectableAdapterIDs.count > 1 {
@@ -159,6 +165,7 @@ struct APIConfigurationEditView: View {
                         }
                     }
                     .pickerStyle(.menu)
+                    .onChange(of: defaultAdapterID) { _, _ in invalidateFetchedModelCandidates() }
                     .labelsHidden()
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -174,6 +181,7 @@ struct APIConfigurationEditView: View {
                             SecureField("Enter API Key", text: $apiKey)
                                 .textFieldStyle(.roundedBorder)
                                 .font(.system(.body, design: .monospaced))
+                                .onChange(of: apiKey) { _, _ in invalidateFetchedModelCandidates() }
                         }
 
                         Button {
@@ -239,8 +247,7 @@ struct APIConfigurationEditView: View {
                     hasUserEditedDefaultModel = true
                 },
                 apiConfiguration: configuration,
-                fallbackModels: nil,
-                fallbackModelDescriptors: fetchedModelDescriptors
+                draftModelCandidates: fetchedModelCandidates
             )
         }
     }
@@ -336,7 +343,7 @@ struct APIConfigurationEditView: View {
             return false
         }
 
-        return validateEndpoint()
+        return true
     }
 
     private func validateEndpoint() -> Bool {
@@ -363,7 +370,7 @@ struct APIConfigurationEditView: View {
             let shouldInsert = isNewConfiguration
             applyDraftToConfiguration()
             try saveConfigurationToStore()
-            let refreshSummary = await queryManager.refreshModels(for: configuration)
+            let refreshSummary = await refreshModelsAfterSave()
 
             vxAtelierPro.log.info(
                 "🔑 Saved configuration and refreshed models: \(configuration.name), isDefault: \(configuration.isDefault), inserted: \(shouldInsert), updated: \(refreshSummary.updated), added: \(refreshSummary.added)"
@@ -397,11 +404,12 @@ struct APIConfigurationEditView: View {
         defer { isRefreshingModels = false }
 
         do {
-            fetchedModelDescriptors = try await queryManager.fetchModelDescriptors(
+            fetchedModelCandidates = try await queryManager.fetchModelCandidates(
                 providerID: providerID,
                 adapterID: defaultAdapterID,
                 configuration: makeProviderConfigurationFromDraft()
             )
+            fetchedModelCandidateSignature = draftModelFetchSignature
             isModelPickerPresented = true
         } catch {
             validationErrorMessage = "Failed to fetch models: \(error.localizedDescription)"
@@ -410,6 +418,65 @@ struct APIConfigurationEditView: View {
                 "🔑 Failed to fetch models for configuration \(name): \(error.localizedDescription)"
             )
         }
+    }
+
+    private func refreshModelsAfterSave() async -> ModelProviderFetchSummary {
+        do {
+            let candidates = try await queryManager.fetchModelCandidates(
+                providerID: configuration.providerIDEnum,
+                adapterID: configuration.defaultAdapterIDEnum,
+                configuration: configuration.makeLLMProviderConfiguration()
+            )
+            return try queryManager.upsertModelCandidates(candidates, for: configuration)
+        } catch {
+            let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            vxAtelierPro.log.error("🔑 Failed to refresh models after save for \(configuration.name): \(message)")
+            if fetchedModelCandidateSignature == draftModelFetchSignature,
+               let fetchedModelCandidates,
+               !fetchedModelCandidates.isEmpty {
+                do {
+                    var summary = try queryManager.upsertModelCandidates(fetchedModelCandidates, for: configuration)
+                    summary.failures.append(ModelProviderFetchFailure(
+                        configurationName: configuration.name,
+                        providerID: configuration.providerIDEnum,
+                        message: message
+                    ))
+                    return summary
+                } catch {
+                    return ModelProviderFetchSummary(failures: [
+                        ModelProviderFetchFailure(
+                            configurationName: configuration.name,
+                            providerID: configuration.providerIDEnum,
+                            message: (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                        )
+                    ])
+                }
+            }
+            return ModelProviderFetchSummary(failures: [
+                ModelProviderFetchFailure(
+                    configurationName: configuration.name,
+                    providerID: configuration.providerIDEnum,
+                    message: message
+                )
+            ])
+        }
+    }
+
+    private var draftModelFetchSignature: String {
+        [
+            providerID.rawValue,
+            defaultAdapterID.rawValue,
+            baseURL,
+            apiKey,
+            configuration.headersJSON,
+            configuration.optionsJSON
+        ].joined(separator: "\u{1F}")
+    }
+
+    private func invalidateFetchedModelCandidates() {
+        guard fetchedModelCandidateSignature != draftModelFetchSignature else { return }
+        fetchedModelCandidates = nil
+        fetchedModelCandidateSignature = nil
     }
 
     private func makeProviderConfigurationFromDraft() -> LLMProviderConfiguration {

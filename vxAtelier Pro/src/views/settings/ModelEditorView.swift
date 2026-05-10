@@ -12,29 +12,18 @@ struct ModelEditorView: View {
     @State private var name: String
     @State private var selectedConfigurationID: PersistentIdentifier?
     @State private var contextSize: Int
-    @State private var modalities: [LLMModality]
-    @State private var schemaFeatures: [LLMSchemaFeature]
-    @State private var selectedAdapterIDRaw: String
+    @State private var capabilities: [LLMModelCapability]
     
     init(model: ModelItem) {
         self.model = model
         _name = State(initialValue: model.name)
         _selectedConfigurationID = State(initialValue: model.apiConfiguration?.persistentModelID)
         _contextSize = State(initialValue: model.contextSize)
-        _modalities = State(initialValue: model.modalityEnums)
-        _schemaFeatures = State(initialValue: model.schemaFeatureEnums)
-        _selectedAdapterIDRaw = State(
-            initialValue: model.adapterIDsRaw.first ?? LLMAdapterID.openAIChatCompletions.rawValue
-        )
-    }
-
-    private var adapterIDs: [LLMAdapterID] {
-        let adapters = model.adapterIDsRaw.compactMap { LLMAdapterID(rawValue: $0) }
-        return adapters.isEmpty ? [.openAIChatCompletions] : adapters
+        _capabilities = State(initialValue: model.capabilities)
     }
 
     private var selectedAdapterID: LLMAdapterID {
-        LLMAdapterID(rawValue: selectedAdapterIDRaw) ?? adapterIDs.first ?? .openAIChatCompletions
+        selectedConfiguration?.defaultAdapterIDEnum ?? .openAIChatCompletions
     }
 
     private var selectedAdapterMappings: [ModelParameterMappingItem] {
@@ -132,22 +121,22 @@ struct ModelEditorView: View {
                 
                 Section {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: AppDefaults.paddingLarge) {
-                        ForEach(LLMModality.allCases.sorted(by: { $0.displayName < $1.displayName }), id: \.self) { modality in
+                        ForEach(LLMModelCapability.allCases.sorted(by: { $0.displayName < $1.displayName })) { capability in
                             Toggle(isOn: Binding(
-                                get: { modalities.contains(modality) },
+                                get: { capabilities.contains(capability) },
                                 set: { isEnabled in
                                     if isEnabled {
-                                        modalities.append(modality)
+                                        capabilities.append(capability)
                                     } else {
-                                        modalities.removeAll { $0 == modality }
+                                        capabilities.removeAll { $0 == capability }
                                     }
                                 }
                             )) {
                                 Label {
-                                    Text(modality.displayName)
+                                    Text(capability.displayName)
                                         .font(.system(.body, design: .rounded))
                                 } icon: {
-                                    Image(systemName: modality.systemName)
+                                    Image(systemName: capability.systemName)
                                         .foregroundColor(.accentColor)
                                 }
                             }
@@ -156,39 +145,7 @@ struct ModelEditorView: View {
                         }
                     }
                 } header: {
-                    Text("Modalities")
-                        .font(.system(.headline, design: .rounded))
-                        .foregroundColor(.primary)
-                        .textCase(nil)
-                }
-
-                Section {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: AppDefaults.paddingLarge) {
-                        ForEach(LLMSchemaFeature.allCases.sorted(by: { $0.displayName < $1.displayName }), id: \.self) { feature in
-                            Toggle(isOn: Binding(
-                                get: { schemaFeatures.contains(feature) },
-                                set: { isEnabled in
-                                    if isEnabled {
-                                        schemaFeatures.append(feature)
-                                    } else {
-                                        schemaFeatures.removeAll { $0 == feature }
-                                    }
-                                }
-                            )) {
-                                Label {
-                                    Text(feature.displayName)
-                                        .font(.system(.body, design: .rounded))
-                                } icon: {
-                                    Image(systemName: feature.systemName)
-                                        .foregroundColor(.accentColor)
-                                }
-                            }
-                            .toggleStyle(.switch)
-                            .padding(.vertical, AppDefaults.paddingSmall)
-                        }
-                    }
-                } header: {
-                    Text("Schema Features")
+                    Text("Capabilities")
                         .font(.system(.headline, design: .rounded))
                         .foregroundColor(.primary)
                         .textCase(nil)
@@ -196,12 +153,9 @@ struct ModelEditorView: View {
 
                 Section {
                     VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
-                        Picker("Adapter", selection: $selectedAdapterIDRaw) {
-                            ForEach(adapterIDs) { family in
-                                Text(family.displayName).tag(family.rawValue)
-                            }
-                        }
-                        .pickerStyle(.menu)
+                        Text("API Mode: \(selectedAdapterID.displayName)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
 
                         HStack {
                             Button {
@@ -280,10 +234,6 @@ struct ModelEditorView: View {
                 if selectedConfigurationID == nil {
                     selectedConfigurationID = model.apiConfiguration?.persistentModelID ?? apiConfigurations.first?.persistentModelID
                 }
-                model.materializeDefaultParameterMappings(preserveCustomized: true)
-                if !adapterIDs.contains(where: { $0.rawValue == selectedAdapterIDRaw }) {
-                    selectedAdapterIDRaw = adapterIDs.first?.rawValue ?? LLMAdapterID.openAIChatCompletions.rawValue
-                }
             }
             .onChange(of: selectedConfigurationID) { _, _ in
                 applyCatalogDefaultsForSelectedConfiguration()
@@ -293,24 +243,11 @@ struct ModelEditorView: View {
     
     private func save() {
         guard let selectedConfiguration else { return }
-        let defaultDescriptor = try? LLMModelDescriptorResolver().descriptor(
-            for: name,
-            providerID: selectedConfiguration.providerIDEnum,
-            apiConfiguration: selectedConfiguration,
-            modelContext: modelContext,
-            adapterIDs: [selectedConfiguration.defaultAdapterIDEnum]
-        )
-        model.name = name
         model.modelID = name
         model.displayName = name
         model.apiConfiguration = selectedConfiguration
-        model.provider = selectedConfiguration.providerIDEnum.displayName
-        model.providerID = selectedConfiguration.providerID
         model.contextSize = contextSize
-        model.adapterIDsRaw = defaultDescriptor?.adapterIDs.map(\.rawValue)
-            ?? [selectedConfiguration.defaultAdapterIDEnum.rawValue]
-        model.modalitiesRaw = modalities.map(\.rawValue)
-        model.schemaFeaturesRaw = schemaFeatures.map(\.rawValue)
+        model.capabilitiesRaw = capabilities.map(\.rawValue)
         model.materializeDefaultParameterMappings(preserveCustomized: true)
         
         do {
@@ -342,18 +279,12 @@ struct ModelEditorView: View {
 
     private func applyCatalogDefaultsForSelectedConfiguration() {
         guard let selectedConfiguration else { return }
-        let descriptor = try? LLMModelDescriptorResolver().descriptor(
+        let candidate = LLMModelDescriptorResolver().catalogDescriptor(
             for: name,
-            providerID: selectedConfiguration.providerIDEnum,
-            apiConfiguration: selectedConfiguration,
-            modelContext: modelContext,
-            adapterIDs: [selectedConfiguration.defaultAdapterIDEnum]
+            providerID: selectedConfiguration.providerIDEnum
         )
-        contextSize = descriptor?.contextWindow ?? AppDefaults.ModelContextSizes.defaultSize
-        modalities = descriptor?.modalities ?? [.text]
-        schemaFeatures = descriptor?.schemaFeatures ?? []
-        selectedAdapterIDRaw = descriptor?.adapterIDs.first?.rawValue
-            ?? selectedConfiguration.defaultAdapterIDEnum.rawValue
+        contextSize = candidate.contextWindow ?? AppDefaults.ModelContextSizes.defaultSize
+        capabilities = candidate.capabilities
     }
 
     private func addMapping(_ parameterID: LLMParameterID) {

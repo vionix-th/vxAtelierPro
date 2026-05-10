@@ -31,7 +31,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
         )
     }
 
-    /// Fetches Anthropic model metadata and maps descriptors to Messages support.
+    /// Fetches Anthropic model metadata and maps it into candidates.
     func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
         let response: JSONValue = try await httpClient.getJSON(
             path: Self.modelsPath,
@@ -39,7 +39,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
             responseType: JSONValue.self
         )
         guard let data = response.objectValue?.array("data") else { return [] }
-        return LLMModelMetadataDecoder.anthropicDescriptors(from: data, profile: profile)
+        return LLMModelMetadataDecoder.anthropicCandidates(from: data, profile: profile)
     }
 
     /// Encodes a provider-neutral request into an Anthropic Messages JSON body.
@@ -53,10 +53,8 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
             body["system"] = .string(request.options.systemPrompt)
         }
         let mappings = LLMParameterMappingResolver.resolve(
-            providerID: request.providerID,
             adapterID: request.adapterID,
-            modelID: request.modelID,
-            modelDescriptor: request.modelDescriptor
+            mappings: request.parameterMappings
         )
         try LLMParameterRequestEncoder.applyScalarOptions(request.options, to: &body, mappings: mappings)
         if !request.tools.isEmpty {
