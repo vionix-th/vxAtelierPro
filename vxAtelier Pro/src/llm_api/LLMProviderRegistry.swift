@@ -36,35 +36,59 @@ struct LLMProviderRegistry {
                 supportedAdapterIDs: [.anthropicMessages],
                 isEnabled: true
             ),
-            LLMProviderProfile.openAICompatible(
+            LLMProviderProfile(
                 id: .openRouter,
                 name: "OpenRouter",
-                baseURL: "https://openrouter.ai/api/v1"
+                defaultBaseURL: "https://openrouter.ai/api/v1",
+                authKind: .bearerToken,
+                defaultAdapterID: .openAICompatibleChatCompletions,
+                supportedAdapterIDs: [.openAICompatibleChatCompletions],
+                isEnabled: true
             ),
-            LLMProviderProfile.openAICompatible(
+            LLMProviderProfile(
                 id: .lmStudio,
                 name: "LM Studio",
-                baseURL: "http://localhost:1234/v1"
+                defaultBaseURL: "http://localhost:1234/v1",
+                authKind: .none,
+                defaultAdapterID: .openAICompatibleChatCompletions,
+                supportedAdapterIDs: [.openAICompatibleChatCompletions],
+                isEnabled: true
             ),
-            LLMProviderProfile.openAICompatible(
+            LLMProviderProfile(
                 id: .ollama,
                 name: "Ollama",
-                baseURL: "http://localhost:11434/v1"
+                defaultBaseURL: "http://localhost:11434/v1",
+                authKind: .none,
+                defaultAdapterID: .openAICompatibleChatCompletions,
+                supportedAdapterIDs: [.openAICompatibleChatCompletions],
+                isEnabled: true
             ),
-            LLMProviderProfile.openAICompatible(
+            LLMProviderProfile(
                 id: .xAI,
                 name: "xAI",
-                baseURL: AppDefaults.XAI.baseURL
+                defaultBaseURL: AppDefaults.XAI.baseURL,
+                authKind: .bearerToken,
+                defaultAdapterID: .openAICompatibleChatCompletions,
+                supportedAdapterIDs: [.openAICompatibleChatCompletions],
+                isEnabled: true
             ),
-            LLMProviderProfile.openAICompatible(
+            LLMProviderProfile(
                 id: .deepSeek,
                 name: "DeepSeek",
-                baseURL: AppDefaults.DeepSeek.baseURL
+                defaultBaseURL: AppDefaults.DeepSeek.baseURL,
+                authKind: .bearerToken,
+                defaultAdapterID: .openAICompatibleChatCompletions,
+                supportedAdapterIDs: [.openAICompatibleChatCompletions],
+                isEnabled: true
             ),
-            LLMProviderProfile.openAICompatible(
+            LLMProviderProfile(
                 id: .customOpenAICompatible,
                 name: "Custom OpenAI Compatible",
-                baseURL: AppDefaults.OpenAi.baseURL
+                defaultBaseURL: AppDefaults.OpenAi.baseURL,
+                authKind: .bearerToken,
+                defaultAdapterID: .openAICompatibleChatCompletions,
+                supportedAdapterIDs: [.openAICompatibleChatCompletions],
+                isEnabled: true
             )
         ]
         self.profiles = Dictionary(uniqueKeysWithValues: allProfiles.map { ($0.id, $0) })
@@ -122,25 +146,5 @@ struct LLMProviderRegistry {
         if probe.contains("custom") { return .customOpenAICompatible }
         if probe.contains("openai") { return .openAIPlatform }
         return .customOpenAICompatible
-    }
-}
-
-/// Factories for reusable provider profile shapes.
-extension LLMProviderProfile {
-    /// Builds a profile for providers that implement the OpenAI Chat Completions shape.
-    static func openAICompatible(
-        id: LLMProviderID,
-        name: String,
-        baseURL: String
-    ) -> LLMProviderProfile {
-        LLMProviderProfile(
-            id: id,
-            name: name,
-            defaultBaseURL: baseURL,
-            authKind: id == .lmStudio || id == .ollama ? .none : .bearerToken,
-            defaultAdapterID: .openAICompatibleChatCompletions,
-            supportedAdapterIDs: [.openAICompatibleChatCompletions],
-            isEnabled: true
-        )
     }
 }
