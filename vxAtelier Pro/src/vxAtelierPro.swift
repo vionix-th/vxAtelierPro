@@ -263,14 +263,6 @@ struct vxAtelierPro: App {
         }
 
         #if os(macOS)
-            // Settings scene keeps the user-selected appearance override
-            Settings {
-                ApplicationSettingsView()
-                    .preferredColorScheme(effectiveColorScheme)
-                    .environment(queryManager)
-                    .environment(\.modelContext, sharedModelContainer.mainContext)
-            }
-
             Window("Utility", id: "utilityPanel") {
                 UtilityPanelView()
                     .preferredColorScheme(effectiveColorScheme)
