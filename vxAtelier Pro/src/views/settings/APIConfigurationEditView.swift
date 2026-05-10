@@ -72,233 +72,14 @@ struct APIConfigurationEditView: View {
         currentProfile.supportedAdapterIDs
     }
 
-    private var shouldRequireAPIKeyToBrowseModels: Bool {
-        switch currentProfile.authKind {
-        case .none:
-            return false
-        case .bearerToken, .xAPIKey:
-            return true
-        case .customHeaders, .chatGPTOAuth, .chatGPTDeviceCode, .chatGPTCodexToken:
-            return false
-        }
-    }
-
-    private var canBrowseModels: Bool {
-        !shouldRequireAPIKeyToBrowseModels || !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
     // MARK: - View Body
 
     var body: some View {
         ScrollView {
-            VStack(spacing: AppDefaults.paddingLarge) {
-                // Name and Preset Section
-                VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
-                    Text("Basic Information")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, AppDefaults.paddingLarge)
-
-                    VStack(spacing: AppDefaults.paddingMedium) {
-                        // Name Field
-                        VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
-                            Text("Configuration Name")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-
-                            TextField("My API Configuration", text: $name)
-                                .textFieldStyle(.roundedBorder)
-                                .padding(.horizontal, AppDefaults.paddingSmall)
-                        }
-                        VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
-                            let configsCount = apiConfigurations.count
-                            let toggleDisabled: Bool = {
-                                if configsCount == 0 { return true } // first config must stay default
-                                if configsCount == 1 && !isNewConfiguration { return true } // only config cannot be unset
-                                return false
-                            }()
-
-                            Toggle(isOn: $isDefault) {
-                                Label("Use as Default Configuration", systemImage: "star.fill")
-                            }
-                            .toggleStyle(.switch)
-                            .padding(.horizontal, AppDefaults.paddingSmall)
-                            .disabled(toggleDisabled)
-                            .help(toggleDisabled ? "The only configuration must remain default." : "")
-                            if toggleDisabled {
-                                Text("The only configuration must remain default.")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
-                            Text("Default Model")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            HStack {
-                                TextField("Default Model", text: $defaultModel)
-                                    .textFieldStyle(.roundedBorder)
-                                    .onChange(of: defaultModel) { _, _ in
-                                        hasUserEditedDefaultModel = true
-                                    }
-                                Button {
-                                    Task { await loadModelsForPicker() }
-                                } label: {
-                                    if isRefreshingModels {
-                                        ProgressView()
-                                            .scaleEffect(0.8)
-                                            .frame(width: 20, height: 20)
-                                    } else {
-                                        Text("Browse Models")
-                                    }
-                                }
-                                .buttonStyle(.bordered)
-                                .disabled(isValidating || isRefreshingModels || !canBrowseModels)
-                            }
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 12)
-                            .background(Color.secondary.opacity(0.08))
-                            .cornerRadius(AppDefaults.cornerRadiusSmall)
-                            .sheet(isPresented: $isModelPickerPresented) {
-                                ModelSelectionView(
-                                    selectedModel: defaultModel,
-                                    onModelSelected: { model in
-                                        defaultModel = model
-                                        hasUserEditedDefaultModel = true
-                                    },
-                                    apiConfiguration: configuration,
-                                    fallbackModels: nil,
-                                    fallbackModelDescriptors: fetchedModelDescriptors
-                                )
-                            }
-                            Text(canBrowseModels ? "Browse provider models and pick a default." : "Enter an API key before browsing provider models.")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding(AppDefaults.paddingLarge)
-                    .background(Color.secondary.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium))
-                    .padding(.horizontal, AppDefaults.paddingLarge)
-                }
-
-                // API Key Section
-                VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
-                    Text("Authentication")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, AppDefaults.paddingLarge)
-
-                    VStack(spacing: AppDefaults.paddingMedium) {
-                        VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
-                            Text("API Key")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-
-                            HStack {
-                                if isAPIKeyVisible {
-                                    apiKeyVisibleView
-                                } else {
-                                    SecureField("Enter API Key", text: $apiKey)
-                                        .textFieldStyle(.roundedBorder)
-                                        .font(.system(.body, design: .monospaced))
-                                }
-
-                                Button {
-                                    isAPIKeyVisible.toggle()
-                                } label: {
-                                    Image(
-                                        systemName: isAPIKeyVisible ? "eye.slash.fill" : "eye.fill"
-                                    )
-                                    .foregroundColor(.accentColor)
-                                }
-                                .buttonStyle(.plain)
-                            }
-
-                            if !apiKey.isEmpty {
-                                HStack {
-                                    Text("Key length: \(apiKey.count) characters")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-
-                                    Spacer()
-
-                                    Button {
-                                        copyToClipboard(apiKey)
-                                    } label: {
-                                        Label("Copy", systemImage: "doc.on.doc")
-                                            .font(.caption)
-                                    }
-                                    .buttonStyle(.borderless)
-                                }
-                            }
-                        }
-                    }
-                    .padding(AppDefaults.paddingLarge)
-                    .background(Color.secondary.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium))
-                    .padding(.horizontal, AppDefaults.paddingLarge)
-                }
-
-                // Endpoint Configuration Section
-                VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
-                    Text("Endpoint Configuration")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, AppDefaults.paddingLarge)
-
-                    VStack(spacing: AppDefaults.paddingMedium) {
-                        VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
-                            Text("Provider Preset")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            Picker("Provider Preset", selection: $selectedPreset) {
-                                ForEach(APIPreset.allCases, id: \.self) { preset in
-                                    Label(preset.displayName, systemImage: preset.iconName)
-                                        .tag(preset)
-                                }
-                            }
-                            .pickerStyle(.menu)
-                            .onChange(of: selectedPreset) { _, _ in
-                                applySelectedPreset()
-                            }
-                            Text("New configurations start from OpenAI Platform defaults.")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
-                            Text("Default API Mode")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            if selectableAdapterIDs.count > 1 {
-                                Picker("", selection: $defaultAdapterID) {
-                                    ForEach(selectableAdapterIDs) { family in
-                                        Text(family.displayName).tag(family)
-                                    }
-                                }
-                                .pickerStyle(.menu)
-                            } else {
-                                Text(selectableAdapterIDs.first?.displayName ?? currentProfile.defaultAdapterID.displayName)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        // Base URL
-                        VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
-                            Text("Base URL")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            TextField("https://api.example.com", text: $baseURL)
-                                .textFieldStyle(.roundedBorder)
-                        }
-                    }
-                    .padding(AppDefaults.paddingLarge)
-                    .background(Color.secondary.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium))
-                    .padding(.horizontal, AppDefaults.paddingLarge)
-                }
-            }
-            .padding(.vertical, AppDefaults.paddingLarge)
+            configurationPanel
+            .padding(AppDefaults.paddingLarge)
+            .frame(maxWidth: 720)
+            .frame(maxWidth: .infinity)
         }
         .navigationTitle(
             isNewConfiguration ? AppDefaults.newApiConfigurationName : "Edit Configuration"
@@ -336,6 +117,173 @@ struct APIConfigurationEditView: View {
                 defaultAdapterID = currentProfile.defaultAdapterID
             }
         }
+    }
+
+    private var configurationPanel: some View {
+        VStack(spacing: 0) {
+            panelRow("Name") {
+                HStack(spacing: AppDefaults.paddingSmall) {
+                    TextField("My API Configuration", text: $name)
+                        .textFieldStyle(.roundedBorder)
+
+                    defaultButton
+                }
+            }
+
+            panelDivider()
+            panelRow("Provider") {
+                Picker("", selection: $selectedPreset) {
+                    ForEach(APIPreset.allCases, id: \.self) { preset in
+                        Label(preset.displayName, systemImage: preset.iconName)
+                            .tag(preset)
+                    }
+                }
+                .pickerStyle(.menu)
+                .onChange(of: selectedPreset) { _, _ in
+                    applySelectedPreset()
+                }
+                .labelsHidden()
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            panelRow("API URL") {
+                TextField("https://api.example.com", text: $baseURL)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            if selectableAdapterIDs.count > 1 {
+                panelRow("API Mode") {
+                    Picker("", selection: $defaultAdapterID) {
+                        ForEach(selectableAdapterIDs) { family in
+                            Text(family.displayName).tag(family)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+
+            panelDivider()
+            panelRow("API Key", alignment: .top) {
+                VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
+                    HStack(spacing: AppDefaults.paddingSmall) {
+                        if isAPIKeyVisible {
+                            apiKeyVisibleView
+                        } else {
+                            SecureField("Enter API Key", text: $apiKey)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.system(.body, design: .monospaced))
+                        }
+
+                        Button {
+                            isAPIKeyVisible.toggle()
+                        } label: {
+                            Image(systemName: isAPIKeyVisible ? "eye.slash.fill" : "eye.fill")
+                                .frame(width: 22, height: 22)
+                        }
+                        .buttonStyle(.borderless)
+                        .help(isAPIKeyVisible ? "Hide API key" : "Show API key")
+
+                        if !apiKey.isEmpty {
+                            Button {
+                                copyToClipboard(apiKey)
+                            } label: {
+                                Image(systemName: "doc.on.doc")
+                                    .frame(width: 22, height: 22)
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Copy API key")
+                        }
+                    }
+                }
+            }
+
+            panelDivider()
+            panelRow("Default Model") {
+                HStack(spacing: AppDefaults.paddingSmall) {
+                    TextField("Default Model", text: $defaultModel)
+                        .textFieldStyle(.roundedBorder)
+                        .onChange(of: defaultModel) { _, _ in
+                            hasUserEditedDefaultModel = true
+                        }
+
+                    Button {
+                        Task { await loadModelsForPicker() }
+                    } label: {
+                        if isRefreshingModels {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                                .frame(width: 18, height: 18)
+                        } else {
+                            Image(systemName: "magnifyingglass")
+                                .frame(width: 22, height: 22)
+                        }
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Browse provider models")
+                }
+            }
+        }
+        .background(Color.secondary.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium))
+        .overlay(
+            RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium)
+                .stroke(Color.secondary.opacity(0.16), lineWidth: 1)
+        )
+        .sheet(isPresented: $isModelPickerPresented) {
+            ModelSelectionView(
+                selectedModel: defaultModel,
+                onModelSelected: { model in
+                    defaultModel = model
+                    hasUserEditedDefaultModel = true
+                },
+                apiConfiguration: configuration,
+                fallbackModels: nil,
+                fallbackModelDescriptors: fetchedModelDescriptors
+            )
+        }
+    }
+
+    private var defaultButton: some View {
+        let isOnlyConfiguration = apiConfigurations.count == 0 || (apiConfigurations.count == 1 && !isNewConfiguration)
+
+        return Button {
+            guard !isOnlyConfiguration else {
+                validationErrorMessage = "At least one API configuration must be marked as default."
+                showValidationError = true
+                return
+            }
+            isDefault.toggle()
+        } label: {
+            Image(systemName: isDefault ? "star.fill" : "star")
+                .foregroundColor(isDefault ? .yellow : .secondary)
+                .frame(width: 22, height: 22)
+        }
+        .buttonStyle(.borderless)
+        .help(isDefault ? "Default configuration" : "Set as default")
+        .accessibilityLabel(isDefault ? "Default configuration" : "Set as default configuration")
+    }
+
+    private func panelRow<Content: View>(
+        _ title: String,
+        alignment: VerticalAlignment = .firstTextBaseline,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        HStack(alignment: alignment, spacing: AppDefaults.paddingMedium) {
+            Text(title)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .frame(width: 120, alignment: .leading)
+
+            content()
+        }
+        .padding(.horizontal, AppDefaults.paddingLarge)
+        .padding(.vertical, 7)
+    }
+
+    private func panelDivider() -> some View {
+        Divider()
     }
 
     // MARK: - Platform-Specific Views
@@ -381,17 +329,17 @@ struct APIConfigurationEditView: View {
         vxAtelierPro.log.debug("🔑 Copied API key to clipboard")
     }
 
-    /// Validates all input fields before saving
-    /// - Returns: True if all inputs are valid
     private func validateDraft() -> Bool {
-        // Check for empty name
         if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             validationErrorMessage = "Configuration name cannot be empty."
             showValidationError = true
             return false
         }
 
-        // Check for valid base URL
+        return validateEndpoint()
+    }
+
+    private func validateEndpoint() -> Bool {
         if !baseURL.hasPrefix("http://") && !baseURL.hasPrefix("https://") {
             validationErrorMessage = "Base URL must start with http:// or https://"
             showValidationError = true
@@ -440,7 +388,7 @@ struct APIConfigurationEditView: View {
     }
 
     private func loadModelsForPicker() async {
-        guard validateDraft() else {
+        guard validateEndpoint() else {
             showValidationError = true
             return
         }
@@ -553,19 +501,6 @@ enum APIPreset: String, CaseIterable {
         case .lmStudio: return "desktopcomputer"
         case .ollama: return "terminal"
         case .customOpenAICompatible: return "slider.horizontal.3"
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .openAI: return .green
-        case .anthropic: return .purple
-        case .xAI: return .red
-        case .deepSeek: return .blue
-        case .openRouter: return .orange
-        case .lmStudio: return .teal
-        case .ollama: return .gray
-        case .customOpenAICompatible: return .secondary
         }
     }
 
