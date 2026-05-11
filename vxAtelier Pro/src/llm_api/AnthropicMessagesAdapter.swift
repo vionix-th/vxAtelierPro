@@ -9,7 +9,9 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
     private let httpClient = LLMHTTPClient()
 
     /// Executes a Messages request through the shared adapter run loop.
-    func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration) -> AsyncThrowingStream<LLMStreamEvent, Error> {
+    func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration)
+        -> AsyncThrowingStream<LLMStreamEvent, Error>
+    {
         return LLMAdapterRunLoop.stream(
             request: request,
             configuration: configuration,
@@ -47,7 +49,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
         var body: [String: JSONValue] = [
             "model": .string(request.modelID),
             "messages": .array(try anthropicMessages(from: request)),
-            "stream": .boolean(stream)
+            "stream": .boolean(stream),
         ]
         if !request.options.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             body["system"] = .string(request.options.systemPrompt)
@@ -56,15 +58,17 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
             adapterID: request.adapterID,
             mappings: request.parameterMappings
         )
-        try LLMParameterRequestEncoder.applyScalarOptions(request.options, to: &body, mappings: mappings)
+        try LLMParameterRequestEncoder.applyScalarOptions(
+            request.options, to: &body, mappings: mappings)
         if !request.tools.isEmpty {
-            body["tools"] = .array(request.tools.map { tool in
-                .object([
-                    "name": .string(tool.name),
-                    "description": .string(tool.description),
-                    "input_schema": tool.parameters
-                ])
-            })
+            body["tools"] = .array(
+                request.tools.map { tool in
+                    .object([
+                        "name": .string(tool.name),
+                        "description": .string(tool.description),
+                        "input_schema": tool.parameters,
+                    ])
+                })
             body["tool_choice"] = .object(["type": .string("auto")])
         }
         return body
@@ -87,39 +91,44 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
                     let toolMessage = request.messages[index]
                     guard toolMessage.role == "tool" else { break }
                     guard let toolCallID = toolMessage.toolCallID, !toolCallID.isEmpty else {
-                        throw LLMProviderError.unsupportedParameter("Anthropic tool_result requires toolCallID.")
+                        throw LLMProviderError.unsupportedParameter(
+                            "Anthropic tool_result requires toolCallID.")
                     }
-                    content.append(.object([
-                        "type": .string("tool_result"),
-                        "tool_use_id": .string(toolCallID),
-                        "content": .string(toolMessage.displayText)
-                    ]))
+                    content.append(
+                        .object([
+                            "type": .string("tool_result"),
+                            "tool_use_id": .string(toolCallID),
+                            "content": .string(toolMessage.displayText),
+                        ]))
                     index = request.messages.index(after: index)
                 }
-                messages.append(.object([
-                    "role": .string("user"),
-                    "content": .array(content)
-                ]))
+                messages.append(
+                    .object([
+                        "role": .string("user"),
+                        "content": .array(content),
+                    ]))
                 continue
             }
 
             var content = try anthropicContent(from: message)
             if !message.toolCalls.isEmpty {
-                let toolUses: [JSONValue] = try message.toolCalls.sorted { $0.index < $1.index }.map { call -> JSONValue in
+                let toolUses: [JSONValue] = try message.toolCalls.sorted { $0.index < $1.index }.map
+                { call -> JSONValue in
                     .object([
                         "type": .string("tool_use"),
                         "id": .string(call.callID ?? call.id),
                         "name": .string(call.name),
-                        "input": try jsonFromString(call.argumentsJSON)
+                        "input": try jsonFromString(call.argumentsJSON),
                     ])
                 }
                 content.append(contentsOf: toolUses)
             }
             if !content.isEmpty {
-                messages.append(.object([
-                    "role": .string(message.role == "assistant" ? "assistant" : "user"),
-                    "content": .array(content)
-                ]))
+                messages.append(
+                    .object([
+                        "role": .string(message.role == "assistant" ? "assistant" : "user"),
+                        "content": .array(content),
+                    ]))
             }
             index = request.messages.index(after: index)
         }
@@ -139,12 +148,13 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
                         "type": .string("image"),
                         "source": .object([
                             "type": .string("url"),
-                            "url": .string(sourceURL)
-                        ])
+                            "url": .string(sourceURL),
+                        ]),
                     ])
                 }
                 guard let data = part.dataBase64, !data.isEmpty else {
-                    throw LLMProviderError.unsupportedParameter("Anthropic image content requires sourceURL or dataBase64.")
+                    throw LLMProviderError.unsupportedParameter(
+                        "Anthropic image content requires sourceURL or dataBase64.")
                 }
                 let mediaType = try anthropicImageMediaType(part.mimeType)
                 return .object([
@@ -152,13 +162,15 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
                     "source": .object([
                         "type": .string("base64"),
                         "media_type": .string(mediaType),
-                        "data": .string(data)
-                    ])
+                        "data": .string(data),
+                    ]),
                 ])
             case .audio:
-                throw LLMProviderError.unsupportedParameter("Anthropic audio content is not supported by this adapter.")
+                throw LLMProviderError.unsupportedParameter(
+                    "Anthropic audio content is not supported by this adapter.")
             case .file:
-                throw LLMProviderError.unsupportedParameter("Anthropic file content is not supported by this adapter.")
+                throw LLMProviderError.unsupportedParameter(
+                    "Anthropic file content is not supported by this adapter.")
             }
         }
     }
@@ -168,7 +180,8 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
         let mediaType = mimeType ?? "image/png"
         let supported = ["image/jpeg", "image/png", "image/gif", "image/webp"]
         guard supported.contains(mediaType) else {
-            throw LLMProviderError.unsupportedParameter("Anthropic image content does not support \(mediaType).")
+            throw LLMProviderError.unsupportedParameter(
+                "Anthropic image content does not support \(mediaType).")
         }
         return mediaType
     }
@@ -188,14 +201,16 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
                 continuation.yield(.textDelta(text))
             } else if let partial = delta.string("partial_json") {
                 let index = event.int("index") ?? 0
-                let call = LLMToolCall(id: "tool-\(index)", index: index, name: "", argumentsJSON: partial)
+                let call = LLMToolCall(
+                    id: "tool-\(index)", index: index, name: "", argumentsJSON: partial)
                 continuation.yield(.toolCallDelta(assembler.merge(call)))
             } else if let thinking = delta.string("thinking") {
                 continuation.yield(.reasoningDelta(thinking))
             }
         case "content_block_start":
             guard let block = event.object("content_block"),
-                  block.string("type") == "tool_use" else { return }
+                block.string("type") == "tool_use"
+            else { return }
             let index = event.int("index") ?? 0
             let call = LLMToolCall(
                 id: block.string("id") ?? "tool-\(index)",
@@ -207,7 +222,11 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
             continuation.yield(.toolCallDelta(assembler.merge(call)))
         case "message_delta":
             if let usage = event.object("usage") {
-                continuation.yield(.usage(LLMUsage(inputTokens: usage.int("input_tokens"), outputTokens: usage.int("output_tokens"), totalTokens: nil)))
+                continuation.yield(
+                    .usage(
+                        LLMUsage(
+                            inputTokens: usage.int("input_tokens"),
+                            outputTokens: usage.int("output_tokens"), totalTokens: nil)))
             }
         case "message_stop":
             continuation.yield(.runCompleted(responseID: nil, modelID: nil))
@@ -228,35 +247,47 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
                 if item.string("type") == "text", let text = item.string("text") {
                     continuation.yield(.textDelta(text))
                 } else if item.string("type") == "tool_use" {
-                    continuation.yield(.toolCallCompleted(LLMToolCall(
-                        id: item.string("id") ?? "tool-\(index)",
-                        callID: item.string("id"),
-                        index: index,
-                        name: item.string("name") ?? "",
-                    argumentsJSON: LLMModelMetadataDecoder.rawJSONString(from: item.object("input").map { .object($0) } ?? .object([:])) ?? "{}"
-                )))
+                    continuation.yield(
+                        .toolCallCompleted(
+                            LLMToolCall(
+                                id: item.string("id") ?? "tool-\(index)",
+                                callID: item.string("id"),
+                                index: index,
+                                name: item.string("name") ?? "",
+                                argumentsJSON: LLMModelMetadataDecoder.rawJSONString(
+                                    from: item.object("input").map { .object($0) } ?? .object([:]))
+                                    ?? "{}"
+                            )))
+                }
             }
         }
-        }
         if let usage = object.object("usage") {
-            continuation.yield(.usage(LLMUsage(inputTokens: usage.int("input_tokens"), outputTokens: usage.int("output_tokens"))))
+            continuation.yield(
+                .usage(
+                    LLMUsage(
+                        inputTokens: usage.int("input_tokens"),
+                        outputTokens: usage.int("output_tokens"))))
         }
-        continuation.yield(.runCompleted(responseID: object.string("id"), modelID: object.string("model")))
+        continuation.yield(
+            .runCompleted(responseID: object.string("id"), modelID: object.string("model")))
     }
 
     /// Parses assistant tool-call arguments into the JSON object required by Anthropic.
     private func jsonFromString(_ string: String) throws -> JSONValue {
         guard let data = string.data(using: .utf8) else {
-            throw LLMProviderError.decoding("Anthropic tool_use arguments must be valid UTF-8 JSON.")
+            throw LLMProviderError.decoding(
+                "Anthropic tool_use arguments must be valid UTF-8 JSON.")
         }
         let value: JSONValue
         do {
             value = try JSONDecoder().decode(JSONValue.self, from: data)
         } catch {
-            throw LLMProviderError.decoding("Anthropic tool_use arguments must be valid JSON object.")
+            throw LLMProviderError.decoding(
+                "Anthropic tool_use arguments must be valid JSON object.")
         }
         guard let object = value.objectValue else {
-            throw LLMProviderError.unsupportedParameter("Anthropic tool_use arguments must decode to a JSON object.")
+            throw LLMProviderError.unsupportedParameter(
+                "Anthropic tool_use arguments must decode to a JSON object.")
         }
         return .object(object)
     }

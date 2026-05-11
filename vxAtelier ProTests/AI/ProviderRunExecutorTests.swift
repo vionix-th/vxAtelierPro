@@ -20,7 +20,6 @@ final class ProviderRunExecutorTests: LLMTestCase {
         let profile = LLMProviderRegistry.shared.profile(for: .openAIPlatform)
         var options = LLMGenerationOptions(streamMode: .enabled)
         options.modelID = "gpt-4.1-mini"
-        options.adapterID = .openAIResponses
         let request = LLMRequest.runtimeEquivalent(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,

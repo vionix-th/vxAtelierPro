@@ -96,7 +96,6 @@ final class ConversationRunContextResolverTests: XCTestCase {
         let profile = LLMProviderRegistry.shared.profile(for: .openAIPlatform)
         let options = LLMGenerationOptions(
             modelID: "gpt-test",
-            adapterID: .openAIResponses,
             streamMode: .disabled
         )
         let context = ConversationRunContext(

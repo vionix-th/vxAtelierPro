@@ -42,7 +42,6 @@ struct ConversationRunContextResolver {
         )
         let options = conversation.options.generationOptions(
             resolvedModelID: modelID,
-            resolvedAdapterID: adapterID,
             mappings: mappings
         )
         let tools = toolCatalog.allTools()

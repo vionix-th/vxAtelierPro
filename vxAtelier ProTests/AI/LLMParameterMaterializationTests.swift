@@ -106,7 +106,6 @@ final class LLMParameterMaterializationTests: XCTestCase {
 
         let generationOptions = options.generationOptions(
             resolvedModelID: "model",
-            resolvedAdapterID: .openAIChatCompletions,
             mappings: mappings
         )
 

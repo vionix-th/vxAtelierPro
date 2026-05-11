@@ -174,13 +174,11 @@ final class ConversationOptions: Equatable {
 
     func generationOptions(
         resolvedModelID: String?,
-        resolvedAdapterID: LLMAdapterID?,
         mappings: [LLMParameterID: LLMParameterMappingDescriptor] = [:]
     ) -> LLMGenerationOptions {
         LLMGenerationOptions(
             systemPrompt: systemPrompt,
             modelID: selectedModelID ?? resolvedModelID,
-            adapterID: resolvedAdapterID,
             temperature: includedDouble(.temperature, mappings: mappings),
             topP: includedDouble(.topP, mappings: mappings),
             maxOutputTokens: includedInt(.maxOutputTokens, mappings: mappings),

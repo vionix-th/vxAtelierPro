@@ -35,7 +35,6 @@ struct LLMCapabilityValidator {
         guard profile.supportedAdapterIDs.contains(request.adapterID) else {
             throw LLMProviderError.unsupportedCapability("\(profile.name) does not support \(request.adapterID.rawValue).")
         }
-        // APIConfigurationItem owns adapter selection; ModelItem owns capabilities and mappings.
     }
 
     /// Confirms requested generation options are mapped and supported by the provider/model pair.

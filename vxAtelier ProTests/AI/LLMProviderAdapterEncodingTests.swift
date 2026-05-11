@@ -246,6 +246,11 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
             modelID: "gpt-test",
+            parameterMappings: LLMParameterMappingCatalog.defaults(
+                providerID: .openAIPlatform,
+                adapterID: .openAIResponses,
+                modelID: "gpt-test"
+            ),
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Answer")])],
             options: LLMGenerationOptions(
                 responseFormat: .jsonSchema,
@@ -322,6 +327,11 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
             providerID: .openAIPlatform,
             adapterID: .openAIChatCompletions,
             modelID: "gpt-5.4-nano",
+            parameterMappings: LLMParameterMappingCatalog.defaults(
+                providerID: .openAIPlatform,
+                adapterID: .openAIChatCompletions,
+                modelID: "gpt-5.4-nano"
+            ),
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])],
             options: LLMGenerationOptions(
                 temperature: 0.7,
@@ -347,6 +357,11 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
             providerID: .openAIPlatform,
             adapterID: .openAIChatCompletions,
             modelID: "gpt-4.1-nano",
+            parameterMappings: LLMParameterMappingCatalog.defaults(
+                providerID: .openAIPlatform,
+                adapterID: .openAIChatCompletions,
+                modelID: "gpt-4.1-nano"
+            ),
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])],
             options: LLMGenerationOptions(maxOutputTokens: 16)
         )
@@ -362,6 +377,11 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
             providerID: .anthropic,
             adapterID: .anthropicMessages,
             modelID: "claude-test",
+            parameterMappings: LLMParameterMappingCatalog.defaults(
+                providerID: .anthropic,
+                adapterID: .anthropicMessages,
+                modelID: "claude-test"
+            ),
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])]
         )
 

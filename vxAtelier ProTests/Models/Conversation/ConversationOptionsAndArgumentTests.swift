@@ -72,7 +72,6 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
 
         let generationOptions = options.generationOptions(
             resolvedModelID: "model",
-            resolvedAdapterID: .openAIChatCompletions,
             mappings: mappings
         )
 

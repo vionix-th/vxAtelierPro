@@ -209,16 +209,6 @@ struct LLMHTTPClient {
         return request
     }
 
-    /// Decodes an SSE payload into a provider JSON object for legacy callers.
-    private func emitSSEPayload(_ payload: String, continuation: AsyncThrowingStream<[String: JSONValue], Error>.Continuation) throws {
-        if payload == "[DONE]" { return }
-        guard let data = payload.data(using: .utf8) else { return }
-        let value = try JSONDecoder().decode(JSONValue.self, from: data)
-        if let object = value.objectValue {
-            continuation.yield(object)
-        }
-    }
-
     /// Decodes an SSE payload into a stream event while preserving metadata support.
     private func emitSSEPayload(_ payload: String, continuation: AsyncThrowingStream<StreamEvent, Error>.Continuation) throws {
         if payload == "[DONE]" { return }

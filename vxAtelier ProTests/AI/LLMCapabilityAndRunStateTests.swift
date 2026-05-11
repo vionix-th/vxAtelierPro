@@ -12,7 +12,7 @@ final class LLMCapabilityAndRunStateTests: XCTestCase {
         let profile = LLMProviderRegistry.shared.profile(for: .lmStudio)
         let request = LLMRequest(
             providerID: .lmStudio,
-            adapterID: .openAIChatCompletions,
+            adapterID: .openAICompatibleChatCompletions,
             modelID: "local-model",
             messages: [
                 LLMMessage(role: "user", content: [LLMContentPart(kind: .image, dataBase64: "aW1n")])
@@ -28,7 +28,7 @@ final class LLMCapabilityAndRunStateTests: XCTestCase {
         let profile = LLMProviderRegistry.shared.profile(for: .openRouter)
         let request = LLMRequest(
             providerID: .openRouter,
-            adapterID: .openAIChatCompletions,
+            adapterID: .openAICompatibleChatCompletions,
             modelID: "vision-model",
             modelCapabilities: [.text, .image, .streaming],
             messages: [
@@ -51,7 +51,7 @@ final class LLMCapabilityAndRunStateTests: XCTestCase {
         )
 
         XCTAssertThrowsError(try LLMCapabilityValidator.validate(request, profile: profile)) { error in
-            XCTAssertEqual(error as? LLMProviderError, .unsupportedCapability("OpenAI does not support file content for chatCompletions."))
+            XCTAssertEqual(error as? LLMProviderError, .unsupportedCapability("OpenAI does not support file content for openAIChatCompletions."))
         }
     }
 
