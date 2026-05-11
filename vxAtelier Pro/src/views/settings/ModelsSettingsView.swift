@@ -135,7 +135,6 @@ struct ModelsSettingsView: View {
                                 SettingsListRow(
                                     title: model.name,
                                     subtitle: model.apiConfiguration?.providerIDEnum.displayName ?? "No API Configuration",
-                                    icons: model.metadataIconSystemNames.map { Image(systemName: $0) },
                                     onEdit: {
                                         editingModel = EditingModel(model: model, isNew: false)
                                     },
