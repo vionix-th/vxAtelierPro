@@ -30,6 +30,7 @@ final class TestEnvironment {
             VoiceConfigurationItem.self,
             ModelItem.self,
             ModelParameterMappingItem.self,
+            ModelParameterAvailabilityItem.self,
             WebSearchConfigurationItem.self
         ])
         
@@ -179,6 +180,11 @@ extension LLMRequest {
             modelID: modelID,
             modelCapabilities: candidate.capabilities,
             parameterMappings: LLMParameterMappingCatalog.defaults(
+                providerID: providerID,
+                adapterID: adapterID,
+                modelID: modelID
+            ),
+            parameterAvailability: LLMParameterAvailabilityCatalog.defaults(
                 providerID: providerID,
                 adapterID: adapterID,
                 modelID: modelID

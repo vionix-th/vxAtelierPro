@@ -37,6 +37,21 @@ final class LLMParameterMaterializationTests: XCTestCase {
         XCTAssertEqual(mapping?.controlType, AiArgumentControlType.stepper.rawValue)
     }
 
+    func testModelMaterializesDefaultParameterAvailabilityFromCatalog() {
+        let config = APIConfigurationItem(name: "Anthropic", baseURL: "https://unit.test", providerID: .anthropic)
+        config.defaultAdapterIDEnum = .anthropicMessages
+        let model = ModelItem(modelID: "claude-sonnet-4-5", apiConfiguration: config)
+
+        let maxTokens = model.parameterAvailability.first {
+            $0.adapterIDEnum == .anthropicMessages && $0.semanticParameterIDEnum == .maxOutputTokens
+        }
+
+        XCTAssertTrue(maxTokens?.isAvailable ?? false)
+        XCTAssertTrue(maxTokens?.isRequired ?? false)
+        XCTAssertEqual(maxTokens?.defaultJSONValue, .integer(4096))
+        XCTAssertEqual(maxTokens?.valueType, LLMParameterValueType.integer.rawValue)
+    }
+
     func testResetDefaultParameterMappingsRestoresAdapterDefaults() {
         let config = APIConfigurationItem(name: "OpenAI", baseURL: "https://unit.test", providerID: .openAIPlatform)
         config.defaultAdapterIDEnum = .openAIChatCompletions
@@ -67,6 +82,50 @@ final class LLMParameterMaterializationTests: XCTestCase {
         XCTAssertFalse(reasoningEffort?.isCustomized ?? true)
     }
 
+    func testCustomizedModelAvailabilitySurvivesDefaultMaterialization() {
+        let config = APIConfigurationItem(name: "OpenAI", baseURL: "https://unit.test", providerID: .openAIPlatform)
+        config.defaultAdapterIDEnum = .openAIChatCompletions
+        let model = ModelItem(modelID: "gpt-4.1-nano", apiConfiguration: config)
+        let temperature = model.parameterAvailability.first {
+            $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .temperature
+        }
+        temperature?.isIncludedByDefault = true
+        temperature?.defaultJSONValue = .number(0.3)
+        temperature?.markCustomized()
+
+        model.materializeDefaultParameterAvailability(preserveCustomized: true)
+
+        XCTAssertEqual(temperature?.defaultJSONValue, .number(0.3))
+        XCTAssertTrue(temperature?.isIncludedByDefault ?? false)
+    }
+
+    func testResetDefaultParameterAvailabilityRestoresAdapterDefaults() {
+        let config = APIConfigurationItem(name: "OpenAI", baseURL: "https://unit.test", providerID: .openAIPlatform)
+        config.defaultAdapterIDEnum = .openAIChatCompletions
+        let model = ModelItem(modelID: "gpt-5.4-nano", apiConfiguration: config)
+        let temperature = model.parameterAvailability.first {
+            $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .temperature
+        }
+        temperature?.isAvailable = true
+        temperature?.markCustomized()
+        model.parameterAvailability.append(ModelParameterAvailabilityItem(
+            adapterID: .openAIChatCompletions,
+            semanticParameterID: .serviceTier,
+            isCustomized: true
+        ))
+
+        model.resetDefaultParameterAvailability(adapterID: .openAIChatCompletions)
+
+        let resetTemperature = model.parameterAvailability.first {
+            $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .temperature
+        }
+        XCTAssertFalse(resetTemperature?.isAvailable ?? true)
+        XCTAssertFalse(resetTemperature?.isCustomized ?? true)
+        XCTAssertNil(model.parameterAvailability.first {
+            $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .serviceTier
+        })
+    }
+
     func testConversationProjectionUsesSemanticDefinitionsAndPresentation() {
         let config = APIConfigurationItem(
             name: "OpenAI",
@@ -76,6 +135,7 @@ final class LLMParameterMaterializationTests: XCTestCase {
             providerID: .openAIPlatform
         )
         config.defaultAdapterIDEnum = .openAIChatCompletions
+        config.models = [ModelItem(modelID: "gpt-4.1-nano", apiConfiguration: config)]
         let options = ConversationOptions(apiConfiguration: config)
         options.temperature = 0.7
 
@@ -96,17 +156,17 @@ final class LLMParameterMaterializationTests: XCTestCase {
         let options = ConversationOptions()
         options.temperature = 0.9
         options.setParameterEnabled(.temperature, enabled: false)
-        let mappings: [LLMParameterID: LLMParameterMappingDescriptor] = [
-            .temperature: LLMParameterMappingDescriptor(
+        let modelAvailability: [LLMParameterID: LLMParameterAvailabilityDescriptor] = [
+            .temperature: LLMParameterAvailabilityDescriptor(
                 adapterID: .openAIChatCompletions,
-                semanticParameterID: .temperature,
-                wireKey: "temperature"
+                semanticParameterID: .temperature
             )
         ]
 
-        let generationOptions = options.generationOptions(
-            resolvedModelID: "model",
-            mappings: mappings
+        let generationOptions = LLMParameterAvailabilityResolver.resolvedOptions(
+            from: options.generationOptions(resolvedModelID: "model"),
+            conversationPreferences: options.parameterInclusionPreferences,
+            modelAvailability: modelAvailability
         )
 
         XCTAssertNil(generationOptions.temperature)

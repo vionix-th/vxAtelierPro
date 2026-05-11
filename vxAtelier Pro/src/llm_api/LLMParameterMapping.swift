@@ -44,32 +44,23 @@ struct LLMParameterMappingDescriptor: Codable, Equatable, Identifiable {
     var id: String { "\(adapterID.rawValue):\(semanticParameterID.rawValue)" }
     var adapterID: LLMAdapterID
     var semanticParameterID: LLMParameterID
-    var isEnabled: Bool
-    var isRequired: Bool
     var encodingKind: LLMParameterEncodingKind
     var wireKey: String
     var structuredPreset: LLMParameterStructuredPreset?
-    var defaultValue: JSONValue?
 
     /// Creates a provider mapping for a semantic parameter at one adapter.
     init(
         adapterID: LLMAdapterID,
         semanticParameterID: LLMParameterID,
-        isEnabled: Bool = true,
-        isRequired: Bool = false,
         encodingKind: LLMParameterEncodingKind = .scalarKey,
         wireKey: String = "",
-        structuredPreset: LLMParameterStructuredPreset? = nil,
-        defaultValue: JSONValue? = nil
+        structuredPreset: LLMParameterStructuredPreset? = nil
     ) {
         self.adapterID = adapterID
         self.semanticParameterID = semanticParameterID
-        self.isEnabled = isEnabled
-        self.isRequired = isRequired
         self.encodingKind = encodingKind
         self.wireKey = wireKey
         self.structuredPreset = structuredPreset
-        self.defaultValue = defaultValue
     }
 }
 
@@ -110,14 +101,9 @@ enum LLMParameterRequestEncoder {
         to body: inout [String: JSONValue],
         mappings: [LLMParameterID: LLMParameterMappingDescriptor]
     ) throws {
-        for mapping in mappings.values where mapping.isEnabled {
+        for mapping in mappings.values {
             guard mapping.encodingKind == .scalarKey else { continue }
-            guard let value = options.jsonValue(for: mapping.semanticParameterID) ?? mapping.defaultValue else {
-                if mapping.isRequired {
-                    throw LLMProviderError.unsupportedParameter("\(mapping.semanticParameterID.rawValue) is required.")
-                }
-                continue
-            }
+            guard let value = options.jsonValue(for: mapping.semanticParameterID) else { continue }
             guard !mapping.wireKey.isEmpty else {
                 throw LLMProviderError.unsupportedParameter("\(mapping.semanticParameterID.rawValue) has no wire key.")
             }

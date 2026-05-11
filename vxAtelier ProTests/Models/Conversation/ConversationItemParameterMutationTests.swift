@@ -49,7 +49,7 @@ final class ConversationItemParameterMutationTests: XCTestCase {
 
         XCTAssertEqual(options.stopSequences, ["END", "STOP"])
         XCTAssertEqual(options.responseFormat, .jsonSchema)
-        XCTAssertEqual(options.reasoning, "high")
+        XCTAssertEqual(options.reasoningEffort, "high")
         XCTAssertEqual(options.serviceTier, "priority")
         XCTAssertEqual(options.parameterValue(.stopSequences), .string("END\nSTOP"))
         XCTAssertEqual(options.parameterValue(.responseFormat), .string("json_schema"))

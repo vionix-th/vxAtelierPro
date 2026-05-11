@@ -2,12 +2,12 @@ import Foundation
 import SwiftData
 
 @Model
-final class ModelParameterMappingItem {
+final class ModelParameterAvailabilityItem {
     var adapterIDRaw: String
     var semanticParameterID: String
-    var encodingKindRaw: String
-    var wireKey: String
-    var structuredPresetRaw: String?
+    var isAvailable: Bool
+    var isRequired: Bool
+    var isIncludedByDefault: Bool
     var displayName: String
     var paramDescription: String
     var valueType: String
@@ -16,6 +16,7 @@ final class ModelParameterMappingItem {
     var maxValue: Double?
     var step: Double?
     var options: [String]?
+    var defaultValueData: Data?
     var isCustomized: Bool
 
     var adapterIDEnum: LLMAdapterID {
@@ -31,39 +32,45 @@ final class ModelParameterMappingItem {
         }
     }
 
-    var encodingKind: LLMParameterEncodingKind {
-        get { LLMParameterEncodingKind(rawValue: encodingKindRaw) ?? .scalarKey }
-        set { encodingKindRaw = newValue.rawValue }
+    var defaultJSONValue: JSONValue? {
+        get {
+            guard let defaultValueData else { return nil }
+            return try? JSONDecoder().decode(JSONValue.self, from: defaultValueData)
+        }
+        set {
+            if let newValue {
+                defaultValueData = try? JSONEncoder().encode(newValue)
+            } else {
+                defaultValueData = nil
+            }
+        }
     }
 
-    var structuredPreset: LLMParameterStructuredPreset? {
-        get { structuredPresetRaw.flatMap(LLMParameterStructuredPreset.init(rawValue:)) }
-        set { structuredPresetRaw = newValue?.rawValue }
-    }
-
-    var descriptor: LLMParameterMappingDescriptor {
-        LLMParameterMappingDescriptor(
+    var descriptor: LLMParameterAvailabilityDescriptor {
+        LLMParameterAvailabilityDescriptor(
             adapterID: adapterIDEnum,
             semanticParameterID: semanticParameterIDEnum,
-            encodingKind: encodingKind,
-            wireKey: wireKey,
-            structuredPreset: structuredPreset
+            isAvailable: isAvailable,
+            isRequired: isRequired,
+            isIncludedByDefault: isIncludedByDefault,
+            defaultValue: defaultJSONValue
         )
     }
 
     init(
         adapterID: LLMAdapterID,
         semanticParameterID: LLMParameterID,
-        encodingKind: LLMParameterEncodingKind = .scalarKey,
-        wireKey: String = "",
-        structuredPreset: LLMParameterStructuredPreset? = nil,
+        isAvailable: Bool = true,
+        isRequired: Bool = false,
+        isIncludedByDefault: Bool = false,
+        defaultValue: JSONValue? = nil,
         isCustomized: Bool = false
     ) {
         self.adapterIDRaw = adapterID.rawValue
         self.semanticParameterID = semanticParameterID.rawValue
-        self.encodingKindRaw = encodingKind.rawValue
-        self.wireKey = wireKey
-        self.structuredPresetRaw = structuredPreset?.rawValue
+        self.isAvailable = isAvailable
+        self.isRequired = isRequired
+        self.isIncludedByDefault = isIncludedByDefault
         let presentation = AiParameterPresentationCatalog.presentation(for: semanticParameterID)
         self.displayName = presentation.displayName
         self.paramDescription = presentation.description
@@ -73,26 +80,33 @@ final class ModelParameterMappingItem {
         self.maxValue = semanticParameterID.maxValue
         self.step = presentation.step
         self.options = semanticParameterID.options
+        if let defaultValue {
+            self.defaultValueData = try? JSONEncoder().encode(defaultValue)
+        } else {
+            self.defaultValueData = nil
+        }
         self.isCustomized = isCustomized
     }
 
-    convenience init(descriptor: LLMParameterMappingDescriptor, isCustomized: Bool = false) {
+    convenience init(descriptor: LLMParameterAvailabilityDescriptor, isCustomized: Bool = false) {
         self.init(
             adapterID: descriptor.adapterID,
             semanticParameterID: descriptor.semanticParameterID,
-            encodingKind: descriptor.encodingKind,
-            wireKey: descriptor.wireKey,
-            structuredPreset: descriptor.structuredPreset,
+            isAvailable: descriptor.isAvailable,
+            isRequired: descriptor.isRequired,
+            isIncludedByDefault: descriptor.isIncludedByDefault,
+            defaultValue: descriptor.defaultValue,
             isCustomized: isCustomized
         )
     }
 
-    func apply(_ descriptor: LLMParameterMappingDescriptor, markCustomized: Bool) {
+    func apply(_ descriptor: LLMParameterAvailabilityDescriptor, markCustomized: Bool) {
         adapterIDEnum = descriptor.adapterID
         semanticParameterIDEnum = descriptor.semanticParameterID
-        encodingKind = descriptor.encodingKind
-        wireKey = descriptor.wireKey
-        structuredPreset = descriptor.structuredPreset
+        isAvailable = descriptor.isAvailable
+        isRequired = descriptor.isRequired
+        isIncludedByDefault = descriptor.isIncludedByDefault
+        defaultJSONValue = descriptor.defaultValue
         isCustomized = markCustomized
     }
 

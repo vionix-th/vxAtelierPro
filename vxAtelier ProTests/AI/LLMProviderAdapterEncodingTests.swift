@@ -323,16 +323,10 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
 
     func testOpenAIChatMapsGPT5MaxOutputTokensToMaxCompletionTokens() throws {
         let adapter = OpenAIChatCompletionsAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
-        let request = LLMRequest(
+        let resolved = Self.resolvedDefaults(
             providerID: .openAIPlatform,
             adapterID: .openAIChatCompletions,
             modelID: "gpt-5.4-nano",
-            parameterMappings: LLMParameterMappingCatalog.defaults(
-                providerID: .openAIPlatform,
-                adapterID: .openAIChatCompletions,
-                modelID: "gpt-5.4-nano"
-            ),
-            messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])],
             options: LLMGenerationOptions(
                 temperature: 0.7,
                 topP: 0.9,
@@ -340,6 +334,15 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
                 stop: ["END"],
                 reasoning: "low"
             )
+        )
+        let request = LLMRequest(
+            providerID: .openAIPlatform,
+            adapterID: .openAIChatCompletions,
+            modelID: "gpt-5.4-nano",
+            parameterMappings: resolved.mappings,
+            parameterAvailability: resolved.availability,
+            messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])],
+            options: resolved.options
         )
 
         let body = try adapter.makeBody(for: request, stream: false)
@@ -373,16 +376,20 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
 
     func testAnthropicMessagesUsesRequiredDefaultMaxTokens() throws {
         let adapter = AnthropicMessagesAdapter(profile: LLMProviderRegistry.shared.profile(for: .anthropic))
+        let resolved = Self.resolvedDefaults(
+            providerID: .anthropic,
+            adapterID: .anthropicMessages,
+            modelID: "claude-test",
+            options: LLMGenerationOptions()
+        )
         let request = LLMRequest(
             providerID: .anthropic,
             adapterID: .anthropicMessages,
             modelID: "claude-test",
-            parameterMappings: LLMParameterMappingCatalog.defaults(
-                providerID: .anthropic,
-                adapterID: .anthropicMessages,
-                modelID: "claude-test"
-            ),
-            messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])]
+            parameterMappings: resolved.mappings,
+            parameterAvailability: resolved.availability,
+            messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])],
+            options: resolved.options
         )
 
         let body = try adapter.makeBody(for: request, stream: false)
@@ -431,5 +438,46 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         XCTAssertThrowsError(try adapter.anthropicMessages(from: request)) { error in
             XCTAssertEqual(error as? LLMProviderError, .unsupportedParameter("Anthropic tool_use arguments must decode to a JSON object."))
         }
+    }
+
+    private static func resolvedDefaults(
+        providerID: LLMProviderID,
+        adapterID: LLMAdapterID,
+        modelID: String,
+        options: LLMGenerationOptions
+    ) -> (
+        mappings: [LLMParameterMappingDescriptor],
+        availability: [LLMParameterAvailabilityDescriptor],
+        options: LLMGenerationOptions
+    ) {
+        let mappingList = LLMParameterMappingCatalog.defaults(
+            providerID: providerID,
+            adapterID: adapterID,
+            modelID: modelID
+        )
+        let mappings = LLMParameterMappingResolver.resolve(adapterID: adapterID, mappings: mappingList)
+        let availabilityList = LLMParameterAvailabilityCatalog.defaults(
+            providerID: providerID,
+            adapterID: adapterID,
+            modelID: modelID
+        )
+        let availability = LLMParameterAvailabilityMappingResolver.resolve(
+            adapterID: adapterID,
+            availability: availabilityList
+        )
+        let sendableAvailability = LLMParameterAvailabilityResolver.sendableModelAvailability(
+            for: options,
+            conversationPreferences: [:],
+            modelAvailability: availability
+        )
+        let sendableMappings = mappings.filter { entry in
+            sendableAvailability[entry.key] != nil && entry.value.encodingKind != .disabled
+        }
+        let resolvedOptions = LLMParameterAvailabilityResolver.resolvedOptions(
+            from: options,
+            conversationPreferences: [:],
+            modelAvailability: availability
+        )
+        return (Array(sendableMappings.values), Array(sendableAvailability.values), resolvedOptions)
     }
 }

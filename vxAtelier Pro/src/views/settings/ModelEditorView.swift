@@ -32,12 +32,24 @@ struct ModelEditorView: View {
             .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
     }
 
+    private var selectedAdapterAvailability: [ModelParameterAvailabilityItem] {
+        model.parameterAvailability
+            .filter { $0.adapterIDEnum == selectedAdapterID }
+            .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+    }
+
     private var selectedConfiguration: APIConfigurationItem? {
         apiConfigurations.first { $0.persistentModelID == selectedConfigurationID }
     }
 
     private var addableParameterIDs: [LLMParameterID] {
         let existing = Set(selectedAdapterMappings.map(\.semanticParameterIDEnum))
+        return LLMParameterID.allCases
+            .filter { $0.isProviderMappable && !existing.contains($0) }
+    }
+
+    private var addableAvailabilityParameterIDs: [LLMParameterID] {
+        let existing = Set(selectedAdapterAvailability.map(\.semanticParameterIDEnum))
         return LLMParameterID.allCases
             .filter { $0.isProviderMappable && !existing.contains($0) }
     }
@@ -199,6 +211,55 @@ struct ModelEditorView: View {
                         .foregroundColor(.primary)
                         .textCase(nil)
                 }
+
+                Section {
+                    VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
+                        Text("API Mode: \(selectedAdapterID.displayName)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        HStack {
+                            Button {
+                                model.resetDefaultParameterAvailability(adapterID: selectedAdapterID)
+                            } label: {
+                                Label("Reset Availability Defaults", systemImage: "arrow.counterclockwise")
+                            }
+                            .buttonStyle(.bordered)
+
+                            Menu {
+                                ForEach(addableAvailabilityParameterIDs) { parameterID in
+                                    Button(AiParameterPresentationCatalog.displayName(for: parameterID)) {
+                                        addAvailability(parameterID)
+                                    }
+                                }
+                            } label: {
+                                Label("Add Availability", systemImage: "plus")
+                            }
+                            .disabled(addableAvailabilityParameterIDs.isEmpty)
+                        }
+
+                        if selectedAdapterAvailability.isEmpty {
+                            Text("No parameter availability configured for this adapter.")
+                                .foregroundColor(.secondary)
+                                .italic()
+                        } else {
+                            VStack(spacing: AppDefaults.paddingSmall) {
+                                ForEach(selectedAdapterAvailability) { availability in
+                                    ModelParameterAvailabilityRow(availability: availability)
+                                    if availability.id != selectedAdapterAvailability.last?.id {
+                                        Divider()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(.vertical, AppDefaults.paddingSmall)
+                } header: {
+                    Text("Parameter Availability")
+                        .font(.system(.headline, design: .rounded))
+                        .foregroundColor(.primary)
+                        .textCase(nil)
+                }
                 
                 if model.modelContext != nil {
                     Section {
@@ -249,6 +310,7 @@ struct ModelEditorView: View {
         model.contextSize = contextSize
         model.capabilitiesRaw = capabilities.map(\.rawValue)
         model.materializeDefaultParameterMappings(preserveCustomized: true)
+        model.materializeDefaultParameterAvailability(preserveCustomized: true)
         
         do {
             if model.modelContext == nil {
@@ -291,13 +353,23 @@ struct ModelEditorView: View {
         let mapping = ModelParameterMappingItem(
             adapterID: selectedAdapterID,
             semanticParameterID: parameterID,
-            isEnabled: true,
-            isRequired: false,
             encodingKind: .scalarKey,
             wireKey: parameterID.rawValue,
             isCustomized: true
         )
         model.parameterMappings.append(mapping)
+    }
+
+    private func addAvailability(_ parameterID: LLMParameterID) {
+        let availability = ModelParameterAvailabilityItem(
+            adapterID: selectedAdapterID,
+            semanticParameterID: parameterID,
+            isAvailable: true,
+            isRequired: false,
+            isIncludedByDefault: false,
+            isCustomized: true
+        )
+        model.parameterAvailability.append(availability)
     }
 }
 
@@ -310,12 +382,6 @@ private struct ModelParameterMappingRow: View {
                 Text(mapping.displayName)
                     .frame(width: 150, alignment: .leading)
                     .help(mapping.paramDescription)
-
-                Toggle("Enabled", isOn: binding(\.isEnabled))
-                    .toggleStyle(.switch)
-
-                Toggle("Required", isOn: binding(\.isRequired))
-                    .toggleStyle(.switch)
 
                 Picker("Encoding", selection: Binding(
                     get: { mapping.encodingKind },
@@ -359,46 +425,76 @@ private struct ModelParameterMappingRow: View {
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
+            }
+        }
+        .padding(.vertical, AppDefaults.paddingSmall)
+    }
+}
 
+private struct ModelParameterAvailabilityRow: View {
+    @Bindable var availability: ModelParameterAvailabilityItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
+            HStack(alignment: .center, spacing: AppDefaults.paddingMedium) {
+                Text(availability.displayName)
+                    .frame(width: 150, alignment: .leading)
+                    .help(availability.paramDescription)
+
+                Toggle("Available", isOn: binding(\.isAvailable))
+                    .toggleStyle(.switch)
+
+                Toggle("Required", isOn: binding(\.isRequired))
+                    .toggleStyle(.switch)
+
+                Toggle("Included by Default", isOn: binding(\.isIncludedByDefault))
+                    .toggleStyle(.switch)
+            }
+
+            HStack(spacing: AppDefaults.paddingMedium) {
                 TextField("Default", text: Binding(
                     get: { defaultValueText },
                     set: { defaultValueText = $0 }
                 ))
                 .textFieldStyle(.roundedBorder)
-                .frame(width: 160)
+                .frame(width: 180)
+
+                Text("Leave empty for no model default value.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
         }
         .padding(.vertical, AppDefaults.paddingSmall)
     }
 
     private var defaultValueText: String {
-        get { mapping.defaultJSONValue?.stringValue ?? "" }
+        get { availability.defaultJSONValue?.stringValue ?? "" }
         nonmutating set {
             let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty {
-                mapping.defaultJSONValue = nil
+                availability.defaultJSONValue = nil
             } else {
-                switch mapping.semanticParameterIDEnum.valueType {
+                switch availability.semanticParameterIDEnum.valueType {
                 case .integer:
-                    mapping.defaultJSONValue = .integer(Int(trimmed) ?? 0)
+                    availability.defaultJSONValue = .integer(Int(trimmed) ?? 0)
                 case .float:
-                    mapping.defaultJSONValue = .number(Double(trimmed) ?? 0)
+                    availability.defaultJSONValue = .number(Double(trimmed) ?? 0)
                 case .boolean:
-                    mapping.defaultJSONValue = .boolean(trimmed.lowercased() == "true")
+                    availability.defaultJSONValue = .boolean(trimmed.lowercased() == "true")
                 case .string:
-                    mapping.defaultJSONValue = .string(trimmed)
+                    availability.defaultJSONValue = .string(trimmed)
                 }
             }
-            mapping.markCustomized()
+            availability.markCustomized()
         }
     }
 
-    private func binding(_ keyPath: ReferenceWritableKeyPath<ModelParameterMappingItem, Bool>) -> Binding<Bool> {
+    private func binding(_ keyPath: ReferenceWritableKeyPath<ModelParameterAvailabilityItem, Bool>) -> Binding<Bool> {
         Binding(
-            get: { mapping[keyPath: keyPath] },
+            get: { availability[keyPath: keyPath] },
             set: {
-                mapping[keyPath: keyPath] = $0
-                mapping.markCustomized()
+                availability[keyPath: keyPath] = $0
+                availability.markCustomized()
             }
         )
     }

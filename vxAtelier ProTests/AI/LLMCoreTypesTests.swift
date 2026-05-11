@@ -228,6 +228,12 @@ final class LLMCoreTypesTests: XCTestCase {
               "match": {
                 "adapterID": "openAIChatCompletions"
               },
+              "parameterAvailability": [
+                {
+                  "parameter": "max_output_tokens",
+                  "includedByDefault": true
+                }
+              ],
               "parameterMappings": [
                 {
                   "parameter": "max_output_tokens",
@@ -241,6 +247,17 @@ final class LLMCoreTypesTests: XCTestCase {
                 "modelRegex": "(^|.*/)gpt-5([-.].*)?$",
                 "adapterID": "openAIChatCompletions"
               },
+              "parameterAvailability": [
+                {
+                  "parameter": "max_output_tokens",
+                  "required": true,
+                  "defaultValue": 4096
+                },
+                {
+                  "parameter": "temperature",
+                  "available": false
+                }
+              ],
               "parameterMappings": [
                 {
                   "parameter": "max_output_tokens",
@@ -253,6 +270,11 @@ final class LLMCoreTypesTests: XCTestCase {
               "match": {
                 "adapterID": "openAICompatibleChatCompletions"
               },
+              "parameterAvailability": [
+                {
+                  "parameter": "max_output_tokens"
+                }
+              ],
               "parameterMappings": [
                 {
                   "parameter": "max_output_tokens",
@@ -287,6 +309,19 @@ final class LLMCoreTypesTests: XCTestCase {
             modelID: "gpt-5.4-nano"
         ).first { $0.semanticParameterID == .maxOutputTokens }
         XCTAssertEqual(mapping?.wireKey, "max_completion_tokens")
+        let mappingJSON = try JSONEncoder().encode(mapping)
+        XCTAssertFalse(String(data: mappingJSON, encoding: .utf8)?.contains("required") ?? true)
+
+        let availability = catalog.parameterAvailability(
+            providerID: .openAIPlatform,
+            adapterID: .openAIChatCompletions,
+            modelID: "gpt-5.4-nano"
+        )
+        let maxTokenAvailability = availability.first { $0.semanticParameterID == .maxOutputTokens }
+        XCTAssertTrue(maxTokenAvailability?.isRequired ?? false)
+        XCTAssertTrue(maxTokenAvailability?.isIncludedByDefault ?? false)
+        XCTAssertEqual(maxTokenAvailability?.defaultValue, .integer(4096))
+        XCTAssertFalse(availability.first { $0.semanticParameterID == .temperature }?.isAvailable ?? true)
 
         let aggregatorMapping = catalog.parameterMappings(
             providerID: .openRouter,

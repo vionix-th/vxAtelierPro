@@ -64,6 +64,67 @@ final class ModelItemTests: XCTestCase {
         XCTAssertEqual(fetched.apiConfiguration?.providerIDEnum, .openAIPlatform)
     }
 
+    func testManualModelCreationStoresDefaultParameterAvailability() throws {
+        let config = APIConfigurationItem(
+            name: "Anthropic",
+            apiKey: "key",
+            baseURL: "https://api.test.com/v1",
+            providerID: .anthropic
+        )
+        config.defaultAdapterIDEnum = .anthropicMessages
+        let model = ModelItem(modelID: "claude-sonnet-4-5", contextSize: 8192, apiConfiguration: config)
+
+        let maxTokens = model.parameterAvailability.first {
+            $0.adapterIDEnum == .anthropicMessages && $0.semanticParameterIDEnum == .maxOutputTokens
+        }
+
+        XCTAssertTrue(maxTokens?.isRequired ?? false)
+        XCTAssertEqual(maxTokens?.defaultJSONValue, .integer(4096))
+    }
+
+    func testDescriptorCreatedModelStoresDefaultParameterAvailability() throws {
+        let config = APIConfigurationItem(
+            name: "OpenAI",
+            apiKey: "key",
+            baseURL: "https://api.test.com/v1",
+            providerID: .openAIPlatform
+        )
+        config.defaultAdapterIDEnum = .openAIChatCompletions
+        let descriptor = LLMDefaultsCatalog.bundled.modelDescriptor(
+            providerID: .openAIPlatform,
+            modelID: "gpt-5.4-nano"
+        )
+        let model = ModelItem(descriptor: descriptor, apiConfiguration: config)
+
+        let temperature = model.parameterAvailability.first {
+            $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .temperature
+        }
+
+        XCTAssertFalse(temperature?.isAvailable ?? true)
+    }
+
+    func testFetchedModelRetainsDefaultParameterAvailability() throws {
+        let config = APIConfigurationItem(
+            name: "OpenAI",
+            apiKey: "key",
+            baseURL: "https://api.test.com/v1",
+            providerID: .openAIPlatform
+        )
+        config.defaultAdapterIDEnum = .openAIChatCompletions
+        let model = ModelItem(modelID: "gpt-4.1-nano", contextSize: 8192, apiConfiguration: config)
+        context.insert(config)
+        context.insert(model)
+        try context.save()
+
+        let fetched = try XCTUnwrap(try context.fetch(FetchDescriptor<ModelItem>()).first)
+        let temperature = fetched.parameterAvailability.first {
+            $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .temperature
+        }
+
+        XCTAssertNotNil(temperature)
+        XCTAssertTrue(temperature?.isAvailable ?? false)
+    }
+
     func testEdgeCases() throws {
         let model = ModelItem(modelID: "", contextSize: 0)
         context.insert(model)

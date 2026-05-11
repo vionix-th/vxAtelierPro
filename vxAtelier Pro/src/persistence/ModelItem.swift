@@ -25,6 +25,7 @@ final class ModelItem {
     var capabilitiesRaw: [String]
     var rawMetadataJSON: String?
     @Relationship(deleteRule: .cascade) var parameterMappings: [ModelParameterMappingItem] = []
+    @Relationship(deleteRule: .cascade) var parameterAvailability: [ModelParameterAvailabilityItem] = []
 
     var name: String { modelID }
 
@@ -50,6 +51,7 @@ final class ModelItem {
             capabilitiesRaw = newValue.capabilities.map(\.rawValue)
             rawMetadataJSON = newValue.rawMetadataJSON
             self.materializeDefaultParameterMappings(preserveCustomized: true)
+            self.materializeDefaultParameterAvailability(preserveCustomized: true)
         }
     }
 
@@ -70,6 +72,7 @@ final class ModelItem {
         self.capabilitiesRaw = []
         self.rawMetadataJSON = nil
         self.parameterMappings = []
+        self.parameterAvailability = []
 
         let defaultCandidate = LLMModelDescriptorResolver().catalogDescriptor(
             for: modelID,
@@ -78,6 +81,7 @@ final class ModelItem {
         self.contextSize = defaultCandidate.contextWindow ?? contextSize
         self.capabilitiesRaw = defaultCandidate.capabilities.map(\.rawValue)
         self.materializeDefaultParameterMappings(preserveCustomized: true)
+        self.materializeDefaultParameterAvailability(preserveCustomized: true)
     }
 
     func materializeDefaultParameterMappings(preserveCustomized: Bool = true) {
@@ -92,6 +96,24 @@ final class ModelItem {
     func resetDefaultParameterMappings(adapterID: LLMAdapterID) {
         guard let apiConfiguration else { return }
         materializeDefaultParameterMappings(
+            adapterID: adapterID,
+            providerID: apiConfiguration.providerIDEnum,
+            preserveCustomized: false
+        )
+    }
+
+    func materializeDefaultParameterAvailability(preserveCustomized: Bool = true) {
+        guard let apiConfiguration else { return }
+        materializeDefaultParameterAvailability(
+            adapterID: apiConfiguration.defaultAdapterIDEnum,
+            providerID: apiConfiguration.providerIDEnum,
+            preserveCustomized: preserveCustomized
+        )
+    }
+
+    func resetDefaultParameterAvailability(adapterID: LLMAdapterID) {
+        guard let apiConfiguration else { return }
+        materializeDefaultParameterAvailability(
             adapterID: adapterID,
             providerID: apiConfiguration.providerIDEnum,
             preserveCustomized: false
@@ -135,6 +157,38 @@ final class ModelItem {
             let defaultIDs = Set(defaults.map(\.semanticParameterID))
             parameterMappings.removeAll { mapping in
                 mapping.adapterIDEnum == adapterID && !defaultIDs.contains(mapping.semanticParameterIDEnum)
+            }
+        }
+    }
+
+    private func materializeDefaultParameterAvailability(
+        adapterID: LLMAdapterID,
+        providerID: LLMProviderID,
+        preserveCustomized: Bool
+    ) {
+        let defaults = LLMParameterAvailabilityCatalog.defaults(
+            providerID: providerID,
+            adapterID: adapterID,
+            modelID: modelID
+        )
+
+        for descriptor in defaults {
+            if let existing = parameterAvailability.first(where: {
+                $0.adapterIDEnum == adapterID && $0.semanticParameterIDEnum == descriptor.semanticParameterID
+            }) {
+                if preserveCustomized && existing.isCustomized {
+                    continue
+                }
+                existing.apply(descriptor, markCustomized: false)
+            } else {
+                parameterAvailability.append(ModelParameterAvailabilityItem(descriptor: descriptor))
+            }
+        }
+
+        if !preserveCustomized {
+            let defaultIDs = Set(defaults.map(\.semanticParameterID))
+            parameterAvailability.removeAll { availability in
+                availability.adapterIDEnum == adapterID && !defaultIDs.contains(availability.semanticParameterIDEnum)
             }
         }
     }

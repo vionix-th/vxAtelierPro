@@ -53,7 +53,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         XCTContext.runActivity(named: "QueryManager materialized parameter mappings") { activity in
             let mappings = primaryModel.parameterMappings
                 .sorted { $0.semanticParameterID < $1.semanticParameterID }
-                .map { "\($0.adapterIDRaw):\($0.semanticParameterID) enabled=\($0.isEnabled) wireKey=\($0.wireKey)" }
+                .map { "\($0.adapterIDRaw):\($0.semanticParameterID) wireKey=\($0.wireKey)" }
                 .joined(separator: "\n")
             activity.add(XCTAttachment(string: mappings))
         }

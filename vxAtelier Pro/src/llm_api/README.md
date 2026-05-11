@@ -42,6 +42,18 @@ Supported profiles:
 - image/file/audio content support
 - tool replay ordering and tool-result correlation
 
+## Parameters
+
+Keep these concepts separate:
+
+- Semantic parameter: app-level name and value, such as `temperature`, `max_output_tokens`, or `reasoning_effort`.
+- Parameter availability: selected-model support state, including available, unavailable, required, and defaulted.
+- Parameter mapping: selected-model semantic-to-wire translation, such as `max_output_tokens` to `max_tokens`, `max_completion_tokens`, or a structured preset.
+
+`LLMParameterDefinitions` owns semantic parameter identities and value metadata. `LLMParameterMapping` owns wire translation descriptors. `LLMParameterAvailabilityResolver` applies selected-model availability plus conversation inclusion preferences before encoding. Provider adapters then encode only the resulting sendable parameters.
+
+Conversation storage may hold semantic values and user enable/disable intent for optional parameters. It must not own model availability, mandatory rules, or wire names.
+
 ## Smoke Tests
 
 Offline adapter and LLM runtime tests use fixtures in `vxAtelier ProTests/AI/Fixtures`.

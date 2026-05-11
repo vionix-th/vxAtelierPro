@@ -9,7 +9,7 @@ final class ConversationOptions: Equatable {
     var avatarImageData: Data? = nil
     var enabledToolsDict: [String: Bool]
     var toolConfigurations: [String: String]
-    var enabledParameterOverrides: [String: Bool]
+    @Attribute(originalName: "enabledParameterOverrides") var parameterInclusionPreferences: [String: Bool]
     var isMarkdownEnabled: Bool = AppDefaults.isMarkdownEnabled
 
     var systemPrompt: String
@@ -19,7 +19,7 @@ final class ConversationOptions: Equatable {
     var maxOutputTokens: Int?
     var stopSequences: [String]
     var responseFormatRaw: String
-    var reasoning: String?
+    @Attribute(originalName: "reasoning") var reasoningEffort: String?
     var serviceTier: String?
     var streamModeRaw: String
     var retryPolicyRaw: String
@@ -44,7 +44,7 @@ final class ConversationOptions: Equatable {
         self.init(avatarImageData: from.avatarImageData, apiConfiguration: from.apiConfiguration)
         enabledToolsDict = from.enabledToolsDict
         toolConfigurations = from.toolConfigurations
-        enabledParameterOverrides = from.enabledParameterOverrides
+        parameterInclusionPreferences = from.parameterInclusionPreferences
         isMarkdownEnabled = from.isMarkdownEnabled
         systemPrompt = from.systemPrompt
         selectedModelID = from.selectedModelID
@@ -53,7 +53,7 @@ final class ConversationOptions: Equatable {
         maxOutputTokens = from.maxOutputTokens
         stopSequences = from.stopSequences
         responseFormatRaw = from.responseFormatRaw
-        reasoning = from.reasoning
+        reasoningEffort = from.reasoningEffort
         serviceTier = from.serviceTier
         streamModeRaw = from.streamModeRaw
         retryPolicyRaw = from.retryPolicyRaw
@@ -68,7 +68,7 @@ final class ConversationOptions: Equatable {
         self.apiConfiguration = apiConfiguration
         self.toolConfigurations = [:]
         self.enabledToolsDict = [:]
-        self.enabledParameterOverrides = [:]
+        self.parameterInclusionPreferences = [:]
         self.systemPrompt = ""
         self.selectedModelID = nil
         self.temperature = nil
@@ -76,7 +76,7 @@ final class ConversationOptions: Equatable {
         self.maxOutputTokens = nil
         self.stopSequences = []
         self.responseFormatRaw = LLMGenerationOptions.ResponseFormat.text.rawValue
-        self.reasoning = nil
+        self.reasoningEffort = nil
         self.serviceTier = nil
         self.streamModeRaw = LLMGenerationOptions.StreamMode.auto.rawValue
         self.retryPolicyRaw = LLMGenerationOptions.RetryPolicy.disabled.rawValue
@@ -123,7 +123,7 @@ final class ConversationOptions: Equatable {
         case .responseFormat:
             return .string(responseFormat.semanticRawValue)
         case .reasoningEffort:
-            return reasoning.flatMap { $0.isEmpty ? nil : .string($0) }
+            return reasoningEffort.flatMap { $0.isEmpty ? nil : .string($0) }
         case .serviceTier:
             return serviceTier.flatMap { $0.isEmpty ? nil : .string($0) }
         }
@@ -147,7 +147,7 @@ final class ConversationOptions: Equatable {
             responseFormat = value?.stringValue.map(LLMGenerationOptions.ResponseFormat.fromSemanticRawValue) ?? .text
         case .reasoningEffort:
             let trimmed = value?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            reasoning = trimmed.isEmpty ? nil : trimmed
+            reasoningEffort = trimmed.isEmpty ? nil : trimmed
         case .serviceTier:
             let trimmed = value?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             serviceTier = trimmed.isEmpty ? nil : trimmed
@@ -155,37 +155,28 @@ final class ConversationOptions: Equatable {
     }
 
     func setParameterEnabled(_ parameter: LLMParameterID, enabled: Bool) {
-        var overrides = enabledParameterOverrides
-        overrides[parameter.rawValue] = enabled
-        enabledParameterOverrides = overrides
+        var preferences = parameterInclusionPreferences
+        preferences[parameter.rawValue] = enabled
+        parameterInclusionPreferences = preferences
     }
 
-    func isParameterEnabled(
-        _ parameter: LLMParameterID,
-        mapping: LLMParameterMappingDescriptor
-    ) -> Bool {
-        guard mapping.isEnabled else { return false }
-        if mapping.isRequired { return true }
-        if let override = enabledParameterOverrides[parameter.rawValue] {
-            return override
-        }
-        return parameterValue(parameter) != nil || mapping.defaultValue != nil
+    func parameterInclusionPreference(_ parameter: LLMParameterID) -> Bool? {
+        parameterInclusionPreferences[parameter.rawValue]
     }
 
     func generationOptions(
-        resolvedModelID: String?,
-        mappings: [LLMParameterID: LLMParameterMappingDescriptor] = [:]
+        resolvedModelID: String?
     ) -> LLMGenerationOptions {
         LLMGenerationOptions(
             systemPrompt: systemPrompt,
             modelID: selectedModelID ?? resolvedModelID,
-            temperature: includedDouble(.temperature, mappings: mappings),
-            topP: includedDouble(.topP, mappings: mappings),
-            maxOutputTokens: includedInt(.maxOutputTokens, mappings: mappings),
-            stop: includedStopSequences(mappings: mappings),
-            responseFormat: includedResponseFormat(mappings: mappings),
-            reasoning: includedString(.reasoningEffort, fallback: reasoning, mappings: mappings),
-            serviceTier: includedString(.serviceTier, fallback: serviceTier, mappings: mappings),
+            temperature: temperature,
+            topP: topP,
+            maxOutputTokens: maxOutputTokens,
+            stop: stopSequences,
+            responseFormat: responseFormat,
+            reasoning: reasoningEffort.flatMap { $0.isEmpty ? nil : $0 },
+            serviceTier: serviceTier.flatMap { $0.isEmpty ? nil : $0 },
             streamMode: streamMode,
             retryPolicy: retryPolicy,
             providerExtras: decodedProviderExtras
@@ -241,58 +232,6 @@ final class ConversationOptions: Equatable {
         toolConfigurations = updatedConfigs
     }
 
-    private func includedString(
-        _ parameter: LLMParameterID,
-        fallback: String?,
-        mappings: [LLMParameterID: LLMParameterMappingDescriptor]
-    ) -> String? {
-        guard shouldInclude(parameter, mappings: mappings) else { return nil }
-        return fallback.flatMap { $0.isEmpty ? nil : $0 }
-    }
-
-    private func includedInt(
-        _ parameter: LLMParameterID,
-        mappings: [LLMParameterID: LLMParameterMappingDescriptor]
-    ) -> Int? {
-        guard shouldInclude(parameter, mappings: mappings) else { return nil }
-        return maxOutputTokens
-    }
-
-    private func includedDouble(
-        _ parameter: LLMParameterID,
-        mappings: [LLMParameterID: LLMParameterMappingDescriptor]
-    ) -> Double? {
-        guard shouldInclude(parameter, mappings: mappings) else { return nil }
-        switch parameter {
-        case .temperature:
-            return temperature
-        case .topP:
-            return topP
-        default:
-            return nil
-        }
-    }
-
-    private func includedStopSequences(mappings: [LLMParameterID: LLMParameterMappingDescriptor]) -> [String] {
-        guard shouldInclude(.stopSequences, mappings: mappings) else { return [] }
-        return stopSequences
-    }
-
-    private func includedResponseFormat(
-        mappings: [LLMParameterID: LLMParameterMappingDescriptor]
-    ) -> LLMGenerationOptions.ResponseFormat {
-        shouldInclude(.responseFormat, mappings: mappings) ? responseFormat : .text
-    }
-
-    private func shouldInclude(
-        _ parameter: LLMParameterID,
-        mappings: [LLMParameterID: LLMParameterMappingDescriptor]
-    ) -> Bool {
-        guard parameter.isProviderMappable else { return true }
-        guard let mapping = mappings[parameter] else { return true }
-        return isParameterEnabled(parameter, mapping: mapping)
-    }
-
     private static func stopSequences(from value: JSONValue?) -> [String] {
         guard let value else { return [] }
         if let array = value.arrayValue {
@@ -310,7 +249,7 @@ final class ConversationOptions: Equatable {
             && lhs.avatarImageData == rhs.avatarImageData
             && lhs.enabledToolsDict == rhs.enabledToolsDict
             && lhs.toolConfigurations == rhs.toolConfigurations
-            && lhs.enabledParameterOverrides == rhs.enabledParameterOverrides
+            && lhs.parameterInclusionPreferences == rhs.parameterInclusionPreferences
             && lhs.isMarkdownEnabled == rhs.isMarkdownEnabled
             && lhs.systemPrompt == rhs.systemPrompt
             && lhs.selectedModelID == rhs.selectedModelID
@@ -319,7 +258,7 @@ final class ConversationOptions: Equatable {
             && lhs.maxOutputTokens == rhs.maxOutputTokens
             && lhs.stopSequences == rhs.stopSequences
             && lhs.responseFormatRaw == rhs.responseFormatRaw
-            && lhs.reasoning == rhs.reasoning
+            && lhs.reasoningEffort == rhs.reasoningEffort
             && lhs.serviceTier == rhs.serviceTier
             && lhs.streamModeRaw == rhs.streamModeRaw
             && lhs.retryPolicyRaw == rhs.retryPolicyRaw

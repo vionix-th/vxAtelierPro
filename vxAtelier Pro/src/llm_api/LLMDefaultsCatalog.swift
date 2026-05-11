@@ -18,7 +18,7 @@ enum LLMDefaultsCatalogError: Error, Equatable, CustomStringConvertible {
     }
 }
 
-/// Bundled model metadata and parameter mapping defaults.
+/// Bundled model metadata, parameter availability, and parameter mapping defaults.
 struct LLMDefaultsCatalog {
     static let bundled: LLMDefaultsCatalog = {
         do {
@@ -109,6 +109,33 @@ struct LLMDefaultsCatalog {
         return order.compactMap { merged[$0] }
     }
 
+    /// Returns parameter availability for matching provider/model/adapter rules.
+    func parameterAvailability(
+        providerID: LLMProviderID,
+        adapterID: LLMAdapterID,
+        modelID: String
+    ) -> [LLMParameterAvailabilityDescriptor] {
+        var merged: [LLMParameterID: LLMParameterAvailabilityDescriptor] = [:]
+        var order: [LLMParameterID] = []
+
+        for rule in rules {
+            guard rule.matches(providerID: providerID, modelID: modelID, adapterID: adapterID),
+                  let parameterAvailability = rule.parameterAvailability else {
+                continue
+            }
+
+            for availability in parameterAvailability {
+                let descriptor = availability.descriptor(adapterID: adapterID)
+                if merged[descriptor.semanticParameterID] == nil {
+                    order.append(descriptor.semanticParameterID)
+                }
+                merged[descriptor.semanticParameterID] = descriptor
+            }
+        }
+
+        return order.compactMap { merged[$0] }
+    }
+
     private static func bundledResourceURL(resourceName: String, extension fileExtension: String) -> URL? {
         for bundle in candidateBundles {
             if let url = bundle.url(forResource: resourceName, withExtension: fileExtension) {
@@ -181,17 +208,20 @@ private struct LLMDefaultsRulePayload: Decodable {
     var match: LLMDefaultsRuleMatchPayload?
     var modelDefaults: LLMModelDefaultsPayload?
     var parameterMappings: [LLMParameterMappingDefault]?
+    var parameterAvailability: [LLMParameterAvailabilityDefault]?
 }
 
 private struct LLMDefaultsRule {
     var match: LLMDefaultsRuleMatch
     var modelDefaults: LLMModelDefaultsPayload?
     var parameterMappings: [LLMParameterMappingDefault]?
+    var parameterAvailability: [LLMParameterAvailabilityDefault]?
 
     init(payload: LLMDefaultsRulePayload) throws {
         self.match = try LLMDefaultsRuleMatch(payload: payload.match)
         self.modelDefaults = payload.modelDefaults
         self.parameterMappings = payload.parameterMappings
+        self.parameterAvailability = payload.parameterAvailability
     }
 
     func matches(
@@ -272,22 +302,35 @@ struct LLMModelDefaultsPayload: Decodable, Equatable {
 
 private struct LLMParameterMappingDefault: Decodable {
     var parameter: LLMParameterID
-    var enabled: Bool?
-    var required: Bool?
     var encoding: LLMParameterEncodingKind?
     var wireKey: String?
     var preset: LLMParameterStructuredPreset?
-    var defaultValue: JSONValue?
 
     func descriptor(adapterID: LLMAdapterID) -> LLMParameterMappingDescriptor {
         LLMParameterMappingDescriptor(
             adapterID: adapterID,
             semanticParameterID: parameter,
-            isEnabled: enabled ?? true,
-            isRequired: required ?? false,
             encodingKind: encoding ?? .scalarKey,
             wireKey: wireKey ?? "",
-            structuredPreset: preset,
+            structuredPreset: preset
+        )
+    }
+}
+
+private struct LLMParameterAvailabilityDefault: Decodable {
+    var parameter: LLMParameterID
+    var available: Bool?
+    var required: Bool?
+    var includedByDefault: Bool?
+    var defaultValue: JSONValue?
+
+    func descriptor(adapterID: LLMAdapterID) -> LLMParameterAvailabilityDescriptor {
+        LLMParameterAvailabilityDescriptor(
+            adapterID: adapterID,
+            semanticParameterID: parameter,
+            isAvailable: available ?? true,
+            isRequired: required ?? false,
+            isIncludedByDefault: includedByDefault ?? (defaultValue != nil),
             defaultValue: defaultValue
         )
     }

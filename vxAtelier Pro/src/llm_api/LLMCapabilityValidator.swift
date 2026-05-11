@@ -77,9 +77,13 @@ struct LLMCapabilityValidator {
                 throw LLMProviderError.unsupportedCapability("\(profile.name) does not support tools for \(request.modelID).")
             }
         }
-        for mapping in mappings.values where mapping.isEnabled && mapping.isRequired {
-            if request.options.jsonValue(for: mapping.semanticParameterID) == nil && mapping.defaultValue == nil {
-                throw LLMProviderError.unsupportedParameter("\(mapping.semanticParameterID.rawValue) is required for \(request.modelID).")
+        let availability = LLMParameterAvailabilityMappingResolver.resolve(
+            adapterID: request.adapterID,
+            availability: request.parameterAvailability
+        )
+        for descriptor in availability.values where descriptor.isAvailable && descriptor.isRequired {
+            if request.options.jsonValue(for: descriptor.semanticParameterID) == nil && descriptor.defaultValue == nil {
+                throw LLMProviderError.unsupportedParameter("\(descriptor.semanticParameterID.rawValue) is required for \(request.modelID).")
             }
         }
     }
@@ -173,7 +177,7 @@ struct LLMCapabilityValidator {
         request: LLMRequest,
         profile: LLMProviderProfile
     ) throws {
-        guard let mapping = mappings[parameterID], mapping.isEnabled, mapping.encodingKind != .disabled else {
+        guard let mapping = mappings[parameterID], mapping.encodingKind != .disabled else {
             throw LLMProviderError.unsupportedParameter("\(profile.name) does not support \(parameterID.rawValue) for \(request.modelID).")
         }
     }

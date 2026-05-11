@@ -41,6 +41,7 @@ final class ConversationRunContextResolverTests: XCTestCase {
 
         let options = ConversationOptions(apiConfiguration: configB)
         options.selectedModelID = "gpt-test"
+        options.maxOutputTokens = 256
         let conversation = ConversationItem("Scoped model", options: options)
 
         env.modelContext.insert(configA)
@@ -111,6 +112,11 @@ final class ConversationRunContextResolverTests: XCTestCase {
             modelID: "gpt-test",
             modelCapabilities: [.text, .tools, .strictTools, .jsonSchema, .jsonObject, .reasoning, .usage, .streaming],
             parameterMappings: LLMParameterMappingCatalog.defaults(
+                providerID: .openAIPlatform,
+                adapterID: .openAIResponses,
+                modelID: "gpt-test"
+            ),
+            parameterAvailability: LLMParameterAvailabilityCatalog.defaults(
                 providerID: .openAIPlatform,
                 adapterID: .openAIResponses,
                 modelID: "gpt-test"

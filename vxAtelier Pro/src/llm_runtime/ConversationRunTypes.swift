@@ -11,6 +11,7 @@ struct ConversationRunContext {
     var modelID: String
     var modelCapabilities: [LLMModelCapability]
     var parameterMappings: [LLMParameterMappingDescriptor]
+    var parameterAvailability: [LLMParameterAvailabilityDescriptor]
     var messages: [LLMMessage]
     var tools: [LLMToolDefinition]
     var options: LLMGenerationOptions

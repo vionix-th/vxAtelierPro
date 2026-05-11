@@ -388,6 +388,26 @@
         "providerRegex": "^openAIPlatform$",
         "adapterID": "openAIResponses"
       },
+      "parameterAvailability": [
+        {
+          "parameter": "max_output_tokens"
+        },
+        {
+          "parameter": "temperature"
+        },
+        {
+          "parameter": "top_p"
+        },
+        {
+          "parameter": "response_format"
+        },
+        {
+          "parameter": "reasoning_effort"
+        },
+        {
+          "parameter": "service_tier"
+        }
+      ],
       "parameterMappings": [
         {
           "parameter": "max_output_tokens",
@@ -427,14 +447,14 @@
         "modelRegex": "^gpt-5(\\.|-|$)",
         "adapterID": "openAIResponses"
       },
-      "parameterMappings": [
+      "parameterAvailability": [
         {
           "parameter": "temperature",
-          "enabled": false
+          "available": false
         },
         {
           "parameter": "top_p",
-          "enabled": false
+          "available": false
         }
       ]
     },
@@ -442,6 +462,23 @@
       "match": {
         "adapterID": "openAIChatCompletions"
       },
+      "parameterAvailability": [
+        {
+          "parameter": "max_output_tokens"
+        },
+        {
+          "parameter": "temperature"
+        },
+        {
+          "parameter": "top_p"
+        },
+        {
+          "parameter": "stop_sequences"
+        },
+        {
+          "parameter": "response_format"
+        }
+      ],
       "parameterMappings": [
         {
           "parameter": "max_output_tokens",
@@ -474,6 +511,23 @@
       "match": {
         "adapterID": "openAICompatibleChatCompletions"
       },
+      "parameterAvailability": [
+        {
+          "parameter": "max_output_tokens"
+        },
+        {
+          "parameter": "temperature"
+        },
+        {
+          "parameter": "top_p"
+        },
+        {
+          "parameter": "stop_sequences"
+        },
+        {
+          "parameter": "response_format"
+        }
+      ],
       "parameterMappings": [
         {
           "parameter": "max_output_tokens",
@@ -507,23 +561,25 @@
         "modelRegex": "(^|.*/)gpt-5(\\.|-|$)",
         "adapterID": "openAIChatCompletions"
       },
+      "parameterAvailability": [
+        {
+          "parameter": "temperature",
+          "available": false
+        },
+        {
+          "parameter": "top_p",
+          "available": false
+        },
+        {
+          "parameter": "stop_sequences",
+          "available": false
+        }
+      ],
       "parameterMappings": [
         {
           "parameter": "max_output_tokens",
           "encoding": "scalarKey",
           "wireKey": "max_completion_tokens"
-        },
-        {
-          "parameter": "temperature",
-          "enabled": false
-        },
-        {
-          "parameter": "top_p",
-          "enabled": false
-        },
-        {
-          "parameter": "stop_sequences",
-          "enabled": false
         }
       ]
     },
@@ -532,23 +588,25 @@
         "modelRegex": "(^|.*/)gpt-5(\\.|-|$)",
         "adapterID": "openAICompatibleChatCompletions"
       },
+      "parameterAvailability": [
+        {
+          "parameter": "temperature",
+          "available": false
+        },
+        {
+          "parameter": "top_p",
+          "available": false
+        },
+        {
+          "parameter": "stop_sequences",
+          "available": false
+        }
+      ],
       "parameterMappings": [
         {
           "parameter": "max_output_tokens",
           "encoding": "scalarKey",
           "wireKey": "max_completion_tokens"
-        },
-        {
-          "parameter": "temperature",
-          "enabled": false
-        },
-        {
-          "parameter": "top_p",
-          "enabled": false
-        },
-        {
-          "parameter": "stop_sequences",
-          "enabled": false
         }
       ]
     },
@@ -558,6 +616,11 @@
         "modelRegex": "^gpt-5(\\.|-|$)",
         "adapterID": "openAIChatCompletions"
       },
+      "parameterAvailability": [
+        {
+          "parameter": "reasoning_effort"
+        }
+      ],
       "parameterMappings": [
         {
           "parameter": "reasoning_effort",
@@ -571,6 +634,23 @@
         "providerRegex": "^deepSeek$",
         "adapterID": "openAICompatibleChatCompletions"
       },
+      "parameterAvailability": [
+        {
+          "parameter": "max_output_tokens"
+        },
+        {
+          "parameter": "temperature"
+        },
+        {
+          "parameter": "top_p"
+        },
+        {
+          "parameter": "stop_sequences"
+        },
+        {
+          "parameter": "response_format"
+        }
+      ],
       "parameterMappings": [
         {
           "parameter": "max_output_tokens",
@@ -605,14 +685,14 @@
         "modelRegex": "^deepseek-(reasoner|v4-pro)$",
         "adapterID": "openAICompatibleChatCompletions"
       },
-      "parameterMappings": [
+      "parameterAvailability": [
         {
           "parameter": "temperature",
-          "enabled": false
+          "available": false
         },
         {
           "parameter": "top_p",
-          "enabled": false
+          "available": false
         }
       ]
     },
@@ -621,13 +701,27 @@
         "providerRegex": "^anthropic$",
         "adapterID": "anthropicMessages"
       },
-      "parameterMappings": [
+      "parameterAvailability": [
         {
           "parameter": "max_output_tokens",
           "required": true,
-          "encoding": "scalarKey",
-          "wireKey": "max_tokens",
           "defaultValue": 4096
+        },
+        {
+          "parameter": "temperature"
+        },
+        {
+          "parameter": "top_p"
+        },
+        {
+          "parameter": "stop_sequences"
+        }
+      ],
+      "parameterMappings": [
+        {
+          "parameter": "max_output_tokens",
+          "encoding": "scalarKey",
+          "wireKey": "max_tokens"
         },
         {
           "parameter": "temperature",

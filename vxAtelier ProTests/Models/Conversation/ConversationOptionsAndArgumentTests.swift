@@ -37,18 +37,27 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
         XCTAssertEqual(options.parameterValue(.model), .string("unit-model"))
     }
 
-    func testParameterEnablementOverridesDoNotClearTypedValues() {
+    func testParameterInclusionPreferencesDoNotClearTypedValues() {
         let options = ConversationOptions()
         options.temperature = 0.9
-        let mapping = LLMParameterMappingDescriptor(
+        let availability = LLMParameterAvailabilityDescriptor(
             adapterID: .openAIChatCompletions,
-            semanticParameterID: .temperature,
-            wireKey: "temperature"
+            semanticParameterID: .temperature
         )
 
-        XCTAssertTrue(options.isParameterEnabled(.temperature, mapping: mapping))
+        XCTAssertTrue(LLMParameterAvailabilityResolver.isParameterSendable(
+            .temperature,
+            value: options.parameterValue(.temperature),
+            conversationPreference: options.parameterInclusionPreference(.temperature),
+            modelAvailability: availability
+        ))
         options.setParameterEnabled(.temperature, enabled: false)
-        XCTAssertFalse(options.isParameterEnabled(.temperature, mapping: mapping))
+        XCTAssertFalse(LLMParameterAvailabilityResolver.isParameterSendable(
+            .temperature,
+            value: options.parameterValue(.temperature),
+            conversationPreference: options.parameterInclusionPreference(.temperature),
+            modelAvailability: availability
+        ))
         XCTAssertEqual(options.temperature, 0.9)
     }
 
@@ -57,27 +66,60 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
         options.temperature = 0.9
         options.maxOutputTokens = 1000
         options.setParameterEnabled(.temperature, enabled: false)
-        let mappings: [LLMParameterID: LLMParameterMappingDescriptor] = [
-            .temperature: LLMParameterMappingDescriptor(
+        let modelAvailability: [LLMParameterID: LLMParameterAvailabilityDescriptor] = [
+            .temperature: LLMParameterAvailabilityDescriptor(
                 adapterID: .openAIChatCompletions,
                 semanticParameterID: .temperature,
-                wireKey: "temperature"
+                defaultValue: .number(0.4)
             ),
-            .maxOutputTokens: LLMParameterMappingDescriptor(
+            .maxOutputTokens: LLMParameterAvailabilityDescriptor(
                 adapterID: .openAIChatCompletions,
-                semanticParameterID: .maxOutputTokens,
-                wireKey: "max_tokens"
+                semanticParameterID: .maxOutputTokens
             )
         ]
 
-        let generationOptions = options.generationOptions(
-            resolvedModelID: "model",
-            mappings: mappings
+        let generationOptions = LLMParameterAvailabilityResolver.resolvedOptions(
+            from: options.generationOptions(resolvedModelID: "model"),
+            conversationPreferences: options.parameterInclusionPreferences,
+            modelAvailability: modelAvailability
+        )
+        let sendableAvailability = LLMParameterAvailabilityResolver.sendableModelAvailability(
+            for: options.generationOptions(resolvedModelID: "model"),
+            conversationPreferences: options.parameterInclusionPreferences,
+            modelAvailability: modelAvailability
         )
 
         XCTAssertNil(generationOptions.temperature)
+        XCTAssertNil(sendableAvailability[.temperature])
         XCTAssertEqual(generationOptions.maxOutputTokens, 1000)
         XCTAssertEqual(options.temperature, 0.9)
+    }
+
+    func testMandatoryParameterCannotBeDisabledByConversationPreference() {
+        let options = ConversationOptions()
+        options.maxOutputTokens = 1000
+        options.setParameterEnabled(.maxOutputTokens, enabled: false)
+        let modelAvailability: [LLMParameterID: LLMParameterAvailabilityDescriptor] = [
+            .maxOutputTokens: LLMParameterAvailabilityDescriptor(
+                adapterID: .openAIChatCompletions,
+                semanticParameterID: .maxOutputTokens,
+                isRequired: true
+            )
+        ]
+
+        let generationOptions = LLMParameterAvailabilityResolver.resolvedOptions(
+            from: options.generationOptions(resolvedModelID: "model"),
+            conversationPreferences: options.parameterInclusionPreferences,
+            modelAvailability: modelAvailability
+        )
+        let sendableAvailability = LLMParameterAvailabilityResolver.sendableModelAvailability(
+            for: options.generationOptions(resolvedModelID: "model"),
+            conversationPreferences: options.parameterInclusionPreferences,
+            modelAvailability: modelAvailability
+        )
+
+        XCTAssertEqual(generationOptions.maxOutputTokens, 1000)
+        XCTAssertNotNil(sendableAvailability[.maxOutputTokens])
     }
 
     func testProjectionUsesSemanticPresentationAndMappings() {
@@ -89,6 +131,7 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
             providerID: .openAIPlatform
         )
         config.defaultAdapterIDEnum = .openAIChatCompletions
+        config.models = [ModelItem(modelID: "gpt-4.1-nano", apiConfiguration: config)]
         let options = ConversationOptions(apiConfiguration: config)
         options.temperature = 0.7
 
@@ -105,11 +148,111 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
         XCTAssertTrue(temperature?.isEnabled ?? false)
     }
 
+    func testAllSemanticParametersHaveConversationConversionCoverage() {
+        let options = ConversationOptions()
+
+        for parameterID in LLMParameterID.allCases {
+            options.setParameterValue(parameterID, value: Self.sampleValue(for: parameterID))
+
+            XCTAssertEqual(options.parameterValue(parameterID), Self.expectedConversationValue(for: parameterID))
+            XCTAssertEqual(parameterID.definition.id, parameterID)
+            XCTAssertFalse(AiParameterPresentationCatalog.presentation(for: parameterID).displayName.isEmpty)
+            XCTAssertFalse(AiParameterPresentationCatalog.presentation(for: parameterID).description.isEmpty)
+        }
+
+        let availability = Dictionary(uniqueKeysWithValues: LLMParameterID.allCases
+            .filter(\.isProviderMappable)
+            .map {
+                ($0, LLMParameterAvailabilityDescriptor(
+                    adapterID: .openAIChatCompletions,
+                    semanticParameterID: $0
+                ))
+            })
+        let generationOptions = LLMParameterAvailabilityResolver.resolvedOptions(
+            from: options.generationOptions(resolvedModelID: "fallback-model"),
+            conversationPreferences: options.parameterInclusionPreferences,
+            modelAvailability: availability
+        )
+
+        for parameterID in LLMParameterID.allCases {
+            XCTAssertEqual(generationOptions.jsonValue(for: parameterID), Self.expectedGenerationValue(for: parameterID))
+        }
+    }
+
     func testToolEnableDisable() {
         let options = ConversationOptions()
         options.setToolEnabled("web_search", enabled: true)
         XCTAssertTrue(options.isToolEnabled("web_search"))
         options.setToolEnabled("web_search", enabled: false)
         XCTAssertFalse(options.isToolEnabled("web_search"))
+    }
+
+    private static func sampleValue(for parameterID: LLMParameterID) -> JSONValue {
+        switch parameterID {
+        case .model:
+            return .string("unit-model")
+        case .systemPrompt:
+            return .string("System")
+        case .maxOutputTokens:
+            return .integer(2048)
+        case .temperature:
+            return .number(0.8)
+        case .topP:
+            return .number(0.9)
+        case .stopSequences:
+            return .string("END\nSTOP")
+        case .responseFormat:
+            return .string("json_schema")
+        case .reasoningEffort:
+            return .string("high")
+        case .serviceTier:
+            return .string("priority")
+        }
+    }
+
+    private static func expectedConversationValue(for parameterID: LLMParameterID) -> JSONValue {
+        switch parameterID {
+        case .model:
+            return .string("unit-model")
+        case .systemPrompt:
+            return .string("System")
+        case .maxOutputTokens:
+            return .integer(2048)
+        case .temperature:
+            return .number(0.8)
+        case .topP:
+            return .number(0.9)
+        case .stopSequences:
+            return .string("END\nSTOP")
+        case .responseFormat:
+            return .string("json_schema")
+        case .reasoningEffort:
+            return .string("high")
+        case .serviceTier:
+            return .string("priority")
+        }
+    }
+
+    private static func expectedGenerationValue(for parameterID: LLMParameterID) -> JSONValue {
+        switch parameterID {
+        case .model:
+            return .string("unit-model")
+        case .systemPrompt:
+            return .string("System")
+        case .maxOutputTokens:
+            return .integer(2048)
+        case .temperature:
+            return .number(0.8)
+        case .topP:
+            return .number(0.9)
+        case .stopSequences:
+            return .array([.string("END"), .string("STOP")])
+        case .responseFormat:
+            return .string("json_schema")
+        case .reasoningEffort:
+            return .string("high")
+        case .serviceTier:
+            return .string("priority")
+        }
     }
 }

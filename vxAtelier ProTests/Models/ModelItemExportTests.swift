@@ -28,6 +28,7 @@ final class ModelItemExportTests: XCTestCase {
             baseURL: "https://api.test.com/v1",
             providerID: .openAIPlatform
         )
+        config.defaultAdapterIDEnum = .openAIChatCompletions
         let original = ModelItem(modelID: "gpt-4", contextSize: 8192, apiConfiguration: config)
         original.capabilitiesRaw = [
             LLMModelCapability.text.rawValue,
@@ -46,6 +47,10 @@ final class ModelItemExportTests: XCTestCase {
             $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
         }
         XCTAssertEqual(restoredMaxTokens?.wireKey, "max_tokens")
+        let restoredMaxTokensAvailability = restored.parameterAvailability.first {
+            $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
+        }
+        XCTAssertTrue(restoredMaxTokensAvailability?.isAvailable ?? false)
     }
 
     func testJsonSerializerImportModelResolvesAPIConfigurationOwnership() throws {

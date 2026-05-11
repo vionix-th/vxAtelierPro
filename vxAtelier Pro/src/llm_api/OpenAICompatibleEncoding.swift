@@ -19,13 +19,8 @@ enum OpenAICompatibleEncoding {
         reservedProviderExtraKeys: Set<String> = []
     ) throws {
         var providerExtras = options.providerExtras
-        for mapping in mappings.values where mapping.isEnabled {
-            guard let value = options.jsonValue(for: mapping.semanticParameterID) ?? mapping.defaultValue else {
-                if mapping.isRequired {
-                    throw LLMProviderError.unsupportedParameter("\(mapping.semanticParameterID.rawValue) is required.")
-                }
-                continue
-            }
+        for mapping in mappings.values {
+            guard let value = options.jsonValue(for: mapping.semanticParameterID) else { continue }
 
             switch mapping.encodingKind {
             case .scalarKey:

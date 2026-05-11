@@ -11,6 +11,7 @@ struct ModelExportData: Codable {
     let capabilities: [String]?
     let rawMetadataJSON: String?
     let parameterMappings: [ModelParameterMappingExportData]?
+    let parameterAvailability: [ModelParameterAvailabilityExportData]?
     let apiConfigurationName: String?
     let apiConfigurationProviderID: String?
     let apiConfigurationBaseURL: String?
@@ -23,6 +24,7 @@ struct ModelExportData: Codable {
         self.capabilities = model.capabilitiesRaw
         self.rawMetadataJSON = model.rawMetadataJSON
         self.parameterMappings = model.parameterMappings.map { ModelParameterMappingExportData($0) }
+        self.parameterAvailability = model.parameterAvailability.map { ModelParameterAvailabilityExportData($0) }
         self.apiConfigurationName = model.apiConfiguration?.name
         self.apiConfigurationProviderID = model.apiConfiguration?.providerID
         self.apiConfigurationBaseURL = model.apiConfiguration?.baseURL
@@ -48,7 +50,9 @@ struct ModelExportData: Codable {
         if let capabilities { model.capabilitiesRaw = capabilities }
         model.rawMetadataJSON = rawMetadataJSON
         model.parameterMappings = parameterMappings?.map { $0.toDataItem() } ?? []
+        model.parameterAvailability = parameterAvailability?.map { $0.toDataItem() } ?? []
         model.materializeDefaultParameterMappings(preserveCustomized: true)
+        model.materializeDefaultParameterAvailability(preserveCustomized: true)
         return model
     }
 }
@@ -56,8 +60,6 @@ struct ModelExportData: Codable {
 struct ModelParameterMappingExportData: Codable {
     let adapterIDRaw: String
     let semanticParameterID: String
-    let isEnabled: Bool
-    let isRequired: Bool
     let encodingKindRaw: String
     let wireKey: String
     let structuredPresetRaw: String?
@@ -69,14 +71,11 @@ struct ModelParameterMappingExportData: Codable {
     let maxValue: Double?
     let step: Double?
     let options: [String]?
-    let defaultValueData: Data?
     let isCustomized: Bool
 
     init(_ mapping: ModelParameterMappingItem) {
         adapterIDRaw = mapping.adapterIDRaw
         semanticParameterID = mapping.semanticParameterID
-        isEnabled = mapping.isEnabled
-        isRequired = mapping.isRequired
         encodingKindRaw = mapping.encodingKindRaw
         wireKey = mapping.wireKey
         structuredPresetRaw = mapping.structuredPresetRaw
@@ -88,7 +87,6 @@ struct ModelParameterMappingExportData: Codable {
         maxValue = mapping.maxValue
         step = mapping.step
         options = mapping.options
-        defaultValueData = mapping.defaultValueData
         isCustomized = mapping.isCustomized
     }
 
@@ -96,8 +94,6 @@ struct ModelParameterMappingExportData: Codable {
         let mapping = ModelParameterMappingItem(
             adapterID: LLMAdapterID(rawValue: adapterIDRaw) ?? .openAIChatCompletions,
             semanticParameterID: LLMParameterID(rawValue: semanticParameterID) ?? .maxOutputTokens,
-            isEnabled: isEnabled,
-            isRequired: isRequired,
             encodingKind: LLMParameterEncodingKind(rawValue: encodingKindRaw) ?? .scalarKey,
             wireKey: wireKey,
             structuredPreset: structuredPresetRaw.flatMap(LLMParameterStructuredPreset.init(rawValue:)),
@@ -111,7 +107,63 @@ struct ModelParameterMappingExportData: Codable {
         mapping.maxValue = maxValue
         mapping.step = step
         mapping.options = options
-        mapping.defaultValueData = defaultValueData
         return mapping
+    }
+}
+
+struct ModelParameterAvailabilityExportData: Codable {
+    let adapterIDRaw: String
+    let semanticParameterID: String
+    let isAvailable: Bool
+    let isRequired: Bool
+    let isIncludedByDefault: Bool
+    let displayName: String
+    let paramDescription: String
+    let valueType: String
+    let controlType: String
+    let minValue: Double?
+    let maxValue: Double?
+    let step: Double?
+    let options: [String]?
+    let defaultValueData: Data?
+    let isCustomized: Bool
+
+    init(_ availability: ModelParameterAvailabilityItem) {
+        adapterIDRaw = availability.adapterIDRaw
+        semanticParameterID = availability.semanticParameterID
+        isAvailable = availability.isAvailable
+        isRequired = availability.isRequired
+        isIncludedByDefault = availability.isIncludedByDefault
+        displayName = availability.displayName
+        paramDescription = availability.paramDescription
+        valueType = availability.valueType
+        controlType = availability.controlType
+        minValue = availability.minValue
+        maxValue = availability.maxValue
+        step = availability.step
+        options = availability.options
+        defaultValueData = availability.defaultValueData
+        isCustomized = availability.isCustomized
+    }
+
+    func toDataItem() -> ModelParameterAvailabilityItem {
+        let availability = ModelParameterAvailabilityItem(
+            adapterID: LLMAdapterID(rawValue: adapterIDRaw) ?? .openAIChatCompletions,
+            semanticParameterID: LLMParameterID(rawValue: semanticParameterID) ?? .maxOutputTokens,
+            isAvailable: isAvailable,
+            isRequired: isRequired,
+            isIncludedByDefault: isIncludedByDefault,
+            isCustomized: isCustomized
+        )
+        availability.displayName = displayName
+        availability.paramDescription = paramDescription
+        availability.valueType = valueType
+        availability.controlType = controlType
+        availability.minValue = minValue
+        availability.maxValue = maxValue
+        availability.step = step
+        availability.options = options
+        availability.defaultValueData = defaultValueData
+        return availability
     }
 }

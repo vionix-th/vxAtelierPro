@@ -40,10 +40,24 @@ struct ConversationRunContextResolver {
             adapterID: adapterID,
             mappings: model.parameterMappings.map(\.descriptor)
         )
-        let options = conversation.options.generationOptions(
-            resolvedModelID: modelID,
-            mappings: mappings
+        let availability = LLMParameterAvailabilityMappingResolver.resolve(
+            adapterID: adapterID,
+            availability: model.parameterAvailability.map(\.descriptor)
         )
+        let rawOptions = conversation.options.generationOptions(resolvedModelID: modelID)
+        let sendableAvailability = LLMParameterAvailabilityResolver.sendableModelAvailability(
+            for: rawOptions,
+            conversationPreferences: conversation.options.parameterInclusionPreferences,
+            modelAvailability: availability
+        )
+        let options = LLMParameterAvailabilityResolver.resolvedOptions(
+            from: rawOptions,
+            conversationPreferences: conversation.options.parameterInclusionPreferences,
+            modelAvailability: availability
+        )
+        let sendableModelMappings = mappings.filter { entry in
+            sendableAvailability[entry.key] != nil && entry.value.encodingKind != .disabled
+        }
         let tools = toolCatalog.allTools()
             .filter { conversation.options.isToolEnabled($0.name) }
             .map { LLMRequestEncoding.toolDefinition(from: $0) }
@@ -56,7 +70,8 @@ struct ConversationRunContextResolver {
             adapterID: adapterID,
             modelID: modelID,
             modelCapabilities: model.capabilities,
-            parameterMappings: Array(mappings.values),
+            parameterMappings: Array(sendableModelMappings.values),
+            parameterAvailability: Array(sendableAvailability.values),
             messages: orderedMessages(in: conversation).map { $0.asDomainMessage() },
             tools: tools,
             options: options
@@ -85,6 +100,7 @@ struct LLMRequestFactory {
             modelID: context.modelID,
             modelCapabilities: context.modelCapabilities,
             parameterMappings: context.parameterMappings,
+            parameterAvailability: context.parameterAvailability,
             messages: context.messages,
             tools: context.tools,
             options: context.options

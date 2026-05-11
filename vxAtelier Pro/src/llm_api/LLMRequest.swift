@@ -7,6 +7,7 @@ struct LLMRequest: Codable, Equatable {
     var modelID: String
     var modelCapabilities: [LLMModelCapability]
     var parameterMappings: [LLMParameterMappingDescriptor]
+    var parameterAvailability: [LLMParameterAvailabilityDescriptor]
     var messages: [LLMMessage]
     var tools: [LLMToolDefinition]
     var options: LLMGenerationOptions
@@ -18,6 +19,7 @@ struct LLMRequest: Codable, Equatable {
         modelID: String,
         modelCapabilities: [LLMModelCapability] = [],
         parameterMappings: [LLMParameterMappingDescriptor] = [],
+        parameterAvailability: [LLMParameterAvailabilityDescriptor] = [],
         messages: [LLMMessage],
         tools: [LLMToolDefinition] = [],
         options: LLMGenerationOptions = LLMGenerationOptions()
@@ -27,6 +29,7 @@ struct LLMRequest: Codable, Equatable {
         self.modelID = modelID
         self.modelCapabilities = modelCapabilities
         self.parameterMappings = parameterMappings
+        self.parameterAvailability = parameterAvailability
         self.messages = messages
         self.tools = tools
         self.options = options

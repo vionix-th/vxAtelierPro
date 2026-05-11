@@ -1,6 +1,6 @@
 import Foundation
 
-/// Non-persistent parameter row rendered from typed conversation options and model mappings.
+/// Non-persistent parameter row rendered from typed conversation options and model availability.
 struct ConversationParameterControl: Identifiable, Equatable {
     var id: LLMParameterID { parameterID }
     var parameterID: LLMParameterID
@@ -34,6 +34,10 @@ enum ConversationParameterProjection {
             adapterID: adapterID,
             mappings: model?.parameterMappings.map(\.descriptor) ?? []
         )
+        let availability = LLMParameterAvailabilityMappingResolver.resolve(
+            adapterID: adapterID,
+            availability: model?.parameterAvailability.map(\.descriptor) ?? []
+        )
 
         var controls = [
             control(
@@ -50,17 +54,24 @@ enum ConversationParameterProjection {
             )
         ]
 
-        for mapping in mappings.values.sorted(by: {
+        for descriptor in availability.values.sorted(by: {
             AiParameterPresentationCatalog.displayName(for: $0.semanticParameterID)
                 < AiParameterPresentationCatalog.displayName(for: $1.semanticParameterID)
         }) {
-            guard mapping.isEnabled, mapping.semanticParameterID.isProviderMappable else { continue }
-            let value = options.parameterValue(mapping.semanticParameterID) ?? mapping.defaultValue
+            guard descriptor.isAvailable,
+                  descriptor.semanticParameterID.isProviderMappable,
+                  mappings[descriptor.semanticParameterID]?.encodingKind != .disabled else { continue }
+            let value = options.parameterValue(descriptor.semanticParameterID) ?? descriptor.defaultValue
             controls.append(control(
-                for: mapping.semanticParameterID,
-                required: mapping.isRequired,
+                for: descriptor.semanticParameterID,
+                required: descriptor.isRequired,
                 value: value,
-                isEnabled: options.isParameterEnabled(mapping.semanticParameterID, mapping: mapping)
+                isEnabled: LLMParameterAvailabilityResolver.isParameterSendable(
+                    descriptor.semanticParameterID,
+                    value: options.parameterValue(descriptor.semanticParameterID),
+                    conversationPreference: options.parameterInclusionPreference(descriptor.semanticParameterID),
+                    modelAvailability: descriptor
+                )
             ))
         }
 

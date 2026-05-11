@@ -84,6 +84,6 @@ final class ConversationItemBackupRestoreTests: XCTestCase {
         XCTAssertEqual(restored.options.temperature, conversation.options.temperature)
         XCTAssertEqual(restored.options.maxOutputTokens, conversation.options.maxOutputTokens)
         XCTAssertEqual(restored.options.selectedModelID, conversation.options.selectedModelID)
-        XCTAssertEqual(restored.options.enabledParameterOverrides, conversation.options.enabledParameterOverrides)
+        XCTAssertEqual(restored.options.parameterInclusionPreferences, conversation.options.parameterInclusionPreferences)
     }
 }

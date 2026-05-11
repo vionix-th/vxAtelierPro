@@ -8,6 +8,7 @@ struct ConversationOptionsExportData: Codable {
     let apiConfiguration: APIConfigurationExportData?
     let enabledToolsDict: [String: Bool]
     let toolConfigurations: [String: String]
+    // Keep export key stable for existing backups; model code names this parameterInclusionPreferences.
     let enabledParameterOverrides: [String: Bool]
     let isMarkdownEnabled: Bool
     let systemPrompt: String?
@@ -17,7 +18,7 @@ struct ConversationOptionsExportData: Codable {
     let maxOutputTokens: Int?
     let stopSequences: [String]?
     let responseFormatRaw: String?
-    let reasoning: String?
+    let reasoningEffort: String?
     let serviceTier: String?
     let streamModeRaw: String?
     let retryPolicyRaw: String?
@@ -28,7 +29,7 @@ struct ConversationOptionsExportData: Codable {
         self.apiConfiguration = options.apiConfiguration.map { APIConfigurationExportData($0) }
         self.enabledToolsDict = options.enabledToolsDict
         self.toolConfigurations = options.toolConfigurations
-        self.enabledParameterOverrides = options.enabledParameterOverrides
+        self.enabledParameterOverrides = options.parameterInclusionPreferences
         self.isMarkdownEnabled = options.isMarkdownEnabled
         self.systemPrompt = options.systemPrompt
         self.selectedModelID = options.selectedModelID
@@ -37,7 +38,7 @@ struct ConversationOptionsExportData: Codable {
         self.maxOutputTokens = options.maxOutputTokens
         self.stopSequences = options.stopSequences
         self.responseFormatRaw = options.responseFormatRaw
-        self.reasoning = options.reasoning
+        self.reasoningEffort = options.reasoningEffort
         self.serviceTier = options.serviceTier
         self.streamModeRaw = options.streamModeRaw
         self.retryPolicyRaw = options.retryPolicyRaw
@@ -52,7 +53,7 @@ struct ConversationOptionsExportData: Codable {
 
         options.enabledToolsDict = enabledToolsDict
         options.toolConfigurations = toolConfigurations
-        options.enabledParameterOverrides = enabledParameterOverrides
+        options.parameterInclusionPreferences = enabledParameterOverrides
         options.isMarkdownEnabled = isMarkdownEnabled
         options.systemPrompt = systemPrompt ?? ""
         options.selectedModelID = selectedModelID
@@ -61,7 +62,7 @@ struct ConversationOptionsExportData: Codable {
         options.maxOutputTokens = maxOutputTokens
         options.stopSequences = stopSequences ?? []
         options.responseFormatRaw = responseFormatRaw ?? LLMGenerationOptions.ResponseFormat.text.rawValue
-        options.reasoning = reasoning
+        options.reasoningEffort = reasoningEffort
         options.serviceTier = serviceTier
         options.streamModeRaw = streamModeRaw ?? LLMGenerationOptions.StreamMode.auto.rawValue
         options.retryPolicyRaw = retryPolicyRaw ?? LLMGenerationOptions.RetryPolicy.disabled.rawValue
