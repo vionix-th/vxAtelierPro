@@ -7,7 +7,6 @@ import Observation
 struct ProjectView: View {
     // MARK: - Environment & Properties
     @Environment(QueryManager.self) private var queryManager: QueryManager
-    @Environment(ConversationViewModelStore.self) private var conversationStore: ConversationViewModelStore
     @Environment(NavigationRouter.self) private var router
     @Query private var projectResult: [ProjectItem]
     @Query private var projectConversations: [ConversationItem]
@@ -243,7 +242,7 @@ struct ProjectView: View {
                     switch route {
                     case .conversation(let id):
                         ConversationView(
-                            viewModel: conversationStore.viewModel(for: id),
+                            conversationID: id,
                             onRequestOptions: onRequestOptions
                         )
                         .id(id)

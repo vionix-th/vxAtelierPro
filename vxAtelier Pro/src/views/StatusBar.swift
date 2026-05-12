@@ -10,6 +10,7 @@ struct StatusBar: View {
     @State private var statusBarLogTypeFilters: Set<LoggingService.LogType> = []
     @State private var displayedMessage: String = ""
     let onRequestLogHistory: () -> Void
+    let onRequestModelSelection: (PersistentIdentifier) -> Void
     @State private var activeConversation: ConversationItem?
     private let messageAnimation: Animation = .easeInOut(duration: 0.18)
     
@@ -72,8 +73,12 @@ struct StatusBar: View {
     }
     
     // MARK: - Initialization
-    init(onRequestLogHistory: @escaping () -> Void) {
+    init(
+        onRequestLogHistory: @escaping () -> Void,
+        onRequestModelSelection: @escaping (PersistentIdentifier) -> Void
+    ) {
         self.onRequestLogHistory = onRequestLogHistory
+        self.onRequestModelSelection = onRequestModelSelection
     }
 
     // MARK: - Filter Persistence Methods
@@ -157,7 +162,12 @@ struct StatusBar: View {
                 if let conversation = activeConversation,
                    !isCompact {
                     HStack(spacing: 6) {
-                        ConversationInfoHeader(conversation: conversation, isCompact: false, queryManager: queryManager)
+                        ConversationInfoHeader(
+                            conversation: conversation,
+                            isCompact: false,
+                            queryManager: queryManager,
+                            onRequestModelSelection: onRequestModelSelection
+                        )
                             .layoutPriority(1)
                     }
                     .frame(minWidth: 200, idealWidth: 400, maxWidth: 500, alignment: .trailing)
@@ -168,7 +178,12 @@ struct StatusBar: View {
             
             if let conversation = activeConversation,
                isCompact {
-                ConversationInfoHeader(conversation: conversation, isCompact: true, queryManager: queryManager)
+                ConversationInfoHeader(
+                    conversation: conversation,
+                    isCompact: true,
+                    queryManager: queryManager,
+                    onRequestModelSelection: onRequestModelSelection
+                )
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(Color.secondary.opacity(0.05))
@@ -400,8 +415,7 @@ struct ConversationInfoHeader: View {
     let conversation: ConversationItem
     let isCompact: Bool
     let queryManager: QueryManager
-    @State private var isModelPickerPresented: Bool = false
-    @State private var refreshTrigger = UUID()
+    let onRequestModelSelection: (PersistentIdentifier) -> Void
 
     private var modelName: String {
         conversation.options.selectedModelID
@@ -444,28 +458,10 @@ struct ConversationInfoHeader: View {
                 .truncationMode(.middle)
                 .foregroundColor(.secondary)                
                 .padding(.horizontal, 2)
-                .id(refreshTrigger) // Force refresh when this ID changes
-                            .onTapGesture {
-                                if conversation.options.apiConfiguration != nil {
-                                    isModelPickerPresented = true
-                                    vxAtelierPro.log.debug("Opening model picker from status bar")
-                                }
-                            }
-                            .sheet(isPresented: $isModelPickerPresented) {
-                                if conversation.options.apiConfiguration != nil {
-                                    ModelSelectionView(
-                                        selectedModel: modelName,
-                                        onModelSelected: { newModel in
-                                            do {
-                                                try queryManager.setModel(newModel, for: conversation)
-                                                refreshTrigger = UUID()
-                                            } catch {
-                                                vxAtelierPro.log.error("Failed to set model \(newModel): \(error.localizedDescription)")
-                                            }
-                                        },
-                                        apiConfiguration: conversation.options.apiConfiguration
-                                    )
-                                }
+                .onTapGesture {
+                    if conversation.options.apiConfiguration != nil {
+                        onRequestModelSelection(conversation.id)
+                    }
                 }
             
             Divider()

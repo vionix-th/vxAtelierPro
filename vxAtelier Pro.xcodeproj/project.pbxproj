@@ -56,12 +56,12 @@
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
 		74D79F682D6FAE49006A061F /* Exceptions for "vxAtelier Pro" folder in "vxAtelier Pro" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-				membershipExceptions = (
-					src/llm_api/AGENTS.md,
-					src/llm_api/README.md,
-					src/llm_runtime/AGENTS.md,
-					src/tts/README.md,
-				);
+			membershipExceptions = (
+				src/llm_api/AGENTS.md,
+				src/llm_api/README.md,
+				src/llm_runtime/AGENTS.md,
+				src/tts/README.md,
+			);
 			target = 74516F522D33EA1300731EDB /* vxAtelier Pro */;
 		};
 		74D79F692D6FAE49006A061F /* Exceptions for "vxAtelier ProTests" folder in "vxAtelier ProTests" target */ = {
@@ -239,7 +239,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1620;
-				LastUpgradeCheck = 1630;
+				LastUpgradeCheck = 2640;
 				TargetAttributes = {
 					74516F522D33EA1300731EDB = {
 						CreatedOnToolsVersion = 16.2;
@@ -329,12 +329,12 @@
 /* Begin PBXTargetDependency section */
 		74516F682D33EA1500731EDB /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-				target = 74516F522D33EA1300731EDB /* vxAtelier Pro */;
+			target = 74516F522D33EA1300731EDB /* vxAtelier Pro */;
 			targetProxy = 74516F672D33EA1500731EDB /* PBXContainerItemProxy */;
 		};
 		74516F722D33EA1500731EDB /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-				target = 74516F522D33EA1300731EDB /* vxAtelier Pro */;
+			target = 74516F522D33EA1300731EDB /* vxAtelier Pro */;
 			targetProxy = 74516F712D33EA1500731EDB /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -398,6 +398,7 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -455,6 +456,7 @@
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VERSIONING_SYSTEM = "Apple Generic";
 			};

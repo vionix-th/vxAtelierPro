@@ -22,6 +22,8 @@ final class NavigationRouter {
     }
 
     func setSelection(_ newSelection: SidebarSelection?) {
+        guard selection != newSelection else { return }
+
         if case .project(let previousID) = selection,
            case .project(let nextID)? = newSelection,
            previousID != nextID {
@@ -41,10 +43,12 @@ final class NavigationRouter {
     }
 
     func setPath(_ path: [ProjectRoute], for projectID: PersistentIdentifier) {
+        guard projectPaths[projectID] != path else { return }
         projectPaths[projectID] = path
     }
 
     func clearPath(for projectID: PersistentIdentifier) {
+        guard projectPaths[projectID]?.isEmpty == false else { return }
         projectPaths[projectID] = []
     }
 

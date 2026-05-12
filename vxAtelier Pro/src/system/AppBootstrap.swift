@@ -11,7 +11,6 @@ struct AppBootstrap {
     let modelContainer: ModelContainer
     let queryManager: QueryManager
     let ttsQueue: TTSQueue
-    let conversationStore: ConversationViewModelStore
     let appSceneModel: AppSceneModel
 
     static func live() -> AppBootstrap {
@@ -35,13 +34,6 @@ struct AppBootstrap {
         let ttsQueue = TTSQueue(modelContext: modelContainer.mainContext)
         vxAtelierPro.log.debug("TTS queue initialized")
 
-        vxAtelierPro.log.debug("Initializing conversation view model store")
-        let conversationStore = ConversationViewModelStore(
-            queryManager: queryManager,
-            ttsQueue: ttsQueue
-        )
-        vxAtelierPro.log.debug("Conversation view model store initialized")
-
         vxAtelierPro.log.debug("Initializing app scene model")
         let appSceneModel = AppSceneModel(
             queryManager: queryManager,
@@ -53,7 +45,6 @@ struct AppBootstrap {
             modelContainer: modelContainer,
             queryManager: queryManager,
             ttsQueue: ttsQueue,
-            conversationStore: conversationStore,
             appSceneModel: appSceneModel
         )
 
@@ -208,7 +199,6 @@ struct AppBootstrap {
             .modelContainer(modelContainer)
             .environment(queryManager)
             .environment(ttsQueue)
-            .environment(conversationStore)
             .environment(appSceneModel)
     }
 

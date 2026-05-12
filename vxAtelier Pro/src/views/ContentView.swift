@@ -7,7 +7,6 @@ struct ContentView: View {
     @Environment(QueryManager.self) private var queryManager
     @Environment(NavigationRouter.self) private var router
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(ConversationViewModelStore.self) private var conversationStore
 
     @Query(sort: [SortDescriptor(\ProjectItem.name)]) private var projects: [ProjectItem]
     @Query(sort: [SortDescriptor(\ConversationItem.timestamp, order: .reverse)]) private var conversations: [ConversationItem]
@@ -217,7 +216,7 @@ struct ContentView: View {
             case .conversation(let id):
                 if let conversation = standaloneConversations.first(where: { $0.id == id }) {
                     ConversationView(
-                        viewModel: conversationStore.viewModel(for: conversation.id),
+                        conversationID: conversation.id,
                         onRequestOptions: onRequestOptions
                     )
                     .id(conversation.id)
@@ -395,10 +394,6 @@ struct ContentView: View {
                 router.setSelection(nil)
             }
         }
-        .onChange(of: conversations) { _, updated in
-            let ids = Set(updated.map(\.id))
-            conversationStore.prune(toExisting: ids)
-        }
     }
 
     /// Shared main content view for all platforms (except iOS compact/empty placeholder)
@@ -486,9 +481,6 @@ struct ContentView: View {
     private func deleteItem(for item: any PersistentModel) {
         let itemId = item.persistentModelID
         let itemType = type(of: item)
-        if let conversation = item as? ConversationItem {
-            conversationStore.remove(conversation.id)
-        }
 
         if selectionMatches(router.selection, item: item) {
             router.setSelection(nil)

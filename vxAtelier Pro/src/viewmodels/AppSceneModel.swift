@@ -5,6 +5,25 @@ import SwiftUI
 @MainActor
 @Observable
 final class AppSceneModel {
+    enum PresentedSheet: Identifiable {
+        case logHistory(UUID)
+        case applicationSettings(ApplicationSettingsView.SettingsTab?, UUID)
+        case conversationOptions(PersistentIdentifier, UUID)
+        case modelSelection(PersistentIdentifier, UUID)
+        case tts(UUID)
+
+        var id: UUID {
+            switch self {
+            case .logHistory(let id),
+                 .applicationSettings(_, let id),
+                 .conversationOptions(_, let id),
+                 .modelSelection(_, let id),
+                 .tts(let id):
+                return id
+            }
+        }
+    }
+
     enum ExportRequest: Identifiable {
         case project(ProjectItem, UUID)
         case conversation(ConversationItem, UUID)
@@ -20,17 +39,15 @@ final class AppSceneModel {
     }
 
     var router = NavigationRouter()
-    var applicationSettingsViewIsPresented: Bool = false
-    var ttsViewIsPresented: Bool = false
-    var settingsInitialTab: ApplicationSettingsView.SettingsTab? = nil
-    var optionsSheetID: PersistentIdentifier?
+    var presentedSheet: PresentedSheet?
     var exportRequest: ExportRequest?
     var importRequested: Bool = false
-    var isLogHistoryShown: Bool = false
     var utilityPanelRequestID: UUID?
 
     private let queryManager: QueryManager
     private let modelContext: ModelContext
+    @ObservationIgnored
+    private var pendingSheetTask: Task<Void, Never>?
 
     init(queryManager: QueryManager, modelContext: ModelContext) {
         self.queryManager = queryManager
@@ -47,7 +64,12 @@ final class AppSceneModel {
 
     func requestOptions(for id: PersistentIdentifier) {
         vxAtelierPro.log.debug("AppSceneModel: options requested for conversation id \(id)")
-        optionsSheetID = id
+        presentSheet(.conversationOptions(id, UUID()))
+    }
+
+    func requestModelSelection(for id: PersistentIdentifier) {
+        vxAtelierPro.log.debug("AppSceneModel: model selection requested for conversation id \(id)")
+        presentSheet(.modelSelection(id, UUID()))
     }
 
     func requestExport(project: ProjectItem) {
@@ -63,16 +85,15 @@ final class AppSceneModel {
     }
 
     func requestSettings(_ tab: ApplicationSettingsView.SettingsTab?) {
-        settingsInitialTab = tab
-        applicationSettingsViewIsPresented = true
+        presentSheet(.applicationSettings(tab, UUID()))
     }
 
     func requestTTS() {
-        ttsViewIsPresented = true
+        presentSheet(.tts(UUID()))
     }
 
     func requestLogHistory() {
-        isLogHistoryShown = true
+        presentSheet(.logHistory(UUID()))
     }
 
     func requestUtilityPanel() {
@@ -82,7 +103,17 @@ final class AppSceneModel {
     func handleTTSPlayback(isPlaying: Bool) {
         if isPlaying {
             vxAtelierPro.log.info("TTS playback started")
-            ttsViewIsPresented = true
+            requestTTS()
+        }
+    }
+
+    private func presentSheet(_ sheet: PresentedSheet) {
+        pendingSheetTask?.cancel()
+        pendingSheetTask = Task { @MainActor in
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            presentedSheet = sheet
+            pendingSheetTask = nil
         }
     }
 

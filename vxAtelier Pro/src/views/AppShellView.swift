@@ -27,7 +27,10 @@ struct AppShellView: View {
             )
 
             if statusBarVisible {
-                StatusBar(onRequestLogHistory: scene.requestLogHistory)
+                StatusBar(
+                    onRequestLogHistory: scene.requestLogHistory,
+                    onRequestModelSelection: scene.requestModelSelection(for:)
+                )
             }
         }
         .environment(scene.router)
@@ -48,72 +51,93 @@ struct AppShellView: View {
                 openWindow(id: "utilityPanel")
             }
         #endif
-        .sheet(isPresented: $scene.isLogHistoryShown) {
-            LogHistorySheet()
-        }
-        // Present Settings from the toolbar menu entry
-        .sheet(
-            isPresented: $scene.applicationSettingsViewIsPresented,
-            onDismiss: {
-                scene.settingsInitialTab = nil
+        .sheet(item: $scene.presentedSheet) { sheet in
+            switch sheet {
+            case .logHistory(_):
+                LogHistorySheet()
+            case .applicationSettings(let initialTab, _):
+                ApplicationSettingsView(initialTab: initialTab)
+                    .environment(queryManager)
+                    .environment(\.modelContext, modelContext)
+                    #if os(macOS)
+                        .frame(idealWidth: 900, idealHeight: 640)
+                    #else
+                        .presentationDetents([.medium, .large])
+                        .presentationDragIndicator(.visible)
+                    #endif
+            case .conversationOptions(let conversationID, _):
+                conversationOptionsSheet(for: conversationID)
+            case .modelSelection(let conversationID, _):
+                modelSelectionSheet(for: conversationID)
+            case .tts(_):
+                TTSControlView()
+                    .onAppear { vxAtelierPro.log.debug("AppShellView: TTSControlView presented") }
             }
-        ) {
-            ApplicationSettingsView(initialTab: scene.settingsInitialTab)
-                .environment(queryManager)
-                .environment(\.modelContext, modelContext)
-                #if os(macOS)
-                    .frame(idealWidth: 900, idealHeight: 640)
-                #else
-                    .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
-                #endif
         }
-        // Hoisted conversation options sheet (stable parent anchor)
-        .sheet(
-            item: $scene.optionsSheetID,
-            onDismiss: {
-                vxAtelierPro.log.debug("AppShellView: options sheet dismissed (onDismiss)")
-            }
-        ) { (conversationID: PersistentIdentifier) in
-            if let conversation = queryManager.conversation(with: conversationID) {
-                ConversationOptionsView(
-                    options: Binding(get: { conversation.options }, set: { conversation.options = $0 })
+    }
+
+    @ViewBuilder
+    private func conversationOptionsSheet(for conversationID: PersistentIdentifier) -> some View {
+        if let conversation = queryManager.conversation(with: conversationID) {
+            ConversationOptionsView(
+                options: Binding(get: { conversation.options }, set: { conversation.options = $0 })
+            )
+            .onAppear {
+                vxAtelierPro.log.debug(
+                    "AppShellView: options sheet presented for conversation '\(conversation.title)' (id: \(conversation.id))"
                 )
-                .onAppear {
+            }
+            .onDisappear {
+                do {
+                    try queryManager.saveContext()
                     vxAtelierPro.log.debug(
-                        "AppShellView: options sheet presented for conversation '\(conversation.title)' (id: \(conversation.id))"
+                        "AppShellView: Saved context after options dismissed for conversation '\(conversation.title)'."
                     )
-                }
-                .onDisappear {
-                    do {
-                        try queryManager.saveContext()
-                        vxAtelierPro.log.debug(
-                            "AppShellView: Saved context after options dismissed for conversation '\(conversation.title)'."
-                        )
-                    } catch {
-                        vxAtelierPro.log.error(
-                            "AppShellView: Failed to save context after options dismissed: \(error.localizedDescription)"
-                        )
-                    }
-                }
-            } else {
-                VStack(spacing: AppDefaults.paddingMedium) {
-                    ProgressView()
-                    Text("Preparing options…")
-                        .foregroundColor(.secondary)
-                }
-                .frame(minWidth: 300, minHeight: 200)
-                .onAppear {
-                    vxAtelierPro.log.debug(
-                        "AppShellView: options sheet waiting for conversation to resolve (requested id: \(conversationID))"
+                } catch {
+                    vxAtelierPro.log.error(
+                        "AppShellView: Failed to save context after options dismissed: \(error.localizedDescription)"
                     )
                 }
             }
+        } else {
+            VStack(spacing: AppDefaults.paddingMedium) {
+                ProgressView()
+                Text("Preparing options...")
+                    .foregroundColor(.secondary)
+            }
+            .frame(minWidth: 300, minHeight: 200)
+            .onAppear {
+                vxAtelierPro.log.debug(
+                    "AppShellView: options sheet waiting for conversation to resolve (requested id: \(conversationID))"
+                )
+            }
         }
-        // TTS playlist sheet
-        .sheet(isPresented: $scene.ttsViewIsPresented) {
-            TTSControlView()
-                .onAppear { vxAtelierPro.log.debug("AppShellView: TTSControlView presented") }
+    }
+
+    @ViewBuilder
+    private func modelSelectionSheet(for conversationID: PersistentIdentifier) -> some View {
+        if let conversation = queryManager.conversation(with: conversationID),
+           let apiConfiguration = conversation.options.apiConfiguration {
+            ModelSelectionView(
+                selectedModel: conversation.options.selectedModelID
+                    ?? apiConfiguration.defaultModelID
+                    ?? "",
+                onModelSelected: { newModel in
+                    do {
+                        try queryManager.setModel(newModel, for: conversation)
+                    } catch {
+                        vxAtelierPro.log.error("Failed to set model \(newModel): \(error.localizedDescription)")
+                    }
+                },
+                apiConfiguration: apiConfiguration
+            )
+        } else {
+            VStack(spacing: AppDefaults.paddingMedium) {
+                ProgressView()
+                Text("Preparing models...")
+                    .foregroundColor(.secondary)
+            }
+            .frame(minWidth: 300, minHeight: 200)
         }
     }
 }
