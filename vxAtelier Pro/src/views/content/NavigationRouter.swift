@@ -52,6 +52,30 @@ final class NavigationRouter {
         projectPaths[projectID] = []
     }
 
+    @discardableResult
+    func clearIfShowing(conversationID: PersistentIdentifier, projectID: PersistentIdentifier?) -> Bool {
+        if selection == .conversation(conversationID) {
+            setSelection(nil)
+            return true
+        }
+
+        guard let projectID,
+              selection == .project(projectID),
+              activeConversationID == conversationID else {
+            return false
+        }
+
+        clearPath(for: projectID)
+        return true
+    }
+
+    @discardableResult
+    func clearIfShowing(projectID: PersistentIdentifier) -> Bool {
+        guard selection == .project(projectID) else { return false }
+        setSelection(nil)
+        return true
+    }
+
     func openConversation(_ conversationID: PersistentIdentifier, in projectID: PersistentIdentifier?) {
         if let projectID {
             setSelection(.project(projectID))

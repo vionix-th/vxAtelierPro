@@ -111,22 +111,20 @@ struct ConversationView: View {
         .padding(AppDefaults.paddingSmall)
         .navigationTitle(navigationTitle)
         .errorAlert(error: $errorAlert)
-        .sheet(isPresented: Binding(get: { bookmarkMessage != nil }, set: { if !$0 { bookmarkMessage = nil } })) {
-            if let message = bookmarkMessage {
-                if let (turn, event) = turnAndEvent(for: message) {
-                    BookmarkSheetView(
-                        label: $bookmarkMessageLabel,
-                        turn: turn,
-                        event: event,
-                        onBookmark: { _, _, label in
-                            insertBookmark(label: label, message: message)
-                            bookmarkMessage = nil
-                        },
-                        onCancel: {
-                            bookmarkMessage = nil
-                        }
-                    )
-                }
+        .sheet(item: $bookmarkMessage) { message in
+            if let (turn, event) = turnAndEvent(for: message) {
+                BookmarkSheetView(
+                    label: $bookmarkMessageLabel,
+                    turn: turn,
+                    event: event,
+                    onBookmark: { _, _, label in
+                        insertBookmark(label: label, message: message)
+                        bookmarkMessage = nil
+                    },
+                    onCancel: {
+                        bookmarkMessage = nil
+                    }
+                )
             }
         }
         .onTapGesture { hideKeyboard() }

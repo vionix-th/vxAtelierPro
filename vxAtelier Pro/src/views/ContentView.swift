@@ -108,8 +108,12 @@ struct ContentView: View {
     private func assignConversationToProject(
         _ conversation: ConversationItem, _ project: ProjectItem?
     ) {
+        let isShowingConversation = router.activeConversationID == conversation.id
         do {
             try queryManager.assignConversation(conversation, to: project)
+            if isShowingConversation {
+                router.openConversation(conversation.id, in: project?.id)
+            }
         } catch {
             let projectName = project?.name ?? "none"
             vxAtelierPro.log.error(
@@ -550,16 +554,8 @@ struct ContentView: View {
         let itemType = type(of: item)
 
         if let conversation = item as? ConversationItem {
-            if router.selection == .conversation(conversation.id) {
-                router.setSelection(nil)
-                vxAtelierPro.log.debug("Selected conversation (ID: \(itemId), Type: \(itemType)) cleared.")
-                return true
-            }
-
-            if let projectID = conversation.project?.id,
-               router.activeConversationID == conversation.id {
-                router.clearPath(for: projectID)
-                vxAtelierPro.log.debug("Project conversation path (ID: \(itemId), Type: \(itemType)) cleared.")
+            if router.clearIfShowing(conversationID: conversation.id, projectID: conversation.project?.id) {
+                vxAtelierPro.log.debug("Conversation navigation (ID: \(itemId), Type: \(itemType)) cleared.")
                 return true
             }
 
@@ -567,11 +563,14 @@ struct ContentView: View {
             return false
         }
 
-        if let project = item as? ProjectItem,
-           router.selection == .project(project.id) {
-            router.setSelection(nil)
-            vxAtelierPro.log.debug("Selected project (ID: \(itemId), Type: \(itemType)) cleared.")
-            return true
+        if let project = item as? ProjectItem {
+            if router.clearIfShowing(projectID: project.id) {
+                vxAtelierPro.log.debug("Project navigation (ID: \(itemId), Type: \(itemType)) cleared.")
+                return true
+            }
+
+            vxAtelierPro.log.debug("Project (ID: \(itemId), Type: \(itemType)) was not active; navigation unchanged.")
+            return false
         }
 
         vxAtelierPro.log.debug("Item (ID: \(itemId), Type: \(itemType)) was not active; navigation unchanged.")

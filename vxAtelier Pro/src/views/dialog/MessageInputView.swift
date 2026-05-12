@@ -1,21 +1,23 @@
 import SwiftUI
+import Observation
 
 @MainActor
-final class MessageInputViewModel: ObservableObject {
+@Observable
+private final class MessageInputController {
     private let queryManager: QueryManager
     private let completionUseCase: ConversationCompletionUseCase
     private let resolveConversation: @MainActor () throws -> ConversationItem
-    private var sendTask: Task<Void, Never>?
+    private let didSend: ((ConversationItem) -> Void)?
 
+    @ObservationIgnored private var sendTask: Task<Void, Never>?
     let draftStore: ConversationDraftStore
 
-    @Published var message: String = ""
-    @Published var isPromptTemplatesPresented: Bool = false
-    @Published var isTaskRunning: Bool = false
-    @Published var showError: Bool = false
-    @Published var errorMessage: String = ""
-    @Published var isInputFocused: Bool
-    var didSend: ((ConversationItem) -> Void)?
+    var message: String = ""
+    var isPromptTemplatesPresented: Bool = false
+    var isTaskRunning: Bool = false
+    var showError: Bool = false
+    var errorMessage: String = ""
+    var isInputFocused: Bool
 
     init(
         queryManager: QueryManager,
@@ -108,7 +110,7 @@ final class MessageInputViewModel: ObservableObject {
 struct MessageInputView: View {
     @FocusState private var isInputFocused: Bool
 
-    @StateObject private var viewModel: MessageInputViewModel
+    @State private var controller: MessageInputController
     private let contextConversation: ConversationItem?
 
     @AppStorage(AppSettings.Keys.conversationTextEditButtonSize) var buttonSize: Double = AppDefaults
@@ -126,8 +128,8 @@ struct MessageInputView: View {
         didSend: ((ConversationItem) -> Void)? = nil
     ) {
         self.contextConversation = contextConversation
-        _viewModel = StateObject(
-            wrappedValue: MessageInputViewModel(
+        _controller = State(
+            initialValue: MessageInputController(
                 queryManager: queryManager,
                 completionUseCase: completionUseCase,
                 draftStore: draftStore,
@@ -139,9 +141,11 @@ struct MessageInputView: View {
     }
 
     var body: some View {
+        @Bindable var controller = controller
+
         ZStack {
             VStack {
-                TextEditor(text: $viewModel.message)
+                TextEditor(text: $controller.message)
                     .padding(AppDefaults.paddingSmall)
                     .frame(minHeight: 32, maxHeight: 48)
                     .scrollContentBackground(.hidden)
@@ -153,14 +157,14 @@ struct MessageInputView: View {
                         if NSEvent.modifierFlags.contains(.shift) {
                             return .ignored
                         }
-                        viewModel.send(autoNameConversations: autoNameConversations)
+                        controller.send(autoNameConversations: autoNameConversations)
                         return .handled
                     }
                     #endif
 
                 HStack {
                     Button(action: {
-                        viewModel.isPromptTemplatesPresented = true
+                        controller.isPromptTemplatesPresented = true
                     }) {
                         Image(systemName: "hare")
                             .resizable()
@@ -168,16 +172,16 @@ struct MessageInputView: View {
                             .frame(width: buttonSize, height: buttonSize)
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .popover(isPresented: $viewModel.isPromptTemplatesPresented) {
+                    .popover(isPresented: $controller.isPromptTemplatesPresented) {
                         PromptTemplateList(
                             category: PromptTemplate.Category.User,
                             onTemplateActivated: { template in
-                                viewModel.applyTemplate(template, conversation: contextConversation)
-                                viewModel.isPromptTemplatesPresented = false
-                                viewModel.isInputFocused = true
+                                controller.applyTemplate(template, conversation: contextConversation)
+                                controller.isPromptTemplatesPresented = false
+                                controller.isInputFocused = true
 
                                 if autoSendConversationTemplates {
-                                    viewModel.send(autoNameConversations: autoNameConversations)
+                                    controller.send(autoNameConversations: autoNameConversations)
                                 }
                             })
                         .frame(minWidth: 200, idealWidth: 400, minHeight: 300, idealHeight: 500)
@@ -186,7 +190,7 @@ struct MessageInputView: View {
                     Spacer()
 
                     Button(action: {
-                        viewModel.send(autoNameConversations: autoNameConversations)
+                        controller.send(autoNameConversations: autoNameConversations)
                     }) {
                         Image(systemName: "location")
                             .resizable()
@@ -199,27 +203,27 @@ struct MessageInputView: View {
             .padding(AppDefaults.paddingMedium)
             .background(Color.secondary.opacity(0.2))
             .cornerRadius(AppDefaults.cornerRadiusMedium)
-            .disabled(viewModel.isTaskRunning)
+            .disabled(controller.isTaskRunning)
 
-            if viewModel.isTaskRunning {
+            if controller.isTaskRunning {
                 ProgressView()
                     .padding(0)
             }
         }
         .padding(AppDefaults.paddingSmall)
-        .alert("Error", isPresented: $viewModel.showError) {
+        .alert("Error", isPresented: $controller.showError) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(viewModel.errorMessage)
+            Text(controller.errorMessage)
         }
         .onAppear {
-            isInputFocused = viewModel.isInputFocused
+            isInputFocused = controller.isInputFocused
         }
-        .onChange(of: viewModel.isInputFocused) { _, newValue in
+        .onChange(of: controller.isInputFocused) { _, newValue in
             isInputFocused = newValue
         }
         .onChange(of: isInputFocused) { _, newValue in
-            viewModel.isInputFocused = newValue
+            controller.isInputFocused = newValue
         }
     }
 }

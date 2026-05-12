@@ -202,8 +202,12 @@ struct ProjectView: View {
                             imageName: "document",
                             onProjectAssign: { targetProject in
                                 vxAtelierPro.log.debug("Assigning conversation '\(conversation.title)' to project '\(targetProject?.name ?? "<nil>")'")
+                                let isShowingConversation = router.activeConversationID == conversation.id
                                 do {
                                     try queryManager.assignConversation(conversation, to: targetProject)
+                                    if isShowingConversation {
+                                        router.openConversation(conversation.id, in: targetProject?.id)
+                                    }
                                 } catch {
                                     vxAtelierPro.log.error("ProjectView: Failed to assign conversation to project: \(error.localizedDescription)")
                                 }

@@ -4,7 +4,7 @@ import SwiftUI
 // MARK: - Status Bar View
 struct StatusBar: View {
     // MARK: - Properties
-    @StateObject private var loggingService = LoggingService.shared
+    @ObservedObject private var loggingService = LoggingService.shared
     @State private var isStatusBarFilterPopoverOpen: Bool = false
     @State private var popupLogTypeFilters: Set<LoggingService.LogType> = []
     @State private var statusBarLogTypeFilters: Set<LoggingService.LogType> = []
