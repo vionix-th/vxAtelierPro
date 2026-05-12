@@ -11,7 +11,6 @@ struct StatusBar: View {
     @State private var displayedMessage: String = ""
     let onRequestLogHistory: () -> Void
     let onRequestModelSelection: (PersistentIdentifier) -> Void
-    @State private var activeConversation: ConversationItem?
     private let messageAnimation: Animation = .easeInOut(duration: 0.18)
     
     // Environment access
@@ -52,6 +51,11 @@ struct StatusBar: View {
         return filteredMessages(with: statusBarLogTypeFilters).last?.type ?? .info
     }
 
+    private var activeConversation: ConversationItem? {
+        guard let id = router.activeConversationID else { return nil }
+        return queryManager.conversation(with: id)
+    }
+
     private func updateDisplayedMessage(animated: Bool = true) {
         let next = latestFilteredMessage
         guard next != displayedMessage else { return }
@@ -64,14 +68,6 @@ struct StatusBar: View {
         }
     }
 
-    private func refreshActiveConversation() {
-        guard let id = router.activeConversationID else {
-            activeConversation = nil
-            return
-        }
-        activeConversation = queryManager.conversation(with: id)
-    }
-    
     // MARK: - Initialization
     init(
         onRequestLogHistory: @escaping () -> Void,
@@ -199,13 +195,9 @@ struct StatusBar: View {
         .onChange(of: popupLogTypeFilters) { _, _ in
             saveFiltersToUserDefaults()
         }
-        .onChange(of: router.activeConversationID) { _, _ in
-            refreshActiveConversation()
-        }
         .onAppear {
             loadFiltersFromUserDefaults()
             updateDisplayedMessage(animated: false)
-            refreshActiveConversation()
         }
     }
     

@@ -118,13 +118,6 @@ struct ContentView: View {
         }
     }
 
-    private func initialConversationID(for projectID: PersistentIdentifier) -> PersistentIdentifier? {
-        if case .conversation(let id)? = router.path(for: projectID).last {
-            return id
-        }
-        return nil
-    }
-
     private func selectConversationFromBookmark(_ bookmark: BookmarkItem) {
         guard let conversation = bookmark.turn?.conversation else {
             vxAtelierPro.log.error("Bookmark selection failed: missing conversation.")
@@ -227,7 +220,6 @@ struct ContentView: View {
                 if let project = filteredProjects.first(where: { $0.id == id }) {
                     ProjectView(
                         projectID: project.id,
-                        initialConversationID: initialConversationID(for: project.id),
                         onRequestOptions: onRequestOptions,
                         onDeleteConversation: { conversation in
                             deleteItem(for: conversation)
@@ -236,6 +228,7 @@ struct ContentView: View {
                             onRequestExportProject(project)
                         }
                     )
+                    .id(project.id)
                 } else {
                     Text("Item not found.")
                 }
@@ -482,12 +475,7 @@ struct ContentView: View {
         let itemId = item.persistentModelID
         let itemType = type(of: item)
 
-        if selectionMatches(router.selection, item: item) {
-            router.setSelection(nil)
-            vxAtelierPro.log.debug("Selected item (ID: \(itemId), Type: \(itemType)) cleared.")
-        } else {
-            vxAtelierPro.log.debug("Selected item (ID: \(itemId), Type: \(itemType)) not cleared.")
-        }
+        clearNavigationIfNeeded(for: item)
 
         do {
             if contentFilter == .trashed {
@@ -532,8 +520,7 @@ struct ContentView: View {
             try queryManager.archiveItem(item)
             vxAtelierPro.log.debug("Successfully archived item (ID: \(itemId), Type: \(itemType)).")
 
-            if selectionMatches(router.selection, item: item) {
-                router.setSelection(nil)
+            if clearNavigationIfNeeded(for: item) {
 
                 // If we're in archive view and this was the last item, return to Show Conversations
                 if wasInArchive {
@@ -555,6 +542,40 @@ struct ContentView: View {
                 "ContentView: Failed to archive item (ID: \(itemId), Type: \(itemType)): \(error.localizedDescription)"
             )
         }
+    }
+
+    @discardableResult
+    private func clearNavigationIfNeeded(for item: any PersistentModel) -> Bool {
+        let itemId = item.persistentModelID
+        let itemType = type(of: item)
+
+        if let conversation = item as? ConversationItem {
+            if router.selection == .conversation(conversation.id) {
+                router.setSelection(nil)
+                vxAtelierPro.log.debug("Selected conversation (ID: \(itemId), Type: \(itemType)) cleared.")
+                return true
+            }
+
+            if let projectID = conversation.project?.id,
+               router.activeConversationID == conversation.id {
+                router.clearPath(for: projectID)
+                vxAtelierPro.log.debug("Project conversation path (ID: \(itemId), Type: \(itemType)) cleared.")
+                return true
+            }
+
+            vxAtelierPro.log.debug("Conversation (ID: \(itemId), Type: \(itemType)) was not active; navigation unchanged.")
+            return false
+        }
+
+        if let project = item as? ProjectItem,
+           router.selection == .project(project.id) {
+            router.setSelection(nil)
+            vxAtelierPro.log.debug("Selected project (ID: \(itemId), Type: \(itemType)) cleared.")
+            return true
+        }
+
+        vxAtelierPro.log.debug("Item (ID: \(itemId), Type: \(itemType)) was not active; navigation unchanged.")
+        return false
     }
 
     private func restoreItem(_ item: any PersistentModel) {

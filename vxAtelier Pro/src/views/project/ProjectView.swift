@@ -14,7 +14,6 @@ struct ProjectView: View {
     // Store the project ID directly in the view
     private let projectID: PersistentIdentifier
     
-    private let initialConversationID: PersistentIdentifier?
     var onRequestOptions: (PersistentIdentifier) -> Void = { _ in }
     var onDeleteConversation: (ConversationItem) -> Void
     var onExportProject: (ProjectItem) -> Void
@@ -27,8 +26,6 @@ struct ProjectView: View {
     // MARK: - State
     @State private var projectOptionsIsPresented: Bool = false
     @State private var isPromptTemplatesPresented: Bool = false
-    @State private var systemPromptValue: String = ""
-    @State private var didApplyInitialConversation: Bool = false
     @State private var composerDraftStore = ConversationDraftStore()
 
     private var pathBinding: Binding<[ProjectRoute]> {
@@ -51,13 +48,11 @@ struct ProjectView: View {
     
     init(
         projectID: PersistentIdentifier,
-        initialConversationID: PersistentIdentifier? = nil,
         onRequestOptions: @escaping (PersistentIdentifier) -> Void = { _ in },
         onDeleteConversation: @escaping (ConversationItem) -> Void,
         onExportProject: @escaping (ProjectItem) -> Void
     ) {
         self.projectID = projectID
-        self.initialConversationID = initialConversationID
         self.onRequestOptions = onRequestOptions
         self.onDeleteConversation = onDeleteConversation
         self.onExportProject = onExportProject
@@ -95,13 +90,21 @@ struct ProjectView: View {
 
     // Helper function to get system prompt editor
     func systemPromptEditor() -> some View {
-        TextEditor(text: $systemPromptValue)
-        .onChange(of: project?.defaultOptions) { oldValue, newValue in
-            systemPromptValue = project?.defaultOptions.systemPrompt ?? ""
-        }
+        TextEditor(text: systemPromptBinding)
         .frame(minHeight: 100)
         .font(.system(.body, design: .monospaced))
         .scrollDisabled(true)
+    }
+
+    private var systemPromptBinding: Binding<String> {
+        Binding(
+            get: { project?.defaultOptions.systemPrompt ?? "" },
+            set: { newValue in
+                guard let project else { return }
+                project.defaultOptions.setParameterValue(.systemPrompt, value: .string(newValue))
+                saveProjectContextAfterSystemPromptChange()
+            }
+        )
     }
 
     // System prompt template button
@@ -120,7 +123,7 @@ struct ProjectView: View {
         .popover(isPresented: $isPromptTemplatesPresented) {
             PromptTemplateList(category: PromptTemplate.Category.System, onTemplateActivated: { template in
                 vxAtelierPro.log.debug("Applied system prompt template: \(template.name)")
-                systemPromptValue = expandVariables(template.prompt)                
+                systemPromptBinding.wrappedValue = expandVariables(template.prompt)
                 isPromptTemplatesPresented = false
             })
             .frame(minWidth: 200, idealWidth: 400, minHeight: 300, idealHeight: 500)
@@ -253,17 +256,6 @@ struct ProjectView: View {
         .onTapGesture {
             hideKeyboard()
         }
-        .onAppear {
-            applyInitialConversationIfNeeded()
-        }
-    }
-
-    private func applyInitialConversationIfNeeded() {
-        guard !didApplyInitialConversation else { return }
-        guard let initialID = initialConversationID else { return }
-        guard project?.conversations.contains(where: { $0.id == initialID }) == true else { return }
-        router.setPath([.conversation(initialID)], for: projectID)
-        didApplyInitialConversation = true
     }
     
     var bodyContent: some View {
@@ -343,20 +335,13 @@ struct ProjectView: View {
             }
             .help("Project Actions")
         }
-        .onAppear() {
-            if let project = self.project {
-                systemPromptValue = project.defaultOptions.systemPrompt
-            }
-        }
-        .onChange(of: systemPromptValue) {
-            if let project = self.project {
-                project.defaultOptions.setParameterValue(.systemPrompt, value: .string(systemPromptValue))
-                do {
-                    try queryManager.saveContext()
-                } catch {
-                    vxAtelierPro.log.error("ProjectView: Failed to save context after changing system prompt: \(error.localizedDescription)")
-                }
-            }
+    }
+
+    private func saveProjectContextAfterSystemPromptChange() {
+        do {
+            try queryManager.saveContext()
+        } catch {
+            vxAtelierPro.log.error("ProjectView: Failed to save context after changing system prompt: \(error.localizedDescription)")
         }
     }
 }
