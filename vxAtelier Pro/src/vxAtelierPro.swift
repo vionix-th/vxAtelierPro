@@ -4,6 +4,8 @@ import SwiftUI
 
 #if os(macOS)
     import AppKit
+#elseif os(iOS)
+    import UIKit
 #endif
 
 // MARK: - Commands
@@ -53,7 +55,7 @@ struct vxAtelierPro: App {
     // MARK: - Platform-Specific Properties
 
     #if os(macOS)
-        @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+        @NSApplicationDelegateAdaptor(AppBootstrap.AppDelegate.self) private var appDelegate
     #endif
 
     /// Centralized logging system for the application
@@ -108,47 +110,8 @@ struct vxAtelierPro: App {
         }
     }
 
-    /// Shared SwiftData container for managing persistent data
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            APIConfigurationItem.self,
-            ModelItem.self,
-            ModelParameterMappingItem.self,
-            ModelParameterAvailabilityItem.self,
-            ConversationOptions.self,
-            MessageItem.self,
-            MessageContentPartItem.self,
-            ToolCallItem.self,
-            ResponseRunItem.self,
-            ConversationTurn.self,
-            TurnEvent.self,
-            ConversationItem.self,
-            ProjectItem.self,
-            BookmarkItem.self,
-            PromptTemplate.self,
-            VoiceConfigurationItem.self,
-            WebSearchConfigurationItem.self,
-        ])
-        let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: isRunningTests)
-
-        do {
-            return try ModelContainer(
-                for: schema, migrationPlan: ProjectMigrationPlan.self,
-                configurations: modelConfiguration)
-        } catch {
-            vxAtelierPro.log.error("Failed to create ModelContainer: \(error.localizedDescription)")
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
-
-    private let queryManager: QueryManager
-    private let ttsQueue: TTSQueue
-    private let conversationStore: ConversationViewModelStore
-    private let appSceneModel: AppSceneModel
-    #if os(macOS)
-        private let hotkeyController: GlobalHotkeyController
-    #endif
+    /// Shared app bootstrap and dependency graph
+    private let bootstrap: AppBootstrap
 
     @AppStorage(AppSettings.Keys.appearanceStyle) private var appearanceStyle: AppearanceStyle = .system
 
@@ -166,86 +129,19 @@ struct vxAtelierPro: App {
     init() {
         vxAtelierPro.log.debug("Initializing vxAtelierPro")
 
-        vxAtelierPro.log.debug("Initializing Query Manager")
-        self.queryManager = QueryManager(modelContext: sharedModelContainer.mainContext)
-        vxAtelierPro.log.debug("Query Manager initialized")
-
-        vxAtelierPro.log.debug("Initializing TTS Queue")
-        self.ttsQueue = TTSQueue(modelContext: sharedModelContainer.mainContext)
-        vxAtelierPro.log.debug("TTS Queue initialized")
-
-        vxAtelierPro.log.debug("Initializing Conversation ViewModel Store")
-        self.conversationStore = ConversationViewModelStore(
-            queryManager: queryManager, ttsQueue: ttsQueue)
-        vxAtelierPro.log.debug("Conversation ViewModel Store initialized")
-
-        vxAtelierPro.log.debug("Initializing App Scene Model")
-        self.appSceneModel = AppSceneModel(
-            queryManager: queryManager,
-            modelContext: sharedModelContainer.mainContext
-        )
-        vxAtelierPro.log.debug("App Scene Model initialized")
+        vxAtelierPro.log.debug("Initializing app bootstrap")
+        self.bootstrap = AppBootstrap.live()
+        vxAtelierPro.log.debug("App bootstrap initialized")
 
         #if os(macOS)
-            vxAtelierPro.log.debug("Initializing Global Hotkey Controller")
-            self.hotkeyController = GlobalHotkeyController(appSceneModel: appSceneModel)
-            appDelegate.onDidFinishLaunching = {
-                [hotkeyController] in
-                Task { @MainActor in
-                    hotkeyController.register()
-                }
-            }
-
-            vxAtelierPro.log.debug("Global Hotkey Controller initialized")
+            vxAtelierPro.log.debug("Installing bootstrap launch hooks")
+            bootstrap.installLaunchHooks(on: appDelegate)
+            vxAtelierPro.log.debug("Bootstrap launch hooks installed")
         #endif
 
-        vxAtelierPro.log.debug("Ensuring system conversation")
-        queryManager.ensureSystemConversation()
-        vxAtelierPro.log.debug("System conversation ensured")
-
-        vxAtelierPro.log.debug("Registering Tools")
-        registerDefaultTools()
-        vxAtelierPro.log.debug("Tools registered")
-
-        #if os(macOS)
-            if UserDefaults.standard.bool(forKey: AppSettings.Keys.makeKeyAndOrderFront) {
-                DispatchQueue.main.async {
-                    NSApp.activate(ignoringOtherApps: true)
-                    vxAtelierPro.log.debug("Brought app to front on startup")
-                }
-            }
-        #endif
+        bootstrap.performLaunchBootstrap()
 
         vxAtelierPro.log.debug("vxAtelierPro initialized")
-    }
-
-    // MARK: - Tool Registration
-    private func registerDefaultTools() {
-        let registry = LLMToolRegistry.shared
-        let context = sharedModelContainer.mainContext
-
-        // Conversation Tools
-        registry.registerTool(ListConversationsTool(modelContext: context))
-        registry.registerTool(RenameConversationTool(modelContext: context))
-        registry.registerTool(FindConversationTool(modelContext: context))
-        registry.registerTool(CurrentConversationTool())
-
-        // Shortcut Tools
-        #if os(macOS)
-            registry.registerTool(ListShortcutsTool())
-            registry.registerTool(RunShortcutTool())
-        #endif
-
-        // Settings Tools
-        registry.registerTool(ListSettingsTool())
-        registry.registerTool(ReadSettingTool())
-        registry.registerTool(WriteSettingTool())
-
-        // Web Search Tool (New) - Pass QueryManager
-        registry.registerTool(WebSearchTool(queryManager: queryManager))
-
-        // Website Reader Tool
-        registry.registerTool(ReadWebsiteTool())
     }
 
     // MARK: - Scene Configuration
@@ -254,12 +150,8 @@ struct vxAtelierPro: App {
         WindowGroup("Main Window", id: "mainWindow") {
             AppShellView()
                 .preferredColorScheme(effectiveColorScheme)
-                .environment(conversationStore)
-                .environment(appSceneModel)
+                .bootstrapped(with: bootstrap)
         }
-        .modelContainer(sharedModelContainer)
-        .environment(queryManager)
-        .environment(ttsQueue)
         .commands {
             AppCommands()
         }
@@ -268,10 +160,7 @@ struct vxAtelierPro: App {
             Window("Utility", id: "utilityPanel") {
                 UtilityPanelView()
                     .preferredColorScheme(effectiveColorScheme)
-                    .environment(queryManager)
-                    .environment(appSceneModel)
-                    .environment(ttsQueue)
-                    .modelContainer(sharedModelContainer)
+                    .bootstrapped(with: bootstrap)
             }
             .windowResizability(.contentSize)
             .defaultSize(width: 420, height: 140)
@@ -306,52 +195,6 @@ struct vxAtelierPro: App {
         }
     }
 
-    @MainActor
-    final class GlobalHotkeyController {
-        private let hotkeys = HotkeyManager()
-        private let appSceneModel: AppSceneModel
-        private var didRegister = false
-
-        init(appSceneModel: AppSceneModel) {
-            self.appSceneModel = appSceneModel
-        }
-
-        func register() {
-            guard !didRegister else { return }
-            didRegister = true
-            vxAtelierPro.log.debug("Registering global hotkeys")
-            hotkeys.register(
-                key: "k",
-                modifierFlags: [.command],
-                action: { [weak self] _ in
-                    guard let self else { return false }
-                    vxAtelierPro.log.debug("Global utility panel hotkey triggered")
-                    Task { @MainActor in
-                        self.appSceneModel.requestUtilityPanel()
-                    }
-                    return true
-                }
-            )
-        }
-    }
-
-    /// Application delegate for macOS-specific behaviors
-    class AppDelegate: NSObject, NSApplicationDelegate {
-        var onDidFinishLaunching: (() -> Void)?
-
-        func applicationDidFinishLaunching(_ notification: Notification) {
-            vxAtelierPro.log.debug("Application did finish launching")
-            onDidFinishLaunching?()
-        }
-
-        func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-            let shouldTerminate = UserDefaults.standard.bool(
-                forKey: AppSettings.Keys.shouldTerminateAfterLastWindowClosed)
-            vxAtelierPro.log.debug(
-                "Checking if should terminate after last window closed: \(shouldTerminate)")
-            return shouldTerminate
-        }
-    }
 #endif
 
 // MARK: - View Extensions

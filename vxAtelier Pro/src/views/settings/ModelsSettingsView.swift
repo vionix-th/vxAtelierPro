@@ -230,3 +230,8 @@ struct ModelsSettingsView: View {
         }
     }
 } 
+
+#Preview {
+    ModelsSettingsView()
+        .bootstrapped(with: .preview())
+}

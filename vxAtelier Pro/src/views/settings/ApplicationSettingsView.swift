@@ -108,3 +108,8 @@ struct ApplicationSettingsView: View {
         }
     }
 }
+
+#Preview {
+    ApplicationSettingsView(initialTab: .general)
+        .bootstrapped(with: .preview())
+}

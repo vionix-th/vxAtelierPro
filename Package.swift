@@ -111,6 +111,7 @@ let package = Package(
                 "system/AppDefaults.swift",
                 "system/AppearanceStyle.swift",
                 "system/DataManager.swift",
+                "system/AppBootstrap.swift",
                 "system/export/APIConfigurationExportData.swift",
                 "system/export/BookmarkExportData.swift",
                 "system/export/ConversationExportData.swift",
