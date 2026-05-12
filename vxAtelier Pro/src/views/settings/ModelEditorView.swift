@@ -3,7 +3,6 @@ import SwiftData
 
 // MARK: - Model Editor View
 struct ModelEditorView: View {
-    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(QueryManager.self) private var queryManager
     @Query(sort: [SortDescriptor(\APIConfigurationItem.name)]) private var apiConfigurations: [APIConfigurationItem]
@@ -56,145 +55,70 @@ struct ModelEditorView: View {
     
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField("Model Name", text: $name)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(.body, design: .rounded))
+            ScrollView {
+                VStack(spacing: 18) {
+                    headerSummary
 
-                    Picker("API Configuration", selection: $selectedConfigurationID) {
-                        ForEach(apiConfigurations) { config in
-                            Text(config.name)
-                                .font(.system(.body, design: .rounded))
-                                .tag(config.persistentModelID as PersistentIdentifier?)
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .top, spacing: 18) {
+                            identitySection
+                                .frame(maxWidth: .infinity)
+                            contextSection
+                                .frame(maxWidth: .infinity)
+                        }
+
+                        VStack(spacing: 18) {
+                            identitySection
+                            contextSection
                         }
                     }
-                    .pickerStyle(.menu)
 
-                    if let selectedConfiguration {
-                        Text("Provider: \(selectedConfiguration.providerIDEnum.displayName)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    } else {
-                        Text("No API configuration selected")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                } header: {
-                    Text("Model Information")
-                        .font(.system(.headline, design: .rounded))
-                        .foregroundColor(.primary)
-                        .textCase(nil)
-                }
-                
-                Section {
-                    VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
-                        HStack(spacing: AppDefaults.paddingLarge) {
-                            TextField("", value: $contextSize, format: .number)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 120)
-                                .monospacedDigit()
-                            
-                            Text("tokens")
-                                .foregroundColor(.secondary)
-                                .font(.system(.body, design: .rounded))
-                            
-                            Spacer()
-                            
-                            Menu {
-                                Group {
-                                    Button("4K (4,096)") { contextSize = 4_096 }
-                                    Button("8K (8,192)") { contextSize = 8_192 }
-                                    Button("16K (16,384)") { contextSize = 16_384 }
-                                }
-                                Divider()
-                                Group {
-                                    Button("32K (32,768)") { contextSize = 32_768 }
-                                    Button("128K (131,072)") { contextSize = 131_072 }
-                                }
-                            } label: {
-                                Label("Presets", systemImage: "slider.horizontal.3")
-                                    .font(.system(.body, design: .rounded))
+                    editorSection(
+                        icon: "switch.2",
+                        title: "Capabilities",
+                        subtitle: "Select the content types and runtime features this model supports."
+                    ) {
+                        LazyVGrid(
+                            columns: [GridItem(.adaptive(minimum: 180), spacing: AppDefaults.paddingMedium)],
+                            alignment: .leading,
+                            spacing: AppDefaults.paddingMedium
+                        ) {
+                            ForEach(LLMModelCapability.allCases.sorted(by: { $0.displayName < $1.displayName })) { capability in
+                                capabilityTile(capability)
                             }
-                            .menuStyle(.borderlessButton)
                         }
-                        .padding(.vertical, AppDefaults.paddingSmall)
-                        
-                        Text("Maximum number of tokens the model can process in a single request")
-                            .font(.system(.caption, design: .rounded))
-                            .foregroundColor(.secondary)
+                        .padding(AppDefaults.paddingLarge)
                     }
-                } header: {
-                    Text("Context Size")
-                        .font(.system(.headline, design: .rounded))
-                        .foregroundColor(.primary)
-                        .textCase(nil)
-                }
-                
-                Section {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: AppDefaults.paddingLarge) {
-                        ForEach(LLMModelCapability.allCases.sorted(by: { $0.displayName < $1.displayName })) { capability in
-                            Toggle(isOn: Binding(
-                                get: { capabilities.contains(capability) },
-                                set: { isEnabled in
-                                    if isEnabled {
-                                        capabilities.append(capability)
-                                    } else {
-                                        capabilities.removeAll { $0 == capability }
-                                    }
-                                }
-                            )) {
-                                Label {
-                                    Text(capability.displayName)
-                                        .font(.system(.body, design: .rounded))
-                                } icon: {
-                                    Image(systemName: capability.systemName)
-                                        .foregroundColor(.accentColor)
-                                }
-                            }
-                            .toggleStyle(.switch)
-                            .padding(.vertical, AppDefaults.paddingSmall)
-                        }
-                    }
-                } header: {
-                    Text("Capabilities")
-                        .font(.system(.headline, design: .rounded))
-                        .foregroundColor(.primary)
-                        .textCase(nil)
-                }
 
-                Section {
-                    VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
-                        Text("API Mode: \(selectedAdapterID.displayName)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-
-                        HStack {
-                            Button {
+                    editorSection(
+                        icon: "arrow.left.arrow.right",
+                        title: "Parameter Translation",
+                        subtitle: "Map semantic controls to adapter-specific request payload fields."
+                    ) {
+                        sectionActionRow(
+                            status: "API Mode: \(selectedAdapterID.displayName)",
+                            primaryTitle: "Reset Adapter Defaults",
+                            primarySystemImage: "arrow.counterclockwise",
+                            primaryAction: {
                                 model.resetDefaultParameterMappings(adapterID: selectedAdapterID)
-                            } label: {
-                                Label("Reset Adapter Defaults", systemImage: "arrow.counterclockwise")
-                            }
-                            .buttonStyle(.bordered)
-
-                            Menu {
+                            },
+                            secondaryTitle: "Add Parameter",
+                            secondarySystemImage: "plus",
+                            secondaryEnabled: !addableParameterIDs.isEmpty,
+                            secondaryMenu: {
                                 ForEach(addableParameterIDs) { parameterID in
                                     Button(AiParameterPresentationCatalog.displayName(for: parameterID)) {
                                         addMapping(parameterID)
                                     }
                                 }
-                            } label: {
-                                Label("Add Parameter", systemImage: "plus")
                             }
-                            .disabled(addableParameterIDs.isEmpty)
-                        }
+                        )
 
                         if selectedAdapterMappings.isEmpty {
-                            Text("No parameters configured for this adapter.")
-                                .foregroundColor(.secondary)
-                                .italic()
+                            emptyStateText("No parameters configured for this adapter.")
                         } else {
-                            VStack(spacing: AppDefaults.paddingSmall) {
+                            Divider()
+                            VStack(spacing: 0) {
                                 ForEach(selectedAdapterMappings) { mapping in
                                     ModelParameterMappingRow(mapping: mapping)
                                     if mapping.id != selectedAdapterMappings.last?.id {
@@ -204,46 +128,36 @@ struct ModelEditorView: View {
                             }
                         }
                     }
-                    .padding(.vertical, AppDefaults.paddingSmall)
-                } header: {
-                    Text("Parameter Translation")
-                        .font(.system(.headline, design: .rounded))
-                        .foregroundColor(.primary)
-                        .textCase(nil)
-                }
 
-                Section {
-                    VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
-                        Text("API Mode: \(selectedAdapterID.displayName)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-
-                        HStack {
-                            Button {
+                    editorSection(
+                        icon: "slider.horizontal.3",
+                        title: "Parameter Availability",
+                        subtitle: "Declare parameter support, defaults, and required flags for the active adapter."
+                    ) {
+                        sectionActionRow(
+                            status: "API Mode: \(selectedAdapterID.displayName)",
+                            primaryTitle: "Reset Availability Defaults",
+                            primarySystemImage: "arrow.counterclockwise",
+                            primaryAction: {
                                 model.resetDefaultParameterAvailability(adapterID: selectedAdapterID)
-                            } label: {
-                                Label("Reset Availability Defaults", systemImage: "arrow.counterclockwise")
-                            }
-                            .buttonStyle(.bordered)
-
-                            Menu {
+                            },
+                            secondaryTitle: "Add Availability",
+                            secondarySystemImage: "plus",
+                            secondaryEnabled: !addableAvailabilityParameterIDs.isEmpty,
+                            secondaryMenu: {
                                 ForEach(addableAvailabilityParameterIDs) { parameterID in
                                     Button(AiParameterPresentationCatalog.displayName(for: parameterID)) {
                                         addAvailability(parameterID)
                                     }
                                 }
-                            } label: {
-                                Label("Add Availability", systemImage: "plus")
                             }
-                            .disabled(addableAvailabilityParameterIDs.isEmpty)
-                        }
+                        )
 
                         if selectedAdapterAvailability.isEmpty {
-                            Text("No parameter availability configured for this adapter.")
-                                .foregroundColor(.secondary)
-                                .italic()
+                            emptyStateText("No parameter availability configured for this adapter.")
                         } else {
-                            VStack(spacing: AppDefaults.paddingSmall) {
+                            Divider()
+                            VStack(spacing: 0) {
                                 ForEach(selectedAdapterAvailability) { availability in
                                     ModelParameterAvailabilityRow(availability: availability)
                                     if availability.id != selectedAdapterAvailability.last?.id {
@@ -253,32 +167,30 @@ struct ModelEditorView: View {
                             }
                         }
                     }
-                    .padding(.vertical, AppDefaults.paddingSmall)
-                } header: {
-                    Text("Parameter Availability")
-                        .font(.system(.headline, design: .rounded))
-                        .foregroundColor(.primary)
-                        .textCase(nil)
-                }
-                
-                if model.modelContext != nil {
-                    Section {
-                        Button(role: .destructive) {
-                            deleteModel()
-                        } label: {
+
+                    if model.modelContext != nil {
+                        editorSection(
+                            icon: "exclamationmark.triangle",
+                            title: "Danger Zone",
+                            subtitle: "Remove this model from the database."
+                        ) {
                             HStack {
-                                Image(systemName: "trash")
-                                Text("Delete Model")
+                                Button(role: .destructive) {
+                                    deleteModel()
+                                } label: {
+                                    Label("Delete Model", systemImage: "trash")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.bordered)
                             }
-                            .frame(maxWidth: .infinity)
-                            .font(.system(.body, design: .rounded))
+                            .padding(AppDefaults.paddingLarge)
                         }
-                        .buttonStyle(.bordered)
-                        .padding(.vertical, AppDefaults.paddingSmall)
                     }
                 }
+                .padding(20)
+                .frame(maxWidth: 1040)
+                .frame(maxWidth: .infinity, alignment: .center)
             }
-            .formStyle(.grouped)
             .navigationTitle(model.modelContext == nil ? "Add Model" : "Edit Model")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -288,7 +200,7 @@ struct ModelEditorView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
                         .font(.system(.body, design: .rounded))
-                        .disabled(name.isEmpty || selectedConfiguration == nil)
+                        .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || selectedConfiguration == nil)
                 }
             }
             .onAppear {
@@ -300,6 +212,359 @@ struct ModelEditorView: View {
                 applyCatalogDefaultsForSelectedConfiguration()
             }
         }
+    }
+
+    private var headerSummary: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top, spacing: AppDefaults.paddingLarge) {
+                Image(systemName: "cpu")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundColor(.accentColor)
+                    .frame(width: 56, height: 56)
+                    .background(
+                        RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous)
+                            .fill(Color.accentColor.opacity(0.12))
+                    )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(model.modelContext == nil ? "Add Model" : "Edit Model")
+                        .font(.system(.title2, design: .rounded).weight(.semibold))
+                    Text(name.isEmpty ? "Configure a model profile for conversations and provider requests." : name)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                }
+
+                Spacer(minLength: AppDefaults.paddingLarge)
+
+                VStack(alignment: .trailing, spacing: AppDefaults.paddingSmall) {
+                    statusPill(
+                        selectedConfiguration?.providerIDEnum.displayName ?? "No Provider",
+                        systemImage: "network"
+                    )
+                    statusPill(
+                        selectedAdapterID.displayName,
+                        systemImage: "point.3.connected.trianglepath.dotted"
+                    )
+                }
+            }
+
+            HStack(spacing: AppDefaults.paddingMedium) {
+                metricPill(title: "Context", value: formattedTokenCount(contextSize), systemImage: "rectangle.expand.vertical")
+                metricPill(title: "Capabilities", value: "\(capabilities.count)", systemImage: "checklist")
+                metricPill(title: "Parameters", value: "\(selectedAdapterMappings.count)", systemImage: "arrow.left.arrow.right")
+            }
+        }
+        .padding(18)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous)
+                .stroke(Color.secondary.opacity(0.16), lineWidth: 1)
+        )
+    }
+
+    private var identitySection: some View {
+        editorSection(
+            icon: "person.text.rectangle",
+            title: "Model Identity",
+            subtitle: "Name and provider configuration used when resolving this model."
+        ) {
+            editorRow("Model Name") {
+                TextField("Model Name", text: $name)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            editorDivider()
+
+            editorRow("API Configuration") {
+                Picker(selection: $selectedConfigurationID) {
+                    ForEach(apiConfigurations) { config in
+                        Text(config.name)
+                            .tag(config.persistentModelID as PersistentIdentifier?)
+                    }
+                } label: {
+                    Text(selectedConfiguration?.name ?? "Select Configuration")
+                }
+                .pickerStyle(.menu)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            editorDivider()
+
+            editorRow("Provider") {
+                Text(selectedConfiguration?.providerIDEnum.displayName ?? "No API configuration selected")
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private var contextSection: some View {
+        editorSection(
+            icon: "rectangle.expand.vertical",
+            title: "Context Window",
+            subtitle: "Maximum tokens the model can process in a single request."
+        ) {
+            VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
+                HStack(alignment: .firstTextBaseline, spacing: AppDefaults.paddingMedium) {
+                    TextField("", value: $contextSize, format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 140)
+                        .monospacedDigit()
+
+                    Text("tokens")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+
+                    Spacer(minLength: AppDefaults.paddingMedium)
+
+                    Menu {
+                        Group {
+                            Button("4K (4,096)") { contextSize = 4_096 }
+                            Button("8K (8,192)") { contextSize = 8_192 }
+                            Button("16K (16,384)") { contextSize = 16_384 }
+                        }
+                        Divider()
+                        Group {
+                            Button("32K (32,768)") { contextSize = 32_768 }
+                            Button("128K (131,072)") { contextSize = 131_072 }
+                        }
+                    } label: {
+                        Label("Presets", systemImage: "slider.horizontal.3")
+                    }
+                    .menuStyle(.borderlessButton)
+                }
+
+                Text(formattedTokenCount(contextSize))
+                    .font(.system(.title3, design: .rounded).weight(.semibold))
+                    .monospacedDigit()
+            }
+            .padding(AppDefaults.paddingLarge)
+        }
+    }
+
+    private func editorSection<Content: View>(
+        icon: String,
+        title: String,
+        subtitle: String? = nil,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: AppDefaults.paddingLarge) {
+            HStack(alignment: .top, spacing: AppDefaults.paddingMedium) {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.accentColor)
+                    .frame(width: 30, height: 30)
+                    .background(
+                        RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium, style: .continuous)
+                            .fill(Color.accentColor.opacity(0.10))
+                    )
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.headline)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+
+            VStack(spacing: 0) {
+                content()
+            }
+            .background(Color.secondary.opacity(0.07))
+            .overlay(
+                RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium, style: .continuous)
+                    .stroke(Color.secondary.opacity(0.16), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium, style: .continuous))
+        }
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous)
+                .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+        )
+    }
+
+    private func editorRow<Content: View>(
+        _ title: String,
+        alignment: VerticalAlignment = .firstTextBaseline,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: alignment, spacing: AppDefaults.paddingMedium) {
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(.secondary)
+                    .frame(width: 140, alignment: .leading)
+
+                content()
+            }
+
+            VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(.secondary)
+
+                content()
+            }
+        }
+        .padding(.horizontal, AppDefaults.paddingLarge)
+        .padding(.vertical, 10)
+    }
+
+    private func editorDivider() -> some View {
+        Divider()
+            .padding(.leading, AppDefaults.paddingLarge)
+    }
+
+    private func sectionActionRow<Content: View>(
+        status: String,
+        primaryTitle: String,
+        primarySystemImage: String,
+        primaryAction: @escaping () -> Void,
+        secondaryTitle: String,
+        secondarySystemImage: String,
+        secondaryEnabled: Bool,
+        @ViewBuilder secondaryMenu: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: AppDefaults.paddingLarge) {
+            statusPill(status, systemImage: "bolt.horizontal")
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: AppDefaults.paddingMedium) {
+                    Button {
+                        primaryAction()
+                    } label: {
+                        Label(primaryTitle, systemImage: primarySystemImage)
+                    }
+                    .buttonStyle(.bordered)
+
+                    Menu {
+                        secondaryMenu()
+                    } label: {
+                        Label(secondaryTitle, systemImage: secondarySystemImage)
+                    }
+                    .disabled(!secondaryEnabled)
+
+                    Spacer(minLength: 0)
+                }
+
+                VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
+                    Button {
+                        primaryAction()
+                    } label: {
+                        Label(primaryTitle, systemImage: primarySystemImage)
+                    }
+                    .buttonStyle(.bordered)
+
+                    Menu {
+                        secondaryMenu()
+                    } label: {
+                        Label(secondaryTitle, systemImage: secondarySystemImage)
+                    }
+                    .disabled(!secondaryEnabled)
+                }
+            }
+        }
+        .padding(.horizontal, AppDefaults.paddingLarge)
+        .padding(.vertical, AppDefaults.paddingLarge)
+    }
+
+    private func emptyStateText(_ text: String) -> some View {
+        HStack(spacing: AppDefaults.paddingMedium) {
+            Image(systemName: "tray")
+                .foregroundColor(.secondary)
+            Text(text)
+                .foregroundColor(.secondary)
+            Spacer(minLength: 0)
+        }
+        .font(.subheadline)
+        .padding(.horizontal, AppDefaults.paddingLarge)
+        .padding(.vertical, AppDefaults.paddingLarge)
+    }
+
+    private func capabilityTile(_ capability: LLMModelCapability) -> some View {
+        let isSelected = capabilities.contains(capability)
+
+        return Button {
+            if isSelected {
+                capabilities.removeAll { $0 == capability }
+            } else {
+                capabilities.append(capability)
+            }
+        } label: {
+            HStack(spacing: AppDefaults.paddingMedium) {
+                Image(systemName: capability.systemName)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(isSelected ? .accentColor : .secondary)
+                    .frame(width: 24, height: 24)
+
+                Text(capability.displayName)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+
+                Spacer(minLength: 0)
+
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(isSelected ? .accentColor : .secondary.opacity(0.6))
+            }
+            .padding(.horizontal, AppDefaults.paddingMedium)
+            .padding(.vertical, 9)
+            .background(
+                RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium, style: .continuous)
+                    .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.06))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium, style: .continuous)
+                    .stroke(isSelected ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.12), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(capability.displayName)
+        .accessibilityValue(isSelected ? "Enabled" : "Disabled")
+    }
+
+    private func statusPill(_ text: String, systemImage: String) -> some View {
+        Label(text, systemImage: systemImage)
+            .font(.caption.weight(.medium))
+            .foregroundColor(.secondary)
+            .lineLimit(1)
+            .padding(.horizontal, AppDefaults.paddingMedium)
+            .padding(.vertical, AppDefaults.paddingSmall)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(Color.secondary.opacity(0.09))
+            )
+    }
+
+    private func metricPill(title: String, value: String, systemImage: String) -> some View {
+        HStack(spacing: AppDefaults.paddingSmall) {
+            Image(systemName: systemImage)
+                .foregroundColor(.accentColor)
+            Text(title)
+                .foregroundColor(.secondary)
+            Text(value)
+                .fontWeight(.semibold)
+                .monospacedDigit()
+        }
+        .font(.caption)
+        .padding(.horizontal, AppDefaults.paddingMedium)
+        .padding(.vertical, 6)
+        .background(
+            Capsule(style: .continuous)
+                .fill(Color.secondary.opacity(0.08))
+        )
+    }
+
+    private func formattedTokenCount(_ value: Int) -> String {
+        value.formatted(.number.grouping(.automatic))
     }
     
     private func save() {
@@ -377,10 +642,38 @@ private struct ModelParameterMappingRow: View {
     @Bindable var mapping: ModelParameterMappingItem
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
-            HStack(alignment: .center, spacing: AppDefaults.paddingMedium) {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: AppDefaults.paddingLarge) {
                 Text(mapping.displayName)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(.primary)
                     .frame(width: 150, alignment: .leading)
+                    .help(mapping.paramDescription)
+
+                VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
+                    Picker("Encoding", selection: Binding(
+                        get: { mapping.encodingKind },
+                        set: {
+                            mapping.encodingKind = $0
+                            mapping.markCustomized()
+                        }
+                    )) {
+                        ForEach(LLMParameterEncodingKind.allCases) { kind in
+                            Text(kind.displayName).tag(kind)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    parameterMappingDetail
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
+                Text(mapping.displayName)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(.primary)
                     .help(mapping.paramDescription)
 
                 Picker("Encoding", selection: Binding(
@@ -395,39 +688,42 @@ private struct ModelParameterMappingRow: View {
                     }
                 }
                 .pickerStyle(.menu)
-            }
 
-            HStack(spacing: AppDefaults.paddingMedium) {
-                if mapping.encodingKind == .scalarKey {
-                    TextField("Wire Key", text: Binding(
-                        get: { mapping.wireKey },
-                        set: {
-                            mapping.wireKey = $0
-                            mapping.markCustomized()
-                        }
-                    ))
-                    .textFieldStyle(.roundedBorder)
-                } else if mapping.encodingKind == .structuredPreset {
-                    Picker("Preset", selection: Binding(
-                        get: { mapping.structuredPreset ?? .openAIChatResponseFormat },
-                        set: {
-                            mapping.structuredPreset = $0
-                            mapping.markCustomized()
-                        }
-                    )) {
-                        ForEach(LLMParameterStructuredPreset.allCases) { preset in
-                            Text(preset.displayName).tag(preset)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                } else {
-                    Text("Omitted from request")
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                parameterMappingDetail
             }
         }
-        .padding(.vertical, AppDefaults.paddingSmall)
+        .padding(.horizontal, AppDefaults.paddingLarge)
+        .padding(.vertical, 12)
+    }
+
+    @ViewBuilder
+    private var parameterMappingDetail: some View {
+        if mapping.encodingKind == .scalarKey {
+            TextField("Wire Key", text: Binding(
+                get: { mapping.wireKey },
+                set: {
+                    mapping.wireKey = $0
+                    mapping.markCustomized()
+                }
+            ))
+            .textFieldStyle(.roundedBorder)
+        } else if mapping.encodingKind == .structuredPreset {
+            Picker("Preset", selection: Binding(
+                get: { mapping.structuredPreset ?? .openAIChatResponseFormat },
+                set: {
+                    mapping.structuredPreset = $0
+                    mapping.markCustomized()
+                }
+            )) {
+                ForEach(LLMParameterStructuredPreset.allCases) { preset in
+                    Text(preset.displayName).tag(preset)
+                }
+            }
+            .pickerStyle(.menu)
+        } else {
+            Text("Omitted from request")
+                .foregroundColor(.secondary)
+        }
     }
 }
 
@@ -435,36 +731,75 @@ private struct ModelParameterAvailabilityRow: View {
     @Bindable var availability: ModelParameterAvailabilityItem
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
-            HStack(alignment: .center, spacing: AppDefaults.paddingMedium) {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: AppDefaults.paddingLarge) {
                 Text(availability.displayName)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(.primary)
                     .frame(width: 150, alignment: .leading)
                     .help(availability.paramDescription)
 
-                Toggle("Available", isOn: binding(\.isAvailable))
-                    .toggleStyle(.switch)
+                VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
+                    HStack(spacing: AppDefaults.paddingLarge) {
+                        Toggle("Available", isOn: binding(\.isAvailable))
+                            .toggleStyle(.switch)
 
-                Toggle("Required", isOn: binding(\.isRequired))
-                    .toggleStyle(.switch)
+                        Toggle("Required", isOn: binding(\.isRequired))
+                            .toggleStyle(.switch)
+
+                        Toggle("Included by Default", isOn: binding(\.isIncludedByDefault))
+                            .toggleStyle(.switch)
+                    }
+
+                    HStack(spacing: AppDefaults.paddingMedium) {
+                        TextField("Default", text: Binding(
+                            get: { defaultValueText },
+                            set: { defaultValueText = $0 }
+                        ))
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 180)
+
+                        Text("Leave empty for no model default value.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
+                Text(availability.displayName)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(.primary)
+                    .help(availability.paramDescription)
+
+                HStack(spacing: AppDefaults.paddingLarge) {
+                    Toggle("Available", isOn: binding(\.isAvailable))
+                        .toggleStyle(.switch)
+
+                    Toggle("Required", isOn: binding(\.isRequired))
+                        .toggleStyle(.switch)
+                }
 
                 Toggle("Included by Default", isOn: binding(\.isIncludedByDefault))
                     .toggleStyle(.switch)
-            }
 
-            HStack(spacing: AppDefaults.paddingMedium) {
-                TextField("Default", text: Binding(
-                    get: { defaultValueText },
-                    set: { defaultValueText = $0 }
-                ))
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 180)
+                HStack(spacing: AppDefaults.paddingMedium) {
+                    TextField("Default", text: Binding(
+                        get: { defaultValueText },
+                        set: { defaultValueText = $0 }
+                    ))
+                    .textFieldStyle(.roundedBorder)
 
-                Text("Leave empty for no model default value.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    Text("Leave empty for no model default value.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
         }
-        .padding(.vertical, AppDefaults.paddingSmall)
+        .padding(.horizontal, AppDefaults.paddingLarge)
+        .padding(.vertical, 12)
     }
 
     private var defaultValueText: String {
