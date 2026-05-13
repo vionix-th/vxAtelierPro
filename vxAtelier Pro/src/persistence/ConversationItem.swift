@@ -197,4 +197,4 @@ final class ConversationItem {
         return count
     }
 
-} 
+}

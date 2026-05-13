@@ -8,5 +8,6 @@ Build/
 DerivedData/
 TestResults
 TestResults.xcresult/
+*.xcuserstate
 vxAtelier ProTests/AI/LiveLLMProviders.local.json
 vxAtelier ProTests/AI/LiveLLMProviders.json

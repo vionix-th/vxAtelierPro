@@ -2,7 +2,7 @@ import Foundation
 
 /// Heuristics for provider detection when persisted model metadata is unavailable.
 public enum LLMModelProviderUtils {
-    
+
     /// Provider names inferred from common model naming conventions.
     public enum Provider: String {
         case openAI = "OpenAI"
@@ -13,17 +13,17 @@ public enum LLMModelProviderUtils {
         case meta = "Meta"
         case mistral = "Mistral"
         case custom = "Custom"
-        
+
         /// Human-facing provider name.
         public var displayName: String {
             return self.rawValue
         }
     }
-    
+
     /// Infers the most likely provider from a model identifier or display name.
     public static func detectProvider(from modelName: String) -> String {
-        if modelName.starts(with: "gpt-") || 
-           (modelName.hasPrefix("o") && modelName.contains("-")) || 
+        if modelName.starts(with: "gpt-") ||
+           (modelName.hasPrefix("o") && modelName.contains("-")) ||
            modelName.contains("-davinci-") ||
            modelName.starts(with: "davinci") ||
            modelName.starts(with: "o1") ||

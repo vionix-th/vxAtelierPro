@@ -109,4 +109,4 @@ final class MessageItem {
             }
         }
     }
-} 
+}

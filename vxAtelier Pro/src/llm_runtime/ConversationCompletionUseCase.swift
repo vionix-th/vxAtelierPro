@@ -106,6 +106,7 @@ final class ConversationCompletionUseCase {
             ) else {
                 return
             }
+            draftSink.complete(conversationID: conversation.id)
 
             let toolCalls = assistantMessage.toolCallItems.sorted { $0.index < $1.index }
             guard !toolCalls.isEmpty else {

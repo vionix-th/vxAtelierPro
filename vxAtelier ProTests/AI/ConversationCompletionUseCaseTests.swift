@@ -130,6 +130,7 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         options.streamMode = .disabled
         let conversation = ConversationItem("Failure", options: options)
         env.modelContext.insert(config)
+        insertOpenAIModel(config: config, env: env)
         env.modelContext.insert(conversation)
 
         await assertThrowsAsyncError(try await ConversationCompletionUseCase.shared.complete(
@@ -193,6 +194,7 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         options.retryPolicy = .oneRetryBeforeTools
         let conversation = ConversationItem("Retry", options: options)
         env.modelContext.insert(config)
+        insertOpenAIModel(config: config, env: env)
         env.modelContext.insert(conversation)
 
         try await ConversationCompletionUseCase.shared.complete(
@@ -240,6 +242,7 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         options.retryPolicy = .oneRetryBeforeTools
         let conversation = ConversationItem("No Retry", options: options)
         env.modelContext.insert(config)
+        insertOpenAIModel(config: config, env: env)
         env.modelContext.insert(conversation)
 
         await assertThrowsAsyncError(try await ConversationCompletionUseCase.shared.complete(
@@ -288,6 +291,7 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         options.streamMode = .disabled
         let conversation = ConversationItem("Tool failure", options: options)
         env.modelContext.insert(config)
+        insertOpenAIModel(config: config, env: env)
         env.modelContext.insert(conversation)
 
         await assertThrowsAsyncError(try await ConversationCompletionUseCase.shared.complete(
@@ -340,6 +344,7 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         options.streamMode = .disabled
         let conversation = ConversationItem("Success", options: options)
         env.modelContext.insert(config)
+        insertOpenAIModel(config: config, env: env)
         env.modelContext.insert(conversation)
 
         try await ConversationCompletionUseCase.shared.complete(
@@ -383,6 +388,7 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         options.streamMode = .disabled
         let conversation = ConversationItem("Cancelled", options: options)
         env.modelContext.insert(config)
+        insertOpenAIModel(config: config, env: env)
         env.modelContext.insert(conversation)
 
         await assertThrowsAsyncError(try await ConversationCompletionUseCase.shared.complete(
@@ -419,5 +425,20 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         ))
 
         XCTAssertTrue(conversation.turns.isEmpty)
+    }
+
+    private func insertOpenAIModel(
+        modelID: String = "gpt-test",
+        config: APIConfigurationItem,
+        env: TestEnvironment
+    ) {
+        let model = ModelItem(modelID: modelID, apiConfiguration: config)
+        model.capabilitiesRaw = [
+            LLMModelCapability.text.rawValue,
+            LLMModelCapability.streaming.rawValue,
+            LLMModelCapability.usage.rawValue,
+            LLMModelCapability.tools.rawValue
+        ]
+        env.modelContext.insert(model)
     }
 }

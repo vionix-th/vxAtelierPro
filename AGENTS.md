@@ -8,7 +8,13 @@
 - Fully implement requested functionality: no new TODOs, placeholders, or missing pieces.
 - Do **not** add `#Preview` blocks or any other SwiftUI preview-related code.
 - Do not make assumptions about existing types/properties/functions; verify in the codebase first.
-- Do not implement backward compatibility or data migrations unless explicitly requested.
+
+## Backward Compatibility / Data Migration
+- This app has no stable release yet; persisted local data is disposable during development.
+- Do **not** add backward-compatibility layers, schema-history tracking, compatibility shims, or SwiftData migration stages for unreleased schema changes unless explicitly requested for a specific task.
+- When a schema change invalidates existing local data, prefer deleting/resetting the incompatible local store over preserving or migrating it.
+- Review schema changes for whether destructive reset remains reliable, not for whether old stores can be migrated.
+- Do not frame missing migrations as a defect unless the Caesar explicitly asks for preservation of existing data.
 
 ## Comments
 - Only add comments when explanation if code is not self explainatory 
@@ -38,4 +44,4 @@
 - Architecture: `docs/DEVELOPER.md`
 - Common mistakes/errors: `docs/TROUBLESHOOTING.md`
 - TTS system: `src/tts/README.md`
-- AI system: `src/ai/README.md`
+- LLM system: `src/llm_api/README.md`

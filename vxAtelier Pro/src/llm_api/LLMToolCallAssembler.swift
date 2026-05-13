@@ -37,6 +37,23 @@ struct LLMToolCallAssembler {
         return existing
     }
 
+    /// Replaces the current assembled call with a provider-final call payload.
+    mutating func replace(with call: LLMToolCall) -> LLMToolCall {
+        let resolvedIndex = indexByID[call.id]
+            ?? call.callID.flatMap { indexByID[$0] }
+            ?? call.index
+        var finalCall = call
+        finalCall.index = resolvedIndex
+        callsByIndex[resolvedIndex] = finalCall
+        if !call.id.isEmpty {
+            indexByID[call.id] = resolvedIndex
+        }
+        if let callID = call.callID, !callID.isEmpty {
+            indexByID[callID] = resolvedIndex
+        }
+        return finalCall
+    }
+
     /// Returns the current calls in provider emission order.
     var assembled: [LLMToolCall] {
         callsByIndex.values.sorted { $0.index < $1.index }

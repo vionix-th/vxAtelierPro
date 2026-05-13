@@ -151,7 +151,6 @@ await MainActor.run {
 ```
 
 **Files Fixed:**
-- `AIToolDialog.swift`: Removed incorrect attempt to make `DialogItem` sendable
 - `ProjectItem.swift`: Fixed async operations to use ID-based fetching
 
 **Explanation:**

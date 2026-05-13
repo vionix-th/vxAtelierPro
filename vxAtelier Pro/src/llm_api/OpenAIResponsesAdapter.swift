@@ -149,7 +149,7 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
                     name: item.string("name") ?? "",
                     argumentsJSON: item.string("arguments") ?? ""
                 )
-                continuation.yield(.toolCallCompleted(assembler.merge(call)))
+                _ = assembler.replace(with: call)
             }
         case "response.completed":
             let response = event.object("response")

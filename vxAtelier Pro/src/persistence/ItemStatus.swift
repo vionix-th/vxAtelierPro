@@ -1,7 +1,7 @@
 import Foundation
 
 /// Status categories for items in the application.
-/// Used by both DialogItem and ProjectItem to track their lifecycle state.
+/// Used by both ConversationItem and ProjectItem to track their lifecycle state.
 public enum ItemStatus: String, Codable {
     /// Active and visible item
     case active = "active"
@@ -11,4 +11,4 @@ public enum ItemStatus: String, Codable {
 
     /// Trashed item (pending deletion)
     case trashed = "trashed"
-} 
+}

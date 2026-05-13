@@ -72,14 +72,11 @@ final class ConversationDraftStore {
 
     func updateToolCalls(_ newToolCalls: [LLMToolCall], conversationID: PersistentIdentifier? = nil) {
         mutate(conversationID: conversationID) { draft in
-            var assembler = LLMToolCallAssembler()
-            for call in draft.toolCalls {
-                _ = assembler.merge(call)
-            }
+            var toolCalls = draft.toolCalls
             for call in newToolCalls {
-                _ = assembler.merge(call)
+                Self.upsertSnapshot(call, into: &toolCalls)
             }
-            draft.toolCalls = assembler.assembled
+            draft.toolCalls = toolCalls.sorted { $0.index < $1.index }
             draft.isActive = true
             draft.runStatus = .awaitingTools
         }
@@ -110,5 +107,15 @@ final class ConversationDraftStore {
         var draft = drafts[id] ?? ConversationDraft()
         body(&draft)
         drafts[id] = draft
+    }
+
+    private static func upsertSnapshot(_ call: LLMToolCall, into calls: inout [LLMToolCall]) {
+        if let existingIndex = calls.firstIndex(where: { existing in
+            existing.index == call.index || existing.id == call.id || (call.callID != nil && existing.callID == call.callID)
+        }) {
+            calls[existingIndex] = call
+        } else {
+            calls.append(call)
+        }
     }
 }

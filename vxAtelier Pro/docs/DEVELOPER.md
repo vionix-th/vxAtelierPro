@@ -36,7 +36,7 @@ This file defines the `vxAtelierPro` struct, which conforms to the `App` protoco
 
 *   **Bootstrapping**: It is responsible for bootstrapping the entire application, including initializing the data layer, injecting dependencies, and setting up the main view hierarchy.
 *   **SwiftData Initialization**: It defines the complete data `Schema` for all `PersistentModel` types and creates the shared `ModelContainer`.
-*   **Dependency Injection**: It initializes `QueryManager`, `TTSQueue`, and `ConversationViewModelStore`, then injects them (and the `ModelContainer`) into the SwiftUI environment.
+*   **Dependency Injection**: It initializes `QueryManager`, `TTSQueue`, and `AppSceneModel`, then injects them (and the `ModelContainer`) into the SwiftUI environment.
 *   **Root View and Scene Management**: It sets up `AppShellView` as the root view, hosts `ContentView` within it, and defines the main `WindowGroup` plus macOS `Settings` and menu bar scenes.
 *   **macOS Hotkeys**: On macOS, it initializes `GlobalHotkeyController` (built on `HotkeyManager`) to register the utility panel hotkey after launch.
 
@@ -556,7 +556,7 @@ This is the root view of the application and the stable parent for global UI pre
 This is the main navigation view, responsible for sidebar structure and detail routing.
 
 *   **Main UI Structure**: Builds the primary layout using `NavigationSplitView` (macOS) and `NavigationSplitView` + `navigationDestination` (iOS).
-*   **Sidebar Composition**: Uses `ContentSidebarDataSource` to transform `QueryManager` data into projects/dialogs/bookmarks based on `NavigationMode` and `ShowSystemDialogs`, and renders via `ContentSidebarView`.
+*   **Sidebar Composition**: Uses `ContentSidebarView` with SwiftData queries and routing state to render projects, conversations, and bookmarks based on `NavigationMode` and `ShowSystemDialogs`.
 *   **State-Driven Routing**: Uses `SidebarSelection` to route to `ProjectView` or `ConversationView`, and uses `ProjectConversationSelection` to focus a specific conversation when navigating into a project.
 *   **Action Hub**: Exposes toolbar menu actions (new items, import, view options, utilities, settings) and delegates app-level requests back to `AppShellView`.
 
@@ -572,7 +572,6 @@ This view provides a persistent, app-wide status bar at the bottom of the main w
 
 This submodule holds the sidebar data and navigation plumbing used by `ContentView`.
 
-*   **`ContentSidebarDataSource.swift`**: Shapes projects/dialogs/bookmarks for the current `NavigationMode` (bookmarks are label-sorted for determinism) and provides a stable list of visible selections.
 *   **`ContentSidebarView.swift`**: Renders sidebar sections using `NavigationItem` rows and `SidebarSortButton`, and wires delete/archive/restore/export actions through closures.
 *   **`ContentRouting.swift`**: Defines `SidebarSelection`, `ProjectConversationSelection`, and `selectionMatches(...)` helpers for selection syncing and routing.
 *   **`Sorters.swift`**: `ConversationSorter` and `ProjectSorter` provide deterministic ordering (with tie-breakers) for sidebar and project lists; `ProjectSorter` scopes last-message timestamps by `NavigationMode`.
@@ -581,16 +580,12 @@ This submodule holds the sidebar data and navigation plumbing used by `ContentVi
 
 This submodule contains the views responsible for displaying and interacting with a single conversation. All views have been migrated to use ID-based selection patterns to prevent crashes when SwiftData objects are deleted while views are active. Deprecated pass-through wrapper properties using the "dialogs" terminology have been removed throughout the codebase.
 
-##### Chat Interface (`ConversationView.swift` & `ConversationViewModel.swift`)
+##### Chat Interface (`ConversationView.swift` & `MessageInputView.swift`)
 
-This pair of files implements the core chat interface using the Model-View-ViewModel (MVVM) pattern.
+These files implement the core chat interface using SwiftUI state plus a focused `@Observable` input controller.
 
-*   **`ConversationView.swift` (The View)**: A declarative SwiftUI view responsible for rendering the UI. It is composed of a `ConversationMessagesList` for the message history and a `MessageInputView` for user input. It observes the ViewModel for all state and forwards all user actions to it. The view has been migrated to use ID-based selection patterns, initializing with a `conversationID` instead of a direct `ConversationItem` reference to prevent crashes when SwiftData objects are deleted while views are active.
-*   **`ConversationViewModel.swift` (The ViewModel)**: An `@MainActor ObservableObject` that holds the state and business logic. It is initialized with a `conversationID` and the `QueryManager`. It publishes all UI state (e.g., `selectedMessages`, `streamingState`) and contains the methods to handle every user action, from message selection to forking a conversation. The ViewModel resolves the actual `ConversationItem` from the `QueryManager` by `conversationID` at render time, ensuring data consistency.
-
-##### ViewModel Store (`ConversationViewModelStore.swift`)
-
-This `@Observable` cache provides one `ConversationViewModel` per conversation ID, preserving UI state (scroll position, selection, streaming) as users switch between conversations.
+*   **`ConversationView.swift`**: A declarative SwiftUI view responsible for rendering the UI. It resolves the active `ConversationItem` by `conversationID`, owns local selection/bookmark state, and passes `ConversationDraftStore` into the message list and input area.
+*   **`MessageInputView.swift`**: Owns composition state through a private `@Observable` `MessageInputController`, handles prompt-template expansion and auto-naming, and calls `ConversationCompletionUseCase` to initiate the provider run.
 
 ##### Message Bubble (`MessageView.swift`)
 
@@ -598,7 +593,7 @@ This is a reusable SwiftUI component that renders a single message bubble in the
 
 *   **Role-Based Layout**: It uses the `message.role` (`user`, `assistant`, `tool`) to determine the layout, alignment, and visual styling of the message.
 *   **Dynamic Content Rendering**: It intelligently renders different content types, including custom views for tool calls, markdown for rich text, and plain text.
-*   **Action Delegation**: It provides a `contextMenu` with a comprehensive set of actions (e.g., bookmark, fork, copy). When an action is triggered, it calls an `onAction` closure, passing the action to the `ConversationViewModel` to handle the logic.
+*   **Action Delegation**: It provides a `contextMenu` with a comprehensive set of actions (e.g., bookmark, fork, copy). When an action is triggered, it calls an `onAction` closure so the parent conversation view can handle the intent.
 *   **State-Aware UI**: It adapts its appearance based on selection state, visually indicating whether it is selected or part of an active selection session.
 
 ##### Message Input (`MessageInputView.swift`)
@@ -864,7 +859,7 @@ This module provides a collection of shared services, helpers, and extensions us
 ### Views Layer
 Location: `src/views/`
 *   **`AppShellView.swift`**: Root UI shell that hosts `ContentView` and `StatusBar`, owns global sheet presentation, and runs import/export tasks.
-*   **`ContentView.swift`**: Main `NavigationSplitView` for sidebar/detail routing. It uses `SidebarSelection` and `ContentSidebarDataSource` to drive navigation and delegates app-level requests to `AppShellView`.
+*   **`ContentView.swift`**: Main `NavigationSplitView` for sidebar/detail routing. It uses `SidebarSelection` and `ContentSidebarView` to drive navigation and delegates app-level requests to `AppShellView`.
 *   **`StatusBar.swift`**: A persistent view displayed at the bottom of the main window. It shows filtered log output and a `DialogInfoHeader` for the active conversation.
 *   **Appearance handling**: The app-level scene builders apply the user-selected appearance using `.preferredColorScheme` with the `@AppStorage("appearanceStyle")` value, so the main window and Settings scene respect runtime theme changes without extra wrapper views.
 
@@ -1058,14 +1053,14 @@ Delete rules:
 * `.nullify` when a conversation is removed from a project.
 
 ## View & State Flow Conventions
-* **Environment Objects:** `QueryManager`, `TTSQueue`, `ConversationViewModelStore`, and SwiftData `ModelContext` are seeded in `vxAtelierPro.App`.
+* **Environment Values:** `QueryManager`, `TTSQueue`, `AppSceneModel`, and SwiftData `ModelContext` are seeded in `vxAtelierPro.App`.
 * **@Query / @ModelContext:** Used where live SwiftData bindings are needed; most list data flows through `QueryManager`.
 * **Navigation:** `NavigationSplitView` for the main shell; `NavigationStack` inside `ProjectView` for project-local routing.
 * **Selection Logic:** `SidebarSelection` drives sidebar/detail routing; `ProjectConversationSelection` and `selectionRequest` enable programmatic selection.
 * **Logging UI:** Status bar shows filtered `LoggingService` output; log history sheet reads `messageHistory`.
 
 ## Lifecycle & Entry Points
-1. `vxAtelierPro.App` registers platform specific `AppDelegate`, initialises `ModelContainer`, `QueryManager`, `TTSQueue`, `ConversationViewModelStore`, and default tools.
+1. `vxAtelierPro.App` registers platform specific `AppDelegate`, initialises `ModelContainer`, `QueryManager`, `TTSQueue`, `AppSceneModel`, and default tools.
 2. The `WindowGroup` hosts `AppShellView` with `.preferredColorScheme` driven by `@AppStorage("appearanceStyle")`; the `Settings` scene hosts `ApplicationSettingsView` with the same override and injected environments.
 3. On macOS, a `MenuBarExtra` supplies quick actions.
 

@@ -205,26 +205,14 @@ struct MessageView: View {
                 // Tool results section (gated by ShowToolCallChips)
                 if message.role == "assistant" && showToolCallChips {
                     let turn = conversation.turns.first(where: { $0.id == turnID })
-                    let toolResults = turn?.events.filter { $0.type == .toolResult && $0.message.toolCallId != nil } ?? []
                     let calls = message.orderedToolCallItems
-                    let callById: [String: ToolCallItem] = {
-                        var dict: [String: ToolCallItem] = [:]
-                        for c in calls {
-                            dict[c.callID] = c
-                        }
-                        return dict
-                    }()
-                    let resultEvents = toolResults.filter { ev in
-                        if let cid = ev.message.toolCallId { return callById[cid] != nil } else { return false }
-                    }.sorted { $0.timestamp < $1.timestamp }
-                    let resultsCountById: [String: Int] = {
-                        Dictionary(grouping: resultEvents, by: { $0.message.toolCallId! }).mapValues { $0.count }
-                    }()
-                    let totalResults = resultEvents.count
-                    let pendingCount = calls.reduce(0) { partial, call in
-                        let id = call.callID
-                        return partial + ((resultsCountById[id] ?? 0) == 0 ? 1 : 0)
-                    }
+                    let displayState = ToolResultDisplayResolver.resolve(
+                        calls: calls,
+                        events: turn?.events ?? []
+                    )
+                    let resultEvents = displayState.results
+                    let totalResults = displayState.totalResults
+                    let pendingCount = displayState.pendingCount
 
                     // Spinner if assistant text is blank and there are pending tool call results
                     if assistantTextIsEmpty && pendingCount > 0 {
@@ -241,10 +229,10 @@ struct MessageView: View {
                     if !calls.isEmpty || pendingCount > 0 || totalResults > 0 {
                         DisclosureGroup(isExpanded: $toolsExpanded) {
                             VStack(alignment: .leading, spacing: 8) {
-                                ForEach(resultEvents, id: \.id) { ev in
+                                ForEach(resultEvents, id: \.id) { result in
+                                    let ev = result.event
                                     let rid = ev.id
-                                    let cid = ev.message.toolCallId ?? ""
-                                    let toolName = (callById[cid]?.name) ?? "Tool"
+                                    let toolName = result.toolCall.name
                                     let isLong = ev.message.displayText.count > 600 || ev.message.displayText.components(separatedBy: "\n").count > 12
                                     let expanded = expandedResultIds.contains(rid)
                                     VStack(alignment: .leading, spacing: 6) {
@@ -399,5 +387,52 @@ struct MessageView: View {
             }
             .help("Delete this message")
         }
+    }
+}
+
+struct ToolResultDisplay {
+    let event: TurnEvent
+    let toolCall: ToolCallItem
+
+    var id: PersistentIdentifier {
+        event.id
+    }
+}
+
+struct ToolResultDisplayState {
+    let results: [ToolResultDisplay]
+    let pendingCount: Int
+
+    var totalResults: Int {
+        results.count
+    }
+}
+
+enum ToolResultDisplayResolver {
+    static func resolve(calls: [ToolCallItem], events: [TurnEvent]) -> ToolResultDisplayState {
+        var callByResultID: [String: ToolCallItem] = [:]
+        for call in calls {
+            callByResultID[call.callID] = call
+            if let providerCallID = call.providerCallID, !providerCallID.isEmpty {
+                callByResultID[providerCallID] = call
+            }
+        }
+
+        var completedCallIDs = Set<String>()
+        let results = events
+            .filter { $0.type == .toolResult }
+            .compactMap { event -> ToolResultDisplay? in
+                guard let toolCallID = event.message.toolCallId,
+                      let call = callByResultID[toolCallID] else {
+                    return nil
+                }
+                completedCallIDs.insert(call.callID)
+                return ToolResultDisplay(event: event, toolCall: call)
+            }
+            .sorted { $0.event.timestamp < $1.event.timestamp }
+        let pendingCount = calls.reduce(0) { partial, call in
+            partial + (completedCallIDs.contains(call.callID) ? 0 : 1)
+        }
+        return ToolResultDisplayState(results: results, pendingCount: pendingCount)
     }
 }

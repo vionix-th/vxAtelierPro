@@ -43,7 +43,7 @@ struct ConversationView: View {
         }
         return conversation.title
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
             ScrollViewReader { proxy in
@@ -569,11 +569,11 @@ fileprivate struct ConversationTurnView: View {
 
             let draft = draftStore.draft(for: conversationID)
             let latestRun = turn.responseRuns.sorted { $0.startedAt < $1.startedAt }.last
-            let latestRunFailed = latestRun?.status == .failed || latestRun?.status == .cancelled
-            let draftFailed = draft.runStatus == .failed || draft.runStatus == .cancelled
-            let shouldRenderDraft = assistantEvents.isEmpty
-                && isLastTurn
-                && (draft.isActive || draftFailed || latestRunFailed)
+            let shouldRenderDraft = ConversationDraftRenderPolicy.shouldRender(
+                isLastTurn: isLastTurn,
+                draft: draft,
+                latestRunStatus: latestRun?.status
+            )
 
             if shouldRenderDraft {
                 MessageView(
@@ -595,5 +595,18 @@ fileprivate struct ConversationTurnView: View {
             }
         }
         .padding(.horizontal, AppDefaults.paddingSmall)
+    }
+}
+
+enum ConversationDraftRenderPolicy {
+    static func shouldRender(
+        isLastTurn: Bool,
+        draft: ConversationDraft,
+        latestRunStatus: LLMRunStatus?
+    ) -> Bool {
+        guard isLastTurn else { return false }
+        let draftFailed = draft.runStatus == .failed || draft.runStatus == .cancelled
+        let latestRunFailed = latestRunStatus == .failed || latestRunStatus == .cancelled
+        return draft.isActive || draftFailed || latestRunFailed
     }
 }
