@@ -157,6 +157,13 @@ struct vxAtelierPro: App {
         }
 
         #if os(macOS)
+            Window("Settings", id: "applicationSettings") {
+                ApplicationSettingsWindowView()
+                    .preferredColorScheme(effectiveColorScheme)
+                    .bootstrapped(with: bootstrap)
+            }
+            .defaultSize(width: 900, height: 640)
+
             Window("Utility", id: "utilityPanel") {
                 UtilityPanelView()
                     .preferredColorScheme(effectiveColorScheme)
@@ -175,6 +182,15 @@ struct vxAtelierPro: App {
 // MARK: - Platform-Specific Components
 
 #if os(macOS)
+    struct ApplicationSettingsWindowView: View {
+        @Environment(AppSceneModel.self) private var sceneModel
+
+        var body: some View {
+            ApplicationSettingsView(initialTab: sceneModel.settingsInitialTab)
+                .id(sceneModel.settingsRequestID)
+        }
+    }
+
     /// Menu bar extra content for macOS
     struct MenuBarContent: View {
         @Environment(\.openWindow) private var openWindow

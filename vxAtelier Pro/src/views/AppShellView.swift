@@ -21,7 +21,14 @@ struct AppShellView: View {
                 onRequestExportProject: scene.requestExport(project:),
                 onRequestExportConversation: scene.requestExport(conversation:),
                 onRequestImport: scene.requestImport,
-                onRequestSettings: scene.requestSettings(_:),
+                onRequestSettings: { tab in
+                    #if os(macOS)
+                        scene.prepareSettingsWindow(tab)
+                        openWindow(id: "applicationSettings")
+                    #else
+                        scene.requestSettings(tab)
+                    #endif
+                },
                 onRequestTTS: scene.requestTTS,
                 onRequestLogHistory: scene.requestLogHistory
             )

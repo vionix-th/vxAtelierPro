@@ -1,115 +1,83 @@
 import SwiftUI
 
-// MARK: - Application Settings View
 struct ApplicationSettingsView: View {
-    enum SettingsTab: CaseIterable, Identifiable {
-        case general
-        case api
-        case webSearch
-        case models
-        case prompts
-        case tts
-        case permissions
-        case maintenance
-        case developer
-        case logSources
+    typealias SettingsTab = SettingsDestination
 
-        var id: Self { self }
-
-        var label: String {
-            switch self {
-            case .general: "General"
-            case .api: "API"
-            case .webSearch: "Web Search"
-            case .models: "Models"
-            case .prompts: "Prompts"
-            case .tts: "Speech"
-            case .permissions: "Permissions"
-            case .maintenance: "Maintenance"
-            case .developer: "Developer"
-            case .logSources: "Log Sources"
-            }
-        }
-
-        var systemImage: String {
-            switch self {
-            case .general: "slider.horizontal.3"
-            case .api: "key.fill"
-            case .webSearch: "magnifyingglass"
-            case .models: "cpu"
-            case .prompts: "text.bubble.fill"
-            case .tts: "person.wave.2.fill"
-            case .permissions: "lock.shield"
-            case .maintenance: "wrench.and.screwdriver"
-            case .developer: "chevron.left.forwardslash.chevron.right"
-            case .logSources: "list.bullet.rectangle"
-            }
-        }
-    }
-
-    @State private var selectedTab: SettingsTab
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var selectedTab: SettingsTab?
+    @State private var compactPath: [SettingsTab]
     private let initialTab: SettingsTab?
 
     init(initialTab: SettingsTab? = nil) {
         self.initialTab = initialTab
         _selectedTab = State(initialValue: initialTab ?? .general)
+        _compactPath = State(initialValue: initialTab.map { [$0] } ?? [])
     }
 
     var body: some View {
-        NavigationSplitView {
-            List(SettingsTab.allCases, selection: $selectedTab) { tab in
-                Label(tab.label, systemImage: tab.systemImage)
-                    .tag(tab)
-            }
-            .navigationTitle("Settings")
-            .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(190)
-        } detail: {
-            Group {
-                switch selectedTab {
-                case .general:
-                    GeneralSettingsView()
-                        .padding(AppDefaults.paddingLarge)
-                case .api:
-                    APISettingsView()
-                        .padding(AppDefaults.paddingLarge)
-                case .webSearch:
-                    WebSearchSettingsView()
-                        .padding(AppDefaults.paddingLarge)
-                case .models:
-                    ModelsSettingsView()
-                        .padding(AppDefaults.paddingLarge)
-                case .prompts:
-                    PromptsSettingsView()
-                        .padding(AppDefaults.paddingLarge)
-                case .tts:
-                    TTSSettingsView()
-                        .padding(AppDefaults.paddingLarge)
-                case .permissions:
-                    PermissionsSettingsView()
-                        .padding(AppDefaults.paddingLarge)
-                case .maintenance:
-                    MaintenanceSettingsView()
-                        .padding(AppDefaults.paddingLarge)
-                case .developer:
-                    DeveloperSettingsView()
-                        .padding(AppDefaults.paddingLarge)
-                case .logSources:
-                    LogSourcesSettingsView()
-                        .padding(AppDefaults.paddingLarge)
-                }
-            }
-        }
+        settingsContainer
         .onAppear {
             vxAtelierPro.log.debug("ApplicationSettingsView appeared")
             if let initialTab = initialTab {
                 selectedTab = initialTab
+                if compactPath.isEmpty {
+                    compactPath = [initialTab]
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var settingsContainer: some View {
+        #if os(macOS)
+        splitSettingsView
+        #else
+        if horizontalSizeClass == .compact {
+            compactSettingsView
+        } else {
+            splitSettingsView
+        }
+        #endif
+    }
+
+    private var splitSettingsView: some View {
+        NavigationSplitView {
+            sidebar
+                .navigationTitle("Settings")
+                .listStyle(.sidebar)
+                .navigationSplitViewColumnWidth(190)
+        } detail: {
+            SettingsDestinationView(destination: selectedTab ?? .general)
+        }
+    }
+
+    private var compactSettingsView: some View {
+        NavigationStack(path: $compactPath) {
+            List(SettingsDestination.allCases) { destination in
+                NavigationLink(value: destination) {
+                    Label(destination.title, systemImage: destination.systemImage)
+                }
+            }
+            .navigationTitle("Settings")
+            .navigationDestination(for: SettingsDestination.self) { destination in
+                SettingsDestinationView(destination: destination)
+            }
+        }
+    }
+
+    private var sidebar: some View {
+        List(SettingsDestination.allCases, id: \.self, selection: $selectedTab) { destination in
+            NavigationLink(value: destination) {
+                Label(destination.title, systemImage: destination.systemImage)
             }
         }
     }
 }
 
-#Preview {
-    ApplicationSettingsView(initialTab: .general)
-        .bootstrapped(with: .preview())
+struct SettingsDestinationView: View {
+    let destination: SettingsDestination
+
+    var body: some View {
+        destination.content
+    }
 }

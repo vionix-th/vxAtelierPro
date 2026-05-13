@@ -3,8 +3,7 @@ import SwiftUI
 struct MaintenanceSettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(QueryManager.self) private var queryManager
-    @State private var showConfirmation: Bool = false
-    @State private var confirmationContext: ConfirmationContext? = nil
+    @State private var confirmation: SettingsConfirmation?
     @State private var showBackupExporter = false
     @State private var showBackupImporter = false
     @State private var backupDocument: BackupDocument? = nil
@@ -15,19 +14,6 @@ struct MaintenanceSettingsView: View {
     private func showCompletion(message: String) {
         completionMessage = message
         showCompletionAlert = true
-    }
-
-    private func handleConfirmation() {
-        switch confirmationContext {
-        case .resetToDefaults:
-            resetToDefaults()
-        case .cleanLocalStorage:
-            cleanLocalStorage()
-        case .restoreDatabase:
-            showBackupImporter = true
-        default:
-            break
-        }
     }
 
     private func resetToDefaults() {
@@ -45,54 +31,60 @@ struct MaintenanceSettingsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: AppDefaults.paddingLarge) {
-                SettingsSectionView(title: "Data Management") {
-                    VStack(spacing: AppDefaults.paddingMedium) {
-                        ActionButton(title: "Reset to Defaults", iconName: "arrow.uturn.backward.circle.fill") {
-                            confirmationContext = .resetToDefaults
-                            showConfirmation = true
-                        }
-                        ActionButton(title: "Clear Local Storage", iconName: "trash.circle.fill") {
-                            confirmationContext = .cleanLocalStorage
-                            showConfirmation = true
-                        }
-                        ActionButton(title: "Backup Database", iconName: "arrow.up.doc") {
-                            Task { @MainActor in
-                                do {
-                                    let data = try await DataManager.shared.createBackup(from: modelContext)
-                                    backupDocument = BackupDocument(backupData: data)
-                                    showBackupExporter = true
-                                } catch {
-                                    showCompletion(message: "Database backup failed: \(error.localizedDescription)")
-                                }
-                            }
-                        }
-                        ActionButton(title: "Restore Database", iconName: "arrow.down.doc") {
-                            confirmationContext = .restoreDatabase
-                            showConfirmation = true
+        SettingsPage(title: "Maintenance") {
+            SettingsFormSection("Data Management") {
+                Button {
+                    confirmation = SettingsConfirmation(
+                        title: "Reset to Defaults",
+                        message: "Are you sure you want to reset all settings to their default values?",
+                        confirmTitle: "Reset",
+                        action: resetToDefaults
+                    )
+                } label: {
+                    Label("Reset to Defaults", systemImage: "arrow.uturn.backward.circle.fill")
+                }
+
+                Button(role: .destructive) {
+                    confirmation = SettingsConfirmation(
+                        title: "Clear Local Storage",
+                        message: "Are you sure you want to clear all local storage? This action cannot be undone.",
+                        confirmTitle: "Clear",
+                        action: cleanLocalStorage
+                    )
+                } label: {
+                    Label("Clear Local Storage", systemImage: "trash.circle.fill")
+                }
+
+                Button {
+                    Task { @MainActor in
+                        do {
+                            let data = try await DataManager.shared.createBackup(from: modelContext)
+                            backupDocument = BackupDocument(backupData: data)
+                            showBackupExporter = true
+                        } catch {
+                            showCompletion(message: "Database backup failed: \(error.localizedDescription)")
                         }
                     }
+                } label: {
+                    Label("Backup Database", systemImage: "arrow.up.doc")
+                }
+
+                Button(role: .destructive) {
+                    confirmation = SettingsConfirmation(
+                        title: "Restore Database",
+                        message: "Are you sure you want to restore the database? This action cannot be undone.",
+                        confirmTitle: "Restore",
+                        action: { showBackupImporter = true }
+                    )
+                } label: {
+                    Label("Restore Database", systemImage: "arrow.down.doc")
                 }
             }
-            .padding(.vertical, AppDefaults.paddingLarge)
         }
-        .navigationTitle("Maintenance")
         .alert(completionMessage, isPresented: $showCompletionAlert) {
             Button("OK", role: .cancel) { }
         }
-        .alert(
-            confirmationContext?.title ?? "",
-            isPresented: $showConfirmation,
-            presenting: confirmationContext
-        ) { context in
-            Button(context.confirmButtonTitle, role: .destructive) {
-                handleConfirmation()
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: { context in
-            Text(context.message)
-        }
+        .settingsConfirmationDialog($confirmation)
         .fileExporter(
             isPresented: $showBackupExporter,
             document: backupDocument,

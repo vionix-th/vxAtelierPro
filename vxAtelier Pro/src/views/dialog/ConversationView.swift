@@ -111,8 +111,14 @@ struct ConversationView: View {
         .padding(AppDefaults.paddingSmall)
         .navigationTitle(navigationTitle)
         .errorAlert(error: $errorAlert)
-        .sheet(item: $bookmarkMessage) { message in
-            if let (turn, event) = turnAndEvent(for: message) {
+        .sheet(
+            isPresented: Binding(
+                get: { bookmarkMessage != nil },
+                set: { if !$0 { bookmarkMessage = nil } }
+            )
+        ) {
+            if let message = bookmarkMessage,
+               let (turn, event) = turnAndEvent(for: message) {
                 BookmarkSheetView(
                     label: $bookmarkMessageLabel,
                     turn: turn,

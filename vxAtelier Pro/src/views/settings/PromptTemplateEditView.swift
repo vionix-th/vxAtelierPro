@@ -1,146 +1,123 @@
 import SwiftUI
 import SwiftData
 
+struct PromptTemplateDraft {
+    let name: String
+    let category: PromptTemplate.Category
+    let summary: String
+    let prompt: String
+}
 
-// MARK: - Prompt Template Edit View
-
-/// A view for editing or creating a prompt template.
-/// Provides controls for setting name, category, summary, and prompt content.
-///
-/// Requirements:
-/// - Must be presented within a NavigationStack
-///
-/// Constraints:
-/// - Template names must be unique
-/// - All fields are required except summary
 struct PromptTemplateEditView: View {
-    // MARK: - Environment & Properties
-    
     @Environment(\.dismiss) private var dismiss
-    @Bindable var template: PromptTemplate
+    let template: PromptTemplate
     let isNewTemplate: Bool
     let templates: [PromptTemplate]
-    var onComplete: (Bool) -> Void
-    
-    // MARK: - State
-    
+    var onCancel: () -> Void
+    var onSave: (PromptTemplateDraft) -> String?
+
+    @State private var name: String
+    @State private var category: PromptTemplate.Category
+    @State private var summary: String
+    @State private var prompt: String
     @State private var showError = false
     @State private var errorMessage = ""
-    
-    // MARK: - View Body
-    
+
+    init(
+        template: PromptTemplate,
+        isNewTemplate: Bool,
+        templates: [PromptTemplate],
+        onCancel: @escaping () -> Void,
+        onSave: @escaping (PromptTemplateDraft) -> String?
+    ) {
+        self.template = template
+        self.isNewTemplate = isNewTemplate
+        self.templates = templates
+        self.onCancel = onCancel
+        self.onSave = onSave
+        _name = State(initialValue: template.name)
+        _category = State(initialValue: template.category)
+        _summary = State(initialValue: template.summary)
+        _prompt = State(initialValue: template.prompt)
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(spacing: AppDefaults.paddingLarge) {
-                // Basic Settings Section
-                VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
-                    Text("Basic Settings")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                        .padding(.vertical, AppDefaults.paddingSmall)
-                        .padding(.horizontal, AppDefaults.paddingSmall)
-                    
-                    VStack(spacing: AppDefaults.paddingMedium) {
-                        // Name Field
-                        VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
-                            Text("Name")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            TextField("Template Name", text: $template.name)
-                                .textFieldStyle(.roundedBorder)
-                        }
-                        
-                        // Category Picker
-                        VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
-                            Text("Category")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            Picker("", selection: $template.category) {
-                                Label("User", systemImage: "person")
-                                    .tag(PromptTemplate.Category.User)
-                                Label("System", systemImage: "gear")
-                                    .tag(PromptTemplate.Category.System)
-                            }
-                            .pickerStyle(.segmented)
-                        }
-                        
-                        // Summary Field
-                        VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
-                            Text("Summary (Optional)")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            TextField("Brief description of the template", text: $template.summary)
-                                .textFieldStyle(.roundedBorder)
-                        }
-                    }
-                    .padding(AppDefaults.paddingLarge)
-                    .background(Color.secondary.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium))
-                    .padding(.horizontal, AppDefaults.paddingLarge)
+        SettingsPage(title: isNewTemplate ? "New Template" : "Edit Template") {
+            SettingsFormSection("Basic Settings") {
+                LabeledContent("Name") {
+                    TextField("Template Name", text: $name)
+                        .textFieldStyle(.roundedBorder)
                 }
-                
-                // Prompt Content Section
-                VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
-                    Text("Prompt Content")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, AppDefaults.paddingLarge)
-                    
-                    TextEditor(text: $template.prompt)
-                        .font(.system(.body, design: .monospaced))
-                        .frame(minHeight: 200)
-                        .cornerRadius(AppDefaults.cornerRadiusMedium)
-                        .padding(AppDefaults.paddingSmall)
-                        .background(Color.secondary.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium))
-                        .padding(.horizontal, AppDefaults.paddingLarge)
+                SettingsPickerRow("Category", selection: $category) {
+                    Label("User", systemImage: "person")
+                        .tag(PromptTemplate.Category.User)
+                    Label("System", systemImage: "gear")
+                        .tag(PromptTemplate.Category.System)
+                }
+                LabeledContent("Summary") {
+                    TextField("Brief description of the template", text: $summary)
+                        .textFieldStyle(.roundedBorder)
                 }
             }
-            .padding(.vertical, AppDefaults.paddingLarge)
+
+            SettingsFormSection("Prompt Content") {
+                TextEditor(text: $prompt)
+                    .font(.system(.body, design: .monospaced))
+                    .frame(minHeight: 240)
+            }
         }
-        .navigationTitle(isNewTemplate ? "New Template" : "Edit Template")
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
+            ToolbarItem(placement: .settingsCancel) {
                 Button("Cancel") {
-                    vxAtelierPro.log.debug("📝 PromptTemplateEditView: Edit cancelled")
-                    onComplete(false)
+                    vxAtelierPro.log.debug("Prompt template edit cancelled")
+                    onCancel()
                 }
             }
-            ToolbarItem(placement: .confirmationAction) {
+            ToolbarItem(placement: .settingsConfirm) {
                 Button("Done") {
-                    // Validate input
-                    if template.name.isEmpty {
+                    if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         errorMessage = "Template name cannot be empty."
                         showError = true
                         return
                     }
                     
-                    if template.prompt.isEmpty {
+                    if prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         errorMessage = "Prompt content cannot be empty."
                         showError = true
                         return
                     }
                     
-                    // Check for name uniqueness
+                    let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
                     let existingTemplate = templates.first { item in
-                        item.name.lowercased() == template.name.lowercased() &&
+                        item.name.lowercased() == trimmedName.lowercased() &&
                         item.persistentModelID != template.persistentModelID
                     }
                     
-                    if let _ = existingTemplate {
-                        vxAtelierPro.log.warning("📝 PromptTemplateEditView: Duplicate template name attempted: '\(template.name)'")
+                    if existingTemplate != nil {
+                        vxAtelierPro.log.warning("Duplicate template name attempted: '\(template.name)'")
                         errorMessage = "A template with this name already exists."
                         showError = true
                         return
                     }
                     
-                    vxAtelierPro.log.notice("📝 PromptTemplateEditView: Template saved: '\(template.name)'")
-                    onComplete(true)
+                    let draft = PromptTemplateDraft(
+                        name: trimmedName,
+                        category: category,
+                        summary: summary.trimmingCharacters(in: .whitespacesAndNewlines),
+                        prompt: prompt
+                    )
+                    if let saveError = onSave(draft) {
+                        errorMessage = saveError
+                        showError = true
+                    } else {
+                        vxAtelierPro.log.notice("Prompt template saved: '\(trimmedName)'")
+                        onCancel()
+                    }
                 }
             }
         }
         .alert("Template Error", isPresented: $showError) {
-            Button("OK") { 
+            Button("OK") {
                 showError = false
             }
         } message: {

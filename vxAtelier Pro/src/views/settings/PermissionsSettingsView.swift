@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct PermissionsSettingsView: View {
-    @StateObject private var permissionManager = PermissionManager()
+    @State private var permissionManager = PermissionManager()
     @AppStorage(AppSettings.Keys.allowSelfSignedCertificates) private var allowSelfSignedCertificates: Bool = false
     @AppStorage(AppSettings.Keys.selfSignedCertWhitelist) private var selfSignedCertWhitelistJSON: String = "[]"
     @State private var selfSignedCertWhitelist: [String] = []
@@ -84,88 +84,41 @@ struct PermissionsSettingsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: AppDefaults.paddingLarge) {
-                SettingsSectionView(title: "Required Permissions") {
-                    VStack(spacing: AppDefaults.paddingLarge) {
-                        #if os(iOS) || os(macOS)
-                        PermissionRowView(
-                            type: .photos,
-                            status: permissionManager.photoLibraryStatus,
-                            action: {
-                                handlePermissionAction(for: .photos)
-                            }
-                        )
-                        Divider()
-                        #endif
-                        PermissionRowView(
-                            type: .camera,
-                            status: permissionManager.cameraStatus,
-                            action: {
-                                handlePermissionAction(for: .camera)
-                            }
-                        )
-                        Divider()
-                        PermissionRowView(
-                            type: .microphone,
-                            status: permissionManager.microphoneStatus,
-                            action: {
-                                handlePermissionAction(for: .microphone)
-                            }
-                        )
-                        Divider()
-                        PermissionRowView(
-                            type: .speech,
-                            status: permissionManager.speechRecognitionStatus,
-                            action: {
-                                handlePermissionAction(for: .speech)
-                            }
-                        )
-                        Divider()
-                        PermissionRowView(
-                            type: .contacts,
-                            status: permissionManager.contactsStatus,
-                            action: {
-                                handlePermissionAction(for: .contacts)
-                            }
-                        )
-                        Divider()
-                        PermissionRowView(
-                            type: .calendars,
-                            status: permissionManager.calendarsStatus,
-                            action: {
-                                handlePermissionAction(for: .calendars)
-                            }
-                        )
-                        Divider()
-                        PermissionRowView(
-                            type: .location,
-                            status: permissionManager.locationStatus,
-                            action: {
-                                handlePermissionAction(for: .location)
-                            }
-                        )
-                        Divider()
-                        PermissionRowView(
-                            type: .accessibility,
-                            status: permissionManager.accessibilityStatus,
-                            action: { handlePermissionAction(for: .accessibility) }
-                        )
-                        Divider()
-                        ToggleRow(title: "Allow Self Signed Certificates", isOn: $allowSelfSignedCertificates, titleWidth: 250)
-                        SelfSignedCertWhitelistView(whitelist: $selfSignedCertWhitelist)
-                            .disabled(!allowSelfSignedCertificates)
-                    }
-                }
+        SettingsPage(title: "Permissions", maxWidth: 840) {
+            SettingsFormSection("Required Permissions") {
+                #if os(iOS) || os(macOS)
+                permissionRow(.photos, status: permissionManager.photoLibraryStatus)
+                #endif
+                permissionRow(.camera, status: permissionManager.cameraStatus)
+                permissionRow(.microphone, status: permissionManager.microphoneStatus)
+                permissionRow(.speech, status: permissionManager.speechRecognitionStatus)
+                permissionRow(.contacts, status: permissionManager.contactsStatus)
+                permissionRow(.calendars, status: permissionManager.calendarsStatus)
+                permissionRow(.location, status: permissionManager.locationStatus)
+                permissionRow(.accessibility, status: permissionManager.accessibilityStatus)
             }
-            .padding(.vertical, AppDefaults.paddingLarge)
+
+            SettingsFormSection("Network Trust") {
+                SettingsToggleRow("Allow Self Signed Certificates", isOn: $allowSelfSignedCertificates)
+                SelfSignedCertWhitelistView(whitelist: $selfSignedCertWhitelist)
+                    .disabled(!allowSelfSignedCertificates)
+            }
         }
-        .navigationTitle("Permissions")
         .onAppear {
             selfSignedCertWhitelist = decodeWhitelist(from: selfSignedCertWhitelistJSON)
         }
         .onChange(of: selfSignedCertWhitelist) {
             selfSignedCertWhitelistJSON = encodeWhitelist(selfSignedCertWhitelist)
         }
+    }
+
+    private func permissionRow(_ type: PermissionType, status: PermissionStatus) -> some View {
+        PermissionRowView(
+            type: type,
+            status: status,
+            action: {
+                handlePermissionAction(for: type)
+            }
+        )
     }
 } 

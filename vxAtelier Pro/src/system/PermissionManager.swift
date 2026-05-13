@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import Observation
 import Speech
 import Photos
 import os // For OSLogType
@@ -102,15 +103,16 @@ enum PermissionStatus: String {
 
 /// Manages checking and requesting permissions required by the application.
 @MainActor
-class PermissionManager: ObservableObject {
-    @Published var photoLibraryStatus: PermissionStatus = .notDetermined
-    @Published var microphoneStatus: PermissionStatus = .notDetermined
-    @Published var speechRecognitionStatus: PermissionStatus = .notDetermined
-    @Published var cameraStatus: PermissionStatus = .notDetermined
-    @Published var contactsStatus: PermissionStatus = .notDetermined
-    @Published var calendarsStatus: PermissionStatus = .notDetermined
-    @Published var locationStatus: PermissionStatus = .notDetermined
-    @Published var accessibilityStatus: PermissionStatus = .notDetermined
+@Observable
+class PermissionManager {
+    var photoLibraryStatus: PermissionStatus = .notDetermined
+    var microphoneStatus: PermissionStatus = .notDetermined
+    var speechRecognitionStatus: PermissionStatus = .notDetermined
+    var cameraStatus: PermissionStatus = .notDetermined
+    var contactsStatus: PermissionStatus = .notDetermined
+    var calendarsStatus: PermissionStatus = .notDetermined
+    var locationStatus: PermissionStatus = .notDetermined
+    var accessibilityStatus: PermissionStatus = .notDetermined
 
     // --- REMOVED Manager Instances ---
     // No longer store manager instances here to prevent premature initialization

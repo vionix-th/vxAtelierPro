@@ -1,5 +1,5 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct APISettingsView: View {
     @Environment(QueryManager.self) private var queryManager
@@ -10,8 +10,7 @@ struct APISettingsView: View {
     @State private var showSaveWarning = false
     @State private var saveWarningMessage = ""
     @State private var didPresentInitialEditor = false
-
-    init() {}
+    @State private var confirmation: SettingsConfirmation?
 
     struct EditingConfig: Identifiable {
         let id = UUID()
@@ -19,76 +18,50 @@ struct APISettingsView: View {
         var isNew: Bool
     }
 
-    private func isDefaultConfiguration(_ config: APIConfigurationItem) -> Bool {
-        return config.isDefault
-    }
-
-    private func deleteAPIConfiguration(_ config: APIConfigurationItem) {
-        do {
-            try queryManager.cleanupReferences(for: config)
-            try queryManager.delete(config)
-        } catch {
-            apiConfigErrorMessage = "Failed to delete configuration \(config.name): \(error.localizedDescription)"
-            showApiConfigError = true
-        }
-    }
-
-    private func startNewConfiguration() {
-        editingConfig = EditingConfig(config: APIConfigurationItem(
-            name: "New Configuration",
-            apiKey: "",
-            baseURL: AppDefaults.OpenAi.baseURL,
-            isDefault: apiConfigurations.count < 2
-        ), isNew: true)
-    }
-
     var body: some View {
-        VStack(spacing: 0) {
-            SettingsActionBar(
-                primaryLabel: {
-                    Label("Add Configuration", systemImage: "plus.circle.fill")
-                        .font(.headline)
-                },
-                primaryAction: {
-                    startNewConfiguration()
-                },
-                secondaryActions: []
-            )
-            .padding(.vertical, AppDefaults.paddingSmall)
-            .padding(.horizontal, AppDefaults.paddingSmall)
-            
-            if apiConfigurations.isEmpty {
-                ContentUnavailableView(
-                    "No API Configurations",
-                    systemImage: "key",
-                    description: Text("Add an API configuration to enable chatting and model fetching.")
+        SettingsListPage(title: "API") {
+            SettingsEntityList(
+                items: apiConfigurations.sorted { $0.name < $1.name },
+                emptyTitle: "No API Configurations",
+                emptySystemImage: "key",
+                emptyDescription: "Add an API configuration to enable chatting and model fetching.",
+                selectionAction: { config in
+                    editingConfig = EditingConfig(config: config, isNew: false)
+                }
+            ) { config in
+                SettingsEntityRow(
+                    title: config.name,
+                    subtitle: config.baseURL,
+                    metadata: config.apiKey.isEmpty
+                        ? nil
+                        : "API Key: \(config.apiKey.prefix(4))...\(config.apiKey.suffix(4))",
+                    systemImages: config.isDefault ? ["star.fill"] : []
                 )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List {
-                    ForEach(apiConfigurations.sorted { $0.name < $1.name }) { config in
-                        SettingsListRow(
-                            title: config.name,
-                            subtitle: config.baseURL,
-                            icons: isDefaultConfiguration(config) ? [Image(systemName: "star.fill")] : [],
-                            onEdit: {
-                                editingConfig = EditingConfig(config: config, isNew: false)
-                            },
-                            onDelete: {
-                                deleteAPIConfiguration(config)
-                            }
-                        ) {
-                            if !config.apiKey.isEmpty {
-                                Text("API Key: \(config.apiKey.prefix(4))...\(config.apiKey.suffix(4))")
-                                    .font(.caption2)
-                                    .foregroundColor(.gray)
-                            }
-                        }
+            } actions: { config in
+                [
+                    SettingsEntityAction(title: "Edit", systemImage: "pencil") {
+                        editingConfig = EditingConfig(config: config, isNew: false)
+                    },
+                    SettingsEntityAction(title: "Delete", systemImage: "trash", role: .destructive) {
+                        confirmation = SettingsConfirmation(
+                            title: "Delete API Configuration",
+                            message: "Delete \"\(config.name)\"? Models using this configuration will be cleaned up.",
+                            confirmTitle: "Delete",
+                            action: { deleteAPIConfiguration(config) }
+                        )
                     }
+                ]
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .settingsPrimary) {
+                Button {
+                    startNewConfiguration()
+                } label: {
+                    Label("Add Configuration", systemImage: "plus")
                 }
             }
         }
-        .navigationTitle("API")
         .onAppear {
             if apiConfigurations.isEmpty && !didPresentInitialEditor {
                 didPresentInitialEditor = true
@@ -120,5 +93,28 @@ struct APISettingsView: View {
                 }
             }
         }
+        .settingsConfirmationDialog($confirmation)
     }
-} 
+
+    private func deleteAPIConfiguration(_ config: APIConfigurationItem) {
+        do {
+            try queryManager.cleanupReferences(for: config)
+            try queryManager.delete(config)
+        } catch {
+            apiConfigErrorMessage = "Failed to delete configuration \(config.name): \(error.localizedDescription)"
+            showApiConfigError = true
+        }
+    }
+
+    private func startNewConfiguration() {
+        editingConfig = EditingConfig(
+            config: APIConfigurationItem(
+                name: "New Configuration",
+                apiKey: "",
+                baseURL: AppDefaults.OpenAi.baseURL,
+                isDefault: apiConfigurations.count < 2
+            ),
+            isNew: true
+        )
+    }
+}

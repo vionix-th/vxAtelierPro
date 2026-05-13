@@ -1,5 +1,5 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct PromptsSettingsView: View {
     @Environment(QueryManager.self) private var queryManager
@@ -7,8 +7,6 @@ struct PromptsSettingsView: View {
     @State private var editingTemplate: EditingTemplate?
     @State private var showPromptTemplateError = false
     @State private var promptTemplateErrorMessage = ""
-
-    // Selection mode state
     @State private var selectionMode = false
     @State private var selectedTemplateIDs: Set<PersistentIdentifier> = []
     @State private var isExporting = false
@@ -16,9 +14,7 @@ struct PromptsSettingsView: View {
     @State private var showImporter = false
     @State private var importMessage: String?
     @State private var showImportAlert = false
-
-    // Define a concrete type for the action bar to resolve generic inference issues
-    typealias CurrentSettingsActionBar = SettingsActionBar<Label<Text, Image>, EmptyView>
+    @State private var confirmation: SettingsConfirmation?
 
     struct EditingTemplate: Identifiable {
         let id = UUID()
@@ -26,136 +22,72 @@ struct PromptsSettingsView: View {
         var isNew: Bool
     }
 
-    private func addTemplate() {
-        editingTemplate = EditingTemplate(template: PromptTemplate(name: "New Template", summary: "", prompt: "", category: .User), isNew: true)
-    }
-
-    private func exportSelectedTemplates() {
-        let selectedTemplates = promptTemplates.filter { selectedTemplateIDs.contains($0.id) }
-        guard !selectedTemplates.isEmpty else { return }
-
-        let exportData = selectedTemplates.map { PromptTemplateExportData($0) }
-        exportDocument = PromptExportDocument(templates: exportData)
-        isExporting = true
-        vxAtelierPro.log.log("Exporting \(selectedTemplates.count) prompt templates.")
-    }
-
-    private func importPrompts(from url: URL) {
-        guard url.startAccessingSecurityScopedResource() else {
-            importMessage = "Failed to access file."
-            showImportAlert = true
-            return
-        }
-        defer { url.stopAccessingSecurityScopedResource() }
-
-        do {
-            let data = try Data(contentsOf: url)
-            let decoder = JSONDecoder()
-            let importedTemplates = try decoder.decode([PromptTemplateExportData].self, from: data)
-
-            for templateData in importedTemplates {
-                let newTemplate = templateData.toDataItem()
-                try queryManager.insert(newTemplate)
-            }
-
-            importMessage = "Successfully imported \(importedTemplates.count) prompts."
-            vxAtelierPro.log.log("Successfully imported \(importedTemplates.count) prompts from \(url.path).")
-        } catch {
-            importMessage = "Failed to import prompts: \(error.localizedDescription)"
-            vxAtelierPro.log.error("Failed to import prompts: \(error.localizedDescription)")
-        }
-        showImportAlert = true
-    }
-
-    private var actionBarSecondaryActions: [CurrentSettingsActionBar.MenuAction] {
-        var actions: [CurrentSettingsActionBar.MenuAction] = []
-
-        if selectionMode {
-            if selectedTemplateIDs.isEmpty {
-                // Show Cancel button when no items are selected
-                actions.append(CurrentSettingsActionBar.MenuAction(
-                    title: "Cancel Export",
-                    iconName: "xmark.circle",
-                    handler: {
-                        selectionMode = false
-                        selectedTemplateIDs.removeAll()
-                    }
-                ))
-            } else {
-                // Show Export button when items are selected
-                actions.append(CurrentSettingsActionBar.MenuAction(
-                    title: "Export Selected",
-                    iconName: "square.and.arrow.up",
-                    handler: exportSelectedTemplates
-                ))
-            }
-
-            // Always show Select All/None in selection mode
-            let allSelected = selectedTemplateIDs.count == promptTemplates.count
-            actions.append(CurrentSettingsActionBar.MenuAction(
-                title: allSelected ? "Select None" : "Select All",
-                iconName: allSelected ? "circle" : "checkmark.circle.fill",
-                handler: {
-                    if allSelected {
-                        selectedTemplateIDs.removeAll()
-                    } else {
-                        selectedTemplateIDs = Set(promptTemplates.map { $0.id })
-                    }
-                }
-            ))
-        } else {
-            // Show Import and Export buttons
-            actions.append(CurrentSettingsActionBar.MenuAction(
-                title: "Import",
-                iconName: "square.and.arrow.down",
-                handler: { showImporter = true }
-            ))
-            actions.append(CurrentSettingsActionBar.MenuAction(
-                title: "Export",
-                iconName: "square.and.arrow.up",
-                handler: { selectionMode = true }
-            ))
-        }
-
-        return actions
+    private var allSelected: Bool {
+        !promptTemplates.isEmpty && selectedTemplateIDs.count == promptTemplates.count
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            CurrentSettingsActionBar(
-                primaryLabel: {
-                    Label("Add Template", systemImage: "plus.circle.fill")
-                },
-                primaryAction: {
-                    addTemplate()
-                },
-                secondaryActions: actionBarSecondaryActions
-            )
-            .font(.headline)
-            .padding(.vertical, AppDefaults.paddingSmall)
-            .padding(.horizontal, AppDefaults.paddingSmall)
-
+        SettingsListPage(title: "Prompts") {
             PromptTemplateList(
                 selectionMode: selectionMode,
                 selectedIDs: selectedTemplateIDs,
-                onSelect: { id in
-                    selectedTemplateIDs.insert(id)
-                    vxAtelierPro.log.log("Selected template id: \(id)")
-                },
-                onDeselect: { id in
-                    selectedTemplateIDs.remove(id)
-                    vxAtelierPro.log.log("Deselected template id: \(id)")
-                },
+                onSelect: { selectedTemplateIDs.insert($0) },
+                onDeselect: { selectedTemplateIDs.remove($0) },
                 onTemplateActivated: { template in
                     editingTemplate = EditingTemplate(template: template, isNew: false)
                 },
-                onAddTemplate: {
-                    addTemplate()
-                }
+                onDelete: confirmDeleteTemplate
             )
-            .padding(.horizontal, AppDefaults.paddingSmall)
         }
-        .navigationTitle("Prompts")
+        .toolbar {
+            ToolbarItem(placement: .settingsPrimary) {
+                Button {
+                    addTemplate()
+                } label: {
+                    Label("Add Template", systemImage: "plus")
+                }
+            }
+            ToolbarItem(placement: .settingsSecondary) {
+                Button {
+                    showImporter = true
+                } label: {
+                    Label("Import", systemImage: "square.and.arrow.down")
+                }
+                .disabled(selectionMode)
+            }
+            ToolbarItem(placement: .settingsSecondary) {
+                Button {
+                    if selectionMode {
+                        exportSelectedTemplates()
+                    } else {
+                        selectionMode = true
+                    }
+                } label: {
+                    Label(selectionMode ? "Export Selected" : "Export", systemImage: "square.and.arrow.up")
+                }
+                .disabled(selectionMode && selectedTemplateIDs.isEmpty)
+            }
+            ToolbarItem(placement: .settingsSecondary) {
+                Button {
+                    if allSelected {
+                        selectedTemplateIDs.removeAll()
+                    } else {
+                        selectedTemplateIDs = Set(promptTemplates.map(\.id))
+                    }
+                } label: {
+                    Label(allSelected ? "Select None" : "Select All", systemImage: allSelected ? "circle" : "checkmark.circle")
+                }
+                .disabled(!selectionMode || promptTemplates.isEmpty)
+            }
+            ToolbarItem(placement: .settingsCancel) {
+                if selectionMode {
+                    Button("Cancel Export") {
+                        selectionMode = false
+                        selectedTemplateIDs.removeAll()
+                    }
+                }
+            }
+        }
         .fileExporter(
             isPresented: $isExporting,
             document: exportDocument,
@@ -168,7 +100,6 @@ struct PromptsSettingsView: View {
             case .failure(let error):
                 vxAtelierPro.log.error("Failed to export prompts: \(error.localizedDescription)")
             }
-            // Exit selection mode after export is complete or cancelled
             selectionMode = false
             selectedTemplateIDs.removeAll()
         }
@@ -184,7 +115,7 @@ struct PromptsSettingsView: View {
                 showImportAlert = true
             }
         }
-        .alert("Import Complete", isPresented: $showImportAlert, presenting: importMessage) { message in
+        .alert("Import Complete", isPresented: $showImportAlert, presenting: importMessage) { _ in
             Button("OK") { }
         } message: { message in
             Text(message)
@@ -195,20 +126,11 @@ struct PromptsSettingsView: View {
                     template: editing.template,
                     isNewTemplate: editing.isNew,
                     templates: promptTemplates,
-                    onComplete: { success in
-                        if success {
-                            do {
-                                if editing.isNew {
-                                    try queryManager.insert(editing.template)
-                                } else {
-                                    try queryManager.saveContext()
-                                }
-                            } catch {
-                                promptTemplateErrorMessage = "Failed to save template: \(error.localizedDescription)"
-                                showPromptTemplateError = true
-                            }
-                        }
+                    onCancel: {
                         editingTemplate = nil
+                    },
+                    onSave: { draft in
+                        saveTemplate(editing, draft: draft)
                     }
                 )
             }
@@ -218,5 +140,94 @@ struct PromptsSettingsView: View {
         } message: {
             Text(promptTemplateErrorMessage)
         }
+        .settingsConfirmationDialog($confirmation)
     }
-} 
+
+    private func addTemplate() {
+        editingTemplate = EditingTemplate(
+            template: PromptTemplate(name: "New Template", summary: "", prompt: "", category: .User),
+            isNew: true
+        )
+    }
+
+    private func saveTemplate(_ editing: EditingTemplate, draft: PromptTemplateDraft) -> String? {
+        let oldName = editing.template.name
+        let oldCategory = editing.template.category
+        let oldSummary = editing.template.summary
+        let oldPrompt = editing.template.prompt
+
+        editing.template.name = draft.name
+        editing.template.category = draft.category
+        editing.template.summary = draft.summary
+        editing.template.prompt = draft.prompt
+
+        do {
+            if editing.isNew {
+                try queryManager.insert(editing.template)
+            } else {
+                try queryManager.saveContext()
+            }
+            return nil
+        } catch {
+            editing.template.name = oldName
+            editing.template.category = oldCategory
+            editing.template.summary = oldSummary
+            editing.template.prompt = oldPrompt
+            return "Failed to save template: \(error.localizedDescription)"
+        }
+    }
+
+    private func deleteTemplate(_ template: PromptTemplate) {
+        do {
+            try queryManager.delete(template)
+        } catch {
+            promptTemplateErrorMessage = "Failed to delete template: \(error.localizedDescription)"
+            showPromptTemplateError = true
+        }
+    }
+
+    private func confirmDeleteTemplate(_ template: PromptTemplate) {
+        confirmation = SettingsConfirmation(
+            title: "Delete Prompt Template",
+            message: "Delete \"\(template.name)\"? This action cannot be undone.",
+            confirmTitle: "Delete",
+            action: { deleteTemplate(template) }
+        )
+    }
+
+    private func exportSelectedTemplates() {
+        let selectedTemplates = promptTemplates.filter { selectedTemplateIDs.contains($0.id) }
+        guard !selectedTemplates.isEmpty else { return }
+
+        exportDocument = PromptExportDocument(
+            templates: selectedTemplates.map { PromptTemplateExportData($0) }
+        )
+        isExporting = true
+        vxAtelierPro.log.log("Exporting \(selectedTemplates.count) prompt templates.")
+    }
+
+    private func importPrompts(from url: URL) {
+        guard url.startAccessingSecurityScopedResource() else {
+            importMessage = "Failed to access file."
+            showImportAlert = true
+            return
+        }
+        defer { url.stopAccessingSecurityScopedResource() }
+
+        do {
+            let data = try Data(contentsOf: url)
+            let importedTemplates = try JSONDecoder().decode([PromptTemplateExportData].self, from: data)
+
+            for templateData in importedTemplates {
+                try queryManager.insert(templateData.toDataItem())
+            }
+
+            importMessage = "Successfully imported \(importedTemplates.count) prompts."
+            vxAtelierPro.log.log("Successfully imported \(importedTemplates.count) prompts from \(url.path).")
+        } catch {
+            importMessage = "Failed to import prompts: \(error.localizedDescription)"
+            vxAtelierPro.log.error("Failed to import prompts: \(error.localizedDescription)")
+        }
+        showImportAlert = true
+    }
+}

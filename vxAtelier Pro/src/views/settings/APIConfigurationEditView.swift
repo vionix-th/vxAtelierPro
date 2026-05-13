@@ -1,17 +1,40 @@
 import SwiftData
 import SwiftUI
 
-#if os(iOS)
-    import UIKit
-#elseif os(macOS)
-    import AppKit
-#endif
+private struct APIConfigurationEditSnapshot {
+    let name: String
+    let apiKey: String
+    let baseURL: String
+    let isDefault: Bool
+    let providerID: String
+    let authKind: String
+    let defaultAdapterID: String
+    let defaultModel: String?
 
-/// A view for editing or creating an API configuration.
-/// Provides a modern interface for managing API connection details with special handling for API keys.
+    init(_ configuration: APIConfigurationItem) {
+        name = configuration.name
+        apiKey = configuration.apiKey
+        baseURL = configuration.baseURL
+        isDefault = configuration.isDefault
+        providerID = configuration.providerID
+        authKind = configuration.authKind
+        defaultAdapterID = configuration.defaultAdapterID
+        defaultModel = configuration.defaultModel
+    }
+
+    func restore(_ configuration: APIConfigurationItem) {
+        configuration.name = name
+        configuration.apiKey = apiKey
+        configuration.baseURL = baseURL
+        configuration.isDefault = isDefault
+        configuration.providerID = providerID
+        configuration.authKind = authKind
+        configuration.defaultAdapterID = defaultAdapterID
+        configuration.defaultModel = defaultModel
+    }
+}
+
 struct APIConfigurationEditView: View {
-    // MARK: - Environment & Properties
-
     @Environment(\.dismiss) private var dismiss
     @Environment(QueryManager.self) private var queryManager
     @Query(sort: [SortDescriptor(\APIConfigurationItem.name)]) private var apiConfigurations: [APIConfigurationItem]
@@ -20,9 +43,6 @@ struct APIConfigurationEditView: View {
     var isNewConfiguration: Bool
     let onSaveCompleted: ((String) -> Void)?
 
-    // MARK: - State
-
-    // Draft form state. Copy into the SwiftData model only when the user saves.
     @State private var name: String
     @State private var apiKey: String
     @State private var baseURL: String
@@ -30,20 +50,15 @@ struct APIConfigurationEditView: View {
     @State private var defaultModel: String
     @State private var providerID: LLMProviderID
     @State private var defaultAdapterID: LLMAdapterID
-
-    // UI state
     @State private var isAPIKeyVisible = false
     @State private var showValidationError = false
     @State private var validationErrorMessage = ""
     @State private var isModelPickerPresented = false
-    @State private var hasUserEditedDefaultModel = false
     @State private var isValidating = false
     @State private var isRefreshingModels = false
     @State private var fetchedModelCandidates: [LLMModelDescriptor]?
     @State private var fetchedModelCandidateSignature: String?
     @State private var selectedPreset: APIPreset
-
-    // MARK: - Initialization
 
     init(
         configuration: APIConfigurationItem,
@@ -73,18 +88,95 @@ struct APIConfigurationEditView: View {
         currentProfile.supportedAdapterIDs
     }
 
-    // MARK: - View Body
-
     var body: some View {
-        ScrollView {
-            configurationPanel
-            .padding(AppDefaults.paddingLarge)
-            .frame(maxWidth: 720)
-            .frame(maxWidth: .infinity)
+        SettingsPage(title: isNewConfiguration ? AppDefaults.newApiConfigurationName : "Edit Configuration") {
+            SettingsFormSection("Connection") {
+                LabeledContent("Name") {
+                    HStack(spacing: AppDefaults.paddingSmall) {
+                        TextField("My API Configuration", text: $name)
+                            .textFieldStyle(.roundedBorder)
+
+                        defaultButton
+                    }
+                }
+
+                SettingsPickerRow("Provider", selection: $selectedPreset) {
+                    ForEach(APIPreset.allCases, id: \.self) { preset in
+                        Label(preset.displayName, systemImage: preset.iconName)
+                            .tag(preset)
+                    }
+                }
+                .onChange(of: selectedPreset) { _, _ in
+                    applySelectedPreset()
+                }
+
+                LabeledContent("API URL") {
+                    TextField("https://api.example.com", text: $baseURL)
+                        .textFieldStyle(.roundedBorder)
+                        .onChange(of: baseURL) { _, _ in invalidateFetchedModelCandidates() }
+                }
+
+                if selectableAdapterIDs.count > 1 {
+                    SettingsPickerRow("API Mode", selection: $defaultAdapterID) {
+                        ForEach(selectableAdapterIDs) { family in
+                            Text(family.displayName).tag(family)
+                        }
+                    }
+                    .onChange(of: defaultAdapterID) { _, _ in invalidateFetchedModelCandidates() }
+                }
+            }
+
+            SettingsFormSection("Credentials") {
+                LabeledContent("API Key") {
+                    HStack(spacing: AppDefaults.paddingSmall) {
+                        apiKeyField
+
+                        Button {
+                            isAPIKeyVisible.toggle()
+                        } label: {
+                            Image(systemName: isAPIKeyVisible ? "eye.slash.fill" : "eye.fill")
+                        }
+                        .buttonStyle(.borderless)
+                        .help(isAPIKeyVisible ? "Hide API key" : "Show API key")
+
+                        if !apiKey.isEmpty {
+                            Button {
+                                ExportUtils.copyToClipboard(apiKey)
+                                vxAtelierPro.log.debug("Copied API key to clipboard")
+                            } label: {
+                                Image(systemName: "doc.on.doc")
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Copy API key")
+                        }
+                    }
+                }
+            }
+
+            SettingsFormSection("Model Defaults") {
+                LabeledContent("Default Model") {
+                    HStack(spacing: AppDefaults.paddingSmall) {
+                        TextField("Default Model", text: $defaultModel)
+                            .textFieldStyle(.roundedBorder)
+                            .onChange(of: defaultModel) { _, _ in
+                                invalidateFetchedModelCandidates()
+                            }
+
+                        Button {
+                            Task { await loadModelsForPicker() }
+                        } label: {
+                            if isRefreshingModels {
+                                ProgressView()
+                            } else {
+                                Image(systemName: "magnifyingglass")
+                            }
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Browse provider models")
+                    }
+                }
+            }
         }
-        .navigationTitle(
-            isNewConfiguration ? AppDefaults.newApiConfigurationName : "Edit Configuration"
-        )
         .alert("Configuration Error", isPresented: $showValidationError) {
             Button("OK") {
                 showValidationError = false
@@ -93,7 +185,7 @@ struct APIConfigurationEditView: View {
             Text(validationErrorMessage)
         }
         .toolbar {
-            ToolbarItem(placement: .confirmationAction) {
+            ToolbarItem(placement: .settingsConfirm) {
                 Button {
                     Task { await save() }
                 } label: {
@@ -105,10 +197,9 @@ struct APIConfigurationEditView: View {
                 }
                 .disabled(isValidating || isRefreshingModels)
             }
-            ToolbarItem(placement: .cancellationAction) {
+            ToolbarItem(placement: .settingsCancel) {
                 Button("Cancel") {
-                    vxAtelierPro.log.debug(
-                        "🔑 APIConfigurationListView: Configuration edit cancelled")
+                    vxAtelierPro.log.debug("API configuration edit cancelled")
                     dismiss()
                 }
             }
@@ -122,129 +213,12 @@ struct APIConfigurationEditView: View {
         .onChange(of: baseURL) { _, _ in invalidateFetchedModelCandidates() }
         .onChange(of: providerID) { _, _ in invalidateFetchedModelCandidates() }
         .onChange(of: defaultAdapterID) { _, _ in invalidateFetchedModelCandidates() }
-    }
-
-    private var configurationPanel: some View {
-        VStack(spacing: 0) {
-            panelRow("Name") {
-                HStack(spacing: AppDefaults.paddingSmall) {
-                    TextField("My API Configuration", text: $name)
-                        .textFieldStyle(.roundedBorder)
-
-                    defaultButton
-                }
-            }
-
-            panelDivider()
-            panelRow("Provider") {
-                Picker("", selection: $selectedPreset) {
-                    ForEach(APIPreset.allCases, id: \.self) { preset in
-                        Label(preset.displayName, systemImage: preset.iconName)
-                            .tag(preset)
-                    }
-                }
-                .pickerStyle(.menu)
-                .onChange(of: selectedPreset) { _, _ in
-                    applySelectedPreset()
-                }
-                .labelsHidden()
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            panelRow("API URL") {
-                TextField("https://api.example.com", text: $baseURL)
-                    .textFieldStyle(.roundedBorder)
-                    .onChange(of: baseURL) { _, _ in invalidateFetchedModelCandidates() }
-            }
-
-            if selectableAdapterIDs.count > 1 {
-                panelRow("API Mode") {
-                    Picker("", selection: $defaultAdapterID) {
-                        ForEach(selectableAdapterIDs) { family in
-                            Text(family.displayName).tag(family)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .onChange(of: defaultAdapterID) { _, _ in invalidateFetchedModelCandidates() }
-                    .labelsHidden()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-
-            panelDivider()
-            panelRow("API Key", alignment: .top) {
-                VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
-                    HStack(spacing: AppDefaults.paddingSmall) {
-                        if isAPIKeyVisible {
-                            apiKeyVisibleView
-                        } else {
-                            SecureField("Enter API Key", text: $apiKey)
-                                .textFieldStyle(.roundedBorder)
-                                .font(.system(.body, design: .monospaced))
-                                .onChange(of: apiKey) { _, _ in invalidateFetchedModelCandidates() }
-                        }
-
-                        Button {
-                            isAPIKeyVisible.toggle()
-                        } label: {
-                            Image(systemName: isAPIKeyVisible ? "eye.slash.fill" : "eye.fill")
-                                .frame(width: 22, height: 22)
-                        }
-                        .buttonStyle(.borderless)
-                        .help(isAPIKeyVisible ? "Hide API key" : "Show API key")
-
-                        if !apiKey.isEmpty {
-                            Button {
-                                copyToClipboard(apiKey)
-                            } label: {
-                                Image(systemName: "doc.on.doc")
-                                    .frame(width: 22, height: 22)
-                            }
-                            .buttonStyle(.borderless)
-                            .help("Copy API key")
-                        }
-                    }
-                }
-            }
-
-            panelDivider()
-            panelRow("Default Model") {
-                HStack(spacing: AppDefaults.paddingSmall) {
-                    TextField("Default Model", text: $defaultModel)
-                        .textFieldStyle(.roundedBorder)
-                        .onChange(of: defaultModel) { _, _ in
-                            hasUserEditedDefaultModel = true
-                        }
-
-                    Button {
-                        Task { await loadModelsForPicker() }
-                    } label: {
-                        if isRefreshingModels {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                                .frame(width: 18, height: 18)
-                        } else {
-                            Image(systemName: "magnifyingglass")
-                                .frame(width: 22, height: 22)
-                        }
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Browse provider models")
-                }
-            }
-        }
-        .background(Color.secondary.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium))
-        .overlay(
-            RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium)
-                .stroke(Color.secondary.opacity(0.16), lineWidth: 1)
-        )
         .sheet(isPresented: $isModelPickerPresented) {
             ModelSelectionView(
                 selectedModel: defaultModel,
                 onModelSelected: { model in
                     defaultModel = model
-                    hasUserEditedDefaultModel = true
+                    invalidateFetchedModelCandidates()
                 },
                 apiConfiguration: configuration,
                 draftModelCandidates: fetchedModelCandidates
@@ -265,75 +239,29 @@ struct APIConfigurationEditView: View {
         } label: {
             Image(systemName: isDefault ? "star.fill" : "star")
                 .foregroundColor(isDefault ? .yellow : .secondary)
-                .frame(width: 22, height: 22)
         }
         .buttonStyle(.borderless)
         .help(isDefault ? "Default configuration" : "Set as default")
         .accessibilityLabel(isDefault ? "Default configuration" : "Set as default configuration")
     }
 
-    private func panelRow<Content: View>(
-        _ title: String,
-        alignment: VerticalAlignment = .firstTextBaseline,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        HStack(alignment: alignment, spacing: AppDefaults.paddingMedium) {
-            Text(title)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .frame(width: 120, alignment: .leading)
-
-            content()
-        }
-        .padding(.horizontal, AppDefaults.paddingLarge)
-        .padding(.vertical, 7)
-    }
-
-    private func panelDivider() -> some View {
-        Divider()
-    }
-
-    // MARK: - Platform-Specific Views
-
     @ViewBuilder
-    private var apiKeyVisibleView: some View {
-        #if os(iOS)
+    private var apiKeyField: some View {
+        if isAPIKeyVisible {
             TextEditor(text: $apiKey)
                 .font(.system(.body, design: .monospaced))
-                .frame(height: 80)
-                .padding(AppDefaults.paddingSmall)
-                .background(
-                    RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium)
-                        .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
-                )
-        #else
-            TextEditor(text: $apiKey)
+                .frame(minHeight: 70)
+                .onChange(of: apiKey) { _, _ in invalidateFetchedModelCandidates() }
+        } else {
+            SecureField("Enter API Key", text: $apiKey)
+                .textFieldStyle(.roundedBorder)
                 .font(.system(.body, design: .monospaced))
-                .frame(minHeight: 60)
-                .padding(AppDefaults.paddingSmall)
-                .background(
-                    RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium)
-                        .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
-                )
-        #endif
+                .onChange(of: apiKey) { _, _ in invalidateFetchedModelCandidates() }
+        }
     }
 
-    /// Suggests a default model for a provider.
     static func suggestedDefaultModel(for providerID: LLMProviderID) -> String {
         LLMModelDescriptorResolver().defaultModelID(for: providerID, apiConfiguration: nil) ?? ""
-    }
-
-    // MARK: - Helper Methods
-
-    /// Cross-platform clipboard copy function
-    private func copyToClipboard(_ string: String) {
-        #if os(iOS)
-            UIPasteboard.general.string = string
-        #elseif os(macOS)
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(string, forType: .string)
-        #endif
-        vxAtelierPro.log.debug("🔑 Copied API key to clipboard")
     }
 
     private func validateDraft() -> Bool {
@@ -356,7 +284,6 @@ struct APIConfigurationEditView: View {
         return true
     }
 
-    /// Saves the configuration changes and refreshes model metadata when possible.
     private func save() async {
         guard validateDraft() else {
             showValidationError = true
@@ -368,18 +295,24 @@ struct APIConfigurationEditView: View {
 
         do {
             let shouldInsert = isNewConfiguration
+            let snapshot = APIConfigurationEditSnapshot(configuration)
             applyDraftToConfiguration()
-            try saveConfigurationToStore()
+            do {
+                try saveConfigurationToStore()
+            } catch {
+                snapshot.restore(configuration)
+                throw error
+            }
             let refreshSummary = await refreshModelsAfterSave()
 
             vxAtelierPro.log.info(
-                "🔑 Saved configuration and refreshed models: \(configuration.name), isDefault: \(configuration.isDefault), inserted: \(shouldInsert), updated: \(refreshSummary.updated), added: \(refreshSummary.added)"
+                "Saved configuration and refreshed models: \(configuration.name), isDefault: \(configuration.isDefault), inserted: \(shouldInsert), updated: \(refreshSummary.updated), added: \(refreshSummary.added)"
             )
             if let failure = refreshSummary.failures.first {
                 let message = "Saved configuration, but model refresh failed: \(failure.message)"
                 onSaveCompleted?(message)
                 vxAtelierPro.log.warning(
-                    "🔑 Saved configuration \(configuration.name), but model refresh failed: \(failure.message)"
+                    "Saved configuration \(configuration.name), but model refresh failed: \(failure.message)"
                 )
                 dismiss()
                 return
@@ -389,7 +322,7 @@ struct APIConfigurationEditView: View {
             validationErrorMessage = "Failed to save configuration: \(error.localizedDescription)"
             showValidationError = true
             vxAtelierPro.log.error(
-                "🔑 Failed to save configuration \(name): \(error.localizedDescription)"
+                "Failed to save configuration \(name): \(error.localizedDescription)"
             )
         }
     }
@@ -415,7 +348,7 @@ struct APIConfigurationEditView: View {
             validationErrorMessage = "Failed to fetch models: \(error.localizedDescription)"
             showValidationError = true
             vxAtelierPro.log.error(
-                "🔑 Failed to fetch models for configuration \(name): \(error.localizedDescription)"
+                "Failed to fetch models for configuration \(name): \(error.localizedDescription)"
             )
         }
     }
@@ -430,7 +363,7 @@ struct APIConfigurationEditView: View {
             return try queryManager.upsertModelCandidates(candidates, for: configuration)
         } catch {
             let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-            vxAtelierPro.log.error("🔑 Failed to refresh models after save for \(configuration.name): \(message)")
+            vxAtelierPro.log.error("Failed to refresh models after save for \(configuration.name): \(message)")
             if fetchedModelCandidateSignature == draftModelFetchSignature,
                let fetchedModelCandidates,
                !fetchedModelCandidates.isEmpty {
@@ -509,7 +442,7 @@ struct APIConfigurationEditView: View {
         if trimmedDefaultModel.isEmpty {
             let suggested = APIConfigurationEditView.suggestedDefaultModel(for: providerID)
             configuration.defaultModel = suggested
-            vxAtelierPro.log.info("🔑 Set default model to computed default: \(suggested)")
+            vxAtelierPro.log.info("Set default model to computed default: \(suggested)")
         } else {
             configuration.defaultModel = trimmedDefaultModel
         }
@@ -519,14 +452,13 @@ struct APIConfigurationEditView: View {
         try queryManager.upsertAPIConfiguration(configuration, makeDefault: isDefault)
     }
 
-    /// Applies the selected preset to the configuration
     private func applySelectedPreset() {
         let preset = selectedPreset
 
-        let allow_new_name_for =
+        let defaultNames =
             APIPreset.allCases.map { $0.displayName } + [AppDefaults.newApiConfigurationName, ""]
 
-        if allow_new_name_for.contains(name) {
+        if defaultNames.contains(name) {
             name = preset.displayName
         }
 
@@ -535,15 +467,11 @@ struct APIConfigurationEditView: View {
         defaultAdapterID = LLMProviderRegistry.shared.profile(for: preset.providerID).defaultAdapterID
 
         defaultModel = APIConfigurationEditView.suggestedDefaultModel(for: preset.providerID)
-        hasUserEditedDefaultModel = false
 
-        vxAtelierPro.log.info("🔑 Applied \(preset.displayName) preset")
+        vxAtelierPro.log.info("Applied \(preset.displayName) preset")
     }
 }
 
-// MARK: - API Presets
-
-/// Predefined configurations for common API providers
 enum APIPreset: String, CaseIterable {
     case openAI = "OpenAI"
     case anthropic = "Anthropic"
@@ -619,11 +547,4 @@ enum APIPreset: String, CaseIterable {
         case .customOpenAICompatible: return AppDefaults.OpenAi.baseURL
         }
     }
-
-}
-
-// MARK: - Validation Error
-private struct ValidationError: LocalizedError {
-    let message: String
-    var errorDescription: String? { message }
 }

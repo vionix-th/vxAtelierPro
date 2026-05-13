@@ -8,44 +8,64 @@ struct PermissionRowView: View {
     let action: () -> Void
     
     var body: some View {
-        HStack(alignment: .center, spacing: AppDefaults.paddingMedium) {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: AppDefaults.paddingMedium) {
+                label
+                Spacer(minLength: AppDefaults.paddingLarge)
+                statusBadge
+                actionButton
+            }
+
+            VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
+                label
+                HStack {
+                    statusBadge
+                    Spacer()
+                    actionButton
+                }
+            }
+        }
+        .padding(.vertical, AppDefaults.paddingSmall)
+    }
+
+    private var label: some View {
+        HStack(alignment: .top, spacing: AppDefaults.paddingMedium) {
             Image(systemName: type.systemImageName)
-                .font(.title2)
-                .frame(width: 30, alignment: .center)
-                .foregroundColor(.secondary)
-            
-            VStack(alignment: .leading, spacing: 4) {
+                .font(.title3)
+                .frame(minWidth: 28, alignment: .center)
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 3) {
                 Text(type.rawValue)
                     .font(.headline)
                 Text(type.usageDescription)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            
-            Spacer()
-            
-            // Status Indicator
-            Text(status.description)
-                .font(.subheadline)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(status.color.opacity(0.2))
-                .foregroundColor(status.color)
-                .clipShape(Capsule())
-            
-            // Action Button
-            Button {
-                action()
-            } label: {
-                // Adjust label based on status
-                switch status {
-                case .notDetermined:
-                    Text("Request Access")
-                case .denied, .restricted, .authorized, .limited:
-                    Text("Open Settings")
-                }
-            }
-            .buttonStyle(.bordered)
         }
     }
-} 
+
+    private var statusBadge: some View {
+        Text(status.description)
+            .font(.caption.weight(.medium))
+            .padding(.horizontal, AppDefaults.paddingMedium)
+            .padding(.vertical, AppDefaults.paddingSmall)
+            .background(status.color.opacity(0.18), in: Capsule())
+            .foregroundStyle(status.color)
+    }
+
+    private var actionButton: some View {
+        Button {
+            action()
+        } label: {
+            switch status {
+            case .notDetermined:
+                Text("Request Access")
+            case .denied, .restricted, .authorized, .limited:
+                Text("Open Settings")
+            }
+        }
+        .buttonStyle(.bordered)
+    }
+}

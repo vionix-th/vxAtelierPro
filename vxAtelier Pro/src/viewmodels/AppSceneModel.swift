@@ -43,6 +43,8 @@ final class AppSceneModel {
     var exportRequest: ExportRequest?
     var importRequested: Bool = false
     var utilityPanelRequestID: UUID?
+    var settingsInitialTab: ApplicationSettingsView.SettingsTab?
+    var settingsRequestID = UUID()
 
     private let queryManager: QueryManager
     private let modelContext: ModelContext
@@ -86,6 +88,11 @@ final class AppSceneModel {
 
     func requestSettings(_ tab: ApplicationSettingsView.SettingsTab?) {
         presentSheet(.applicationSettings(tab, UUID()))
+    }
+
+    func prepareSettingsWindow(_ tab: ApplicationSettingsView.SettingsTab?) {
+        settingsInitialTab = tab
+        settingsRequestID = UUID()
     }
 
     func requestTTS() {

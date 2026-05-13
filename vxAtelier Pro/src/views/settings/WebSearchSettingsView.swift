@@ -1,5 +1,5 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct WebSearchSettingsView: View {
     @Environment(QueryManager.self) private var queryManager
@@ -7,8 +7,7 @@ struct WebSearchSettingsView: View {
     @State private var editingConfig: EditingConfig?
     @State private var showWebSearchConfigError = false
     @State private var webSearchConfigErrorMessage = ""
-
-    init() {}
+    @State private var confirmation: SettingsConfirmation?
 
     struct EditingConfig: Identifiable {
         let id = UUID()
@@ -16,70 +15,54 @@ struct WebSearchSettingsView: View {
         var isNew: Bool
     }
 
-    private func deleteWebSearchConfiguration(_ config: WebSearchConfigurationItem) {
-        do {
-            try queryManager.delete(config)
-        } catch {
-            webSearchConfigErrorMessage = "Failed to delete configuration \(config.name): \(error.localizedDescription)"
-            showWebSearchConfigError = true
-        }
-    }
-
     var body: some View {
-        VStack(spacing: 0) {
-            SettingsActionBar(
-                primaryLabel: {
-                    Label("Add Web Search Config", systemImage: "plus.circle.fill")
-                        .font(.headline)
-                },
-                primaryAction: {
-                    editingConfig = EditingConfig(config: WebSearchConfigurationItem(
-                        name: "New Web Search Config",
-                        provider: WebSearchProvider.google.rawValue
-                    ), isNew: true)
-                },
-                secondaryActions: []
-            )
-            .padding(.vertical, AppDefaults.paddingSmall)
-            .padding(.horizontal, AppDefaults.paddingSmall)
-
-            if webSearchConfigurations.isEmpty {
-                ContentUnavailableView(
-                    "No Web Search Configurations",
-                    systemImage: "magnifyingglass",
-                    description: Text("Add a web search configuration to enable the search tool.")
+        SettingsListPage(title: "Web Search") {
+            SettingsEntityList(
+                items: webSearchConfigurations.sorted { $0.name < $1.name },
+                emptyTitle: "No Web Search Configurations",
+                emptySystemImage: "magnifyingglass",
+                emptyDescription: "Add a web search configuration to enable the search tool.",
+                selectionAction: { config in
+                    editingConfig = EditingConfig(config: config, isNew: false)
+                }
+            ) { config in
+                SettingsEntityRow(
+                    title: config.name,
+                    subtitle: "Provider: \(config.provider)",
+                    metadata: metadata(for: config),
+                    systemImages: config.isDefault ? ["star.fill"] : []
                 )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List {
-                    ForEach(webSearchConfigurations.sorted { $0.name < $1.name }) { config in
-                        SettingsListRow(
-                            title: config.name,
-                            subtitle: "Provider: \(config.provider)",
-                            icons: config.isDefault ? [Image(systemName: "star.fill")] : [],
-                            onEdit: {
-                                editingConfig = EditingConfig(config: config, isNew: false)
-                            },
-                            onDelete: {
-                                deleteWebSearchConfiguration(config)
-                            }
-                        ) {
-                            if let key = config.apiKey, !key.isEmpty {
-                                Text("API Key: \(key.prefix(4))...\(key.suffix(4))")
-                                    .font(.caption2)
-                                    .foregroundColor(.gray)
-                            }
-                            if let cx = config.searchEngineId, !cx.isEmpty {
-                                Text("Engine ID: \(cx)")
-                                    .font(.caption2)
-                                    .foregroundColor(.gray)
-                            }
-                        }
+            } actions: { config in
+                [
+                    SettingsEntityAction(title: "Edit", systemImage: "pencil") {
+                        editingConfig = EditingConfig(config: config, isNew: false)
+                    },
+                    SettingsEntityAction(title: "Delete", systemImage: "trash", role: .destructive) {
+                        confirmation = SettingsConfirmation(
+                            title: "Delete Web Search Configuration",
+                            message: "Delete \"\(config.name)\"? This action cannot be undone.",
+                            confirmTitle: "Delete",
+                            action: { deleteWebSearchConfiguration(config) }
+                        )
                     }
+                ]
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .settingsPrimary) {
+                Button {
+                    editingConfig = EditingConfig(
+                        config: WebSearchConfigurationItem(
+                            name: "New Web Search Config",
+                            provider: WebSearchProvider.google.rawValue
+                        ),
+                        isNew: true
+                    )
+                } label: {
+                    Label("Add Web Search Config", systemImage: "plus")
                 }
             }
         }
-        .navigationTitle("Web Search")
         .alert("Web Search Config Error", isPresented: $showWebSearchConfigError) {
             Button("OK") { showWebSearchConfigError = false }
         } message: {
@@ -93,5 +76,26 @@ struct WebSearchSettingsView: View {
                 )
             }
         }
+        .settingsConfirmationDialog($confirmation)
     }
-} 
+
+    private func metadata(for config: WebSearchConfigurationItem) -> String? {
+        var values: [String] = []
+        if let key = config.apiKey, !key.isEmpty {
+            values.append("API Key: \(key.prefix(4))...\(key.suffix(4))")
+        }
+        if let cx = config.searchEngineId, !cx.isEmpty {
+            values.append("Engine ID: \(cx)")
+        }
+        return values.isEmpty ? nil : values.joined(separator: "  ")
+    }
+
+    private func deleteWebSearchConfiguration(_ config: WebSearchConfigurationItem) {
+        do {
+            try queryManager.delete(config)
+        } catch {
+            webSearchConfigErrorMessage = "Failed to delete configuration \(config.name): \(error.localizedDescription)"
+            showWebSearchConfigError = true
+        }
+    }
+}

@@ -1,192 +1,128 @@
-import SwiftUI
 import Foundation
+import SwiftUI
 
 private let logSourcesKey = "LoggingService.sources"
 
-private extension LogSourcesSettingsView {
-    var searchBackgroundColor: Color {
-        #if os(macOS)
-        return Color(nsColor: .windowBackgroundColor).opacity(0.7)
-        #else
-        return Color(UIColor.systemBackground).opacity(0.7)
-        #endif
-    }
-    var toolbarBackgroundColor: Color {
-        #if os(macOS)
-        return Color(nsColor: .controlBackgroundColor)
-        #else
-        return Color(UIColor.secondarySystemBackground)
-        #endif
-    }
-    var separatorColor: Color {
-        #if os(macOS)
-        return Color(nsColor: .separatorColor)
-        #else
-        return Color(UIColor.separator)
-        #endif
-    }
-}
-
-
 struct LogSourcesSettingsView: View {
     @State private var sources: [LogSource: Bool] = [:]
-    @State private var isLoading = true
     @State private var searchText = ""
-    
-    var filteredSources: [LogSource] {
-        if sources.isEmpty { return [] }
-        
-        return sources.keys.filter { source in
-            searchText.isEmpty || 
+
+    private var isFiltering: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var filteredSources: [LogSource] {
+        sources.keys.filter { source in
+            searchText.isEmpty ||
             source.file.localizedCaseInsensitiveContains(searchText) ||
             source.function.localizedCaseInsensitiveContains(searchText)
-        }.sorted(by: logSourceSort)
+        }
+        .sorted(by: logSourceSort)
     }
-    
+
     var body: some View {
-        VStack(spacing: 0) {
-            // Toolbar with search and toggle buttons
-            HStack {
-                // Search field
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.secondary)
-                    TextField("Filter log sources...", text: $searchText)
-#if os(macOS)
-                        .textFieldStyle(PlainTextFieldStyle())
-#else
-                        .textFieldStyle(.plain)
-#endif
-                        .padding(8)
-                        .background(searchBackgroundColor)
-                        .cornerRadius(6)
-                    if !searchText.isEmpty {
-                        Button(action: { searchText = "" }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(.secondary)
-                        }
-#if os(macOS)
-                        .buttonStyle(PlainButtonStyle())
-#else
-                        .buttonStyle(.plain)
-#endif
-                        .padding(.trailing, 4)
-                    }
-                }
-                
-                Spacer()
-                
-                // Toggle buttons
-                if !filteredSources.isEmpty {
-                    HStack(spacing: 8) {
-                        Button(action: toggleAllFilteredOn) {
-                            Text("Enable All")
-                                .font(.caption)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.blue.opacity(0.2))
-                                .cornerRadius(4)
-                        }
-#if os(macOS)
-                        .buttonStyle(PlainButtonStyle())
-#else
-                        .buttonStyle(.plain)
-#endif
-                        
-                        Button(action: toggleAllFilteredOff) {
-                            Text("Disable All")
-                                .font(.caption)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.blue.opacity(0.2))
-                                .cornerRadius(4)
-                        }
-#if os(macOS)
-                        .buttonStyle(PlainButtonStyle())
-#else
-                        .buttonStyle(.plain)
-#endif
-                    }
-                    .padding(.trailing, 4)
-                }
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-            .background(toolbarBackgroundColor)
-            .overlay(Rectangle()
-                .frame(height: 0.5)
-                .foregroundColor(separatorColor),
-                alignment: .bottom)
-            
-            // List of log sources
-            if sources.isEmpty {
-                Text("No log sources registered yet.")
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if filteredSources.isEmpty {
-                Text("No log sources match '\(searchText)'")
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List(filteredSources, id: \.self) { source in
-                    Toggle(isOn: Binding(
-                        get: { sources[source, default: true] },
-                        set: { newValue in
-                            sources[source] = newValue
-                            saveSources()
-                        }
-                    )) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(source.file)
-                                .font(.headline)
-                            Text(source.function)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
+        SettingsListPage(title: "Log Sources") {
+            VStack(spacing: 0) {
+                SettingsSearchField(prompt: "Filter log sources", text: $searchText)
+                    .padding()
+
+                content
             }
         }
-        .navigationTitle("Log Sources")
+        .toolbar {
+            ToolbarItem(placement: .settingsPrimary) {
+                Menu {
+                    Button {
+                        setFilteredSources(enabled: true)
+                    } label: {
+                        Label(isFiltering ? "Enable Matching Sources" : "Enable All Sources", systemImage: "checkmark.circle")
+                    }
+                    .disabled(filteredSources.isEmpty)
+
+                    Button {
+                        setFilteredSources(enabled: false)
+                    } label: {
+                        Label(isFiltering ? "Disable Matching Sources" : "Disable All Sources", systemImage: "xmark.circle")
+                    }
+                    .disabled(filteredSources.isEmpty)
+                } label: {
+                    Label("Source Actions", systemImage: "ellipsis.circle")
+                }
+                .disabled(sources.isEmpty)
+            }
+        }
         .onAppear(perform: loadSources)
     }
-    
+
+    @ViewBuilder
+    private var content: some View {
+        if sources.isEmpty {
+            SettingsEmptyState(
+                title: "No Log Sources",
+                systemImage: "list.bullet.rectangle",
+                description: "No log sources are registered yet."
+            )
+        } else if filteredSources.isEmpty {
+            SettingsEmptyState(
+                title: "No Matching Sources",
+                systemImage: "line.3.horizontal.decrease.circle",
+                description: "No log sources match \"\(searchText)\"."
+            )
+        } else {
+            SettingsEntityList(
+                items: filteredSources,
+                emptyTitle: "No Log Sources",
+                emptySystemImage: "list.bullet.rectangle",
+                emptyDescription: "No log sources are registered yet."
+            ) { source in
+                SettingsToggleRow(
+                    source.file,
+                    subtitle: source.function,
+                    isOn: sourceBinding(for: source)
+                )
+            }
+        }
+    }
+
     private func loadSources() {
         guard let data = UserDefaults.standard.data(forKey: logSourcesKey) else {
             sources = [:]
             return
         }
         do {
-            let decoded = try JSONDecoder().decode([LogSource: Bool].self, from: data)
-            sources = decoded
+            sources = try JSONDecoder().decode([LogSource: Bool].self, from: data)
         } catch {
             sources = [:]
+            vxAtelierPro.log.error("Failed to decode log sources: \(error.localizedDescription)")
         }
     }
-    
+
+    private func sourceBinding(for source: LogSource) -> Binding<Bool> {
+        Binding(
+            get: { sources[source, default: true] },
+            set: { newValue in
+                sources[source] = newValue
+                saveSources()
+            }
+        )
+    }
+
     private func saveSources() {
         do {
             let data = try JSONEncoder().encode(sources)
             UserDefaults.standard.set(data, forKey: logSourcesKey)
         } catch {
-            // Ignore errors for now
+            vxAtelierPro.log.error("Failed to save log sources: \(error.localizedDescription)")
         }
     }
-    
-    private func toggleAllFilteredOn() {
+
+    private func setFilteredSources(enabled: Bool) {
         for source in filteredSources {
-            sources[source] = true
+            sources[source] = enabled
         }
         saveSources()
     }
-    
-    private func toggleAllFilteredOff() {
-        for source in filteredSources {
-            sources[source] = false
-        }
-        saveSources()
-    }
-    
+
     private func logSourceSort(lhs: LogSource, rhs: LogSource) -> Bool {
         if lhs.file == rhs.file {
             return lhs.function < rhs.function

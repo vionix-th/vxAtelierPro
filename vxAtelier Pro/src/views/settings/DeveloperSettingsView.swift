@@ -14,33 +14,28 @@ struct DeveloperSettingsView: View {
     @AppStorage(AppSettings.Keys.showToolCallChips) private var showToolCallChips: Bool = true
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: AppDefaults.paddingLarge) {
-                SettingsSectionView(title: "Developer Settings") {
-                    VStack(spacing: AppDefaults.paddingMedium) {
-                        ToggleRow(title: "Default Markdown Support (for new conversations)", isOn: $isMarkdownEnabled, titleWidth: 300)
-                        ToggleRow(title: "Markdown Selectable", isOn: $isMarkdownTextSelectable, titleWidth: 250)
-                        ToggleRow(title: "Show System Conversations (Debug)", isOn: $showSystemConversations, titleWidth: 250)
-                        ToggleRow(title: "Show Tool Call Chips", isOn: $showToolCallChips, titleWidth: 250)
-                        ToggleRow(title: "Make Key and Order Front", isOn: $makeKeyAndOrderFront, titleWidth: 250)
-                    }
-                }
-
-                SettingsSectionView(title: "Conversation & Streaming Debug") {
-                    VStack(spacing: AppDefaults.paddingMedium) {
-                        ToggleRow(title: "Auto-Scroll Debug Logs", isOn: $autoScrollDebugEnabled, titleWidth: 250)
-                        ToggleRow(title: "Auto-Scroll Gate (Bottom Stickiness)", isOn: $autoScrollGateEnabled, titleWidth: 250)
-                        Divider()
-                        ToggleRow(title: "Streaming Throttle Enabled", isOn: $streamingThrottleEnabled, titleWidth: 250)
-                        StepperRow(title: "Streaming Throttle Interval (ms)", bounds: 10...500, step: 10, value: $streamingThrottleIntervalMs, titleWidth: 250)
-                        ToggleRow(title: "Streaming Debug Logs", isOn: $streamingDebugEnabled, titleWidth: 250)
-                        Divider()
-                        ToggleRow(title: "Markdown: Finalize Only on Stream", isOn: $markdownStreamFinalizeOnly, titleWidth: 250)
-                    }
-                }
+        SettingsPage(title: "Developer") {
+            SettingsFormSection("Developer Settings") {
+                SettingsToggleRow("Default Markdown Support (for new conversations)", isOn: $isMarkdownEnabled)
+                SettingsToggleRow("Markdown Selectable", isOn: $isMarkdownTextSelectable)
+                SettingsToggleRow("Show System Conversations (Debug)", isOn: $showSystemConversations)
+                SettingsToggleRow("Show Tool Call Chips", isOn: $showToolCallChips)
+                SettingsToggleRow("Make Key and Order Front", isOn: $makeKeyAndOrderFront)
             }
-            .padding(.vertical, AppDefaults.paddingLarge)
+
+            SettingsFormSection("Conversation & Streaming Debug") {
+                SettingsToggleRow("Auto-Scroll Debug Logs", isOn: $autoScrollDebugEnabled)
+                SettingsToggleRow("Auto-Scroll Gate (Bottom Stickiness)", isOn: $autoScrollGateEnabled)
+                SettingsToggleRow("Streaming Throttle Enabled", isOn: $streamingThrottleEnabled)
+                SettingsStepperRow(
+                    title: "Streaming Throttle Interval (ms)",
+                    bounds: 10...500,
+                    step: 10,
+                    value: $streamingThrottleIntervalMs
+                )
+                SettingsToggleRow("Streaming Debug Logs", isOn: $streamingDebugEnabled)
+                SettingsToggleRow("Markdown: Finalize Only on Stream", isOn: $markdownStreamFinalizeOnly)
+            }
         }
-        .navigationTitle("Developer")
     }
 }

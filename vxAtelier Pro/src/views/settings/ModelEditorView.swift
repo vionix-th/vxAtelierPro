@@ -1,5 +1,121 @@
+import Foundation
 import SwiftUI
 import SwiftData
+
+private struct ModelEditSnapshot {
+    let modelID: String
+    let displayName: String
+    let apiConfiguration: APIConfigurationItem?
+    let contextSize: Int
+    let capabilitiesRaw: [String]
+    let rawMetadataJSON: String?
+    let mappingObjects: [ModelParameterMappingItem]
+    let mappingSnapshots: [ModelParameterMappingSnapshot]
+    let availabilityObjects: [ModelParameterAvailabilityItem]
+    let availabilitySnapshots: [ModelParameterAvailabilitySnapshot]
+
+    init(model: ModelItem) {
+        modelID = model.modelID
+        displayName = model.displayName
+        apiConfiguration = model.apiConfiguration
+        contextSize = model.contextSize
+        capabilitiesRaw = model.capabilitiesRaw
+        rawMetadataJSON = model.rawMetadataJSON
+        mappingObjects = model.parameterMappings
+        mappingSnapshots = model.parameterMappings.map(ModelParameterMappingSnapshot.init)
+        availabilityObjects = model.parameterAvailability
+        availabilitySnapshots = model.parameterAvailability.map(ModelParameterAvailabilitySnapshot.init)
+    }
+
+    func restore(_ model: ModelItem) {
+        let originalMappingIDs = Set(mappingObjects.map(ObjectIdentifier.init))
+        for mapping in model.parameterMappings where !originalMappingIDs.contains(ObjectIdentifier(mapping)) {
+            model.modelContext?.delete(mapping)
+        }
+
+        let originalAvailabilityIDs = Set(availabilityObjects.map(ObjectIdentifier.init))
+        for availability in model.parameterAvailability where !originalAvailabilityIDs.contains(ObjectIdentifier(availability)) {
+            model.modelContext?.delete(availability)
+        }
+
+        model.modelID = modelID
+        model.displayName = displayName
+        model.apiConfiguration = apiConfiguration
+        model.contextSize = contextSize
+        model.capabilitiesRaw = capabilitiesRaw
+        model.rawMetadataJSON = rawMetadataJSON
+        model.parameterMappings = mappingObjects
+        model.parameterAvailability = availabilityObjects
+
+        for snapshot in mappingSnapshots {
+            snapshot.restore()
+        }
+        for snapshot in availabilitySnapshots {
+            snapshot.restore()
+        }
+    }
+}
+
+private struct ModelParameterMappingSnapshot {
+    let item: ModelParameterMappingItem
+    let adapterIDRaw: String
+    let semanticParameterID: String
+    let encodingKindRaw: String
+    let wireKey: String
+    let structuredPresetRaw: String?
+    let isCustomized: Bool
+
+    init(_ item: ModelParameterMappingItem) {
+        self.item = item
+        adapterIDRaw = item.adapterIDRaw
+        semanticParameterID = item.semanticParameterID
+        encodingKindRaw = item.encodingKindRaw
+        wireKey = item.wireKey
+        structuredPresetRaw = item.structuredPresetRaw
+        isCustomized = item.isCustomized
+    }
+
+    func restore() {
+        item.adapterIDRaw = adapterIDRaw
+        item.semanticParameterID = semanticParameterID
+        item.encodingKindRaw = encodingKindRaw
+        item.wireKey = wireKey
+        item.structuredPresetRaw = structuredPresetRaw
+        item.isCustomized = isCustomized
+    }
+}
+
+private struct ModelParameterAvailabilitySnapshot {
+    let item: ModelParameterAvailabilityItem
+    let adapterIDRaw: String
+    let semanticParameterID: String
+    let isAvailable: Bool
+    let isRequired: Bool
+    let isIncludedByDefault: Bool
+    let defaultValueData: Data?
+    let isCustomized: Bool
+
+    init(_ item: ModelParameterAvailabilityItem) {
+        self.item = item
+        adapterIDRaw = item.adapterIDRaw
+        semanticParameterID = item.semanticParameterID
+        isAvailable = item.isAvailable
+        isRequired = item.isRequired
+        isIncludedByDefault = item.isIncludedByDefault
+        defaultValueData = item.defaultValueData
+        isCustomized = item.isCustomized
+    }
+
+    func restore() {
+        item.adapterIDRaw = adapterIDRaw
+        item.semanticParameterID = semanticParameterID
+        item.isAvailable = isAvailable
+        item.isRequired = isRequired
+        item.isIncludedByDefault = isIncludedByDefault
+        item.defaultValueData = defaultValueData
+        item.isCustomized = isCustomized
+    }
+}
 
 // MARK: - Model Editor View
 struct ModelEditorView: View {
@@ -12,6 +128,10 @@ struct ModelEditorView: View {
     @State private var selectedConfigurationID: PersistentIdentifier?
     @State private var contextSize: Int
     @State private var capabilities: [LLMModelCapability]
+    @State private var originalSnapshot: ModelEditSnapshot?
+    @State private var confirmation: SettingsConfirmation?
+    @State private var editorErrorMessage = ""
+    @State private var showEditorError = false
     
     init(model: ModelItem) {
         self.model = model
@@ -19,6 +139,7 @@ struct ModelEditorView: View {
         _selectedConfigurationID = State(initialValue: model.apiConfiguration?.persistentModelID)
         _contextSize = State(initialValue: model.contextSize)
         _capabilities = State(initialValue: model.capabilities)
+        _originalSnapshot = State(initialValue: ModelEditSnapshot(model: model))
     }
 
     private var selectedAdapterID: LLMAdapterID {
@@ -176,7 +297,12 @@ struct ModelEditorView: View {
                         ) {
                             HStack {
                                 Button(role: .destructive) {
-                                    deleteModel()
+                                    confirmation = SettingsConfirmation(
+                                        title: "Delete Model",
+                                        message: "Delete \"\(model.name)\"? This action cannot be undone.",
+                                        confirmTitle: "Delete",
+                                        action: deleteModel
+                                    )
                                 } label: {
                                     Label("Delete Model", systemImage: "trash")
                                         .frame(maxWidth: .infinity)
@@ -193,11 +319,14 @@ struct ModelEditorView: View {
             }
             .navigationTitle(model.modelContext == nil ? "Add Model" : "Edit Model")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                ToolbarItem(placement: .settingsCancel) {
+                    Button("Cancel") {
+                        originalSnapshot?.restore(model)
+                        dismiss()
+                    }
                         .font(.system(.body, design: .rounded))
                 }
-                ToolbarItem(placement: .confirmationAction) {
+                ToolbarItem(placement: .settingsConfirm) {
                     Button("Save") { save() }
                         .font(.system(.body, design: .rounded))
                         .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || selectedConfiguration == nil)
@@ -211,6 +340,12 @@ struct ModelEditorView: View {
             .onChange(of: selectedConfigurationID) { _, _ in
                 applyCatalogDefaultsForSelectedConfiguration()
             }
+            .alert("Model Error", isPresented: $showEditorError) {
+                Button("OK") { showEditorError = false }
+            } message: {
+                Text(editorErrorMessage)
+            }
+            .settingsConfirmationDialog($confirmation)
         }
     }
 
@@ -392,17 +527,15 @@ struct ModelEditorView: View {
 
     private func editorRow<Content: View>(
         _ title: String,
-        alignment: VerticalAlignment = .firstTextBaseline,
         @ViewBuilder content: () -> Content
     ) -> some View {
         ViewThatFits(in: .horizontal) {
-            HStack(alignment: alignment, spacing: AppDefaults.paddingMedium) {
+            LabeledContent {
+                content()
+            } label: {
                 Text(title)
                     .font(.subheadline.weight(.medium))
                     .foregroundColor(.secondary)
-                    .frame(width: 140, alignment: .leading)
-
-                content()
             }
 
             VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
@@ -581,26 +714,25 @@ struct ModelEditorView: View {
             if model.modelContext == nil {
                 try queryManager.insert(model)
             } else {
-                // If the model already exists, just save the context
-                // The insert method already calls saveContext
                 try queryManager.saveContext()
             }
-            // queryManager.refresh() // Refresh QueryManager after save (already done by insert/saveContext)
             dismiss()
         } catch {
+            originalSnapshot?.restore(model)
             vxAtelierPro.log.error("Failed to save model \(name): \(error.localizedDescription)")
-            // Optionally show an alert to the user here
+            editorErrorMessage = "Failed to save model: \(error.localizedDescription)"
+            showEditorError = true
         }
     }
     
     private func deleteModel() {
         do {
             try queryManager.delete(model)
-            // queryManager.refresh() // Refresh QueryManager after delete (already done by delete)
             dismiss()
         } catch {
             vxAtelierPro.log.error("Failed to delete model \(model.name): \(error.localizedDescription)")
-            // Optionally show an alert to the user here
+            editorErrorMessage = "Failed to delete model: \(error.localizedDescription)"
+            showEditorError = true
         }
     }
 
