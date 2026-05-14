@@ -34,31 +34,79 @@ extension ToolbarItemPlacement {
     }
 }
 
+private struct SettingsPageShell<Content: View>: View {
+    let title: String
+    var maxWidth: CGFloat = 760
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        content
+            .frame(maxWidth: maxWidth)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .navigationTitle(title)
+    }
+}
+
 struct SettingsPage<Content: View>: View {
     let title: String
     var maxWidth: CGFloat = 760
     @ViewBuilder let content: Content
 
     var body: some View {
-        Form {
-            content
+        SettingsPageShell(title: title, maxWidth: maxWidth) {
+            Form {
+                content
+            }
+            #if os(macOS)
+            .formStyle(.grouped)
+            #endif
         }
-        #if os(macOS)
-        .formStyle(.grouped)
-        #endif
-        .frame(maxWidth: maxWidth)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .navigationTitle(title)
     }
 }
 
 struct SettingsListPage<Content: View>: View {
     let title: String
+    var maxWidth: CGFloat = 760
     @ViewBuilder let content: Content
 
     var body: some View {
-        content
-            .navigationTitle(title)
+        SettingsPageShell(title: title, maxWidth: maxWidth) {
+            content
+        }
+    }
+}
+
+struct SettingsSearchListPage<Content: View, SearchContent: View>: View {
+    let title: String
+    var maxWidth: CGFloat = 760
+    @ViewBuilder let searchContent: SearchContent
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        SettingsPageShell(title: title, maxWidth: maxWidth) {
+            VStack(spacing: 0) {
+                searchContent
+                    .padding()
+
+                content
+            }
+        }
+    }
+}
+
+struct SettingsInsetGroupedListPage<Content: View>: View {
+    let title: String
+    var maxWidth: CGFloat = 760
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        SettingsPageShell(title: title, maxWidth: maxWidth) {
+            content
+                #if os(iOS)
+                .listStyle(.insetGrouped)
+                #endif
+                .listSectionSeparator(.hidden)
+        }
     }
 }
 

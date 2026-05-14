@@ -42,14 +42,15 @@ struct ModelsSettingsView: View {
     }
 
     var body: some View {
-        SettingsListPage(title: "Models") {
-            VStack(spacing: 0) {
+        SettingsSearchListPage(
+            title: "Models",
+            searchContent: {
                 SettingsSearchField(prompt: "Filter models", text: $searchText)
-                    .padding()
-
+            },
+            content: {
                 content
             }
-        }
+        )
         .toolbar {
             ToolbarItem(placement: .settingsPrimary) {
                 Button {

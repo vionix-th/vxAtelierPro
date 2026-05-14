@@ -17,18 +17,19 @@ struct LogSourcesSettingsView: View {
             source.file.localizedCaseInsensitiveContains(searchText) ||
             source.function.localizedCaseInsensitiveContains(searchText)
         }
-        .sorted(by: logSourceSort)
+            .sorted(by: logSourceSort)
     }
 
     var body: some View {
-        SettingsListPage(title: "Log Sources") {
-            VStack(spacing: 0) {
+        SettingsSearchListPage(
+            title: "Log Sources",
+            searchContent: {
                 SettingsSearchField(prompt: "Filter log sources", text: $searchText)
-                    .padding()
-
+            },
+            content: {
                 content
             }
-        }
+        )
         .toolbar {
             ToolbarItem(placement: .settingsPrimary) {
                 Menu {

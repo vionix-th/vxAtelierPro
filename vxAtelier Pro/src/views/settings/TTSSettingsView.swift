@@ -19,7 +19,7 @@ struct TTSSettingsView: View {
     }
 
     var body: some View {
-        SettingsListPage(title: "Speech") {
+        SettingsInsetGroupedListPage(title: "Speech") {
             List {
                 Section {
                     SettingsToggleRow("Autoplay Next", isOn: $ttsAutoplay)
@@ -95,12 +95,6 @@ struct TTSSettingsView: View {
                     Text("Voice Configurations")
                 }
             }
-            #if os(iOS)
-            .listStyle(.insetGrouped)
-            #endif
-            .listSectionSeparator(.hidden)
-            .frame(maxWidth: 760)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .sheet(item: $editingConfig) { editing in
             NavigationStack {
