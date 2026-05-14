@@ -58,8 +58,7 @@ struct ConversationOptionsView: View {
                     VStack(spacing: AppDefaults.paddingLarge) {
                         apiConfigurationPicker()
                         
-                        // Use SettingsSectionView for parameters
-                        SettingsSectionView(title: "Model Parameters") {
+                        SettingsCardView(title: "Model Parameters") {
                             VStack(spacing: AppDefaults.paddingMedium) {
                                 let controls = parameterControls
                                 if !controls.isEmpty {
@@ -95,8 +94,7 @@ struct ConversationOptionsView: View {
             VStack {
                 ScrollView {
                     VStack(spacing: AppDefaults.paddingLarge) {
-                        // Use SettingsSectionView for Tools
-                        SettingsSectionView(title: "Available Tools") {
+                        SettingsCardView(title: "Available Tools") {
                             // Move Enable/Disable buttons inside
                             HStack {
                                 Button("Enable All Tools") {
@@ -187,8 +185,7 @@ struct ConversationOptionsView: View {
             VStack {
                 ScrollView {
                     VStack(spacing: AppDefaults.paddingLarge) {
-                        // Use SettingsSectionView for General Options
-                        SettingsSectionView(title: "General Options") { 
+                        SettingsCardView(title: "General Options") { 
                             VStack(spacing: AppDefaults.paddingMedium) {
                                 // Display Options
                                 VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
@@ -364,7 +361,7 @@ private struct SystemPromptEditor: View {
                         }
                         .buttonStyle(.plain)
                         .popover(isPresented: $isTemplatesPresented) {
-                            PromptTemplateList(category: PromptTemplate.Category.System) { template in
+                            PromptTemplateListView(category: PromptTemplate.Category.System) { template in
                                 vxAtelierPro.log.info("Applied template: \(template.name)")
                                 promptValue = expandVariables(template.prompt)
                                 isTemplatesPresented = false

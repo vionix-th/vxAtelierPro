@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// System permission and network security settings.
 struct PermissionsSettingsView: View {
     @State private var permissionManager = PermissionManager()
     @AppStorage(AppSettings.Keys.allowSelfSignedCertificates) private var allowSelfSignedCertificates: Bool = false

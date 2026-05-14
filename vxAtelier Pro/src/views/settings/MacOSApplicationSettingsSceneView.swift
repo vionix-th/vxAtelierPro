@@ -1,6 +1,7 @@
 import SwiftUI
 
 #if os(macOS)
+/// Native macOS Settings scene root.
 struct MacOSApplicationSettingsSceneView: View {
     @AppStorage(AppSettings.Keys.selectedMacSettingsSection) private var selectedSectionRaw =
         AppDefaults.selectedMacSettingsSection
@@ -51,6 +52,7 @@ struct MacOSApplicationSettingsSceneView: View {
     }
 }
 
+/// One macOS Settings section with its destination picker and content.
 private struct MacOSSettingsSectionView: View {
     let section: MacOSSettingsSection
     @Binding var selectedDestinationRaw: String
@@ -90,7 +92,7 @@ private struct MacOSSettingsSectionView: View {
                 }
             }
 
-            ApplicationSettingsDestinationContentView(destination: selectedDestination)
+            SettingsDestinationView(destination: selectedDestination)
         }
     }
 }

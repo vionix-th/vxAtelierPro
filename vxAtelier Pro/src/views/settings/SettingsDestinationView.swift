@@ -1,6 +1,7 @@
 import SwiftUI
 
-struct ApplicationSettingsDestinationContentView: View {
+/// Thin wrapper that renders one shared settings destination.
+struct SettingsDestinationView: View {
     let destination: SettingsDestination
 
     var body: some View {

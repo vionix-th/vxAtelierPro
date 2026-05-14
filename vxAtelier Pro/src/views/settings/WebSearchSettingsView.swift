@@ -1,6 +1,7 @@
 import SwiftData
 import SwiftUI
 
+/// Web search configuration list and editor launcher.
 struct WebSearchSettingsView: View {
     @Environment(QueryManager.self) private var queryManager
     @Query(sort: [SortDescriptor(\WebSearchConfigurationItem.name)]) private var webSearchConfigurations: [WebSearchConfigurationItem]
@@ -9,6 +10,7 @@ struct WebSearchSettingsView: View {
     @State private var webSearchConfigErrorMessage = ""
     @State private var confirmation: SettingsConfirmation?
 
+    /// In-memory state for a web search configuration being edited.
     struct EditingConfig: Identifiable {
         let id = UUID()
         var config: WebSearchConfigurationItem

@@ -179,16 +179,16 @@ let package = Package(
                 // Views - Status Bar
                 // Views - Settings
                 "views/settings/APIConfigurationEditView.swift",
-                "views/settings/ApplicationSettingsDestinationContentView.swift",
+                "views/settings/SettingsDestinationView.swift",
                 "views/settings/IOSApplicationSettingsSheetView.swift",
                 "views/settings/MacOSApplicationSettingsSceneView.swift",
                 "views/settings/MacOSSettingsSection.swift",
                 "views/settings/SettingsDestination.swift",
                 "views/settings/ModelSelectionView.swift",
-                "views/settings/ModelMetadataPresentation.swift",
+                "views/settings/ModelMetadata+Display.swift",
                 "views/settings/ModelEditorView.swift",
                 "views/settings/PromptTemplateEditView.swift",
-                "views/settings/PromptTemplateList.swift",
+                "views/settings/PromptTemplateListView.swift",
                 "views/settings/VoiceConfigurationEditView.swift",
                 "views/settings/WebSearchConfigurationEditView.swift",
                 "views/settings/APISettingsView.swift",
@@ -203,7 +203,7 @@ let package = Package(
                 "views/settings/DeveloperSettingsView.swift",
                 // Views - Settings Components
                 "views/settings/components/SettingsPrimitives.swift",
-                "views/settings/components/SettingsSectionView.swift",
+                "views/settings/components/SettingsCardView.swift",
                 "views/settings/components/SelfSignedCertWhitelistView.swift",
                 // Views - Utility
                 "views/utility/UtilityPanelView.swift",

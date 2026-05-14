@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// A reusable view component for settings sections with consistent styling
-struct SettingsSectionView<Content: View>: View {
+/// Card-style container for settings subpanels.
+struct SettingsCardView<Content: View>: View {
     let title: String
     let content: Content
     

@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// Developer-focused preferences and diagnostics.
 struct DeveloperSettingsView: View {
     @AppStorage(AppSettings.Keys.isMarkdownEnabled) private var isMarkdownEnabled: Bool = AppDefaults.isMarkdownEnabled
     @AppStorage(AppSettings.Keys.isMarkdownTextSelectable) private var isMarkdownTextSelectable: Bool = AppDefaults.isMarkdownTextSelectable

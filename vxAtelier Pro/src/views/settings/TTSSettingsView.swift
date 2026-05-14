@@ -2,6 +2,7 @@ import AVFoundation
 import SwiftData
 import SwiftUI
 
+/// Text-to-speech settings and voice profile management.
 struct TTSSettingsView: View {
     @Environment(QueryManager.self) private var queryManager
     @Query(sort: [SortDescriptor(\VoiceConfigurationItem.language)]) private var voiceConfigurations: [VoiceConfigurationItem]
@@ -12,6 +13,7 @@ struct TTSSettingsView: View {
     @State private var errorMessage = ""
     @State private var confirmation: SettingsConfirmation?
 
+    /// In-memory state for a voice configuration being edited.
     private struct EditingConfig: Identifiable {
         let id = UUID()
         var config: VoiceConfigurationItem

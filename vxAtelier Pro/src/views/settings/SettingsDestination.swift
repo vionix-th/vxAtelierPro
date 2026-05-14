@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// Shared settings destinations available on both iOS and macOS.
 enum SettingsDestination: String, CaseIterable, Identifiable, Hashable {
     case general
     case api

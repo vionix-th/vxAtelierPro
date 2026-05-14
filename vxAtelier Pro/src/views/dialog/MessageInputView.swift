@@ -173,7 +173,7 @@ struct MessageInputView: View {
                     }
                     .buttonStyle(PlainButtonStyle())
                     .popover(isPresented: $controller.isPromptTemplatesPresented) {
-                        PromptTemplateList(
+                        PromptTemplateListView(
                             category: PromptTemplate.Category.User,
                             onTemplateActivated: { template in
                                 controller.applyTemplate(template, conversation: contextConversation)

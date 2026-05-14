@@ -121,7 +121,7 @@ struct ProjectView: View {
         .padding(.trailing, 12)
         .buttonStyle(PlainButtonStyle())
         .popover(isPresented: $isPromptTemplatesPresented) {
-            PromptTemplateList(category: PromptTemplate.Category.System, onTemplateActivated: { template in
+            PromptTemplateListView(category: PromptTemplate.Category.System, onTemplateActivated: { template in
                 vxAtelierPro.log.debug("Applied system prompt template: \(template.name)")
                 systemPromptBinding.wrappedValue = expandVariables(template.prompt)
                 isPromptTemplatesPresented = false

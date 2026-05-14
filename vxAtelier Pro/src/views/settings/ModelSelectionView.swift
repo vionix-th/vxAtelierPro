@@ -197,6 +197,7 @@ struct ModelSelectionView: View {
     }
 }
 
+/// Display model record used by the picker and search results.
 private struct ModelSelectionOption: Identifiable {
     let id: String
     let name: String
@@ -230,6 +231,7 @@ private struct ModelSelectionOption: Identifiable {
     }
 }
 
+/// Selectable row for a model option.
 private struct ModelRowView: View {
     let model: ModelSelectionOption
     let isSelected: Bool
@@ -307,6 +309,7 @@ private struct ModelRowView: View {
     }
 }
 
+/// Toggle chip used to filter model capabilities.
 private struct MetadataChip: View {
     let title: String
     let systemName: String

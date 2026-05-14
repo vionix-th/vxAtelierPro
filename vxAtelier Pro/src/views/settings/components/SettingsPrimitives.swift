@@ -1,14 +1,17 @@
 import SwiftUI
 
+/// Presentation mode that decides whether settings actions live inline or in the navigation toolbar.
 enum SettingsPresentationStyle {
     case appNavigation
     case macSettingsScene
 }
 
+/// Environment key for the current settings presentation mode.
 private struct SettingsPresentationStyleKey: EnvironmentKey {
     static let defaultValue: SettingsPresentationStyle = .appNavigation
 }
 
+/// Shared environment accessors for settings presentation policy.
 extension EnvironmentValues {
     var settingsPresentationStyle: SettingsPresentationStyle {
         get { self[SettingsPresentationStyleKey.self] }
@@ -16,6 +19,7 @@ extension EnvironmentValues {
     }
 }
 
+/// Inline action row used when macOS Settings keeps actions inside page content.
 struct SettingsInlineActionRow<Content: View>: View {
     @ViewBuilder let content: Content
 
@@ -29,6 +33,7 @@ struct SettingsInlineActionRow<Content: View>: View {
     }
 }
 
+/// Page action region that only renders inline controls in the macOS Settings scene.
 struct SettingsPageActionRegion<Content: View>: View {
     @Environment(\.settingsPresentationStyle) private var settingsPresentationStyle
     private let padded: Bool
@@ -50,6 +55,7 @@ struct SettingsPageActionRegion<Content: View>: View {
     }
 }
 
+/// iOS settings navigation toolbar adapter for trailing and cancellation actions.
 private struct SettingsNavigationActionsModifier<Actions: View, CancellationAction: View>: ViewModifier {
     let actions: Actions
     let cancellationAction: CancellationAction
@@ -72,6 +78,7 @@ private struct SettingsNavigationActionsModifier<Actions: View, CancellationActi
     }
 }
 
+/// Settings navigation toolbar helpers.
 extension View {
     func settingsNavigationActions<Actions: View>(
         @ViewBuilder _ actions: () -> Actions
@@ -97,7 +104,8 @@ extension View {
     }
 }
 
-private struct SettingsPageShell<Content: View>: View {
+/// Shared wrapper that constrains settings page width and applies the title.
+private struct SettingsPageContainer<Content: View>: View {
     let title: String
     var maxWidth: CGFloat = 760
     @ViewBuilder let content: Content
@@ -110,13 +118,14 @@ private struct SettingsPageShell<Content: View>: View {
     }
 }
 
+/// Form-based settings page with grouped styling on macOS.
 struct SettingsPage<Content: View>: View {
     let title: String
     var maxWidth: CGFloat = 760
     @ViewBuilder let content: Content
 
     var body: some View {
-        SettingsPageShell(title: title, maxWidth: maxWidth) {
+        SettingsPageContainer(title: title, maxWidth: maxWidth) {
             Form {
                 content
             }
@@ -127,18 +136,20 @@ struct SettingsPage<Content: View>: View {
     }
 }
 
+/// Settings page wrapper for list-based content.
 struct SettingsListPage<Content: View>: View {
     let title: String
     var maxWidth: CGFloat = 760
     @ViewBuilder let content: Content
 
     var body: some View {
-        SettingsPageShell(title: title, maxWidth: maxWidth) {
+        SettingsPageContainer(title: title, maxWidth: maxWidth) {
             content
         }
     }
 }
 
+/// Settings page wrapper that pairs search controls with list content.
 struct SettingsSearchListPage<Content: View, SearchContent: View>: View {
     let title: String
     var maxWidth: CGFloat = 760
@@ -146,7 +157,7 @@ struct SettingsSearchListPage<Content: View, SearchContent: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        SettingsPageShell(title: title, maxWidth: maxWidth) {
+        SettingsPageContainer(title: title, maxWidth: maxWidth) {
             VStack(spacing: 0) {
                 searchContent
                     .padding()
@@ -157,13 +168,14 @@ struct SettingsSearchListPage<Content: View, SearchContent: View>: View {
     }
 }
 
+/// Settings page wrapper for inset-grouped lists on iOS.
 struct SettingsInsetGroupedListPage<Content: View>: View {
     let title: String
     var maxWidth: CGFloat = 760
     @ViewBuilder let content: Content
 
     var body: some View {
-        SettingsPageShell(title: title, maxWidth: maxWidth) {
+        SettingsPageContainer(title: title, maxWidth: maxWidth) {
             content
                 #if os(iOS)
                 .listStyle(.insetGrouped)
@@ -173,6 +185,7 @@ struct SettingsInsetGroupedListPage<Content: View>: View {
     }
 }
 
+/// Labeled form section with an optional footer.
 struct SettingsFormSection<Content: View>: View {
     let title: String
     let footer: String?
@@ -197,6 +210,7 @@ struct SettingsFormSection<Content: View>: View {
     }
 }
 
+/// Row that pairs a label with a trailing toggle.
 struct SettingsToggleRow: View {
     let title: String
     let subtitle: String?
@@ -219,6 +233,7 @@ struct SettingsToggleRow: View {
     }
 }
 
+/// Row that pairs a label with a trailing picker.
 struct SettingsPickerRow<Selection: Hashable, Content: View>: View {
     let title: String
     @Binding var selection: Selection
@@ -242,6 +257,7 @@ struct SettingsPickerRow<Selection: Hashable, Content: View>: View {
     }
 }
 
+/// Row that pairs a label with a slider and numeric readout.
 struct SettingsSliderRow: View {
     let title: String
     let bounds: ClosedRange<Double>
@@ -263,6 +279,7 @@ struct SettingsSliderRow: View {
     }
 }
 
+/// Row that pairs a label with a bounded stepper value.
 struct SettingsStepperRow: View {
     let title: String
     let bounds: ClosedRange<Int>
@@ -282,6 +299,7 @@ struct SettingsStepperRow: View {
     }
 }
 
+/// Search field with leading icon and clear action.
 struct SettingsSearchField: View {
     let prompt: String
     @Binding var text: String
@@ -306,6 +324,7 @@ struct SettingsSearchField: View {
     }
 }
 
+/// Empty-state placeholder for settings collections.
 struct SettingsEmptyState: View {
     let title: String
     let systemImage: String
@@ -317,6 +336,7 @@ struct SettingsEmptyState: View {
     }
 }
 
+/// Confirmation payload for destructive settings actions.
 struct SettingsConfirmation: Identifiable {
     let id = UUID()
     let title: String
@@ -360,6 +380,7 @@ extension View {
     }
 }
 
+/// Action payload for settings entity rows.
 struct SettingsEntityAction: Identifiable {
     let id = UUID()
     let title: String
@@ -380,6 +401,7 @@ struct SettingsEntityAction: Identifiable {
     }
 }
 
+/// List wrapper for settings entities with empty state, swipe actions, and context menus.
 struct SettingsEntityList<Item: Identifiable, RowContent: View>: View {
     let items: [Item]
     let emptyTitle: String
@@ -441,6 +463,7 @@ struct SettingsEntityList<Item: Identifiable, RowContent: View>: View {
     }
 }
 
+/// Stack-based row wrapper for settings entities that do not use `List`.
 struct SettingsEntityRows<Item: Identifiable, RowContent: View>: View {
     let items: [Item]
     let emptyTitle: String
@@ -511,6 +534,7 @@ struct SettingsEntityRows<Item: Identifiable, RowContent: View>: View {
     }
 }
 
+/// Compact entity row with title, subtitle, metadata, and trailing status icons.
 struct SettingsEntityRow<Accessory: View>: View {
     let title: String
     let subtitle: String?
@@ -560,6 +584,7 @@ struct SettingsEntityRow<Accessory: View>: View {
     }
 }
 
+/// Leading label block for toggle and picker rows.
 private struct SettingsRowLabel: View {
     let title: String
     let subtitle: String?

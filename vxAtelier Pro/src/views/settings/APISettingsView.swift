@@ -1,6 +1,7 @@
 import SwiftData
 import SwiftUI
 
+/// API provider configuration list and editor launcher.
 struct APISettingsView: View {
     @Environment(QueryManager.self) private var queryManager
     @Query(sort: [SortDescriptor(\APIConfigurationItem.name)]) private var apiConfigurations: [APIConfigurationItem]
@@ -12,6 +13,7 @@ struct APISettingsView: View {
     @State private var didPresentInitialEditor = false
     @State private var confirmation: SettingsConfirmation?
 
+    /// In-memory state for an API configuration being edited.
     struct EditingConfig: Identifiable {
         let id = UUID()
         var config: APIConfigurationItem

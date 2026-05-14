@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 
+/// Editor for regular-expression whitelist entries used with self-signed certificates.
 public struct SelfSignedCertWhitelistView: View {
     @Binding var whitelist: [String]
     @Environment(\.isEnabled) private var isEnabled
@@ -135,6 +136,7 @@ public struct SelfSignedCertWhitelistView: View {
     }
 }
 
+/// Stored regular-expression entry in the self-signed certificate whitelist.
 private struct RegexPatternItem: Identifiable {
     let index: Int
     let pattern: String

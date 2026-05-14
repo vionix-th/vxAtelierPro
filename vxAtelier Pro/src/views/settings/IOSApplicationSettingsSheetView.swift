@@ -1,6 +1,7 @@
 import SwiftUI
 
 #if os(iOS)
+/// iOS Settings sheet root with compact and regular width layouts.
 struct IOSApplicationSettingsSheetView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var selectedDestination: SettingsDestination?
@@ -42,7 +43,7 @@ struct IOSApplicationSettingsSheetView: View {
                 .listStyle(.sidebar)
                 .navigationSplitViewColumnWidth(190)
         } detail: {
-            ApplicationSettingsDestinationContentView(destination: selectedDestination ?? .general)
+            SettingsDestinationView(destination: selectedDestination ?? .general)
         }
     }
 
@@ -55,7 +56,7 @@ struct IOSApplicationSettingsSheetView: View {
             }
             .navigationTitle("Settings")
             .navigationDestination(for: SettingsDestination.self) { destination in
-                ApplicationSettingsDestinationContentView(destination: destination)
+                SettingsDestinationView(destination: destination)
             }
         }
     }

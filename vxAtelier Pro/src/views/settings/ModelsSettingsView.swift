@@ -1,6 +1,7 @@
 import SwiftData
 import SwiftUI
 
+/// Model list management and refresh controls.
 struct ModelsSettingsView: View {
     @Environment(QueryManager.self) private var queryManager
     @Query(sort: [SortDescriptor(\APIConfigurationItem.name)]) private var apiConfigurations: [APIConfigurationItem]
@@ -12,12 +13,14 @@ struct ModelsSettingsView: View {
     @State private var completionMessage = ""
     @State private var confirmation: SettingsConfirmation?
 
+    /// In-memory state for a model being edited.
     struct EditingModel: Identifiable {
         let id = UUID()
         var model: ModelItem
         var isNew: Bool
     }
 
+    /// Display wrapper for a persisted model row.
     struct ModelRowItem: Identifiable {
         let model: ModelItem
         var id: PersistentIdentifier { model.persistentModelID }

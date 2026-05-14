@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// Reset, backup, and restore tools for local app data.
 struct MaintenanceSettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(QueryManager.self) private var queryManager

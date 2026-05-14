@@ -1,6 +1,7 @@
 import SwiftData
 import SwiftUI
 
+/// Prompt template management and import/export controls.
 struct PromptsSettingsView: View {
     @Environment(QueryManager.self) private var queryManager
     @Query(sort: [SortDescriptor(\PromptTemplate.name)]) private var promptTemplates: [PromptTemplate]
@@ -16,6 +17,7 @@ struct PromptsSettingsView: View {
     @State private var showImportAlert = false
     @State private var confirmation: SettingsConfirmation?
 
+    /// In-memory state for a prompt template being edited.
     struct EditingTemplate: Identifiable {
         let id = UUID()
         var template: PromptTemplate
@@ -39,7 +41,7 @@ struct PromptsSettingsView: View {
                     }
                 }
 
-                PromptTemplateList(
+                PromptTemplateListView(
                     selectionMode: selectionMode,
                     selectedIDs: selectedTemplateIDs,
                     onSelect: { selectedTemplateIDs.insert($0) },

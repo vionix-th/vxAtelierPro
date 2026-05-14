@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// Top-level macOS Settings tabs that group shared destinations.
 enum MacOSSettingsSection: String, CaseIterable, Identifiable, Hashable {
     case general
     case providers

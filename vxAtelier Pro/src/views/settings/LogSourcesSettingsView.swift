@@ -3,6 +3,7 @@ import SwiftUI
 
 private let logSourcesKey = "LoggingService.sources"
 
+/// Logging source visibility controls.
 struct LogSourcesSettingsView: View {
     @State private var sources: [LogSource: Bool] = [:]
     @State private var searchText = ""

@@ -1,6 +1,7 @@
 import SwiftData
 import SwiftUI
 
+/// Rollback snapshot for API configuration edits.
 private struct APIConfigurationEditSnapshot {
     let name: String
     let apiKey: String
@@ -34,6 +35,7 @@ private struct APIConfigurationEditSnapshot {
     }
 }
 
+/// Editor for API provider configuration records.
 struct APIConfigurationEditView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(QueryManager.self) private var queryManager
@@ -472,6 +474,7 @@ struct APIConfigurationEditView: View {
     }
 }
 
+/// Preset provider options used to seed API configuration fields.
 enum APIPreset: String, CaseIterable {
     case openAI = "OpenAI"
     case anthropic = "Anthropic"

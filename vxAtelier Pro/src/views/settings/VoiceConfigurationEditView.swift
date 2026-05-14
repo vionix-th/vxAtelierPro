@@ -1,6 +1,7 @@
 import AVFoundation
 import SwiftUI
 
+/// Transient payload used when saving voice configurations.
 struct VoiceConfigurationDraft {
     let language: String
     let voiceIdentifier: String
@@ -9,6 +10,7 @@ struct VoiceConfigurationDraft {
     let pitchMultiplier: Double
 }
 
+/// Editor for text-to-speech voice profiles.
 struct VoiceConfigurationEditView: View {
     @Environment(\.dismiss) private var dismiss
     let configuration: VoiceConfigurationItem

@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// General application preferences.
 struct GeneralSettingsView: View {
     @AppStorage(AppSettings.Keys.appearanceStyle) private var appearanceStyle: AppearanceStyle = .system    
     @AppStorage(AppSettings.Keys.showRowToolButtons) private var showRowToolButtons: Bool = AppDefaults.showRowToolButtons

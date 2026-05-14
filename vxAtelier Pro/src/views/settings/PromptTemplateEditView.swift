@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 
+/// Transient payload used when saving prompt templates.
 struct PromptTemplateDraft {
     let name: String
     let category: PromptTemplate.Category
@@ -8,6 +9,7 @@ struct PromptTemplateDraft {
     let prompt: String
 }
 
+/// Editor for prompt template records.
 struct PromptTemplateEditView: View {
     @Environment(\.dismiss) private var dismiss
     let template: PromptTemplate

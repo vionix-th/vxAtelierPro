@@ -631,7 +631,7 @@ This submodule contains the platform settings shells, shared settings destinatio
 Settings navigation is split by platform. Shared settings pages stay reusable and platform-neutral; platform shells own presentation and navigation policy.
 
 *   **`SettingsDestination.swift`**: Defines all concrete settings destinations and maps each destination to its shared content view.
-*   **`ApplicationSettingsDestinationContentView.swift`**: Thin wrapper that renders the selected `SettingsDestination` content.
+*   **`SettingsDestinationView.swift`**: Thin wrapper that renders the selected `SettingsDestination` content.
 *   **`MacOSApplicationSettingsSceneView.swift`**: Native macOS `Settings` scene root. It uses a `TabView` for top-level sections, keeps the macOS Settings toolbar reserved for section tabs, and renders page-level actions inline through `SettingsPageActionRegion`.
 *   **`MacOSSettingsSection.swift`**: Groups destinations into macOS Settings sections such as General, Providers, Content, Speech, Security, and Advanced. Update this when adding or moving settings destinations.
 *   **`AppSceneModel.requestSettings(_:)`**: Persists the requested destination and containing section before opening the macOS Settings scene.
@@ -912,8 +912,8 @@ This section documents the views responsible for configuring the application's b
 *   **`WebSearchConfigurationEditView.swift`**: A detailed sheet view for creating or editing a `WebSearchConfigurationItem`. It allows the user to select a provider (e.g., Google), enter the required credentials like an API key and a search engine ID, and set the configuration as the default for the application. It dynamically shows the required fields based on the selected provider.
 *   **`ModelsSettingsView.swift`**: The main interface for managing the AI models available to the application. It provides a primary action to fetch and update the list of models from all configured API providers. The view displays models grouped by provider and allows for the manual addition, editing, or deletion of any model. It also includes a destructive action to remove all models at once.
 *   **`ModelEditorView.swift`**: A sheet view for creating or editing a `ModelItem`. It provides fields to define the model's name, provider, context size (with convenient presets), and capabilities (e.g., vision, tool use) via a series of toggles.
-*   **`PromptsSettingsView.swift`**: The main view for managing prompt templates. It provides context-aware page actions for adding templates, exporting, and toggling multi-select mode. It embeds the `PromptTemplateList` to render the list of templates.
-*   **`PromptTemplateList.swift`**: A reusable view that displays `PromptTemplate` items. It is highly configurable, supporting both a standard mode (where tapping a template activates it) and a multi-select mode. It can be filtered by category and handles the presentation of the `PromptTemplateEditView` sheet for creation and editing.
+*   **`PromptsSettingsView.swift`**: The main view for managing prompt templates. It provides context-aware page actions for adding templates, exporting, and toggling multi-select mode. It embeds the `PromptTemplateListView` to render the list of templates.
+*   **`PromptTemplateListView.swift`**: A reusable view that displays `PromptTemplate` items. It is highly configurable, supporting both a standard mode (where tapping a template activates it) and a multi-select mode. It can be filtered by category and handles the presentation of the `PromptTemplateEditView` sheet for creation and editing.
 *   **`PromptTemplateEditView.swift`**: A sheet view for creating or editing a `PromptTemplate`. It provides a form for all template properties, including name, category, summary, and the full prompt content. It also performs validation to ensure template names are unique and required fields are filled.
 *   **`TTSSettingsView.swift`**: The main view for configuring Text-to-Speech (TTS) settings. It provides global controls for autoplay and repeat mode, and it embeds the `VoiceConfigurationListView` to manage individual voice profiles.
 *   **`VoiceConfigurationListView.swift`**: A view that lists all `VoiceConfigurationItem`s and allows users to add, edit, or delete them. It presents the `VoiceConfigurationEditView` in a sheet for detailed editing.
@@ -991,7 +991,7 @@ views/
     MacOSApplicationSettingsSceneView.swift
     MacOSSettingsSection.swift
     PromptsSettingsView.swift
-    PromptTemplateList.swift
+    PromptTemplateListView.swift
 ```
 
 > UI best practices: use `AppBootstrap` for app-wide dependency injection, keep `NavigationRouter` focused on main content navigation, prefer `@Query` / `@Environment(\.modelContext)` for local SwiftData bindings, and keep settings platform policy in the macOS/iOS settings shells.

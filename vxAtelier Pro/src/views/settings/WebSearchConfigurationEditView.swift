@@ -1,6 +1,7 @@
 import SwiftData
 import SwiftUI
 
+/// Rollback snapshot for web search configuration edits.
 private struct WebSearchConfigurationSnapshot {
     let name: String
     let provider: String
@@ -25,6 +26,7 @@ private struct WebSearchConfigurationSnapshot {
     }
 }
 
+/// Editor for web search configuration records.
 struct WebSearchConfigurationEditView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(QueryManager.self) private var queryManager

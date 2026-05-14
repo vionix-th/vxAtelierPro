@@ -1,7 +1,8 @@
 import SwiftData
 import SwiftUI
 
-struct PromptTemplateList: View {
+/// Reusable prompt template list with selection and delete actions.
+struct PromptTemplateListView: View {
     let category: PromptTemplate.Category?
     let selectionMode: Bool
     let selectedIDs: Set<PersistentIdentifier>

@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import SwiftData
 
+/// Rollback snapshot for model edits.
 private struct ModelEditSnapshot {
     let modelID: String
     let displayName: String
@@ -56,6 +57,7 @@ private struct ModelEditSnapshot {
     }
 }
 
+/// Rollback snapshot for one parameter-mapping row.
 private struct ModelParameterMappingSnapshot {
     let item: ModelParameterMappingItem
     let adapterIDRaw: String
@@ -85,6 +87,7 @@ private struct ModelParameterMappingSnapshot {
     }
 }
 
+/// Rollback snapshot for one parameter-availability row.
 private struct ModelParameterAvailabilitySnapshot {
     let item: ModelParameterAvailabilityItem
     let adapterIDRaw: String
@@ -118,6 +121,7 @@ private struct ModelParameterAvailabilitySnapshot {
 }
 
 // MARK: - Model Editor View
+/// Editor for model metadata, capabilities, and parameter mappings.
 struct ModelEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(QueryManager.self) private var queryManager
@@ -770,6 +774,7 @@ struct ModelEditorView: View {
     }
 }
 
+/// Row editor for adapter parameter mappings.
 private struct ModelParameterMappingRow: View {
     @Bindable var mapping: ModelParameterMappingItem
 
@@ -859,6 +864,7 @@ private struct ModelParameterMappingRow: View {
     }
 }
 
+/// Row editor for adapter parameter availability rules.
 private struct ModelParameterAvailabilityRow: View {
     @Bindable var availability: ModelParameterAvailabilityItem
 
