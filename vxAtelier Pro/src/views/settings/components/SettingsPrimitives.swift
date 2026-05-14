@@ -1,36 +1,99 @@
 import SwiftUI
 
-extension ToolbarItemPlacement {
-    static var settingsPrimary: ToolbarItemPlacement {
-        #if os(iOS)
-        .topBarTrailing
-        #else
-        .primaryAction
-        #endif
+enum SettingsPresentationStyle {
+    case appNavigation
+    case macSettingsScene
+}
+
+private struct SettingsPresentationStyleKey: EnvironmentKey {
+    static let defaultValue: SettingsPresentationStyle = .appNavigation
+}
+
+extension EnvironmentValues {
+    var settingsPresentationStyle: SettingsPresentationStyle {
+        get { self[SettingsPresentationStyleKey.self] }
+        set { self[SettingsPresentationStyleKey.self] = newValue }
+    }
+}
+
+struct SettingsInlineActionRow<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        HStack(spacing: AppDefaults.paddingMedium) {
+            content
+            Spacer(minLength: 0)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+    }
+}
+
+struct SettingsPageActionRegion<Content: View>: View {
+    @Environment(\.settingsPresentationStyle) private var settingsPresentationStyle
+    private let padded: Bool
+    @ViewBuilder let content: Content
+
+    init(padded: Bool = true, @ViewBuilder content: () -> Content) {
+        self.padded = padded
+        self.content = content()
     }
 
-    static var settingsSecondary: ToolbarItemPlacement {
+    var body: some View {
+        if settingsPresentationStyle == .macSettingsScene {
+            SettingsInlineActionRow {
+                content
+            }
+            .padding(.horizontal, padded ? nil : 0)
+            .padding(.top, padded ? AppDefaults.paddingMedium : 0)
+        }
+    }
+}
+
+private struct SettingsNavigationActionsModifier<Actions: View, CancellationAction: View>: ViewModifier {
+    let actions: Actions
+    let cancellationAction: CancellationAction
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
         #if os(iOS)
-        .topBarTrailing
+        content
+            .toolbar {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    actions
+                }
+                ToolbarItem(placement: .topBarLeading) {
+                    cancellationAction
+                }
+            }
         #else
-        .secondaryAction
+        content
         #endif
     }
+}
 
-    static var settingsCancel: ToolbarItemPlacement {
-        #if os(iOS)
-        .topBarLeading
-        #else
-        .cancellationAction
-        #endif
+extension View {
+    func settingsNavigationActions<Actions: View>(
+        @ViewBuilder _ actions: () -> Actions
+    ) -> some View {
+        modifier(
+            SettingsNavigationActionsModifier(
+                actions: actions(),
+                cancellationAction: EmptyView()
+            )
+        )
     }
 
-    static var settingsConfirm: ToolbarItemPlacement {
-        #if os(iOS)
-        .topBarTrailing
-        #else
-        .confirmationAction
-        #endif
+    func settingsNavigationActions<Actions: View, CancellationAction: View>(
+        @ViewBuilder _ actions: () -> Actions,
+        @ViewBuilder cancellation: () -> CancellationAction
+    ) -> some View {
+        modifier(
+            SettingsNavigationActionsModifier(
+                actions: actions(),
+                cancellationAction: cancellation()
+            )
+        )
     }
 }
 

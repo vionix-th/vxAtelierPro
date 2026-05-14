@@ -20,47 +20,47 @@ struct APISettingsView: View {
 
     var body: some View {
         SettingsListPage(title: "API") {
-            SettingsEntityList(
-                items: apiConfigurations.sorted { $0.name < $1.name },
-                emptyTitle: "No API Configurations",
-                emptySystemImage: "key",
-                emptyDescription: "Add an API configuration to enable chatting and model fetching.",
-                selectionAction: { config in
-                    editingConfig = EditingConfig(config: config, isNew: false)
+            VStack(spacing: AppDefaults.paddingLarge) {
+                SettingsPageActionRegion {
+                    addConfigurationButton
                 }
-            ) { config in
-                SettingsEntityRow(
-                    title: config.name,
-                    subtitle: config.baseURL,
-                    metadata: config.apiKey.isEmpty
-                        ? nil
-                        : "API Key: \(config.apiKey.prefix(4))...\(config.apiKey.suffix(4))",
-                    systemImages: config.isDefault ? ["star.fill"] : []
-                )
-            } actions: { config in
-                [
-                    SettingsEntityAction(title: "Edit", systemImage: "pencil") {
+
+                SettingsEntityList(
+                    items: apiConfigurations.sorted { $0.name < $1.name },
+                    emptyTitle: "No API Configurations",
+                    emptySystemImage: "key",
+                    emptyDescription: "Add an API configuration to enable chatting and model fetching.",
+                    selectionAction: { config in
                         editingConfig = EditingConfig(config: config, isNew: false)
-                    },
-                    SettingsEntityAction(title: "Delete", systemImage: "trash", role: .destructive) {
-                        confirmation = SettingsConfirmation(
-                            title: "Delete API Configuration",
-                            message: "Delete \"\(config.name)\"? Models using this configuration will be cleaned up.",
-                            confirmTitle: "Delete",
-                            action: { deleteAPIConfiguration(config) }
-                        )
                     }
-                ]
+                ) { config in
+                    SettingsEntityRow(
+                        title: config.name,
+                        subtitle: config.baseURL,
+                        metadata: config.apiKey.isEmpty
+                            ? nil
+                            : "API Key: \(config.apiKey.prefix(4))...\(config.apiKey.suffix(4))",
+                        systemImages: config.isDefault ? ["star.fill"] : []
+                    )
+                } actions: { config in
+                    [
+                        SettingsEntityAction(title: "Edit", systemImage: "pencil") {
+                            editingConfig = EditingConfig(config: config, isNew: false)
+                        },
+                        SettingsEntityAction(title: "Delete", systemImage: "trash", role: .destructive) {
+                            confirmation = SettingsConfirmation(
+                                title: "Delete API Configuration",
+                                message: "Delete \"\(config.name)\"? Models using this configuration will be cleaned up.",
+                                confirmTitle: "Delete",
+                                action: { deleteAPIConfiguration(config) }
+                            )
+                        }
+                    ]
+                }
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .settingsPrimary) {
-                Button {
-                    startNewConfiguration()
-                } label: {
-                    Label("Add Configuration", systemImage: "plus")
-                }
-            }
+        .settingsNavigationActions {
+            addConfigurationButton
         }
         .onAppear {
             if apiConfigurations.isEmpty && !didPresentInitialEditor {
@@ -94,6 +94,14 @@ struct APISettingsView: View {
             }
         }
         .settingsConfirmationDialog($confirmation)
+    }
+
+    private var addConfigurationButton: some View {
+        Button {
+            startNewConfiguration()
+        } label: {
+            Label("Add Configuration", systemImage: "plus")
+        }
     }
 
     private func deleteAPIConfiguration(_ config: APIConfigurationItem) {

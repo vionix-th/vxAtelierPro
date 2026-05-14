@@ -28,7 +28,7 @@ struct ContentView: View {
     let onRequestExportProject: (ProjectItem) -> Void
     let onRequestExportConversation: (ConversationItem) -> Void
     let onRequestImport: () -> Void
-    let onRequestSettings: (ApplicationSettingsView.SettingsTab?) -> Void
+    let onRequestSettings: (SettingsDestination?) -> Void
     let onRequestTTS: () -> Void
     let onRequestLogHistory: () -> Void
 

@@ -36,6 +36,8 @@ enum AppSettings {
         static let appearanceStyle = "appearanceStyle"
         static let showRowToolButtons = "showRowToolButtons"
         static let showSystemConversations = "ShowSystemConversations"
+        static let selectedSettingsDestination = "SelectedSettingsDestination"
+        static let selectedMacSettingsSection = "SelectedMacSettingsSection"
 
         // Sidebar sorting
         static let sidebarConversationsSortDescending = "SidebarConversationsSortOrderDescending"
@@ -110,6 +112,16 @@ enum AppSettings {
         Keys.isMarkdownEnabled: .init(key: Keys.isMarkdownEnabled, type: Bool.self),
         Keys.isMarkdownTextSelectable: .init(key: Keys.isMarkdownTextSelectable, type: Bool.self),
         Keys.showSystemConversations: .init(key: Keys.showSystemConversations, type: Bool.self),
+        Keys.selectedSettingsDestination: .init(
+            key: Keys.selectedSettingsDestination,
+            type: String.self,
+            allowedValues: SettingsDestination.allCases.map(\.rawValue)
+        ),
+        Keys.selectedMacSettingsSection: .init(
+            key: Keys.selectedMacSettingsSection,
+            type: String.self,
+            allowedValues: MacOSSettingsSection.allCases.map(\.rawValue)
+        ),
         Keys.projectConversationsSortDescending: .init(key: Keys.projectConversationsSortDescending, type: Bool.self),
         Keys.projectConversationsSortType: .init(
             key: Keys.projectConversationsSortType,

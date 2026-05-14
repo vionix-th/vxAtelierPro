@@ -112,14 +112,14 @@ struct WebSearchConfigurationEditView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .settingsConfirm) {
+            ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
                     if validateInputs() {
                         saveConfiguration()
                     }
                 }
             }
-            ToolbarItem(placement: .settingsCancel) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") {
                     dismiss()
                 }

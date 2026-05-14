@@ -67,13 +67,13 @@ struct PromptTemplateEditView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .settingsCancel) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") {
                     vxAtelierPro.log.debug("Prompt template edit cancelled")
                     onCancel()
                 }
             }
-            ToolbarItem(placement: .settingsConfirm) {
+            ToolbarItem(placement: .confirmationAction) {
                 Button("Done") {
                     if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         errorMessage = "Template name cannot be empty."

@@ -200,6 +200,7 @@ struct AppBootstrap {
             .environment(queryManager)
             .environment(ttsQueue)
             .environment(appSceneModel)
+            .environment(appSceneModel.router)
     }
 
     #if os(macOS)

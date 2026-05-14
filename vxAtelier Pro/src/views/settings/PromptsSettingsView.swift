@@ -28,63 +28,38 @@ struct PromptsSettingsView: View {
 
     var body: some View {
         SettingsListPage(title: "Prompts") {
-            PromptTemplateList(
-                selectionMode: selectionMode,
-                selectedIDs: selectedTemplateIDs,
-                onSelect: { selectedTemplateIDs.insert($0) },
-                onDeselect: { selectedTemplateIDs.remove($0) },
-                onTemplateActivated: { template in
-                    editingTemplate = EditingTemplate(template: template, isNew: false)
-                },
-                onDelete: confirmDeleteTemplate
-            )
-        }
-        .toolbar {
-            ToolbarItem(placement: .settingsPrimary) {
-                Button {
-                    addTemplate()
-                } label: {
-                    Label("Add Template", systemImage: "plus")
-                }
-            }
-            ToolbarItem(placement: .settingsSecondary) {
-                Button {
-                    showImporter = true
-                } label: {
-                    Label("Import", systemImage: "square.and.arrow.down")
-                }
-                .disabled(selectionMode)
-            }
-            ToolbarItem(placement: .settingsSecondary) {
-                Button {
+            VStack(spacing: AppDefaults.paddingLarge) {
+                SettingsPageActionRegion {
+                    addTemplateButton
+                    importButton
+                    exportButton
+                    selectAllButton
                     if selectionMode {
-                        exportSelectedTemplates()
-                    } else {
-                        selectionMode = true
+                        cancelExportButton
                     }
-                } label: {
-                    Label(selectionMode ? "Export Selected" : "Export", systemImage: "square.and.arrow.up")
                 }
-                .disabled(selectionMode && selectedTemplateIDs.isEmpty)
+
+                PromptTemplateList(
+                    selectionMode: selectionMode,
+                    selectedIDs: selectedTemplateIDs,
+                    onSelect: { selectedTemplateIDs.insert($0) },
+                    onDeselect: { selectedTemplateIDs.remove($0) },
+                    onTemplateActivated: { template in
+                        editingTemplate = EditingTemplate(template: template, isNew: false)
+                    },
+                    onDelete: confirmDeleteTemplate
+                )
             }
-            ToolbarItem(placement: .settingsSecondary) {
-                Button {
-                    if allSelected {
-                        selectedTemplateIDs.removeAll()
-                    } else {
-                        selectedTemplateIDs = Set(promptTemplates.map(\.id))
-                    }
-                } label: {
-                    Label(allSelected ? "Select None" : "Select All", systemImage: allSelected ? "circle" : "checkmark.circle")
-                }
-                .disabled(!selectionMode || promptTemplates.isEmpty)
-            }
-            ToolbarItem(placement: .settingsCancel) {
+        }
+        .settingsNavigationActions {
+            addTemplateButton
+            importButton
+            exportButton
+            selectAllButton
+        } cancellation: {
+            Group {
                 if selectionMode {
-                    Button("Cancel Export") {
-                        selectionMode = false
-                        selectedTemplateIDs.removeAll()
-                    }
+                    cancelExportButton
                 }
             }
         }
@@ -141,6 +116,56 @@ struct PromptsSettingsView: View {
             Text(promptTemplateErrorMessage)
         }
         .settingsConfirmationDialog($confirmation)
+    }
+
+    private var addTemplateButton: some View {
+        Button {
+            addTemplate()
+        } label: {
+            Label("Add Template", systemImage: "plus")
+        }
+    }
+
+    private var importButton: some View {
+        Button {
+            showImporter = true
+        } label: {
+            Label("Import", systemImage: "square.and.arrow.down")
+        }
+        .disabled(selectionMode)
+    }
+
+    private var exportButton: some View {
+        Button {
+            if selectionMode {
+                exportSelectedTemplates()
+            } else {
+                selectionMode = true
+            }
+        } label: {
+            Label(selectionMode ? "Export Selected" : "Export", systemImage: "square.and.arrow.up")
+        }
+        .disabled(selectionMode && selectedTemplateIDs.isEmpty)
+    }
+
+    private var selectAllButton: some View {
+        Button {
+            if allSelected {
+                selectedTemplateIDs.removeAll()
+            } else {
+                selectedTemplateIDs = Set(promptTemplates.map(\.id))
+            }
+        } label: {
+            Label(allSelected ? "Select None" : "Select All", systemImage: allSelected ? "circle" : "checkmark.circle")
+        }
+        .disabled(!selectionMode || promptTemplates.isEmpty)
+    }
+
+    private var cancelExportButton: some View {
+        Button("Cancel Export") {
+            selectionMode = false
+            selectedTemplateIDs.removeAll()
+        }
     }
 
     private func addTemplate() {

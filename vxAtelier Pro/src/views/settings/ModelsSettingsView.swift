@@ -45,53 +45,23 @@ struct ModelsSettingsView: View {
         SettingsSearchListPage(
             title: "Models",
             searchContent: {
-                SettingsSearchField(prompt: "Filter models", text: $searchText)
+                VStack(spacing: AppDefaults.paddingMedium) {
+                    SettingsPageActionRegion(padded: false) {
+                        updateModelListButton
+                        addModelButton
+                        removeAllModelsButton
+                    }
+                    SettingsSearchField(prompt: "Filter models", text: $searchText)
+                }
             },
             content: {
                 content
             }
         )
-        .toolbar {
-            ToolbarItem(placement: .settingsPrimary) {
-                Button {
-                    updateModels()
-                } label: {
-                    if isUpdatingModels {
-                        ProgressView()
-                    } else {
-                        Label("Update Model List", systemImage: "arrow.triangle.2.circlepath")
-                    }
-                }
-                .disabled(isUpdatingModels || apiConfigurations.isEmpty)
-            }
-            ToolbarItem(placement: .settingsPrimary) {
-                Button {
-                    editingModel = EditingModel(
-                        model: ModelItem(
-                            modelID: "New Model",
-                            contextSize: AppDefaults.ModelContextSizes.defaultSize,
-                            apiConfiguration: apiConfigurations.first
-                        ),
-                        isNew: true
-                    )
-                } label: {
-                    Label("Add Model", systemImage: "plus")
-                }
-                .disabled(apiConfigurations.isEmpty)
-            }
-            ToolbarItem(placement: .settingsSecondary) {
-                Button(role: .destructive) {
-                    confirmation = SettingsConfirmation(
-                        title: "Delete All Models",
-                        message: "Are you sure you want to delete all models? This action cannot be undone.",
-                        confirmTitle: "Delete",
-                        action: deleteAllModels
-                    )
-                } label: {
-                    Label("Remove All Models", systemImage: "trash")
-                }
-                .disabled(models.isEmpty)
-            }
+        .settingsNavigationActions {
+            updateModelListButton
+            addModelButton
+            removeAllModelsButton
         }
         .sheet(item: $editingModel) { editing in
             ModelEditorView(model: editing.model)
@@ -100,6 +70,49 @@ struct ModelsSettingsView: View {
             Button("OK", role: .cancel) { }
         }
         .settingsConfirmationDialog($confirmation)
+    }
+
+    private var updateModelListButton: some View {
+        Button {
+            updateModels()
+        } label: {
+            if isUpdatingModels {
+                ProgressView()
+            } else {
+                Label("Update Model List", systemImage: "arrow.triangle.2.circlepath")
+            }
+        }
+        .disabled(isUpdatingModels || apiConfigurations.isEmpty)
+    }
+
+    private var addModelButton: some View {
+        Button {
+            editingModel = EditingModel(
+                model: ModelItem(
+                    modelID: "New Model",
+                    contextSize: AppDefaults.ModelContextSizes.defaultSize,
+                    apiConfiguration: apiConfigurations.first
+                ),
+                isNew: true
+            )
+        } label: {
+            Label("Add Model", systemImage: "plus")
+        }
+        .disabled(apiConfigurations.isEmpty)
+    }
+
+    private var removeAllModelsButton: some View {
+        Button(role: .destructive) {
+            confirmation = SettingsConfirmation(
+                title: "Delete All Models",
+                message: "Are you sure you want to delete all models? This action cannot be undone.",
+                confirmTitle: "Delete",
+                action: deleteAllModels
+            )
+        } label: {
+            Label("Remove All Models", systemImage: "trash")
+        }
+        .disabled(models.isEmpty)
     }
 
     @ViewBuilder

@@ -185,7 +185,7 @@ struct APIConfigurationEditView: View {
             Text(validationErrorMessage)
         }
         .toolbar {
-            ToolbarItem(placement: .settingsConfirm) {
+            ToolbarItem(placement: .confirmationAction) {
                 Button {
                     Task { await save() }
                 } label: {
@@ -197,7 +197,7 @@ struct APIConfigurationEditView: View {
                 }
                 .disabled(isValidating || isRefreshingModels)
             }
-            ToolbarItem(placement: .settingsCancel) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") {
                     vxAtelierPro.log.debug("API configuration edit cancelled")
                     dismiss()

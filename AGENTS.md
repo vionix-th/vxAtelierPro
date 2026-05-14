@@ -24,8 +24,16 @@
 - Read `Package.swift` to understand the application structure.
 - Update `Package.swift` whenever adding or deleting files.
 
+## App Composition / Settings UI
+- Treat `AppBootstrap` as the app composition root. App-wide dependencies must be injected through `bootstrapped(with:)` / `AppBootstrap.applyingDependencies(to:)`, not ad hoc from feature views.
+- `AppShellView` consumes app dependencies, hosts global sheets/tasks, and bridges platform scene requests. It should not re-publish `QueryManager`, `ModelContext`, `AppSceneModel`, `TTSQueue`, or `NavigationRouter`.
+- Keep `NavigationRouter` scoped to main content navigation. Do not use it as a generic app router for Settings scene presentation or platform window commands.
+- Settings use separate platform shells: `MacOSApplicationSettingsSceneView` for the native macOS `Settings` scene and `IOSApplicationSettingsSheetView` for the iOS sheet. Shared settings pages live below those shells and should not own platform scene policy.
+- macOS Settings must keep the native Settings toolbar for section tabs. Root settings page actions belong in inline page action regions on macOS and navigation toolbar actions on iOS.
+- When adding a settings page, update `SettingsDestination`, `MacOSSettingsSection`, `AppDefaults` / `AppSettings` if persistence is needed, and `Package.swift` if files are added.
+
 ## Logging
-- Logging must use the `os.Logger` defined in `vxAtelierPro.swift` (`vxAtelierPro.log`) and the appropriate channel (`log`, `debug`, `error`).
+- Logging must use the shared logger exposed by `vxAtelierPro.log` and the appropriate level (`debug`, `info`, `warning`, `error`, etc.).
 - In `async` functions use `await vxAtelierPro.log…`; otherwise use `vxAtelierPro.log…`.
 
 ## Build / Test
@@ -41,7 +49,7 @@
 - Use APIs such as `startAccessingSecurityScopedResource` / `stopAccessingSecurityScopedResource` when necessary or recommended.
 
 ## Documentation Pointers
-- Architecture: `docs/DEVELOPER.md`
-- Common mistakes/errors: `docs/TROUBLESHOOTING.md`
-- TTS system: `src/tts/README.md`
-- LLM system: `src/llm_api/README.md`
+- Architecture: `vxAtelier Pro/docs/DEVELOPER.md`
+- Common mistakes/errors: `vxAtelier Pro/docs/TROUBLESHOOTING.md`
+- TTS system: `vxAtelier Pro/src/tts/README.md`
+- LLM system: `vxAtelier Pro/src/llm_api/README.md`

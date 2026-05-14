@@ -260,7 +260,7 @@ Use `Task` for async operations and handle cancellation properly:
 
 **Files Affected:**
 - `ContentView.swift`: Direct async calls in `onAppear`
-- `ApplicationSettingsView.swift`: Async model updates without proper task management
+- Settings pages: async fetch/update actions should use `.task`, explicit `Task`, and cancellation-aware view state rather than fire-and-forget work in `onAppear`
 
 ### 2. Multiple Source of Truth
 
@@ -431,7 +431,7 @@ do {
 
 **Files Affected:**
 - `ConversationView.swift`: Multiple try-catch blocks with minimal error handling
-- `ApplicationSettingsView.swift`: Silent error catches
+- Settings pages: destructive and persistence actions should log failures through `vxAtelierPro.log` and surface user-facing errors where recovery is needed
 
 ### 2. Error Propagation in SwiftData
 

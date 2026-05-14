@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum SettingsDestination: CaseIterable, Identifiable, Hashable {
+enum SettingsDestination: String, CaseIterable, Identifiable, Hashable {
     case general
     case api
     case webSearch

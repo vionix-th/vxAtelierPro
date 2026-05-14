@@ -3,12 +3,12 @@ import SwiftData
 import SwiftUI
 
 struct AppShellView: View {
-    @Environment(\.modelContext) private var modelContext
     @Environment(QueryManager.self) private var queryManager
     @Environment(TTSQueue.self) private var ttsQueue
     @Environment(AppSceneModel.self) private var sceneModel
     #if os(macOS)
         @Environment(\.openWindow) private var openWindow
+        @Environment(\.openSettings) private var openSettings
     #endif
     @AppStorage(AppSettings.Keys.statusBarVisible) private var statusBarVisible: Bool = AppDefaults.statusBarVisible
 
@@ -21,14 +21,7 @@ struct AppShellView: View {
                 onRequestExportProject: scene.requestExport(project:),
                 onRequestExportConversation: scene.requestExport(conversation:),
                 onRequestImport: scene.requestImport,
-                onRequestSettings: { tab in
-                    #if os(macOS)
-                        scene.prepareSettingsWindow(tab)
-                        openWindow(id: "applicationSettings")
-                    #else
-                        scene.requestSettings(tab)
-                    #endif
-                },
+                onRequestSettings: scene.requestSettings,
                 onRequestTTS: scene.requestTTS,
                 onRequestLogHistory: scene.requestLogHistory
             )
@@ -40,7 +33,6 @@ struct AppShellView: View {
                 )
             }
         }
-        .environment(scene.router)
         #if os(iOS)
             .onChange(of: ttsQueue.isPlaying) {
                 sceneModel.handleTTSPlayback(isPlaying: ttsQueue.isPlaying)
@@ -53,6 +45,10 @@ struct AppShellView: View {
         .task(id: scene.exportTaskID) { await scene.exportTask() }
         .task(id: scene.importRequestFlag) { await scene.importTask() }
         #if os(macOS)
+            .onChange(of: scene.openSettingsSceneRequestID) { _, requestID in
+                guard requestID != nil else { return }
+                openSettings()
+            }
             .onChange(of: scene.utilityPanelRequestID) { _, requestID in
                 guard requestID != nil else { return }
                 openWindow(id: "utilityPanel")
@@ -62,16 +58,12 @@ struct AppShellView: View {
             switch sheet {
             case .logHistory(_):
                 LogHistorySheet()
+            #if os(iOS)
             case .applicationSettings(let initialTab, _):
-                ApplicationSettingsView(initialTab: initialTab)
-                    .environment(queryManager)
-                    .environment(\.modelContext, modelContext)
-                    #if os(macOS)
-                        .frame(idealWidth: 900, idealHeight: 640)
-                    #else
-                        .presentationDetents([.medium, .large])
-                        .presentationDragIndicator(.visible)
-                    #endif
+                IOSApplicationSettingsSheetView(initialDestination: initialTab)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            #endif
             case .conversationOptions(let conversationID, _):
                 conversationOptionsSheet(for: conversationID)
             case .modelSelection(let conversationID, _):

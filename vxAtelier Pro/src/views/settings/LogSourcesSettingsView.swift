@@ -24,35 +24,42 @@ struct LogSourcesSettingsView: View {
         SettingsSearchListPage(
             title: "Log Sources",
             searchContent: {
-                SettingsSearchField(prompt: "Filter log sources", text: $searchText)
+                VStack(spacing: AppDefaults.paddingMedium) {
+                    SettingsPageActionRegion(padded: false) {
+                        sourceActionsMenu
+                    }
+                    SettingsSearchField(prompt: "Filter log sources", text: $searchText)
+                }
             },
             content: {
                 content
             }
         )
-        .toolbar {
-            ToolbarItem(placement: .settingsPrimary) {
-                Menu {
-                    Button {
-                        setFilteredSources(enabled: true)
-                    } label: {
-                        Label(isFiltering ? "Enable Matching Sources" : "Enable All Sources", systemImage: "checkmark.circle")
-                    }
-                    .disabled(filteredSources.isEmpty)
-
-                    Button {
-                        setFilteredSources(enabled: false)
-                    } label: {
-                        Label(isFiltering ? "Disable Matching Sources" : "Disable All Sources", systemImage: "xmark.circle")
-                    }
-                    .disabled(filteredSources.isEmpty)
-                } label: {
-                    Label("Source Actions", systemImage: "ellipsis.circle")
-                }
-                .disabled(sources.isEmpty)
-            }
+        .settingsNavigationActions {
+            sourceActionsMenu
         }
         .onAppear(perform: loadSources)
+    }
+
+    private var sourceActionsMenu: some View {
+        Menu {
+            Button {
+                setFilteredSources(enabled: true)
+            } label: {
+                Label(isFiltering ? "Enable Matching Sources" : "Enable All Sources", systemImage: "checkmark.circle")
+            }
+            .disabled(filteredSources.isEmpty)
+
+            Button {
+                setFilteredSources(enabled: false)
+            } label: {
+                Label(isFiltering ? "Disable Matching Sources" : "Disable All Sources", systemImage: "xmark.circle")
+            }
+            .disabled(filteredSources.isEmpty)
+        } label: {
+            Label("Source Actions", systemImage: "ellipsis.circle")
+        }
+        .disabled(sources.isEmpty)
     }
 
     @ViewBuilder

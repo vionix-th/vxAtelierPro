@@ -79,12 +79,12 @@ public struct SelfSignedCertWhitelistView: View {
                     }
                 }
                 .toolbar {
-                    ToolbarItem(placement: .settingsCancel) {
+                    ToolbarItem(placement: .cancellationAction) {
                         Button("Cancel") {
                             editingPattern = nil
                         }
                     }
-                    ToolbarItem(placement: .settingsConfirm) {
+                    ToolbarItem(placement: .confirmationAction) {
                         Button(item.isNew ? "Add" : "Save") {
                             saveEditingPattern(item)
                         }

@@ -1,6 +1,6 @@
 # vxAtelier Pro Codebase Documentation
 
-> Last updated: 2026-01-21
+> Last updated: 2026-05-14
 
 This document provides an in-depth technical reference of the **vxAtelier Pro** source code.  Use it together with `README.md` for a complete understanding of architectural concepts and high-level features.
 
@@ -34,10 +34,10 @@ Location: `src/`
 
 This file defines the `vxAtelierPro` struct, which conforms to the `App` protocol and serves as the main entry point for the application.
 
-*   **Bootstrapping**: It is responsible for bootstrapping the entire application, including initializing the data layer, injecting dependencies, and setting up the main view hierarchy.
+*   **Bootstrapping**: It creates a shared `AppBootstrap`, which owns the data layer, app services, scene model, dependency injection, launch hooks, and default tool registration.
 *   **SwiftData Initialization**: It defines the complete data `Schema` for all `PersistentModel` types and creates the shared `ModelContainer`.
-*   **Dependency Injection**: It initializes `QueryManager`, `TTSQueue`, and `AppSceneModel`, then injects them (and the `ModelContainer`) into the SwiftUI environment.
-*   **Root View and Scene Management**: It sets up `AppShellView` as the root view, hosts `ContentView` within it, and defines the main `WindowGroup` plus macOS `Settings` and menu bar scenes.
+*   **Dependency Injection**: App scenes call `.bootstrapped(with:)`, which injects the `ModelContainer`, `QueryManager`, `TTSQueue`, `AppSceneModel`, and the app `NavigationRouter`.
+*   **Root View and Scene Management**: It sets up `AppShellView` as the main window root, defines the native macOS `Settings` scene with `MacOSApplicationSettingsSceneView`, and provides the utility panel and menu bar scenes on macOS.
 *   **macOS Hotkeys**: On macOS, it initializes `GlobalHotkeyController` (built on `HotkeyManager`) to register the utility panel hotkey after launch.
 
 ---
@@ -73,13 +73,13 @@ src/
 │  ├─ content/      # Sidebar data source, routing, selection models
 │  ├─ dialog/       # Views related to a single conversation/dialog
 │  ├─ project/      # Views related to a project
-│  ├─ settings/     # All views for the application settings window
+│  ├─ settings/     # Platform settings shells, shared settings destinations, and settings pages
 │  │  └─ components/# Reusable components specific to settings views
 │  └─ utility/      # Utility views (e.g., log history sheet)
 └─ vxAtelierPro.swift# Root entry & shared singletons
 ```
 
-`Package.swift` explicitly lists only the files required for the main target, but *all* sources under `src/` are compiled by SPM.
+`Package.swift` explicitly lists the SwiftPM source files for editor and SourceKit integration. When files are added, deleted, or renamed, keep that list in sync.
 
 ---
 
@@ -90,12 +90,14 @@ src/
 
 ### Building
 ```bash
-xcodebuild -scheme "vxAtelier Pro"             # Full IDE build
-swift build                                   # Editor/indexing compile check only
+xcodebuild -project "vxAtelier Pro.xcodeproj" -scheme "vxAtelier Pro" -destination "platform=macOS" -configuration Debug build
+xcodebuild -project "vxAtelier Pro.xcodeproj" -scheme "vxAtelier Pro" -destination "generic/platform=iOS Simulator" -configuration Debug build
 ```
 
+Xcode / `xcodebuild` is the build and test authority. The SwiftPM manifest is maintained for dependency graph and editor integration, not as the app build authority.
+
 ### Linting & Formatting
-Xcode compile-time diagnostics are authoritative. SPM compile-time diagnostics may be used only for editor/indexing feedback. Add SwiftLint or swift-format as desired.
+Xcode compile-time diagnostics are authoritative. Add SwiftLint or swift-format only if the project adopts them explicitly.
 
 ---
 
@@ -547,9 +549,10 @@ This module contains all the SwiftUI views that constitute the application's use
 
 This is the root view of the application and the stable parent for global UI presentation.
 
-*   **Global Presentation Host**: Owns sheet presentation for settings, conversation options, TTS queue, and log history, keeping presentation anchors stable across navigation changes.
+*   **Global Presentation Host**: Owns sheet presentation for iOS settings, conversation options, model selection, TTS queue, and log history, keeping presentation anchors stable across navigation changes.
 *   **Import/Export Orchestration**: Runs async import/export tasks (via `DataManager`) and updates navigation selection on completion.
-*   **Selection Bridging**: Maintains `activeConversationID` and `selectionRequest` to coordinate status bar context and programmatic navigation.
+*   **Platform Scene Bridging**: Observes `AppSceneModel` scene request IDs and calls platform environment actions such as `openSettings()` and `openWindow(id:)`.
+*   **Dependency Boundary**: Consumes dependencies injected by `AppBootstrap`; it does not re-publish app-wide environment values.
 
 #### Content View (`ContentView.swift`)
 
@@ -557,7 +560,7 @@ This is the main navigation view, responsible for sidebar structure and detail r
 
 *   **Main UI Structure**: Builds the primary layout using `NavigationSplitView` (macOS) and `NavigationSplitView` + `navigationDestination` (iOS).
 *   **Sidebar Composition**: Uses `ContentSidebarView` with SwiftData queries and routing state to render projects, conversations, and bookmarks based on `NavigationMode` and `ShowSystemDialogs`.
-*   **State-Driven Routing**: Uses `SidebarSelection` to route to `ProjectView` or `ConversationView`, and uses `ProjectConversationSelection` to focus a specific conversation when navigating into a project.
+*   **State-Driven Routing**: Uses `NavigationRouter` plus `SidebarSelection` to route to `ProjectView` or `ConversationView`, and uses project-local routes to focus a specific conversation when navigating into a project.
 *   **Action Hub**: Exposes toolbar menu actions (new items, import, view options, utilities, settings) and delegates app-level requests back to `AppShellView`.
 
 #### Status Bar (`StatusBar.swift`)
@@ -621,19 +624,23 @@ This enum defines all possible user actions that can be performed on a single `M
 
 #### Settings Views (`src/views/settings/`)
 
-This submodule contains all the views related to the application's settings screens.
+This submodule contains the platform settings shells, shared settings destination mapping, and concrete settings pages.
 
-##### Main Settings Container (`ApplicationSettingsView.swift`)
+##### Settings Shells And Destinations
 
-This view acts as the main container for the entire settings interface, orchestrating navigation between the various settings panels.
+Settings navigation is split by platform. Shared settings pages stay reusable and platform-neutral; platform shells own presentation and navigation policy.
 
-*   **Container View**: It uses a `NavigationSplitView` to create a standard master-detail layout, with a sidebar listing settings categories.
-*   **Enum-Driven Navigation**: A `SettingsTab` enum defines all available settings categories. The view uses a `switch` statement on a `@State` variable of this enum type to determine which settings view to display in the detail pane, making the navigation clear and extensible.
-*   **Modular Structure**: Each settings screen is implemented as a separate, self-contained SwiftUI view (e.g., `GeneralSettingsView`, `APISettingsView`) embedded within this container.
+*   **`SettingsDestination.swift`**: Defines all concrete settings destinations and maps each destination to its shared content view.
+*   **`ApplicationSettingsDestinationContentView.swift`**: Thin wrapper that renders the selected `SettingsDestination` content.
+*   **`MacOSApplicationSettingsSceneView.swift`**: Native macOS `Settings` scene root. It uses a `TabView` for top-level sections, keeps the macOS Settings toolbar reserved for section tabs, and renders page-level actions inline through `SettingsPageActionRegion`.
+*   **`MacOSSettingsSection.swift`**: Groups destinations into macOS Settings sections such as General, Providers, Content, Speech, Security, and Advanced. Update this when adding or moving settings destinations.
+*   **`MacOSApplicationSettingsSelection.swift`**: Persists the requested destination and containing section before opening the macOS Settings scene.
+*   **`IOSApplicationSettingsSheetView.swift`**: iOS settings sheet root. It uses `NavigationStack` in compact width and `NavigationSplitView` in regular width.
+*   **Request Flow**: `ContentView` delegates settings requests to `AppShellView`, which calls `AppSceneModel.requestSettings(_:)`. On iOS this presents the sheet; on macOS it records the requested destination and asks the native Settings scene to open.
 
-##### Confirmation Context (`ConfirmationContext.swift`)
+##### Settings Confirmation
 
-This enum defines the text content for various confirmation dialogs used throughout the settings screens. It provides a centralized, type-safe source of truth for the titles, descriptive messages, and button labels for destructive actions like resetting defaults or clearing storage, ensuring a consistent user experience.
+`SettingsConfirmation` in `SettingsPrimitives.swift` defines confirmation dialog content used throughout settings screens. It provides a centralized, type-safe source of truth for destructive actions like resetting defaults or clearing storage.
 
 ##### General Settings (`GeneralSettingsView.swift`)
 
@@ -647,7 +654,7 @@ This view manages a variety of global application settings related to appearance
 This view provides a standard Create, Read, Update, and Delete (CRUD) interface for managing `APIConfigurationItem` objects.
 
 *   **Sheet-Based Editing**: It uses a sheet to present the `APIConfigurationEditView` for both creating new configurations and editing existing ones. This modal approach provides a focused editing experience.
-*   **Data Source**: It reads the list of configurations directly from the `QueryManager` and uses it to perform all delete operations.
+*   **Data Source**: It reads persisted configurations with SwiftData and uses `QueryManager` commands for mutations that need central save/logging behavior.
 *   **Default Configuration Management**: It visually indicates the default configuration with a star icon and contains the logic to assign a new default if the current one is deleted.
 
 ##### API Configuration Editor (`APIConfigurationEditView.swift`)
@@ -663,7 +670,7 @@ This is the modal view responsible for the detailed editing of a single `APIConf
 This view provides a CRUD interface for managing `WebSearchConfigurationItem` objects, mirroring the design of the API settings panel.
 
 *   **Sheet-Based Editing**: It uses a sheet to present the `WebSearchConfigurationEditView` for creating and editing configurations.
-*   **Data Source**: It reads the list of configurations from the `QueryManager` and uses it to handle delete operations.
+*   **Data Source**: It reads persisted configurations with SwiftData and uses `QueryManager` commands for mutations that need central save/logging behavior.
 *   **Default Configuration Management**: It visually marks the default configuration and ensures a new default is assigned if the current one is deleted.
 
 ##### Web Search Configuration Editor (`WebSearchConfigurationEditView.swift`)
@@ -858,7 +865,7 @@ This module provides a collection of shared services, helpers, and extensions us
 
 ### Views Layer
 Location: `src/views/`
-*   **`AppShellView.swift`**: Root UI shell that hosts `ContentView` and `StatusBar`, owns global sheet presentation, and runs import/export tasks.
+*   **`AppShellView.swift`**: Root UI shell that hosts `ContentView` and `StatusBar`, owns global sheet presentation, runs import/export tasks, and bridges macOS scene requests.
 *   **`ContentView.swift`**: Main `NavigationSplitView` for sidebar/detail routing. It uses `SidebarSelection` and `ContentSidebarView` to drive navigation and delegates app-level requests to `AppShellView`.
 *   **`StatusBar.swift`**: A persistent view displayed at the bottom of the main window. It shows filtered log output and a `DialogInfoHeader` for the active conversation.
 *   **Appearance handling**: The app-level scene builders apply the user-selected appearance using `.preferredColorScheme` with the `@AppStorage("appearanceStyle")` value, so the main window and Settings scene respect runtime theme changes without extra wrapper views.
@@ -892,9 +899,12 @@ This section documents the views responsible for configuring the application's b
 
 *   **`ModelSelectionView.swift`**: A reusable sheet view for selecting an AI model. It allows users to filter the list of available `ModelItem`s by the current AI service provider, search by name, and filter by model capabilities (e.g., Vision, Tool Use). It is used in any context where a user needs to choose a model for a task.
 
-#### Settings Tabs
+#### Settings Shells And Pages
 
-* **`ApplicationSettingsView.swift`** – The main container for the settings UI. It uses a `NavigationSplitView` to present a sidebar of settings categories (defined in a `SettingsTab` enum) and displays the corresponding view for the selected category (e.g., `GeneralSettingsView`, `APISettingsView`).
+*   **`SettingsDestination.swift`**: Defines every shared settings destination and its content.
+*   **`MacOSApplicationSettingsSceneView.swift`**: Native macOS Settings scene. It uses `MacOSSettingsSection` for toolbar tabs and keeps page actions inline instead of adding extra toolbar items.
+*   **`IOSApplicationSettingsSheetView.swift`**: iOS settings sheet. It adapts between compact `NavigationStack` and regular-width `NavigationSplitView`.
+*   **`SettingsPrimitives.swift`**: Shared settings page containers, inline/mac action regions, iOS navigation action placement, and confirmation dialogs.
 *   **`GeneralSettingsView.swift`**: Manages general application preferences. It provides controls for setting the app's `AppearanceStyle`, toggling UI elements like the status bar, and configuring default avatar settings. All settings are persisted directly via `@AppStorage`.
 *   **`APISettingsView.swift`**: The main view for managing AI service provider configurations. It lists all saved `APIConfigurationItem`s, shows which is the default, allows users to add new ones, and handles deletion. It presents the `APIConfigurationEditView` in a sheet for creating or editing a configuration.
 *   **`APIConfigurationEditView.swift`**: A sheet view for creating or editing an `APIConfigurationItem`. It exposes provider preset, name, API key, API-root base URL, default adapter ID, default model, and advanced headers/options JSON. Users do not edit fixed chat/responses/messages/models paths in normal configuration.
@@ -902,7 +912,7 @@ This section documents the views responsible for configuring the application's b
 *   **`WebSearchConfigurationEditView.swift`**: A detailed sheet view for creating or editing a `WebSearchConfigurationItem`. It allows the user to select a provider (e.g., Google), enter the required credentials like an API key and a search engine ID, and set the configuration as the default for the application. It dynamically shows the required fields based on the selected provider.
 *   **`ModelsSettingsView.swift`**: The main interface for managing the AI models available to the application. It provides a primary action to fetch and update the list of models from all configured API providers. The view displays models grouped by provider and allows for the manual addition, editing, or deletion of any model. It also includes a destructive action to remove all models at once.
 *   **`ModelEditorView.swift`**: A sheet view for creating or editing a `ModelItem`. It provides fields to define the model's name, provider, context size (with convenient presets), and capabilities (e.g., vision, tool use) via a series of toggles.
-*   **`PromptsSettingsView.swift`**: The main view for managing prompt templates. It features a `SettingsActionBar` to enable adding new templates and toggling a multi-select mode for batch operations. It embeds the `PromptTemplateList` to render the list of templates.
+*   **`PromptsSettingsView.swift`**: The main view for managing prompt templates. It provides context-aware page actions for adding templates, exporting, and toggling multi-select mode. It embeds the `PromptTemplateList` to render the list of templates.
 *   **`PromptTemplateList.swift`**: A reusable view that displays `PromptTemplate` items. It is highly configurable, supporting both a standard mode (where tapping a template activates it) and a multi-select mode. It can be filtered by category and handles the presentation of the `PromptTemplateEditView` sheet for creation and editing.
 *   **`PromptTemplateEditView.swift`**: A sheet view for creating or editing a `PromptTemplate`. It provides a form for all template properties, including name, category, summary, and the full prompt content. It also performs validation to ensure template names are unique and required fields are filled.
 *   **`TTSSettingsView.swift`**: The main view for configuring Text-to-Speech (TTS) settings. It provides global controls for autoplay and repeat mode, and it embeds the `VoiceConfigurationListView` to manage individual voice profiles.
@@ -912,7 +922,7 @@ This section documents the views responsible for configuring the application's b
 *   **`PermissionRowView.swift`**: A reusable component located in `src/views/components/` that displays the status of a single permission (e.g., granted, denied). It provides a button that either initiates a permission request or directs the user to the relevant section of the system's Settings app.
 *   **`SelfSignedCertWhitelistView.swift`**: A reusable component located in `src/views/settings/components/` for managing a whitelist of regular expression patterns. This allows the application to connect to specified servers that use self-signed SSL certificates, providing a necessary security workaround for development or private enterprise environments.
 *   **`MaintenanceSettingsView.swift`**: Provides a centralized interface for critical data management tasks. It includes actions to reset user defaults, clear local storage, and perform database backup and restore operations using the native system file exporter and importer views.
-*   **`ConfirmationContext.swift`**: A simple enum that defines the content (title, message, button text) for various confirmation dialogs, ensuring a consistent user experience for destructive actions like resetting settings or restoring the database.
+*   **`SettingsConfirmation`**: A simple enum in `SettingsPrimitives.swift` that defines the content (title, message, button text) for confirmation dialogs, ensuring a consistent user experience for destructive actions like resetting settings or restoring the database.
 *   **`DeveloperSettingsView.swift`**: A view that exposes advanced, developer-focused settings. It provides toggles for default Markdown rendering, text selectability, system dialog visibility, tool call chips, and streaming diagnostics.
 
 ### Utility Components (`src/views/utility/`)
@@ -976,12 +986,15 @@ views/
     ConversationView.swift
     MessageView.swift
   settings/
-    SettingsSidebar.swift
+    SettingsDestination.swift
+    IOSApplicationSettingsSheetView.swift
+    MacOSApplicationSettingsSceneView.swift
+    MacOSSettingsSection.swift
     PromptsSettingsView.swift
     PromptTemplateList.swift
 ```
 
-> UI best practices: prefer `QueryManager` for app-wide lists, use `@Environment(\.modelContext)` / `@Query` for local SwiftData bindings, and use `NavigationSplitView` for macOS 14 / iPadOS 17.
+> UI best practices: use `AppBootstrap` for app-wide dependency injection, keep `NavigationRouter` focused on main content navigation, prefer `@Query` / `@Environment(\.modelContext)` for local SwiftData bindings, and keep settings platform policy in the macOS/iOS settings shells.
 
 ---
 
@@ -1030,7 +1043,7 @@ Implementation notes:
 | Protocol | Purpose | Notes |
 |----------|---------|-------|
 | `StatusModifiable` | Internal helper to update `ItemStatus` on any `PersistentModel`. | Used by `QueryManager` |
-| **`QueryManager`** | `@Observable` manager that centralizes SwiftData fetches, provides filtered collections, and CRUD helpers. | Instantiated in `vxAtelierPro.App` |
+| **`QueryManager`** | `@Observable` command facade for SwiftData mutations and targeted lookups. | Instantiated and injected by `AppBootstrap` |
 
 ## SwiftData Model Relationships
 ```
@@ -1053,16 +1066,17 @@ Delete rules:
 * `.nullify` when a conversation is removed from a project.
 
 ## View & State Flow Conventions
-* **Environment Values:** `QueryManager`, `TTSQueue`, `AppSceneModel`, and SwiftData `ModelContext` are seeded in `vxAtelierPro.App`.
-* **@Query / @ModelContext:** Used where live SwiftData bindings are needed; most list data flows through `QueryManager`.
-* **Navigation:** `NavigationSplitView` for the main shell; `NavigationStack` inside `ProjectView` for project-local routing.
-* **Selection Logic:** `SidebarSelection` drives sidebar/detail routing; `ProjectConversationSelection` and `selectionRequest` enable programmatic selection.
+* **Environment Values:** `AppBootstrap` seeds `ModelContainer`, `QueryManager`, `TTSQueue`, `AppSceneModel`, SwiftData `ModelContext`, and `NavigationRouter` through `.bootstrapped(with:)`.
+* **@Query / @ModelContext:** Use live SwiftData bindings where views own local data presentation; use `QueryManager` for command-style mutations and targeted lookups.
+* **Navigation:** `NavigationSplitView` for main content routing; `NavigationStack` inside `ProjectView` for project-local routing; platform-specific settings shells for application settings navigation.
+* **Selection Logic:** `NavigationRouter` owns main content selection/path state. `MacOSApplicationSettingsSelection` persists the requested settings destination for the native macOS Settings scene.
 * **Logging UI:** Status bar shows filtered `LoggingService` output; log history sheet reads `messageHistory`.
 
 ## Lifecycle & Entry Points
-1. `vxAtelierPro.App` registers platform specific `AppDelegate`, initialises `ModelContainer`, `QueryManager`, `TTSQueue`, `AppSceneModel`, and default tools.
-2. The `WindowGroup` hosts `AppShellView` with `.preferredColorScheme` driven by `@AppStorage("appearanceStyle")`; the `Settings` scene hosts `ApplicationSettingsView` with the same override and injected environments.
-3. On macOS, a `MenuBarExtra` supplies quick actions.
+1. `vxAtelierPro.App` creates `AppBootstrap`, which initializes `ModelContainer`, `QueryManager`, `TTSQueue`, `AppSceneModel`, launch hooks, and default tools.
+2. The `WindowGroup` hosts `AppShellView` with `.preferredColorScheme` driven by `@AppStorage("appearanceStyle")`; each scene applies `.bootstrapped(with:)` for shared dependencies.
+3. On macOS, the native `Settings` scene hosts `MacOSApplicationSettingsSceneView`; on iOS, `AppSceneModel.requestSettings(_:)` presents `IOSApplicationSettingsSheetView` from `AppShellView`.
+4. On macOS, a `MenuBarExtra` supplies quick actions.
 
 ---
 

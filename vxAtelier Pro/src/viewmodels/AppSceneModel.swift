@@ -7,7 +7,9 @@ import SwiftUI
 final class AppSceneModel {
     enum PresentedSheet: Identifiable {
         case logHistory(UUID)
-        case applicationSettings(ApplicationSettingsView.SettingsTab?, UUID)
+        #if os(iOS)
+            case applicationSettings(SettingsDestination?, UUID)
+        #endif
         case conversationOptions(PersistentIdentifier, UUID)
         case modelSelection(PersistentIdentifier, UUID)
         case tts(UUID)
@@ -15,11 +17,14 @@ final class AppSceneModel {
         var id: UUID {
             switch self {
             case .logHistory(let id),
-                 .applicationSettings(_, let id),
                  .conversationOptions(_, let id),
                  .modelSelection(_, let id),
                  .tts(let id):
                 return id
+            #if os(iOS)
+            case .applicationSettings(_, let id):
+                return id
+            #endif
             }
         }
     }
@@ -38,13 +43,14 @@ final class AppSceneModel {
         }
     }
 
-    var router = NavigationRouter()
+    let router = NavigationRouter()
     var presentedSheet: PresentedSheet?
     var exportRequest: ExportRequest?
     var importRequested: Bool = false
     var utilityPanelRequestID: UUID?
-    var settingsInitialTab: ApplicationSettingsView.SettingsTab?
-    var settingsRequestID = UUID()
+    #if os(macOS)
+        var openSettingsSceneRequestID: UUID?
+    #endif
 
     private let queryManager: QueryManager
     private let modelContext: ModelContext
@@ -86,13 +92,13 @@ final class AppSceneModel {
         importRequested = true
     }
 
-    func requestSettings(_ tab: ApplicationSettingsView.SettingsTab?) {
-        presentSheet(.applicationSettings(tab, UUID()))
-    }
-
-    func prepareSettingsWindow(_ tab: ApplicationSettingsView.SettingsTab?) {
-        settingsInitialTab = tab
-        settingsRequestID = UUID()
+    func requestSettings(_ destination: SettingsDestination?) {
+        #if os(iOS)
+            presentSheet(.applicationSettings(destination, UUID()))
+        #else
+            MacOSApplicationSettingsSelection.select(destination)
+            openSettingsSceneRequestID = UUID()
+        #endif
     }
 
     func requestTTS() {

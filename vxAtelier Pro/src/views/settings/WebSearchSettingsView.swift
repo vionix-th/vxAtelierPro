@@ -17,51 +17,45 @@ struct WebSearchSettingsView: View {
 
     var body: some View {
         SettingsListPage(title: "Web Search") {
-            SettingsEntityList(
-                items: webSearchConfigurations.sorted { $0.name < $1.name },
-                emptyTitle: "No Web Search Configurations",
-                emptySystemImage: "magnifyingglass",
-                emptyDescription: "Add a web search configuration to enable the search tool.",
-                selectionAction: { config in
-                    editingConfig = EditingConfig(config: config, isNew: false)
+            VStack(spacing: AppDefaults.paddingLarge) {
+                SettingsPageActionRegion {
+                    addWebSearchConfigButton
                 }
-            ) { config in
-                SettingsEntityRow(
-                    title: config.name,
-                    subtitle: "Provider: \(config.provider)",
-                    metadata: metadata(for: config),
-                    systemImages: config.isDefault ? ["star.fill"] : []
-                )
-            } actions: { config in
-                [
-                    SettingsEntityAction(title: "Edit", systemImage: "pencil") {
+
+                SettingsEntityList(
+                    items: webSearchConfigurations.sorted { $0.name < $1.name },
+                    emptyTitle: "No Web Search Configurations",
+                    emptySystemImage: "magnifyingglass",
+                    emptyDescription: "Add a web search configuration to enable the search tool.",
+                    selectionAction: { config in
                         editingConfig = EditingConfig(config: config, isNew: false)
-                    },
-                    SettingsEntityAction(title: "Delete", systemImage: "trash", role: .destructive) {
-                        confirmation = SettingsConfirmation(
-                            title: "Delete Web Search Configuration",
-                            message: "Delete \"\(config.name)\"? This action cannot be undone.",
-                            confirmTitle: "Delete",
-                            action: { deleteWebSearchConfiguration(config) }
-                        )
                     }
-                ]
+                ) { config in
+                    SettingsEntityRow(
+                        title: config.name,
+                        subtitle: "Provider: \(config.provider)",
+                        metadata: metadata(for: config),
+                        systemImages: config.isDefault ? ["star.fill"] : []
+                    )
+                } actions: { config in
+                    [
+                        SettingsEntityAction(title: "Edit", systemImage: "pencil") {
+                            editingConfig = EditingConfig(config: config, isNew: false)
+                        },
+                        SettingsEntityAction(title: "Delete", systemImage: "trash", role: .destructive) {
+                            confirmation = SettingsConfirmation(
+                                title: "Delete Web Search Configuration",
+                                message: "Delete \"\(config.name)\"? This action cannot be undone.",
+                                confirmTitle: "Delete",
+                                action: { deleteWebSearchConfiguration(config) }
+                            )
+                        }
+                    ]
+                }
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .settingsPrimary) {
-                Button {
-                    editingConfig = EditingConfig(
-                        config: WebSearchConfigurationItem(
-                            name: "New Web Search Config",
-                            provider: WebSearchProvider.google.rawValue
-                        ),
-                        isNew: true
-                    )
-                } label: {
-                    Label("Add Web Search Config", systemImage: "plus")
-                }
-            }
+        .settingsNavigationActions {
+            addWebSearchConfigButton
         }
         .alert("Web Search Config Error", isPresented: $showWebSearchConfigError) {
             Button("OK") { showWebSearchConfigError = false }
@@ -77,6 +71,20 @@ struct WebSearchSettingsView: View {
             }
         }
         .settingsConfirmationDialog($confirmation)
+    }
+
+    private var addWebSearchConfigButton: some View {
+        Button {
+            editingConfig = EditingConfig(
+                config: WebSearchConfigurationItem(
+                    name: "New Web Search Config",
+                    provider: WebSearchProvider.google.rawValue
+                ),
+                isNew: true
+            )
+        } label: {
+            Label("Add Web Search Config", systemImage: "plus")
+        }
     }
 
     private func metadata(for config: WebSearchConfigurationItem) -> String? {

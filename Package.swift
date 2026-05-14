@@ -179,7 +179,11 @@ let package = Package(
                 // Views - Status Bar
                 // Views - Settings
                 "views/settings/APIConfigurationEditView.swift",
-                "views/settings/ApplicationSettingsView.swift",
+                "views/settings/ApplicationSettingsDestinationContentView.swift",
+                "views/settings/IOSApplicationSettingsSheetView.swift",
+                "views/settings/MacOSApplicationSettingsSelection.swift",
+                "views/settings/MacOSApplicationSettingsSceneView.swift",
+                "views/settings/MacOSSettingsSection.swift",
                 "views/settings/SettingsDestination.swift",
                 "views/settings/ModelSelectionView.swift",
                 "views/settings/ModelMetadataPresentation.swift",

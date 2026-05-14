@@ -41,6 +41,8 @@ struct AppDefaults {
     static let isMarkdownTextSelectable = false
     static let statusBarVisible = true
     static let showSystemConversations = false
+    static let selectedSettingsDestination = SettingsDestination.general.rawValue
+    static let selectedMacSettingsSection = MacOSSettingsSection.general.rawValue
     static let autoSendConversationTemplates = true
     static let showRowToolButtons = true
     static let showEmptySections = false 
@@ -178,6 +180,8 @@ extension AppDefaults {
             AppDefaults.isMarkdownTextSelectable,
             forKey: AppSettings.Keys.isMarkdownTextSelectable)
         defaults.set(AppDefaults.showSystemConversations, forKey: AppSettings.Keys.showSystemConversations)
+        defaults.set(AppDefaults.selectedSettingsDestination, forKey: AppSettings.Keys.selectedSettingsDestination)
+        defaults.set(AppDefaults.selectedMacSettingsSection, forKey: AppSettings.Keys.selectedMacSettingsSection)
         defaults.set(AppDefaults.makeKeyAndOrderFront, forKey: AppSettings.Keys.makeKeyAndOrderFront)
         defaults.set(AppDefaults.autoScrollDebugEnabled, forKey: AppSettings.Keys.autoScrollDebugEnabled)
         defaults.set(AppDefaults.autoScrollGateEnabled, forKey: AppSettings.Keys.autoScrollGateEnabled)

@@ -319,14 +319,14 @@ struct ModelEditorView: View {
             }
             .navigationTitle(model.modelContext == nil ? "Add Model" : "Edit Model")
             .toolbar {
-                ToolbarItem(placement: .settingsCancel) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         originalSnapshot?.restore(model)
                         dismiss()
                     }
                         .font(.system(.body, design: .rounded))
                 }
-                ToolbarItem(placement: .settingsConfirm) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
                         .font(.system(.body, design: .rounded))
                         .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || selectedConfiguration == nil)

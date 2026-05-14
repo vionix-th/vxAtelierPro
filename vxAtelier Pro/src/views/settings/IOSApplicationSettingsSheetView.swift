@@ -1,43 +1,38 @@
 import SwiftUI
 
-struct ApplicationSettingsView: View {
-    typealias SettingsTab = SettingsDestination
-
+#if os(iOS)
+struct IOSApplicationSettingsSheetView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @State private var selectedTab: SettingsTab?
-    @State private var compactPath: [SettingsTab]
-    private let initialTab: SettingsTab?
+    @State private var selectedDestination: SettingsDestination?
+    @State private var compactPath: [SettingsDestination]
+    private let initialDestination: SettingsDestination?
 
-    init(initialTab: SettingsTab? = nil) {
-        self.initialTab = initialTab
-        _selectedTab = State(initialValue: initialTab ?? .general)
-        _compactPath = State(initialValue: initialTab.map { [$0] } ?? [])
+    init(initialDestination: SettingsDestination? = nil) {
+        self.initialDestination = initialDestination
+        _selectedDestination = State(initialValue: initialDestination ?? .general)
+        _compactPath = State(initialValue: initialDestination.map { [$0] } ?? [])
     }
 
     var body: some View {
         settingsContainer
-        .onAppear {
-            vxAtelierPro.log.debug("ApplicationSettingsView appeared")
-            if let initialTab = initialTab {
-                selectedTab = initialTab
-                if compactPath.isEmpty {
-                    compactPath = [initialTab]
+            .onAppear {
+                vxAtelierPro.log.debug("IOSApplicationSettingsSheetView appeared")
+                if let initialDestination {
+                    selectedDestination = initialDestination
+                    if compactPath.isEmpty {
+                        compactPath = [initialDestination]
+                    }
                 }
             }
-        }
     }
 
     @ViewBuilder
     private var settingsContainer: some View {
-        #if os(macOS)
-        splitSettingsView
-        #else
         if horizontalSizeClass == .compact {
             compactSettingsView
         } else {
             splitSettingsView
         }
-        #endif
     }
 
     private var splitSettingsView: some View {
@@ -47,7 +42,7 @@ struct ApplicationSettingsView: View {
                 .listStyle(.sidebar)
                 .navigationSplitViewColumnWidth(190)
         } detail: {
-            SettingsDestinationView(destination: selectedTab ?? .general)
+            ApplicationSettingsDestinationContentView(destination: selectedDestination ?? .general)
         }
     }
 
@@ -60,24 +55,17 @@ struct ApplicationSettingsView: View {
             }
             .navigationTitle("Settings")
             .navigationDestination(for: SettingsDestination.self) { destination in
-                SettingsDestinationView(destination: destination)
+                ApplicationSettingsDestinationContentView(destination: destination)
             }
         }
     }
 
     private var sidebar: some View {
-        List(SettingsDestination.allCases, id: \.self, selection: $selectedTab) { destination in
+        List(SettingsDestination.allCases, id: \.self, selection: $selectedDestination) { destination in
             NavigationLink(value: destination) {
                 Label(destination.title, systemImage: destination.systemImage)
             }
         }
     }
 }
-
-struct SettingsDestinationView: View {
-    let destination: SettingsDestination
-
-    var body: some View {
-        destination.content
-    }
-}
+#endif

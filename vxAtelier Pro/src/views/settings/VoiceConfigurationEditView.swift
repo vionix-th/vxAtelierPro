@@ -118,13 +118,13 @@ struct VoiceConfigurationEditView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .settingsCancel) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") {
                     synthesizer.stopSpeaking(at: .immediate)
                     onCancel()
                 }
             }
-            ToolbarItem(placement: .settingsConfirm) {
+            ToolbarItem(placement: .confirmationAction) {
                 Button("Done") {
                     save()
                 }
