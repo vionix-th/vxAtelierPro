@@ -96,7 +96,7 @@ final class AppSceneModel {
         #if os(iOS)
             presentSheet(.applicationSettings(destination, UUID()))
         #else
-            MacOSApplicationSettingsSelection.select(destination)
+            selectMacOSSettingsDestination(destination)
             openSettingsSceneRequestID = UUID()
         #endif
     }
@@ -129,6 +129,17 @@ final class AppSceneModel {
             pendingSheetTask = nil
         }
     }
+
+    #if os(macOS)
+        private func selectMacOSSettingsDestination(_ destination: SettingsDestination?, defaults: UserDefaults = .standard) {
+            let resolvedDestination = destination ?? .general
+            defaults.set(resolvedDestination.rawValue, forKey: AppSettings.Keys.selectedSettingsDestination)
+            defaults.set(
+                MacOSSettingsSection.section(containing: resolvedDestination).rawValue,
+                forKey: AppSettings.Keys.selectedMacSettingsSection
+            )
+        }
+    #endif
 
     func exportTask() async {
         guard let request = exportRequest else { return }

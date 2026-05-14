@@ -634,7 +634,7 @@ Settings navigation is split by platform. Shared settings pages stay reusable an
 *   **`ApplicationSettingsDestinationContentView.swift`**: Thin wrapper that renders the selected `SettingsDestination` content.
 *   **`MacOSApplicationSettingsSceneView.swift`**: Native macOS `Settings` scene root. It uses a `TabView` for top-level sections, keeps the macOS Settings toolbar reserved for section tabs, and renders page-level actions inline through `SettingsPageActionRegion`.
 *   **`MacOSSettingsSection.swift`**: Groups destinations into macOS Settings sections such as General, Providers, Content, Speech, Security, and Advanced. Update this when adding or moving settings destinations.
-*   **`MacOSApplicationSettingsSelection.swift`**: Persists the requested destination and containing section before opening the macOS Settings scene.
+*   **`AppSceneModel.requestSettings(_:)`**: Persists the requested destination and containing section before opening the macOS Settings scene.
 *   **`IOSApplicationSettingsSheetView.swift`**: iOS settings sheet root. It uses `NavigationStack` in compact width and `NavigationSplitView` in regular width.
 *   **Request Flow**: `ContentView` delegates settings requests to `AppShellView`, which calls `AppSceneModel.requestSettings(_:)`. On iOS this presents the sheet; on macOS it records the requested destination and asks the native Settings scene to open.
 
@@ -1069,7 +1069,7 @@ Delete rules:
 * **Environment Values:** `AppBootstrap` seeds `ModelContainer`, `QueryManager`, `TTSQueue`, `AppSceneModel`, SwiftData `ModelContext`, and `NavigationRouter` through `.bootstrapped(with:)`.
 * **@Query / @ModelContext:** Use live SwiftData bindings where views own local data presentation; use `QueryManager` for command-style mutations and targeted lookups.
 * **Navigation:** `NavigationSplitView` for main content routing; `NavigationStack` inside `ProjectView` for project-local routing; platform-specific settings shells for application settings navigation.
-* **Selection Logic:** `NavigationRouter` owns main content selection/path state. `MacOSApplicationSettingsSelection` persists the requested settings destination for the native macOS Settings scene.
+* **Selection Logic:** `NavigationRouter` owns main content selection/path state. `AppSceneModel.requestSettings(_:)` persists the requested settings destination for the native macOS Settings scene.
 * **Logging UI:** Status bar shows filtered `LoggingService` output; log history sheet reads `messageHistory`.
 
 ## Lifecycle & Entry Points

@@ -181,7 +181,6 @@ let package = Package(
                 "views/settings/APIConfigurationEditView.swift",
                 "views/settings/ApplicationSettingsDestinationContentView.swift",
                 "views/settings/IOSApplicationSettingsSheetView.swift",
-                "views/settings/MacOSApplicationSettingsSelection.swift",
                 "views/settings/MacOSApplicationSettingsSceneView.swift",
                 "views/settings/MacOSSettingsSection.swift",
                 "views/settings/SettingsDestination.swift",

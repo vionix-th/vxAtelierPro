@@ -61,7 +61,7 @@ struct AppShellView: View {
             #if os(iOS)
             case .applicationSettings(let initialTab, _):
                 IOSApplicationSettingsSheetView(initialDestination: initialTab)
-                    .presentationDetents([.medium, .large])
+                    .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
             #endif
             case .conversationOptions(let conversationID, _):

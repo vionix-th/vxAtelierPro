@@ -27,7 +27,7 @@ struct MacOSApplicationSettingsSceneView: View {
                 .tag(section)
             }
         }
-        .scenePadding()
+        // this seem obserdly large: .scenePadding()
         .frame(minWidth: 720, minHeight: 520)
         .environment(\.settingsPresentationStyle, .macSettingsScene)
         .onAppear {
