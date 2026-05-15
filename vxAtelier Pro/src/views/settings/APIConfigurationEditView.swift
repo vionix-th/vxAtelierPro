@@ -104,7 +104,7 @@ struct APIConfigurationEditView: View {
             SettingsFormSection("Connection") {
                 LabeledContent("Name") {
                     HStack(spacing: AppDefaults.paddingSmall) {
-                        TextField("My API Configuration", text: $name)
+                        TextField("", text: $name)
                             .textFieldStyle(.roundedBorder)
 
                         defaultButton
@@ -122,7 +122,7 @@ struct APIConfigurationEditView: View {
                 }
 
                 LabeledContent("API URL") {
-                    TextField("https://api.example.com", text: $baseURL)
+                    TextField("", text: $baseURL)
                         .textFieldStyle(.roundedBorder)
                         .onChange(of: baseURL) { _, _ in invalidateFetchedModelCandidates() }
                 }
@@ -171,7 +171,7 @@ struct APIConfigurationEditView: View {
             SettingsFormSection("Model Defaults") {
                 LabeledContent("Default Model") {
                     HStack(spacing: AppDefaults.paddingSmall) {
-                        TextField("Default Model", text: $defaultModel)
+                        TextField("", text: $defaultModel)
                             .textFieldStyle(.roundedBorder)
                             .onChange(of: defaultModel) { _, _ in
                                 invalidateFetchedModelCandidates()
@@ -364,7 +364,7 @@ struct APIConfigurationEditView: View {
                 .frame(minHeight: 70)
                 .onChange(of: apiKey) { _, _ in invalidateFetchedModelCandidates() }
         } else {
-            SecureField("Enter API Key", text: $apiKey)
+            SecureField("", text: $apiKey)
                 .textFieldStyle(.roundedBorder)
                 .font(.system(.body, design: .monospaced))
                 .onChange(of: apiKey) { _, _ in invalidateFetchedModelCandidates() }

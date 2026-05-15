@@ -47,7 +47,7 @@ struct PromptTemplateEditView: View {
         SettingsPage(title: isNewTemplate ? "New Template" : "Edit Template") {
             SettingsFormSection("Basic Settings") {
                 LabeledContent("Name") {
-                    TextField("Template Name", text: $name)
+                    TextField("", text: $name)
                         .textFieldStyle(.roundedBorder)
                 }
                 SettingsPickerRow("Category", selection: $category) {
@@ -57,7 +57,7 @@ struct PromptTemplateEditView: View {
                         .tag(PromptTemplate.Category.System)
                 }
                 LabeledContent("Summary") {
-                    TextField("Brief description of the template", text: $summary)
+                    TextField("", text: $summary)
                         .textFieldStyle(.roundedBorder)
                 }
             }

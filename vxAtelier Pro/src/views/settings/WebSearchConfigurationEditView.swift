@@ -58,7 +58,7 @@ struct WebSearchConfigurationEditView: View {
         SettingsPage(title: isNewConfiguration ? "New Web Search Config" : "Edit Web Search Config") {
             SettingsFormSection("Basic Information") {
                 LabeledContent("Configuration Name") {
-                    TextField("My Search Config", text: $name)
+                    TextField("", text: $name)
                         .textFieldStyle(.roundedBorder)
                 }
 
@@ -76,9 +76,9 @@ struct WebSearchConfigurationEditView: View {
                     HStack {
                         Group {
                             if isAPIKeyVisible {
-                                TextField("Enter API Key", text: $apiKey)
+                                TextField("", text: $apiKey)
                             } else {
-                                SecureField("Enter API Key", text: $apiKey)
+                                SecureField("", text: $apiKey)
                             }
                         }
                         .textFieldStyle(.roundedBorder)
@@ -107,7 +107,7 @@ struct WebSearchConfigurationEditView: View {
 
                 if provider == .google {
                     LabeledContent("Search Engine ID (cx)") {
-                        TextField("Enter Google Search Engine ID", text: $searchEngineId)
+                        TextField("", text: $searchEngineId)
                             .textFieldStyle(.roundedBorder)
                     }
                 }
