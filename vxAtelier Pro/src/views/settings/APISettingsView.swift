@@ -125,11 +125,12 @@ struct APISettingsView: View {
     }
 
     private func startNewConfiguration() {
+        let defaultPreset = APIPreset.preset(for: .openAIPlatform)
         editingConfig = EditingConfig(
             config: APIConfigurationItem(
-                name: "New Configuration",
+                name: defaultPreset.displayName,
                 apiKey: "",
-                baseURL: AppDefaults.OpenAi.baseURL,
+                baseURL: defaultPreset.baseURL,
                 isDefault: apiConfigurations.count < 2
             ),
             isNew: true
