@@ -374,6 +374,30 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         XCTAssertNil(body["max_completion_tokens"])
     }
 
+    func testCodexResponsesUsesMappedRouteParametersFromDefaults() throws {
+        let adapter = OpenAIResponsesAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAICodexChatGPTSubscription))
+        let resolved = Self.resolvedDefaults(
+            providerID: .openAICodexChatGPTSubscription,
+            adapterID: .openAIResponses,
+            modelID: "gpt-5.4-mini",
+            options: LLMGenerationOptions(maxOutputTokens: 16)
+        )
+        let request = LLMRequest(
+            providerID: .openAICodexChatGPTSubscription,
+            adapterID: .openAIResponses,
+            modelID: "gpt-5.4-mini",
+            parameterMappings: resolved.mappings,
+            parameterAvailability: resolved.availability,
+            messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])],
+            options: resolved.options
+        )
+
+        let body = try adapter.makeBody(for: request, stream: true)
+        XCTAssertEqual(body["stream"], .boolean(true))
+        XCTAssertEqual(body["store"], .boolean(false))
+        XCTAssertNil(body["max_output_tokens"])
+    }
+
     func testAnthropicMessagesUsesRequiredDefaultMaxTokens() throws {
         let adapter = AnthropicMessagesAdapter(profile: LLMProviderRegistry.shared.profile(for: .anthropic))
         let resolved = Self.resolvedDefaults(

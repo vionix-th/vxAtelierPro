@@ -10,7 +10,22 @@ enum LLMParameterID: String, Codable, CaseIterable, Identifiable {
     case stopSequences = "stop_sequences"
     case responseFormat = "response_format"
     case reasoningEffort = "reasoning_effort"
+    case reasoningSummary = "reasoning_summary"
     case serviceTier = "service_tier"
+    case stream
+    case store
+    case toolChoice = "tool_choice"
+    case parallelToolCalls = "parallel_tool_calls"
+    case promptCacheKey = "prompt_cache_key"
+    case previousResponseID = "previous_response_id"
+    case include
+    case textVerbosity = "text_verbosity"
+    case frequencyPenalty = "frequency_penalty"
+    case presencePenalty = "presence_penalty"
+    case logitBias = "logit_bias"
+    case seed
+    case user
+    case safetyIdentifier = "safety_identifier"
 
     /// Exposes the semantic parameter key as the SwiftUI identity.
     var id: String { rawValue }
@@ -88,8 +103,18 @@ enum LLMParameterDefinitionCatalog {
             return .init(id: parameterID, valueType: .string, options: ["text", "json_object", "json_schema"])
         case .reasoningEffort:
             return .init(id: parameterID, valueType: .string)
+        case .reasoningSummary:
+            return .init(id: parameterID, valueType: .string)
         case .serviceTier:
             return .init(id: parameterID, valueType: .string)
+        case .stream, .store, .parallelToolCalls:
+            return .init(id: parameterID, valueType: .boolean)
+        case .toolChoice, .promptCacheKey, .previousResponseID, .include, .textVerbosity, .logitBias, .user, .safetyIdentifier:
+            return .init(id: parameterID, valueType: .string)
+        case .frequencyPenalty, .presencePenalty:
+            return .init(id: parameterID, valueType: .float, minValue: -2, maxValue: 2)
+        case .seed:
+            return .init(id: parameterID, valueType: .integer)
         }
     }
 }

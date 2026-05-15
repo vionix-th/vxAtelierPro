@@ -205,8 +205,38 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
             return .string("json_schema")
         case .reasoningEffort:
             return .string("high")
+        case .reasoningSummary:
+            return .string("auto")
         case .serviceTier:
             return .string("priority")
+        case .stream:
+            return .boolean(true)
+        case .store:
+            return .boolean(false)
+        case .toolChoice:
+            return .string("auto")
+        case .parallelToolCalls:
+            return .boolean(true)
+        case .promptCacheKey:
+            return .string("cache-key")
+        case .previousResponseID:
+            return .string("resp_previous")
+        case .include:
+            return .array([.string("reasoning.encrypted_content")])
+        case .textVerbosity:
+            return .string("medium")
+        case .frequencyPenalty:
+            return .number(0.1)
+        case .presencePenalty:
+            return .number(0.2)
+        case .logitBias:
+            return .object(["42": .integer(1)])
+        case .seed:
+            return .integer(123)
+        case .user:
+            return .string("user-id")
+        case .safetyIdentifier:
+            return .string("safety-id")
         }
     }
 
@@ -228,8 +258,38 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
             return .string("json_schema")
         case .reasoningEffort:
             return .string("high")
+        case .reasoningSummary:
+            return .string("auto")
         case .serviceTier:
             return .string("priority")
+        case .stream:
+            return .boolean(true)
+        case .store:
+            return .boolean(false)
+        case .toolChoice:
+            return .string("auto")
+        case .parallelToolCalls:
+            return .boolean(true)
+        case .promptCacheKey:
+            return .string("cache-key")
+        case .previousResponseID:
+            return .string("resp_previous")
+        case .include:
+            return .array([.string("reasoning.encrypted_content")])
+        case .textVerbosity:
+            return .string("medium")
+        case .frequencyPenalty:
+            return .number(0.1)
+        case .presencePenalty:
+            return .number(0.2)
+        case .logitBias:
+            return .object(["42": .integer(1)])
+        case .seed:
+            return .integer(123)
+        case .user:
+            return .string("user-id")
+        case .safetyIdentifier:
+            return .string("safety-id")
         }
     }
 
@@ -251,8 +311,38 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
             return .string("json_schema")
         case .reasoningEffort:
             return .string("high")
+        case .reasoningSummary:
+            return .string("auto")
         case .serviceTier:
             return .string("priority")
+        case .stream:
+            return .boolean(true)
+        case .store:
+            return .boolean(false)
+        case .toolChoice:
+            return .string("auto")
+        case .parallelToolCalls:
+            return .boolean(true)
+        case .promptCacheKey:
+            return .string("cache-key")
+        case .previousResponseID:
+            return .string("resp_previous")
+        case .include:
+            return .array([.string("reasoning.encrypted_content")])
+        case .textVerbosity:
+            return .string("medium")
+        case .frequencyPenalty:
+            return .number(0.1)
+        case .presencePenalty:
+            return .number(0.2)
+        case .logitBias:
+            return .object(["42": .integer(1)])
+        case .seed:
+            return .integer(123)
+        case .user:
+            return .string("user-id")
+        case .safetyIdentifier:
+            return .string("safety-id")
         }
     }
 }

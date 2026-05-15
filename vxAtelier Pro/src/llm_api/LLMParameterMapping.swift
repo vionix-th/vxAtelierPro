@@ -135,6 +135,30 @@ extension LLMGenerationOptions {
             return reasoning.flatMap { $0.isEmpty ? nil : .string($0) }
         case .serviceTier:
             return serviceTier.flatMap { $0.isEmpty ? nil : .string($0) }
+        case .stream:
+            switch streamMode {
+            case .enabled:
+                return .boolean(true)
+            case .disabled:
+                return .boolean(false)
+            case .auto:
+                return nil
+            }
+        case .store,
+             .toolChoice,
+             .parallelToolCalls,
+             .promptCacheKey,
+             .previousResponseID,
+             .include,
+             .textVerbosity,
+             .frequencyPenalty,
+             .presencePenalty,
+             .logitBias,
+             .seed,
+             .user,
+             .safetyIdentifier,
+             .reasoningSummary:
+            return providerExtras[parameterID.rawValue]
         }
     }
 }

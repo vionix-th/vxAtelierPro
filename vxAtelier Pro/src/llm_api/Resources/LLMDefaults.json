@@ -461,6 +461,42 @@
     },
     {
       "match": {
+        "providerRegex": "^openAICodexChatGPTSubscription$",
+        "adapterID": "openAIResponses"
+      },
+      "parameterAvailability": [
+        {
+          "parameter": "stream",
+          "required": true,
+          "includedByDefault": true,
+          "defaultValue": true
+        },
+        {
+          "parameter": "store",
+          "required": true,
+          "includedByDefault": true,
+          "defaultValue": false
+        },
+        {
+          "parameter": "max_output_tokens",
+          "available": false
+        }
+      ],
+      "parameterMappings": [
+        {
+          "parameter": "stream",
+          "encoding": "scalarKey",
+          "wireKey": "stream"
+        },
+        {
+          "parameter": "store",
+          "encoding": "scalarKey",
+          "wireKey": "store"
+        }
+      ]
+    },
+    {
+      "match": {
         "providerRegex": "^(openAIPlatform|openAICodexChatGPTSubscription)$",
         "modelRegex": "^gpt-5(\\.|-|$)",
         "adapterID": "openAIResponses"

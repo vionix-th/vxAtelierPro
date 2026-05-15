@@ -81,9 +81,13 @@ struct LLMCapabilityValidator {
             adapterID: request.adapterID,
             availability: request.parameterAvailability
         )
-        for descriptor in availability.values where descriptor.isAvailable && descriptor.isRequired {
-            if request.options.jsonValue(for: descriptor.semanticParameterID) == nil && descriptor.defaultValue == nil {
+        for descriptor in availability.values where descriptor.isAvailable && descriptor.semanticParameterID.isProviderMappable {
+            let value = request.options.jsonValue(for: descriptor.semanticParameterID)
+            if descriptor.isRequired && value == nil && descriptor.defaultValue == nil {
                 throw LLMProviderError.unsupportedParameter("\(descriptor.semanticParameterID.rawValue) is required for \(request.modelID).")
+            }
+            if value != nil || descriptor.defaultValue != nil || descriptor.isRequired {
+                try requireMapping(descriptor.semanticParameterID, mappings: mappings, request: request, profile: profile)
             }
         }
     }

@@ -69,10 +69,103 @@ enum AiParameterPresentationCatalog {
                 description: "Reasoning effort control",
                 controlType: .textField
             )
+        case .reasoningSummary:
+            return .init(
+                displayName: "Reasoning Summary",
+                description: "Reasoning summary detail level",
+                controlType: .textField
+            )
         case .serviceTier:
             return .init(
                 displayName: "Service Tier",
                 description: "Provider service tier",
+                controlType: .textField
+            )
+        case .stream:
+            return .init(
+                displayName: "Stream",
+                description: "Whether the provider request uses streaming transport",
+                controlType: .toggle
+            )
+        case .store:
+            return .init(
+                displayName: "Store",
+                description: "Whether the provider stores the response",
+                controlType: .toggle
+            )
+        case .toolChoice:
+            return .init(
+                displayName: "Tool Choice",
+                description: "Provider tool choice control",
+                controlType: .textField
+            )
+        case .parallelToolCalls:
+            return .init(
+                displayName: "Parallel Tool Calls",
+                description: "Whether the provider may run tool calls in parallel",
+                controlType: .toggle
+            )
+        case .promptCacheKey:
+            return .init(
+                displayName: "Prompt Cache Key",
+                description: "Provider prompt cache key",
+                controlType: .textField
+            )
+        case .previousResponseID:
+            return .init(
+                displayName: "Previous Response ID",
+                description: "Provider previous response identifier",
+                controlType: .textField
+            )
+        case .include:
+            return .init(
+                displayName: "Include",
+                description: "Additional provider response fields to include",
+                controlType: .textField
+            )
+        case .textVerbosity:
+            return .init(
+                displayName: "Text Verbosity",
+                description: "Provider text verbosity",
+                controlType: .textField
+            )
+        case .frequencyPenalty:
+            return .init(
+                displayName: "Frequency Penalty",
+                description: "Frequency penalty",
+                controlType: .slider,
+                step: 0.1
+            )
+        case .presencePenalty:
+            return .init(
+                displayName: "Presence Penalty",
+                description: "Presence penalty",
+                controlType: .slider,
+                step: 0.1
+            )
+        case .logitBias:
+            return .init(
+                displayName: "Logit Bias",
+                description: "Provider logit bias JSON",
+                controlType: .textField
+            )
+        case .seed:
+            return .init(
+                displayName: "Seed",
+                description: "Deterministic sampling seed",
+                controlType: .stepper,
+                step: 1
+            )
+        case .user:
+            return .init(
+                displayName: "User",
+                description: "Provider user identifier",
+                controlType: .textField
+            )
+        case .safetyIdentifier:
+            return .init(
+                displayName: "Safety Identifier",
+                description: "Provider safety identifier",
                 controlType: .textField
             )
         }

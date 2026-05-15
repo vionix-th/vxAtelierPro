@@ -21,6 +21,7 @@ enum OpenAICompatibleEncoding {
         var providerExtras = options.providerExtras
         for mapping in mappings.values {
             guard let value = options.jsonValue(for: mapping.semanticParameterID) else { continue }
+            providerExtras.removeValue(forKey: mapping.semanticParameterID.rawValue)
 
             switch mapping.encodingKind {
             case .scalarKey:

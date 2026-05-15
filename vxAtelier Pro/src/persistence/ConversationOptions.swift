@@ -126,6 +126,30 @@ final class ConversationOptions: Equatable {
             return reasoningEffort.flatMap { $0.isEmpty ? nil : .string($0) }
         case .serviceTier:
             return serviceTier.flatMap { $0.isEmpty ? nil : .string($0) }
+        case .stream:
+            switch streamMode {
+            case .enabled:
+                return .boolean(true)
+            case .disabled:
+                return .boolean(false)
+            case .auto:
+                return nil
+            }
+        case .store,
+             .toolChoice,
+             .parallelToolCalls,
+             .promptCacheKey,
+             .previousResponseID,
+             .include,
+             .textVerbosity,
+             .frequencyPenalty,
+             .presencePenalty,
+             .logitBias,
+             .seed,
+             .user,
+             .safetyIdentifier,
+             .reasoningSummary:
+            return decodedProviderExtras[parameter.rawValue]
         }
     }
 
@@ -151,6 +175,31 @@ final class ConversationOptions: Equatable {
         case .serviceTier:
             let trimmed = value?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             serviceTier = trimmed.isEmpty ? nil : trimmed
+        case .stream:
+            if let bool = value?.boolValue {
+                streamMode = bool ? .enabled : .disabled
+            } else if let rawValue = value?.stringValue {
+                streamMode = LLMGenerationOptions.StreamMode(rawValue: rawValue) ?? .auto
+            } else {
+                streamMode = .auto
+            }
+        case .store,
+             .toolChoice,
+             .parallelToolCalls,
+             .promptCacheKey,
+             .previousResponseID,
+             .include,
+             .textVerbosity,
+             .frequencyPenalty,
+             .presencePenalty,
+             .logitBias,
+             .seed,
+             .user,
+             .safetyIdentifier,
+             .reasoningSummary:
+            var extras = decodedProviderExtras
+            extras[parameter.rawValue] = value
+            decodedProviderExtras = extras
         }
     }
 

@@ -136,6 +136,23 @@ private extension LLMGenerationOptions {
             reasoning = nil
         case .serviceTier:
             serviceTier = nil
+        case .stream:
+            streamMode = .auto
+        case .store,
+             .toolChoice,
+             .parallelToolCalls,
+             .promptCacheKey,
+             .previousResponseID,
+             .include,
+             .textVerbosity,
+             .frequencyPenalty,
+             .presencePenalty,
+             .logitBias,
+             .seed,
+             .user,
+             .safetyIdentifier,
+             .reasoningSummary:
+            providerExtras.removeValue(forKey: parameterID.rawValue)
         }
     }
 
@@ -164,6 +181,27 @@ private extension LLMGenerationOptions {
             reasoning = value.stringValue
         case .serviceTier:
             serviceTier = value.stringValue
+        case .stream:
+            if let bool = value.boolValue {
+                streamMode = bool ? .enabled : .disabled
+            } else if let string = value.stringValue {
+                streamMode = LLMGenerationOptions.StreamMode(rawValue: string) ?? .auto
+            }
+        case .store,
+             .toolChoice,
+             .parallelToolCalls,
+             .promptCacheKey,
+             .previousResponseID,
+             .include,
+             .textVerbosity,
+             .frequencyPenalty,
+             .presencePenalty,
+             .logitBias,
+             .seed,
+             .user,
+             .safetyIdentifier,
+             .reasoningSummary:
+            providerExtras[parameterID.rawValue] = value
         }
     }
 }
