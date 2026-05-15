@@ -201,6 +201,28 @@ class DataManager {
             )
         }
     }
+
+    @MainActor
+    func restoreBackup(from url: URL, into context: ModelContext) async throws {
+        let didStartAccessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if didStartAccessing {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        do {
+            let data = try Data(contentsOf: url)
+            try await restoreBackup(from: data, into: context)
+        } catch let error as DataManagerError {
+            throw error
+        } catch {
+            throw DataManagerError.restoreFailed(
+                reason: "Could not read backup file",
+                error: error
+            )
+        }
+    }
     
     // MARK: - Context Backup
     
@@ -248,9 +270,9 @@ class DataManager {
         try await FileHelper.shared.save(data: data, filename: "\(project.name).json")
     }
     
-    /// Imports a project or conversation from a file.
+    /// Imports a supported single-object export from a file picker.
     /// - Parameter context: The ModelContext to import into
-    /// - Returns: The imported item (either ProjectItem or ConversationItem)
+    /// - Returns: The imported item
     /// - Throws: If the import fails or the format is not recognized
     @MainActor
     func importData(into context: ModelContext) async throws -> Any {
@@ -264,8 +286,34 @@ class DataManager {
                 underlyingErrors: [error]
             )
         }
-        
-        // Validate basic JSON structure first
+
+        return try await importData(from: data, into: context)
+    }
+
+    @MainActor
+    func importData(from url: URL, into context: ModelContext) async throws -> Any {
+        let didStartAccessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if didStartAccessing {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        do {
+            let data = try Data(contentsOf: url)
+            return try await importData(from: data, into: context)
+        } catch let error as DataManagerError {
+            throw error
+        } catch {
+            throw DataManagerError.importFailed(
+                reason: "Could not read import file",
+                underlyingErrors: [error]
+            )
+        }
+    }
+
+    @MainActor
+    func importData(from data: Data, into context: ModelContext) async throws -> Any {
         do {
             _ = try JSONSerialization.jsonObject(with: data)
         } catch {
@@ -273,42 +321,101 @@ class DataManager {
                 description: "The file is not valid JSON: \(error.localizedDescription)"
             )
         }
-        
-        // Try as project format
+
         var projectError: Error?
         do {
             let project = try JsonSerializer.importProject(from: data, context: context)
+            context.insert(project)
+            let queryManager = QueryManager(modelContext: context)
             try await normalizeModelContext(context)
+            try queryManager.saveContext()
             return project
-        } catch {
+        } catch let error as DecodingError {
             projectError = error
             vxAtelierPro.log.debug("Failed to import as project: \(error.localizedDescription)")
+        } catch {
+            throw DataManagerError.importFailed(
+                reason: "Could not save imported project",
+                underlyingErrors: [error]
+            )
         }
-        
-        // Try as conversation format
+
         var conversationError: Error?
         do {
             let conversation = try JsonSerializer.importConversation(from: data, context: context)
+            context.insert(conversation)
+            let queryManager = QueryManager(modelContext: context)
             try await normalizeModelContext(context)
+            try queryManager.saveContext()
             return conversation
-        } catch {
+        } catch let error as DecodingError {
             conversationError = error
             vxAtelierPro.log.debug("Failed to import as conversation: \(error.localizedDescription)")
-        }
-        
-        // Analyze errors to provide better feedback
-        if projectError is DecodingError, conversationError is DecodingError {
-            // Some other errors occurred during processing
+        } catch {
             throw DataManagerError.importFailed(
-                reason: "File format recognized but couldn't process data", 
-                underlyingErrors: [projectError, conversationError].compactMap { $0 }
-            )        
-        } else {
-            // Both were JSON parsing errors - likely wrong format entirely
-            throw DataManagerError.invalidFileFormat(
-                description: "File doesn't match project or conversation format"
+                reason: "Could not save imported conversation",
+                underlyingErrors: [error]
             )
         }
+
+        do {
+            let voiceConfiguration = try JsonSerializer.importVoiceConfiguration(from: data)
+            context.insert(voiceConfiguration)
+            let queryManager = QueryManager(modelContext: context)
+            try await normalizeModelContext(context)
+            try queryManager.saveContext()
+            return voiceConfiguration
+        } catch let error as DecodingError {
+            vxAtelierPro.log.debug("Failed to import as voice configuration: \(error.localizedDescription)")
+        } catch {
+            throw DataManagerError.importFailed(
+                reason: "Could not save imported voice configuration",
+                underlyingErrors: [error]
+            )
+        }
+
+        do {
+            let model = try JsonSerializer.importModel(from: data, context: context)
+            context.insert(model)
+            let queryManager = QueryManager(modelContext: context)
+            try await normalizeModelContext(context)
+            try queryManager.saveContext()
+            return model
+        } catch let error as DecodingError {
+            vxAtelierPro.log.debug("Failed to import as model: \(error.localizedDescription)")
+        } catch {
+            throw DataManagerError.importFailed(
+                reason: "Could not save imported model",
+                underlyingErrors: [error]
+            )
+        }
+
+        do {
+            let promptTemplate = try JsonSerializer.importPromptTemplate(from: data, context: context)
+            context.insert(promptTemplate)
+            let queryManager = QueryManager(modelContext: context)
+            try await normalizeModelContext(context)
+            try queryManager.saveContext()
+            return promptTemplate
+        } catch let error as DecodingError {
+            vxAtelierPro.log.debug("Failed to import as prompt template: \(error.localizedDescription)")
+        } catch {
+            throw DataManagerError.importFailed(
+                reason: "Could not save imported prompt template",
+                underlyingErrors: [error]
+            )
+        }
+
+        if projectError is DecodingError, conversationError is DecodingError {
+            throw DataManagerError.importFailed(
+                reason: "File format recognized but couldn't process data",
+                underlyingErrors: [projectError, conversationError].compactMap { $0 }
+            )
+        }
+
+        throw DataManagerError.invalidFileFormat(
+            description: "File doesn't match a supported import format"
+        )
     }
     
     @MainActor

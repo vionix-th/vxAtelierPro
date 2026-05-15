@@ -52,13 +52,11 @@ final class AppSceneModel {
         var openSettingsSceneRequestID: UUID?
     #endif
 
-    private let queryManager: QueryManager
     private let modelContext: ModelContext
     @ObservationIgnored
     private var pendingSheetTask: Task<Void, Never>?
 
-    init(queryManager: QueryManager, modelContext: ModelContext) {
-        self.queryManager = queryManager
+    init(modelContext: ModelContext) {
         self.modelContext = modelContext
     }
 
@@ -181,17 +179,29 @@ final class AppSceneModel {
         do {
             let importedItem = try await DataManager.shared.importData(into: modelContext)
             if let project = importedItem as? ProjectItem {
-                try queryManager.insert(project)
                 router.setSelection(.project(project.id))
                 router.clearPath(for: project.id)
                 await MainActor.run {
                     vxAtelierPro.log.info("Successfully imported project '\(project.name)'.")
                 }
             } else if let conversation = importedItem as? ConversationItem {
-                try queryManager.insert(conversation)
                 router.openConversation(conversation.id, in: conversation.project?.id)
                 await MainActor.run {
                     vxAtelierPro.log.info("Successfully imported conversation '\(conversation.title)'.")
+                }
+            } else if let promptTemplate = importedItem as? PromptTemplate {
+                await MainActor.run {
+                    vxAtelierPro.log.info("Successfully imported prompt template '\(promptTemplate.name)'.")
+                }
+            } else if let voiceConfiguration = importedItem as? VoiceConfigurationItem {
+                await MainActor.run {
+                    vxAtelierPro.log.info(
+                        "Successfully imported voice configuration '\(voiceConfiguration.language)' for role '\(voiceConfiguration.role)'."
+                    )
+                }
+            } else if let model = importedItem as? ModelItem {
+                await MainActor.run {
+                    vxAtelierPro.log.info("Successfully imported model '\(model.modelID)'.")
                 }
             }
         } catch {

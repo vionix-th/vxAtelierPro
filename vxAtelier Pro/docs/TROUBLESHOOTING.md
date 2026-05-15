@@ -114,6 +114,14 @@ Use the centralized facade:
 ```
 All keys live in `system/AppSettings.swift`; defaults remain in `system/AppDefaults.swift`.
 
+### 6. macOS Startup Recovery Mode
+
+**Problem:**  
+The normal app bootstrap can fail before Settings or maintenance UI becomes available.
+
+**Solution:**  
+Hold the Option key during launch, or set `VXATELIER_FORCE_RECOVERY_MODE=1` for tests and local debugging, to open the recovery window instead of the normal app shell. Recovery mode can reset `UserDefaults`, wipe the local SwiftData store, and restore or import data before relaunching the app into normal mode.
+
 **Problem:**  
 Attempting to make SwiftData `@Model` classes conform to `Sendable` protocol, often as a quick fix for compiler warnings about capturing model instances in async contexts.
 

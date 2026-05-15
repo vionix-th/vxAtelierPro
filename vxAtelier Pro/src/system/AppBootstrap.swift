@@ -14,16 +14,23 @@ struct AppBootstrap {
     let appSceneModel: AppSceneModel
 
     static func live() -> AppBootstrap {
-        makeBootstrap(seedPreviewData: false)
+        makeBootstrap(seedPreviewData: false, isStoredInMemoryOnly: false)
     }
 
     static func preview() -> AppBootstrap {
-        makeBootstrap(seedPreviewData: true)
+        makeBootstrap(seedPreviewData: true, isStoredInMemoryOnly: false)
     }
 
-    private static func makeBootstrap(seedPreviewData: Bool) -> AppBootstrap {
+    static func inMemory() -> AppBootstrap {
+        makeBootstrap(seedPreviewData: false, isStoredInMemoryOnly: true)
+    }
+
+    private static func makeBootstrap(
+        seedPreviewData: Bool,
+        isStoredInMemoryOnly: Bool
+    ) -> AppBootstrap {
         vxAtelierPro.log.debug("Initializing model container")
-        let modelContainer = makeModelContainer()
+        let modelContainer = makeModelContainer(isStoredInMemoryOnly: isStoredInMemoryOnly)
         vxAtelierPro.log.debug("Model container initialized")
 
         vxAtelierPro.log.debug("Initializing query manager")
@@ -35,10 +42,7 @@ struct AppBootstrap {
         vxAtelierPro.log.debug("TTS queue initialized")
 
         vxAtelierPro.log.debug("Initializing app scene model")
-        let appSceneModel = AppSceneModel(
-            queryManager: queryManager,
-            modelContext: modelContainer.mainContext
-        )
+        let appSceneModel = AppSceneModel(modelContext: modelContainer.mainContext)
         vxAtelierPro.log.debug("App scene model initialized")
 
         let bootstrap = AppBootstrap(
@@ -55,7 +59,7 @@ struct AppBootstrap {
         return bootstrap
     }
 
-    private static func makeModelContainer() -> ModelContainer {
+    private static func makeModelContainer(isStoredInMemoryOnly: Bool) -> ModelContainer {
         let schema = Schema([
             APIConfigurationItem.self,
             ModelItem.self,
@@ -78,12 +82,13 @@ struct AppBootstrap {
 
         let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
         let isRunningPreviews = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+        let shouldStoreInMemory = isStoredInMemoryOnly || isRunningTests || isRunningPreviews
         vxAtelierPro.log.debug(
-            "Creating ModelContainer with in-memory store: \(isRunningTests || isRunningPreviews)"
+            "Creating ModelContainer with in-memory store: \(shouldStoreInMemory)"
         )
         let modelConfiguration = ModelConfiguration(
             schema: schema,
-            isStoredInMemoryOnly: isRunningTests || isRunningPreviews
+            isStoredInMemoryOnly: shouldStoreInMemory
         )
 
         do {

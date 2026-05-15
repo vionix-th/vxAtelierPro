@@ -10,7 +10,6 @@ struct MaintenanceSettingsView: View {
     @State private var backupDocument: BackupDocument? = nil
     @State private var completionMessage: String = ""
     @State private var showCompletionAlert = false
-    @State private var restoreError: Error? = nil
 
     private func showCompletion(message: String) {
         completionMessage = message
@@ -18,13 +17,13 @@ struct MaintenanceSettingsView: View {
     }
 
     private func resetToDefaults() {
-        AppDefaults.resetUserDefaults()
+        AppRecoveryService.resetUserDefaults()
         showCompletion(message: "Application settings reset to defaults.")
     }
 
     private func cleanLocalStorage() {
         do {
-            try queryManager.cleanLocalStorage()
+            try AppRecoveryService.cleanLocalStorage(using: queryManager)
             showCompletion(message: "Local storage cleaned.")
         } catch {
             showCompletion(message: "Failed to clean local storage: \(error.localizedDescription)")
@@ -65,7 +64,7 @@ struct MaintenanceSettingsView: View {
                 ) {
                     Task { @MainActor in
                         do {
-                            let data = try await DataManager.shared.createBackup(from: modelContext)
+                            let data = try await AppRecoveryService.createBackup(from: modelContext)
                             backupDocument = BackupDocument(backupData: data)
                             showBackupExporter = true
                         } catch {
@@ -113,27 +112,19 @@ struct MaintenanceSettingsView: View {
             switch result {
             case .success(let urls):
                 guard let url = urls.first else { return }
-                guard url.startAccessingSecurityScopedResource() else {
-                    showCompletion(message: "Permission denied: could not access selected backup file.")
-                    return
-                }
-                defer { url.stopAccessingSecurityScopedResource() }
-                do {
-                    let data = try Data(contentsOf: url)
-                    Task { @MainActor in
-                        do {
-                            try await DataManager.shared.restoreBackup(from: data, into: modelContext)
-                            queryManager.ensureSystemConversation()
-                            showCompletion(message: "Database restored successfully")
-                        } catch {
-                            showCompletion(message: "Database restore failed: \(error.localizedDescription)")
-                        }
+                Task { @MainActor in
+                    do {
+                        try await AppRecoveryService.restoreBackup(from: url, into: modelContext)
+                        queryManager.ensureSystemConversation()
+                        showCompletion(message: "Database restored successfully")
+                    } catch {
+                        showCompletion(message: "Database restore failed: \(error.localizedDescription)")
                     }
-                } catch {
-                    showCompletion(message: "Failed to read selected backup file: \(error.localizedDescription)")
                 }
             case .failure(let error):
-                showCompletion(message: "Backup import failed: \(error.localizedDescription)")
+                if (error as NSError).code != CocoaError.userCancelled.rawValue {
+                    showCompletion(message: "Backup import failed: \(error.localizedDescription)")
+                }
             }
         }
     }

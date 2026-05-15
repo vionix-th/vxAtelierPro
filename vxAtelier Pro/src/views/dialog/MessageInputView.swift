@@ -123,7 +123,13 @@ struct MessageInputView: View {
         completionUseCase: ConversationCompletionUseCase? = nil,
         draftStore: ConversationDraftStore,
         contextConversation: ConversationItem? = nil,
-        focusInputOnAppear: Bool = vxAtelierPro.macOS,
+        focusInputOnAppear: Bool = {
+            #if os(macOS)
+                return true
+            #else
+                return false
+            #endif
+        }(),
         resolveConversation: @escaping @MainActor () throws -> ConversationItem,
         didSend: ((ConversationItem) -> Void)? = nil
     ) {

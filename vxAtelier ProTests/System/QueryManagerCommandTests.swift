@@ -1,5 +1,8 @@
 import SwiftData
 import XCTest
+#if os(macOS)
+import AppKit
+#endif
 #if canImport(vxAtelier_Pro_debug)
 @testable import vxAtelier_Pro_debug
 #else
@@ -203,4 +206,44 @@ final class QueryManagerCommandTests: XCTestCase {
         XCTAssertEqual(first.purpose, .system)
         XCTAssertEqual(try testEnv.conversations().filter { $0.purpose == .system }.count, 1)
     }
+
+    #if os(macOS)
+        func testRecoveryModeDetectionHonorsEnvironmentOverride() {
+            XCTAssertTrue(
+                vxAtelierPro.shouldLaunchInRecoveryMode(
+                    environment: ["VXATELIER_FORCE_RECOVERY_MODE": "1"],
+                    modifierFlags: []
+                )
+            )
+
+            XCTAssertFalse(
+                vxAtelierPro.shouldLaunchInRecoveryMode(
+                    environment: [:],
+                    modifierFlags: []
+                )
+            )
+        }
+
+        func testRecoveryModeDetectionHonorsOptionKeyState() {
+            XCTAssertTrue(
+                vxAtelierPro.shouldLaunchInRecoveryMode(
+                    environment: [:],
+                    modifierFlags: [.maskAlternate]
+                )
+            )
+        }
+
+        func testPersistentStoreDirectoryCandidatesUseStableApplicationSupportRoots() throws {
+            let urls = try StartupRecoveryStore.persistentStoreDirectoryCandidates(
+                bundleIdentifier: "com.example.vxAtelierPro",
+                executableName: "vxAtelierPro",
+                appName: "vxAtelier Pro"
+            )
+
+            XCTAssertEqual(urls.count, 3)
+            XCTAssertTrue(urls.contains { $0.lastPathComponent == "com.example.vxAtelierPro" })
+            XCTAssertTrue(urls.contains { $0.lastPathComponent == "vxAtelierPro" })
+            XCTAssertTrue(urls.contains { $0.lastPathComponent == "vxAtelier Pro" })
+        }
+    #endif
 }
