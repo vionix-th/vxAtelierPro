@@ -3,7 +3,7 @@ import Foundation
 /// Stable identifier for a supported LLM provider profile.
 enum LLMProviderID: String, Codable, CaseIterable, Identifiable {
     case openAIPlatform
-    case openAIChatGPTSubscription
+    case openAICodexChatGPTSubscription
     case openRouter
     case lmStudio
     case ollama
@@ -19,7 +19,7 @@ enum LLMProviderID: String, Codable, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .openAIPlatform: return "OpenAI Platform"
-        case .openAIChatGPTSubscription: return "ChatGPT Subscription"
+        case .openAICodexChatGPTSubscription: return "Codex ChatGPT Subscription"
         case .openRouter: return "OpenRouter"
         case .lmStudio: return "LM Studio"
         case .ollama: return "Ollama"
@@ -58,9 +58,8 @@ enum LLMAuthKind: String, Codable, CaseIterable {
     case bearerToken
     case xAPIKey
     case customHeaders
-    case chatGPTOAuth
-    case chatGPTDeviceCode
-    case chatGPTCodexToken
+    case codexChatGPTOAuth
+    case codexChatGPTDeviceCode
 }
 
 /// Static provider transport metadata used for configuration and adapter selection.

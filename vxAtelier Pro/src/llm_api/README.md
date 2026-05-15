@@ -29,7 +29,7 @@ Supported profiles:
 - OpenAI Platform: Responses first, with OpenAI Chat Completions adapter support.
 - Anthropic: Messages API.
 - OpenRouter, LM Studio, Ollama, xAI, DeepSeek, custom OpenAI-compatible: Chat Completions-compatible adapter.
-- ChatGPT Subscription: profile exists but is disabled until supported OAuth, device-code, or Codex-token auth can be embedded safely.
+- Codex ChatGPT Subscription: Responses adapter routed through `https://chatgpt.com/backend-api/codex/responses`, authenticated by app-owned OAuth or device-code tokens, with static model inventory when remote model listing is unavailable.
 
 ## Validation
 

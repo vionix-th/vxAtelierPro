@@ -37,6 +37,9 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
 
     /// Reuses Chat Completions model listing for Responses-capable configurations.
     func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
+        if profile.id == .openAICodexChatGPTSubscription {
+            return CodexChatGPTModels.candidates()
+        }
         let chatFallback = OpenAIChatCompletionsAdapter(profile: profile)
         return try await chatFallback.fetchModels(configuration: configuration)
     }

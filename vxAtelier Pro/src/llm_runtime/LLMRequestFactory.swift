@@ -20,7 +20,7 @@ struct ConversationRunContextResolver {
     func resolve(
         conversation: ConversationItem,
         apiConfig: APIConfigurationItem
-    ) throws -> ConversationRunContext {
+    ) async throws -> ConversationRunContext {
         let providerID = apiConfig.providerIDEnum
         let profile = registry.profile(for: providerID)
         let adapterID = apiConfig.defaultAdapterIDEnum
@@ -64,7 +64,7 @@ struct ConversationRunContextResolver {
 
         return ConversationRunContext(
             conversationID: conversation.id,
-            providerConfiguration: apiConfig.makeLLMProviderConfiguration(),
+            providerConfiguration: try await CodexChatGPTOAuthService.resolvedProviderConfiguration(for: apiConfig),
             providerProfile: profile,
             providerID: providerID,
             adapterID: adapterID,

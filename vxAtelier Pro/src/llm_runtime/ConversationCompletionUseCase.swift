@@ -75,7 +75,7 @@ final class ConversationCompletionUseCase {
         draftSink: any ConversationDraftSink
     ) async throws {
         for _ in 0..<maxToolDepth {
-            let context = try contextResolver.resolve(conversation: conversation, apiConfig: apiConfig)
+            let context = try await contextResolver.resolve(conversation: conversation, apiConfig: apiConfig)
             let request = try requestFactory.makeRequest(from: context)
             let run = try runStore.createResponseRun(for: request, turn: turn, conversation: conversation)
 

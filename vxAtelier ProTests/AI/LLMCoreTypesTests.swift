@@ -13,7 +13,7 @@ final class LLMCoreTypesTests: XCTestCase {
 
         XCTAssertEqual(registry.profile(for: .openAIPlatform).defaultAdapterID, .openAIResponses)
         XCTAssertTrue(registry.profile(for: .openAIPlatform).supportedAdapterIDs.contains(.openAIChatCompletions))
-        XCTAssertFalse(registry.profile(for: .openAIChatGPTSubscription).isEnabled)
+        XCTAssertTrue(registry.profile(for: .openAICodexChatGPTSubscription).isEnabled)
         XCTAssertEqual(LLMProviderRegistry.providerID(fromProviderName: "LM Studio"), .lmStudio)
         XCTAssertEqual(LLMProviderRegistry.providerID(fromProviderName: "OpenRouter"), .openRouter)
     }
@@ -22,6 +22,7 @@ final class LLMCoreTypesTests: XCTestCase {
         let defaults = LLMDefaultsCatalog.bundled
 
         XCTAssertEqual(defaults.defaultModelID(for: .openAIPlatform), "gpt-5.4-nano")
+        XCTAssertEqual(defaults.defaultModelID(for: .openAICodexChatGPTSubscription), "gpt-5.5")
         XCTAssertEqual(defaults.defaultModelID(for: .anthropic), "claude-sonnet-4-6")
         XCTAssertEqual(defaults.defaultModelID(for: .openRouter), "openai/gpt-5.4-nano")
         XCTAssertEqual(defaults.defaultModelID(for: .xAI), "grok-4.3")

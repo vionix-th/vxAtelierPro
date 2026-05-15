@@ -32,6 +32,7 @@ final class APIConfigurationItem {
     var defaultAdapterID: String
     var headersJSON: String
     var optionsJSON: String
+    var credentialJSON: String
 
     var providerIDEnum: LLMProviderID {
         get { LLMProviderID(rawValue: providerID) ?? .customOpenAICompatible }
@@ -90,17 +91,33 @@ final class APIConfigurationItem {
         self.defaultAdapterID = profile.defaultAdapterID.rawValue
         self.headersJSON = "{}"
         self.optionsJSON = "{}"
+        self.credentialJSON = "{}"
     }
 
     func makeLLMProviderConfiguration() -> LLMProviderConfiguration {
-        Self.makeLLMProviderConfiguration(
+        var headers = decodedHeaders
+        var credential = apiKey
+        if providerIDEnum == .openAICodexChatGPTSubscription,
+           let tokenSet = codexChatGPTTokenSet {
+            credential = tokenSet.accessToken
+            if let accountID = tokenSet.accountID, !accountID.isEmpty {
+                headers["ChatGPT-Account-Id"] = accountID
+            }
+            headers["originator"] = headers["originator"] ?? "vxatelier_pro"
+        }
+        return Self.makeLLMProviderConfiguration(
             providerID: providerIDEnum,
             authKind: authKindEnum,
-            apiKey: apiKey,
+            apiKey: credential,
             baseURL: baseURL,
-            headers: decodedHeaders,
+            headers: headers,
             options: decodedOptions
         )
+    }
+
+    var codexChatGPTTokenSet: CodexChatGPTTokenSet? {
+        get { CodexChatGPTTokenSet.decoded(from: credentialJSON)?.withClaimsFromTokens() }
+        set { credentialJSON = newValue?.withClaimsFromTokens().encoded() ?? "{}" }
     }
 
     static func makeLLMProviderConfiguration(

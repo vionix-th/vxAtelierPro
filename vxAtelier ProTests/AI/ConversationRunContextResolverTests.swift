@@ -8,7 +8,7 @@ import XCTest
 
 @MainActor
 final class ConversationRunContextResolverTests: XCTestCase {
-    func testResolverAndFactoryResolveModelFromSelectedAPIConfiguration() throws {
+    func testResolverAndFactoryResolveModelFromSelectedAPIConfiguration() async throws {
         let env = TestEnvironment()
         let configA = APIConfigurationItem(
             name: "OpenAI A",
@@ -50,7 +50,7 @@ final class ConversationRunContextResolverTests: XCTestCase {
         env.modelContext.insert(modelB)
         env.modelContext.insert(conversation)
 
-        let context = try ConversationRunContextResolver(
+        let context = try await ConversationRunContextResolver(
             toolCatalog: StaticLLMToolCatalog([])
         ).resolve(
             conversation: conversation,
@@ -68,7 +68,7 @@ final class ConversationRunContextResolverTests: XCTestCase {
         )
     }
 
-    func testResolverFailsWhenNoPersistedModelExists() throws {
+    func testResolverFailsWhenNoPersistedModelExists() async throws {
         let env = TestEnvironment()
         let config = APIConfigurationItem(
             name: "OpenAI",
@@ -83,12 +83,15 @@ final class ConversationRunContextResolverTests: XCTestCase {
         env.modelContext.insert(config)
         env.modelContext.insert(conversation)
 
-        XCTAssertThrowsError(try ConversationRunContextResolver(
-            toolCatalog: StaticLLMToolCatalog([])
-        ).resolve(
-            conversation: conversation,
-            apiConfig: config
-        )) { error in
+        do {
+            _ = try await ConversationRunContextResolver(
+                toolCatalog: StaticLLMToolCatalog([])
+            ).resolve(
+                conversation: conversation,
+                apiConfig: config
+            )
+            XCTFail("Expected resolver to reject a missing persisted model.")
+        } catch {
             XCTAssertEqual(error as? LLMProviderError, .invalidConfiguration("Model gpt-missing is not available for OpenAI."))
         }
     }

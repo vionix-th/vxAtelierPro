@@ -226,7 +226,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
                 XCTFail("\(provider.name ?? provider.id.rawValue) is enabled but APIConfiguration did not produce a secret credential.")
                 return
             }
-        case .none, .customHeaders, .chatGPTOAuth, .chatGPTDeviceCode, .chatGPTCodexToken:
+        case .none, .customHeaders, .codexChatGPTOAuth, .codexChatGPTDeviceCode:
             return
         }
     }

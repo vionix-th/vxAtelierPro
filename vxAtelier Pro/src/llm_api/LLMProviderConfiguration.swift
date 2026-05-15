@@ -56,9 +56,9 @@ enum LLMProviderHeaderResolver {
         case (.xAPIKey, .secret(let secret)):
             headers["x-api-key"] = secret
             headers["anthropic-version"] = headers["anthropic-version"] ?? "2023-06-01"
+        case (.codexChatGPTOAuth, .secret(let secret)), (.codexChatGPTDeviceCode, .secret(let secret)):
+            headers["Authorization"] = "Bearer \(secret)"
         case (.none, _), (.customHeaders, _), (_, .none):
-            break
-        case (.chatGPTOAuth, _), (.chatGPTDeviceCode, _), (.chatGPTCodexToken, _):
             break
         }
 

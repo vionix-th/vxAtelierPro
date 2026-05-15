@@ -39,9 +39,7 @@ struct APISettingsView: View {
                     SettingsEntityRow(
                         title: config.name,
                         subtitle: config.baseURL,
-                        metadata: config.apiKey.isEmpty
-                            ? nil
-                            : "API Key: \(config.apiKey.prefix(4))...\(config.apiKey.suffix(4))",
+                        metadata: metadata(for: config),
                         systemImages: config.isDefault ? ["star.fill"] : []
                     )
                 } actions: { config in
@@ -104,6 +102,16 @@ struct APISettingsView: View {
         } label: {
             Label("Add Configuration", systemImage: "plus")
         }
+    }
+
+    private func metadata(for config: APIConfigurationItem) -> String? {
+        if config.providerIDEnum == .openAICodexChatGPTSubscription {
+            guard let tokenSet = config.codexChatGPTTokenSet else {
+                return "Codex ChatGPT Subscription: not signed in"
+            }
+            return "Codex ChatGPT Subscription: \(tokenSet.email ?? tokenSet.accountID ?? "signed in")"
+        }
+        return config.apiKey.isEmpty ? nil : "API Key: \(config.apiKey.prefix(4))...\(config.apiKey.suffix(4))"
     }
 
     private func deleteAPIConfiguration(_ config: APIConfigurationItem) {

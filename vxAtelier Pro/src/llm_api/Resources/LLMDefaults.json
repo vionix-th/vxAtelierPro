@@ -5,6 +5,10 @@
       "defaultModel": "gpt-5.4-nano"
     },
     {
+      "provider": "openAICodexChatGPTSubscription",
+      "defaultModel": "gpt-5.5"
+    },
+    {
       "provider": "anthropic",
       "defaultModel": "claude-sonnet-4-6"
     },
@@ -111,17 +115,31 @@
     },
     {
       "match": {
-        "providerRegex": "^openAIChatGPTSubscription$"
+        "providerRegex": "^openAICodexChatGPTSubscription$"
       },
       "modelDefaults": {
-        "contextWindow": 128000,
+        "contextWindow": 400000,
         "capabilities": [
           "text",
           "image",
+          "file",
           "tools",
+          "strictTools",
+          "jsonSchema",
+          "jsonObject",
           "reasoning",
+          "usage",
           "streaming"
         ]
+      }
+    },
+    {
+      "match": {
+        "providerRegex": "^openAICodexChatGPTSubscription$",
+        "modelRegex": "^gpt-5\\.5$"
+      },
+      "modelDefaults": {
+        "contextWindow": 1050000
       }
     },
     {
@@ -385,7 +403,7 @@
     },
     {
       "match": {
-        "providerRegex": "^openAIPlatform$",
+        "providerRegex": "^(openAIPlatform|openAICodexChatGPTSubscription)$",
         "adapterID": "openAIResponses"
       },
       "parameterAvailability": [
@@ -443,7 +461,7 @@
     },
     {
       "match": {
-        "providerRegex": "^openAIPlatform$",
+        "providerRegex": "^(openAIPlatform|openAICodexChatGPTSubscription)$",
         "modelRegex": "^gpt-5(\\.|-|$)",
         "adapterID": "openAIResponses"
       },

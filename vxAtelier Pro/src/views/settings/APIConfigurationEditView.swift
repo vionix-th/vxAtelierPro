@@ -11,6 +11,7 @@ private struct APIConfigurationEditSnapshot {
     let authKind: String
     let defaultAdapterID: String
     let defaultModel: String?
+    let credentialJSON: String
 
     init(_ configuration: APIConfigurationItem) {
         name = configuration.name
@@ -21,6 +22,7 @@ private struct APIConfigurationEditSnapshot {
         authKind = configuration.authKind
         defaultAdapterID = configuration.defaultAdapterID
         defaultModel = configuration.defaultModel
+        credentialJSON = configuration.credentialJSON
     }
 
     func restore(_ configuration: APIConfigurationItem) {
@@ -32,12 +34,14 @@ private struct APIConfigurationEditSnapshot {
         configuration.authKind = authKind
         configuration.defaultAdapterID = defaultAdapterID
         configuration.defaultModel = defaultModel
+        configuration.credentialJSON = credentialJSON
     }
 }
 
 /// Editor for API provider configuration records.
 struct APIConfigurationEditView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @Environment(QueryManager.self) private var queryManager
     @Query(sort: [SortDescriptor(\APIConfigurationItem.name)]) private var apiConfigurations: [APIConfigurationItem]
 
@@ -61,6 +65,10 @@ struct APIConfigurationEditView: View {
     @State private var fetchedModelCandidates: [LLMModelDescriptor]?
     @State private var fetchedModelCandidateSignature: String?
     @State private var selectedPreset: APIPreset
+    @State private var isCodexAuthenticating = false
+    @State private var codexAuthStatusMessage: String?
+    @State private var deviceCodeChallenge: CodexChatGPTOAuthService.DeviceCodeChallenge?
+    @State private var codexCredentialJSON: String
 
     init(
         configuration: APIConfigurationItem,
@@ -80,6 +88,7 @@ struct APIConfigurationEditView: View {
             ?? APIConfigurationEditView.suggestedDefaultModel(for: configuration.providerIDEnum)
         _defaultModel = State(initialValue: initialDefaultModel)
         _selectedPreset = State(initialValue: APIPreset.preset(for: configuration.providerIDEnum))
+        _codexCredentialJSON = State(initialValue: configuration.credentialJSON)
     }
 
     private var currentProfile: LLMProviderProfile {
@@ -129,27 +138,31 @@ struct APIConfigurationEditView: View {
             }
 
             SettingsFormSection("Credentials") {
-                LabeledContent("API Key") {
-                    HStack(spacing: AppDefaults.paddingSmall) {
-                        apiKeyField
+                if isCodexChatGPTSubscription {
+                    codexChatGPTAuthControls
+                } else {
+                    LabeledContent("API Key") {
+                        HStack(spacing: AppDefaults.paddingSmall) {
+                            apiKeyField
 
-                        Button {
-                            isAPIKeyVisible.toggle()
-                        } label: {
-                            Image(systemName: isAPIKeyVisible ? "eye.slash.fill" : "eye.fill")
-                        }
-                        .buttonStyle(.borderless)
-                        .help(isAPIKeyVisible ? "Hide API key" : "Show API key")
-
-                        if !apiKey.isEmpty {
                             Button {
-                                ExportUtils.copyToClipboard(apiKey)
-                                vxAtelierPro.log.debug("Copied API key to clipboard")
+                                isAPIKeyVisible.toggle()
                             } label: {
-                                Image(systemName: "doc.on.doc")
+                                Image(systemName: isAPIKeyVisible ? "eye.slash.fill" : "eye.fill")
                             }
                             .buttonStyle(.borderless)
-                            .help("Copy API key")
+                            .help(isAPIKeyVisible ? "Hide API key" : "Show API key")
+
+                            if !apiKey.isEmpty {
+                                Button {
+                                    ExportUtils.copyToClipboard(apiKey)
+                                    vxAtelierPro.log.debug("Copied API key to clipboard")
+                                } label: {
+                                    Image(systemName: "doc.on.doc")
+                                }
+                                .buttonStyle(.borderless)
+                                .help("Copy API key")
+                            }
                         }
                     }
                 }
@@ -245,6 +258,102 @@ struct APIConfigurationEditView: View {
         .buttonStyle(.borderless)
         .help(isDefault ? "Default configuration" : "Set as default")
         .accessibilityLabel(isDefault ? "Default configuration" : "Set as default configuration")
+    }
+
+    private var isCodexChatGPTSubscription: Bool {
+        providerID == .openAICodexChatGPTSubscription
+    }
+
+    private var codexTokenSet: CodexChatGPTTokenSet? {
+        CodexChatGPTTokenSet.decoded(from: codexCredentialJSON)?.withClaimsFromTokens()
+    }
+
+    @ViewBuilder
+    private var codexChatGPTAuthControls: some View {
+        LabeledContent("Status") {
+            VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
+                Text(codexAuthStatusText)
+                    .foregroundStyle(codexTokenSet == nil ? .secondary : .primary)
+                if let message = codexAuthStatusMessage {
+                    Text(message)
+                        .foregroundStyle(.secondary)
+                        .font(.footnote)
+                }
+            }
+        }
+
+        if let challenge = deviceCodeChallenge {
+            LabeledContent("Device Code") {
+                HStack(spacing: AppDefaults.paddingSmall) {
+                    Text(challenge.userCode)
+                        .font(.system(.body, design: .monospaced))
+                    Button {
+                        ExportUtils.copyToClipboard(challenge.userCode)
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Copy device code")
+                    Button {
+                        openURL(challenge.verificationURL)
+                    } label: {
+                        Image(systemName: "safari")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Open verification page")
+                }
+            }
+        }
+
+        LabeledContent("Sign In") {
+            HStack(spacing: AppDefaults.paddingSmall) {
+                Button {
+                    signInWithCodexBrowser()
+                } label: {
+                    Label("Browser", systemImage: "safari")
+                }
+                .disabled(isCodexAuthenticating)
+
+                Button {
+                    signInWithCodexDeviceCode()
+                } label: {
+                    Label("Device Code", systemImage: "rectangle.connected.to.line.below")
+                }
+                .disabled(isCodexAuthenticating)
+
+                if isCodexAuthenticating {
+                    ProgressView()
+                }
+            }
+        }
+
+        if codexTokenSet != nil {
+            LabeledContent("Token") {
+                HStack(spacing: AppDefaults.paddingSmall) {
+                    Button {
+                        refreshCodexToken()
+                    } label: {
+                        Label("Refresh", systemImage: "arrow.clockwise")
+                    }
+                    .disabled(isCodexAuthenticating)
+
+                    Button(role: .destructive) {
+                        signOutCodex()
+                    } label: {
+                        Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                    }
+                    .disabled(isCodexAuthenticating)
+                }
+            }
+        }
+    }
+
+    private var codexAuthStatusText: String {
+        guard let tokenSet = codexTokenSet else {
+            return "Not signed in to Codex ChatGPT Subscription."
+        }
+        let identity = tokenSet.email ?? tokenSet.accountID ?? "signed-in account"
+        return "Signed in as \(identity)."
     }
 
     @ViewBuilder
@@ -403,6 +512,7 @@ struct APIConfigurationEditView: View {
             defaultAdapterID.rawValue,
             baseURL,
             apiKey,
+            codexCredentialJSON,
             configuration.headersJSON,
             configuration.optionsJSON
         ].joined(separator: "\u{1F}")
@@ -415,6 +525,22 @@ struct APIConfigurationEditView: View {
     }
 
     private func makeProviderConfigurationFromDraft() -> LLMProviderConfiguration {
+        if providerID == .openAICodexChatGPTSubscription {
+            var headers = configuration.decodedHeaders
+            let tokenSet = codexTokenSet
+            if let accountID = tokenSet?.accountID, !accountID.isEmpty {
+                headers["ChatGPT-Account-Id"] = accountID
+            }
+            headers["originator"] = headers["originator"] ?? "vxatelier_pro"
+            return APIConfigurationItem.makeLLMProviderConfiguration(
+                providerID: providerID,
+                authKind: tokenSet?.authMethod ?? .codexChatGPTOAuth,
+                apiKey: tokenSet?.accessToken ?? "",
+                baseURL: baseURL,
+                headers: headers,
+                options: configuration.decodedOptions
+            )
+        }
         return APIConfigurationItem.makeLLMProviderConfiguration(
             providerID: providerID,
             authKind: currentProfile.authKind,
@@ -433,6 +559,13 @@ struct APIConfigurationEditView: View {
         configuration.providerID = providerID.rawValue
         configuration.authKind = profile.authKind.rawValue
         configuration.defaultAdapterID = defaultAdapterID.rawValue
+        if providerID == .openAICodexChatGPTSubscription {
+            configuration.authKind = (codexTokenSet?.authMethod ?? .codexChatGPTOAuth).rawValue
+            configuration.apiKey = ""
+            configuration.credentialJSON = codexCredentialJSON
+        } else {
+            configuration.credentialJSON = "{}"
+        }
 
         let configsCount = apiConfigurations.count
         if configsCount == 0 || configsCount == 1 && !isNewConfiguration {
@@ -467,16 +600,92 @@ struct APIConfigurationEditView: View {
         baseURL = preset.baseURL
         providerID = preset.providerID
         defaultAdapterID = LLMProviderRegistry.shared.profile(for: preset.providerID).defaultAdapterID
+        if preset.providerID == .openAICodexChatGPTSubscription {
+            apiKey = ""
+        }
 
         defaultModel = APIConfigurationEditView.suggestedDefaultModel(for: preset.providerID)
 
         vxAtelierPro.log.info("Applied \(preset.displayName) preset")
+    }
+
+    private func applyCodexToken(_ tokenSet: CodexChatGPTTokenSet) {
+        providerID = .openAICodexChatGPTSubscription
+        selectedPreset = .codexChatGPTSubscription
+        baseURL = CodexChatGPTOAuthService.codexBackendBaseURL
+        defaultAdapterID = .openAIResponses
+        apiKey = ""
+        codexCredentialJSON = tokenSet.encoded()
+        defaultModel = APIConfigurationEditView.suggestedDefaultModel(for: providerID)
+        invalidateFetchedModelCandidates()
+    }
+
+    private func signInWithCodexBrowser() {
+        isCodexAuthenticating = true
+        codexAuthStatusMessage = "Waiting for browser authorization."
+        deviceCodeChallenge = nil
+        Task { @MainActor in
+            defer { isCodexAuthenticating = false }
+            do {
+                let tokenSet = try await CodexChatGPTOAuthService.signInWithBrowser { url in
+                    openURL(url)
+                }
+                applyCodexToken(tokenSet)
+                codexAuthStatusMessage = "Browser sign-in completed."
+            } catch {
+                codexAuthStatusMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func signInWithCodexDeviceCode() {
+        isCodexAuthenticating = true
+        codexAuthStatusMessage = "Requesting device code."
+        deviceCodeChallenge = nil
+        Task { @MainActor in
+            defer { isCodexAuthenticating = false }
+            do {
+                let challenge = try await CodexChatGPTOAuthService.startDeviceCodeLogin()
+                deviceCodeChallenge = challenge
+                codexAuthStatusMessage = "Open verification page and enter device code."
+                let tokenSet = try await CodexChatGPTOAuthService.completeDeviceCodeLogin(challenge)
+                applyCodexToken(tokenSet)
+                deviceCodeChallenge = nil
+                codexAuthStatusMessage = "Device-code sign-in completed."
+            } catch {
+                codexAuthStatusMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func refreshCodexToken() {
+        guard let tokenSet = codexTokenSet else { return }
+        isCodexAuthenticating = true
+        codexAuthStatusMessage = "Refreshing Codex ChatGPT token."
+        Task { @MainActor in
+            defer { isCodexAuthenticating = false }
+            do {
+                let refreshed = try await CodexChatGPTOAuthService.refresh(tokenSet)
+                applyCodexToken(refreshed)
+                codexAuthStatusMessage = "Token refreshed."
+            } catch {
+                codexAuthStatusMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func signOutCodex() {
+        codexCredentialJSON = "{}"
+        codexAuthStatusMessage = "Signed out."
+        deviceCodeChallenge = nil
+        invalidateFetchedModelCandidates()
     }
 }
 
 /// Preset provider options used to seed API configuration fields.
 enum APIPreset: String, CaseIterable {
     case openAI = "OpenAI"
+    case codexChatGPTSubscription = "Codex ChatGPT Subscription"
     case anthropic = "Anthropic"
     case xAI = "xAI"
     case deepSeek = "DeepSeek"
@@ -492,6 +701,7 @@ enum APIPreset: String, CaseIterable {
     var iconName: String {
         switch self {
         case .openAI: return "sparkles"
+        case .codexChatGPTSubscription: return "terminal"
         case .anthropic: return "person.text.rectangle"
         case .xAI: return "bolt.fill"
         case .deepSeek: return "brain"
@@ -505,6 +715,7 @@ enum APIPreset: String, CaseIterable {
     var providerID: LLMProviderID {
         switch self {
         case .openAI: return .openAIPlatform
+        case .codexChatGPTSubscription: return .openAICodexChatGPTSubscription
         case .anthropic: return .anthropic
         case .xAI: return .xAI
         case .deepSeek: return .deepSeek
@@ -519,6 +730,8 @@ enum APIPreset: String, CaseIterable {
         switch providerID {
         case .openAIPlatform:
             return .openAI
+        case .openAICodexChatGPTSubscription:
+            return .codexChatGPTSubscription
         case .anthropic:
             return .anthropic
         case .xAI:
@@ -533,14 +746,13 @@ enum APIPreset: String, CaseIterable {
             return .ollama
         case .customOpenAICompatible:
             return .customOpenAICompatible
-        case .openAIChatGPTSubscription:
-            return .openAI
         }
     }
 
     var baseURL: String {
         switch self {
         case .openAI: return AppDefaults.OpenAi.baseURL
+        case .codexChatGPTSubscription: return CodexChatGPTOAuthService.codexBackendBaseURL
         case .anthropic: return AppDefaults.Anthropic.baseURL
         case .xAI: return AppDefaults.XAI.baseURL
         case .deepSeek: return AppDefaults.DeepSeek.baseURL

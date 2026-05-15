@@ -13,6 +13,7 @@ struct APIConfigurationExportData: Codable {
     let defaultModelID: String?
     let headersJSON: String?
     let optionsJSON: String?
+    let credentialJSON: String?
     let isDefault: Bool?
     
     init(_ config: APIConfigurationItem) {
@@ -25,6 +26,7 @@ struct APIConfigurationExportData: Codable {
         self.defaultModelID = config.defaultModelID
         self.headersJSON = config.headersJSON
         self.optionsJSON = config.optionsJSON
+        self.credentialJSON = config.credentialJSON
         self.isDefault = config.isDefault
     }
     
@@ -41,6 +43,7 @@ struct APIConfigurationExportData: Codable {
         if let defaultAdapterID { item.defaultAdapterID = defaultAdapterID }
         if let headersJSON { item.headersJSON = headersJSON }
         if let optionsJSON { item.optionsJSON = optionsJSON }
+        if let credentialJSON { item.credentialJSON = credentialJSON }
         return item
     }
 }

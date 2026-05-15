@@ -19,13 +19,13 @@ struct LLMProviderRegistry {
                 isEnabled: true
             ),
             LLMProviderProfile(
-                id: .openAIChatGPTSubscription,
-                name: "ChatGPT Subscription",
-                defaultBaseURL: "http://127.0.0.1",
-                authKind: .chatGPTOAuth,
+                id: .openAICodexChatGPTSubscription,
+                name: "Codex ChatGPT Subscription",
+                defaultBaseURL: "https://chatgpt.com/backend-api/codex",
+                authKind: .codexChatGPTOAuth,
                 defaultAdapterID: .openAIResponses,
                 supportedAdapterIDs: [.openAIResponses],
-                isEnabled: false
+                isEnabled: true
             ),
             LLMProviderProfile(
                 id: .anthropic,
@@ -109,10 +109,7 @@ struct LLMProviderRegistry {
     func adapter(for adapterID: LLMAdapterID, providerID: LLMProviderID) -> LLMProviderAdapter {
         let profile = profile(for: providerID)
         guard profile.isEnabled else {
-            return DisabledLLMProviderAdapter(
-                profile: profile,
-                message: "ChatGPT subscription auth is disabled because no supported embedded OAuth, device-code, or Codex-token flow is configured."
-            )
+            return DisabledLLMProviderAdapter(profile: profile, message: "\(profile.name) is disabled.")
         }
         guard profile.supportedAdapterIDs.contains(adapterID) else {
             return DisabledLLMProviderAdapter(
@@ -142,7 +139,8 @@ struct LLMProviderRegistry {
         if probe.contains("ollama") { return .ollama }
         if probe.contains("xai") || probe.contains("x.ai") || probe.contains("grok") { return .xAI }
         if probe.contains("deepseek") { return .deepSeek }
-        if probe.contains("chatgpt") { return .openAIChatGPTSubscription }
+        if probe.contains("codex") && probe.contains("chatgpt") { return .openAICodexChatGPTSubscription }
+        if probe.contains("chatgpt") { return .openAICodexChatGPTSubscription }
         if probe.contains("custom") { return .customOpenAICompatible }
         if probe.contains("openai") { return .openAIPlatform }
         return .customOpenAICompatible
