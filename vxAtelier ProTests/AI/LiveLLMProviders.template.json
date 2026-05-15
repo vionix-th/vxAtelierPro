@@ -19,6 +19,20 @@
       ]
     },
     {
+      "id": "openAICodexChatGPTSubscription",
+      "name": "Codex ChatGPT Subscription",
+      "enabled": false,
+      "baseURL": "https://chatgpt.com/backend-api/codex",
+      "credentialJSON": "replace-with-exported-codex-chatgpt-token-json",
+      "models": [
+        "gpt-5.5"
+      ],
+      "checkModels": false,
+      "adapterIDs": [
+        "openAIResponses"
+      ]
+    },
+    {
       "id": "anthropic",
       "name": "Anthropic",
       "enabled": false,

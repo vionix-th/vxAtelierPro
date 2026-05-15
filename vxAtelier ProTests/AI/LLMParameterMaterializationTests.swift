@@ -89,14 +89,14 @@ final class LLMParameterMaterializationTests: XCTestCase {
         let temperature = model.parameterAvailability.first {
             $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .temperature
         }
-        temperature?.isIncludedByDefault = true
+        temperature?.isEnabled = true
         temperature?.defaultJSONValue = .number(0.3)
         temperature?.markCustomized()
 
         model.materializeDefaultParameterAvailability(preserveCustomized: true)
 
         XCTAssertEqual(temperature?.defaultJSONValue, .number(0.3))
-        XCTAssertTrue(temperature?.isIncludedByDefault ?? false)
+        XCTAssertTrue(temperature?.isEnabled ?? false)
     }
 
     func testResetDefaultParameterAvailabilityRestoresAdapterDefaults() {

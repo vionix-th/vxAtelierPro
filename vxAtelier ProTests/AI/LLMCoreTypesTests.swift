@@ -232,7 +232,7 @@ final class LLMCoreTypesTests: XCTestCase {
               "parameterAvailability": [
                 {
                   "parameter": "max_output_tokens",
-                  "includedByDefault": true
+                  "enabled": true
                 }
               ],
               "parameterMappings": [
@@ -320,7 +320,7 @@ final class LLMCoreTypesTests: XCTestCase {
         )
         let maxTokenAvailability = availability.first { $0.semanticParameterID == .maxOutputTokens }
         XCTAssertTrue(maxTokenAvailability?.isRequired ?? false)
-        XCTAssertTrue(maxTokenAvailability?.isIncludedByDefault ?? false)
+        XCTAssertTrue(maxTokenAvailability?.isEnabled ?? false)
         XCTAssertEqual(maxTokenAvailability?.defaultValue, .integer(4096))
         XCTAssertFalse(availability.first { $0.semanticParameterID == .temperature }?.isAvailable ?? true)
 

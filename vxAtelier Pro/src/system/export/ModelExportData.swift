@@ -116,7 +116,7 @@ struct ModelParameterAvailabilityExportData: Codable {
     let semanticParameterID: String
     let isAvailable: Bool
     let isRequired: Bool
-    let isIncludedByDefault: Bool
+    let isEnabled: Bool
     let displayName: String
     let paramDescription: String
     let valueType: String
@@ -133,7 +133,7 @@ struct ModelParameterAvailabilityExportData: Codable {
         semanticParameterID = availability.semanticParameterID
         isAvailable = availability.isAvailable
         isRequired = availability.isRequired
-        isIncludedByDefault = availability.isIncludedByDefault
+        isEnabled = availability.isEnabled
         displayName = availability.displayName
         paramDescription = availability.paramDescription
         valueType = availability.valueType
@@ -152,7 +152,7 @@ struct ModelParameterAvailabilityExportData: Codable {
             semanticParameterID: LLMParameterID(rawValue: semanticParameterID) ?? .maxOutputTokens,
             isAvailable: isAvailable,
             isRequired: isRequired,
-            isIncludedByDefault: isIncludedByDefault,
+            isEnabled: isEnabled,
             isCustomized: isCustomized
         )
         availability.displayName = displayName

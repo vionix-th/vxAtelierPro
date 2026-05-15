@@ -183,7 +183,6 @@
         "contextWindow": 128000,
         "capabilities": [
           "text",
-          "tools",
           "jsonObject",
           "usage",
           "streaming"
@@ -316,6 +315,21 @@
     },
     {
       "match": {
+        "providerRegex": "^openRouter$",
+        "modelRegex": "^deepseek/deepseek-(reasoner|v4-pro)$",
+        "adapterID": "openAICompatibleChatCompletions"
+      },
+      "parameterAvailability": [
+        {
+          "parameter": "stream",
+          "required": true,
+          "enabled": true,
+          "defaultValue": true
+        }
+      ]
+    },
+    {
+      "match": {
         "providerRegex": "^(lmStudio|ollama|customOpenAICompatible)$"
       },
       "modelDefaults": {
@@ -424,6 +438,11 @@
         },
         {
           "parameter": "service_tier"
+        },
+        {
+          "parameter": "stream",
+          "enabled": false,
+          "defaultValue": false
         }
       ],
       "parameterMappings": [
@@ -456,6 +475,11 @@
           "parameter": "service_tier",
           "encoding": "scalarKey",
           "wireKey": "service_tier"
+        },
+        {
+          "parameter": "stream",
+          "encoding": "scalarKey",
+          "wireKey": "stream"
         }
       ]
     },
@@ -468,13 +492,13 @@
         {
           "parameter": "stream",
           "required": true,
-          "includedByDefault": true,
+          "enabled": true,
           "defaultValue": true
         },
         {
           "parameter": "store",
           "required": true,
-          "includedByDefault": true,
+          "enabled": true,
           "defaultValue": false
         },
         {
@@ -531,6 +555,11 @@
         },
         {
           "parameter": "response_format"
+        },
+        {
+          "parameter": "stream",
+          "enabled": false,
+          "defaultValue": false
         }
       ],
       "parameterMappings": [
@@ -558,6 +587,11 @@
           "parameter": "response_format",
           "encoding": "structuredPreset",
           "preset": "openAIChatResponseFormat"
+        },
+        {
+          "parameter": "stream",
+          "encoding": "scalarKey",
+          "wireKey": "stream"
         }
       ]
     },
@@ -580,6 +614,11 @@
         },
         {
           "parameter": "response_format"
+        },
+        {
+          "parameter": "stream",
+          "enabled": false,
+          "defaultValue": false
         }
       ],
       "parameterMappings": [
@@ -607,6 +646,11 @@
           "parameter": "response_format",
           "encoding": "structuredPreset",
           "preset": "openAIChatResponseFormat"
+        },
+        {
+          "parameter": "stream",
+          "encoding": "scalarKey",
+          "wireKey": "stream"
         }
       ]
     },
@@ -769,6 +813,11 @@
         },
         {
           "parameter": "stop_sequences"
+        },
+        {
+          "parameter": "stream",
+          "enabled": false,
+          "defaultValue": false
         }
       ],
       "parameterMappings": [
@@ -791,6 +840,11 @@
           "parameter": "stop_sequences",
           "encoding": "scalarKey",
           "wireKey": "stop_sequences"
+        },
+        {
+          "parameter": "stream",
+          "encoding": "scalarKey",
+          "wireKey": "stream"
         }
       ]
     }

@@ -7,7 +7,7 @@ final class ModelParameterAvailabilityItem {
     var semanticParameterID: String
     var isAvailable: Bool
     var isRequired: Bool
-    var isIncludedByDefault: Bool
+    var isEnabled: Bool
     var displayName: String
     var paramDescription: String
     var valueType: String
@@ -52,7 +52,7 @@ final class ModelParameterAvailabilityItem {
             semanticParameterID: semanticParameterIDEnum,
             isAvailable: isAvailable,
             isRequired: isRequired,
-            isIncludedByDefault: isIncludedByDefault,
+            isEnabled: isEnabled,
             defaultValue: defaultJSONValue
         )
     }
@@ -62,7 +62,7 @@ final class ModelParameterAvailabilityItem {
         semanticParameterID: LLMParameterID,
         isAvailable: Bool = true,
         isRequired: Bool = false,
-        isIncludedByDefault: Bool = false,
+        isEnabled: Bool = false,
         defaultValue: JSONValue? = nil,
         isCustomized: Bool = false
     ) {
@@ -70,7 +70,7 @@ final class ModelParameterAvailabilityItem {
         self.semanticParameterID = semanticParameterID.rawValue
         self.isAvailable = isAvailable
         self.isRequired = isRequired
-        self.isIncludedByDefault = isIncludedByDefault
+        self.isEnabled = isEnabled
         let presentation = AiParameterPresentationCatalog.presentation(for: semanticParameterID)
         self.displayName = presentation.displayName
         self.paramDescription = presentation.description
@@ -94,7 +94,7 @@ final class ModelParameterAvailabilityItem {
             semanticParameterID: descriptor.semanticParameterID,
             isAvailable: descriptor.isAvailable,
             isRequired: descriptor.isRequired,
-            isIncludedByDefault: descriptor.isIncludedByDefault,
+            isEnabled: descriptor.isEnabled,
             defaultValue: descriptor.defaultValue,
             isCustomized: isCustomized
         )
@@ -105,7 +105,7 @@ final class ModelParameterAvailabilityItem {
         semanticParameterIDEnum = descriptor.semanticParameterID
         isAvailable = descriptor.isAvailable
         isRequired = descriptor.isRequired
-        isIncludedByDefault = descriptor.isIncludedByDefault
+        isEnabled = descriptor.isEnabled
         defaultJSONValue = descriptor.defaultValue
         isCustomized = markCustomized
     }

@@ -94,7 +94,7 @@ private struct ModelParameterAvailabilitySnapshot {
     let semanticParameterID: String
     let isAvailable: Bool
     let isRequired: Bool
-    let isIncludedByDefault: Bool
+    let isEnabled: Bool
     let defaultValueData: Data?
     let isCustomized: Bool
 
@@ -104,7 +104,7 @@ private struct ModelParameterAvailabilitySnapshot {
         semanticParameterID = item.semanticParameterID
         isAvailable = item.isAvailable
         isRequired = item.isRequired
-        isIncludedByDefault = item.isIncludedByDefault
+        isEnabled = item.isEnabled
         defaultValueData = item.defaultValueData
         isCustomized = item.isCustomized
     }
@@ -114,7 +114,7 @@ private struct ModelParameterAvailabilitySnapshot {
         item.semanticParameterID = semanticParameterID
         item.isAvailable = isAvailable
         item.isRequired = isRequired
-        item.isIncludedByDefault = isIncludedByDefault
+        item.isEnabled = isEnabled
         item.defaultValueData = defaultValueData
         item.isCustomized = isCustomized
     }
@@ -767,7 +767,7 @@ struct ModelEditorView: View {
             semanticParameterID: parameterID,
             isAvailable: true,
             isRequired: false,
-            isIncludedByDefault: false,
+            isEnabled: false,
             isCustomized: true
         )
         model.parameterAvailability.append(availability)
@@ -885,7 +885,7 @@ private struct ModelParameterAvailabilityRow: View {
                         Toggle("Required", isOn: binding(\.isRequired))
                             .toggleStyle(.switch)
 
-                        Toggle("Included by Default", isOn: binding(\.isIncludedByDefault))
+                        Toggle("Enabled", isOn: binding(\.isEnabled))
                             .toggleStyle(.switch)
                     }
 
@@ -920,7 +920,7 @@ private struct ModelParameterAvailabilityRow: View {
                         .toggleStyle(.switch)
                 }
 
-                Toggle("Included by Default", isOn: binding(\.isIncludedByDefault))
+                Toggle("Enabled", isOn: binding(\.isEnabled))
                     .toggleStyle(.switch)
 
                 HStack(spacing: AppDefaults.paddingMedium) {

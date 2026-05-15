@@ -1,6 +1,6 @@
 import Foundation
 
-/// Model-level availability and default inclusion for one semantic parameter.
+/// Model-level availability and enabled state for one semantic parameter.
 struct LLMParameterAvailabilityDescriptor: Codable, Equatable, Identifiable {
     /// Combines adapter and semantic parameter so one model can store per-adapter availability.
     var id: String { "\(adapterID.rawValue):\(semanticParameterID.rawValue)" }
@@ -8,7 +8,7 @@ struct LLMParameterAvailabilityDescriptor: Codable, Equatable, Identifiable {
     var semanticParameterID: LLMParameterID
     var isAvailable: Bool
     var isRequired: Bool
-    var isIncludedByDefault: Bool
+    var isEnabled: Bool
     var defaultValue: JSONValue?
 
     /// Creates model-level sendability metadata for a semantic parameter at one adapter.
@@ -17,14 +17,14 @@ struct LLMParameterAvailabilityDescriptor: Codable, Equatable, Identifiable {
         semanticParameterID: LLMParameterID,
         isAvailable: Bool = true,
         isRequired: Bool = false,
-        isIncludedByDefault: Bool = false,
+        isEnabled: Bool = false,
         defaultValue: JSONValue? = nil
     ) {
         self.adapterID = adapterID
         self.semanticParameterID = semanticParameterID
         self.isAvailable = isAvailable
         self.isRequired = isRequired
-        self.isIncludedByDefault = isIncludedByDefault
+        self.isEnabled = isEnabled
         self.defaultValue = defaultValue
     }
 }
@@ -72,7 +72,7 @@ enum LLMParameterAvailabilityResolver {
         guard availability.isAvailable else { return false }
         if availability.isRequired { return true }
         if let conversationPreference { return conversationPreference }
-        return availability.isIncludedByDefault || value != nil || availability.defaultValue != nil
+        return availability.isEnabled || value != nil || availability.defaultValue != nil
     }
 
     /// Returns provider-neutral options after model availability and conversation preferences are applied.

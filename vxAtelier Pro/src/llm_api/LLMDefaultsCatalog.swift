@@ -321,7 +321,7 @@ private struct LLMParameterAvailabilityDefault: Decodable {
     var parameter: LLMParameterID
     var available: Bool?
     var required: Bool?
-    var includedByDefault: Bool?
+    var enabled: Bool?
     var defaultValue: JSONValue?
 
     func descriptor(adapterID: LLMAdapterID) -> LLMParameterAvailabilityDescriptor {
@@ -330,7 +330,7 @@ private struct LLMParameterAvailabilityDefault: Decodable {
             semanticParameterID: parameter,
             isAvailable: available ?? true,
             isRequired: required ?? false,
-            isIncludedByDefault: includedByDefault ?? (defaultValue != nil),
+            isEnabled: enabled ?? (defaultValue != nil),
             defaultValue: defaultValue
         )
     }
