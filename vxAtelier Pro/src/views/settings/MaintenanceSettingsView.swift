@@ -34,29 +34,35 @@ struct MaintenanceSettingsView: View {
     var body: some View {
         SettingsPage(title: "Maintenance") {
             SettingsFormSection("Data Management") {
-                Button {
+                maintenanceActionButton(
+                    title: "Reset to Defaults",
+                    systemImage: "arrow.uturn.backward.circle.fill"
+                ) {
                     confirmation = SettingsConfirmation(
                         title: "Reset to Defaults",
                         message: "Are you sure you want to reset all settings to their default values?",
                         confirmTitle: "Reset",
                         action: resetToDefaults
                     )
-                } label: {
-                    Label("Reset to Defaults", systemImage: "arrow.uturn.backward.circle.fill")
                 }
 
-                Button(role: .destructive) {
+                maintenanceActionButton(
+                    title: "Clear Local Storage",
+                    systemImage: "trash.circle.fill",
+                    role: .destructive
+                ) {
                     confirmation = SettingsConfirmation(
                         title: "Clear Local Storage",
                         message: "Are you sure you want to clear all local storage? This action cannot be undone.",
                         confirmTitle: "Clear",
                         action: cleanLocalStorage
                     )
-                } label: {
-                    Label("Clear Local Storage", systemImage: "trash.circle.fill")
                 }
 
-                Button {
+                maintenanceActionButton(
+                    title: "Backup Database",
+                    systemImage: "arrow.up.doc"
+                ) {
                     Task { @MainActor in
                         do {
                             let data = try await DataManager.shared.createBackup(from: modelContext)
@@ -66,19 +72,19 @@ struct MaintenanceSettingsView: View {
                             showCompletion(message: "Database backup failed: \(error.localizedDescription)")
                         }
                     }
-                } label: {
-                    Label("Backup Database", systemImage: "arrow.up.doc")
                 }
 
-                Button(role: .destructive) {
+                maintenanceActionButton(
+                    title: "Restore Database",
+                    systemImage: "arrow.down.doc",
+                    role: .destructive
+                ) {
                     confirmation = SettingsConfirmation(
                         title: "Restore Database",
                         message: "Are you sure you want to restore the database? This action cannot be undone.",
                         confirmTitle: "Restore",
                         action: { showBackupImporter = true }
                     )
-                } label: {
-                    Label("Restore Database", systemImage: "arrow.down.doc")
                 }
             }
         }
@@ -129,6 +135,22 @@ struct MaintenanceSettingsView: View {
             case .failure(let error):
                 showCompletion(message: "Backup import failed: \(error.localizedDescription)")
             }
+        }
+    }
+
+    @ViewBuilder
+    private func maintenanceActionButton(
+        title: String,
+        systemImage: String,
+        role: ButtonRole? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(role: role, action: action) {
+            HStack(spacing: AppDefaults.paddingSmall) {
+                Label(title, systemImage: systemImage)
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 } 
