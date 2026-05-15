@@ -334,7 +334,7 @@ struct vxAtelierPro: App {
                                 message: "Reset all application settings to their default values? The app will remain in recovery mode.",
                                 confirmTitle: "Reset",
                                 action: {
-                                    AppRecoveryService.resetUserDefaults()
+                                    AppDefaults.resetUserDefaults()
                                     showCompletion(
                                         message: "Application settings reset to defaults. Quit recovery mode and relaunch normally when ready."
                                     )
@@ -436,13 +436,13 @@ struct vxAtelierPro: App {
 
         @MainActor
         private func wipeStoreAndRelaunch() async {
-            do {
-                try AppRecoveryService.wipePersistentStore()
-                try AppRecoveryService.relaunchNormalApp()
-            } catch {
-                showCompletion(message: "Store wipe failed: \(error.localizedDescription)")
+                do {
+                    try AppRecoveryService.wipePersistentStore()
+                    try AppRecoveryService.relaunchNormalApp()
+                } catch {
+                    showCompletion(message: "Store wipe failed: \(error.localizedDescription)")
+                }
             }
-        }
 
         @MainActor
         private func performRecoveryImport(mode: RecoveryImportMode, url: URL) async {
@@ -459,9 +459,9 @@ struct vxAtelierPro: App {
                 let bootstrap = AppBootstrap.live()
                 switch mode {
                 case .backup:
-                    try await AppRecoveryService.restoreBackup(from: url, into: bootstrap.modelContainer.mainContext)
+                    try await DataManager.shared.restoreBackup(from: url, into: bootstrap.modelContainer.mainContext)
                 case .genericImport:
-                    _ = try await AppRecoveryService.importData(from: url, into: bootstrap.modelContainer.mainContext)
+                    _ = try await DataManager.shared.importData(from: url, into: bootstrap.modelContainer.mainContext)
                 }
                 bootstrap.queryManager.ensureSystemConversation()
                 try AppRecoveryService.relaunchNormalApp()

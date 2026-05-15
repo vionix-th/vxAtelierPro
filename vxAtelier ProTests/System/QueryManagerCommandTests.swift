@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 import XCTest
 #if os(macOS)
@@ -207,6 +208,36 @@ final class QueryManagerCommandTests: XCTestCase {
         XCTAssertEqual(try testEnv.conversations().filter { $0.purpose == .system }.count, 1)
     }
 
+    func testWipePersistentStorePreservesRootDirectoryAndRemovesContents() throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let nestedDirectory = root.appendingPathComponent("nested", isDirectory: true)
+        let storeFile = root.appendingPathComponent("default.store")
+        let walFile = root.appendingPathComponent("default.store-wal")
+        let shmFile = root.appendingPathComponent("default.store-shm")
+
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: nestedDirectory, withIntermediateDirectories: true)
+        try Data("store".utf8).write(to: storeFile)
+        try Data("wal".utf8).write(to: walFile)
+        try Data("shm".utf8).write(to: shmFile)
+        defer {
+            try? fileManager.removeItem(at: shmFile)
+            try? fileManager.removeItem(at: walFile)
+            try? fileManager.removeItem(at: root)
+        }
+
+        try StartupRecoveryStore.wipePersistentStore(at: [root], fileManager: fileManager)
+
+        var isDirectory = ObjCBool(false)
+        XCTAssertTrue(fileManager.fileExists(atPath: root.path, isDirectory: &isDirectory))
+        XCTAssertTrue(isDirectory.boolValue)
+        XCTAssertTrue(try fileManager.contentsOfDirectory(at: root, includingPropertiesForKeys: nil).isEmpty)
+        XCTAssertFalse(fileManager.fileExists(atPath: storeFile.path))
+        XCTAssertFalse(fileManager.fileExists(atPath: walFile.path))
+        XCTAssertFalse(fileManager.fileExists(atPath: shmFile.path))
+    }
+
     #if os(macOS)
         func testRecoveryModeDetectionHonorsEnvironmentOverride() {
             XCTAssertTrue(
@@ -233,6 +264,21 @@ final class QueryManagerCommandTests: XCTestCase {
             )
         }
 
+        func testPersistentStoreDirectoryCandidatesIncludeApplicationSupportRoot() throws {
+            let urls = try StartupRecoveryStore.persistentStoreDirectoryCandidates(
+                bundleIdentifier: "com.example.vxAtelierPro",
+                executableName: "vxAtelierPro",
+                appName: "vxAtelier Pro"
+            )
+
+            let applicationSupport = FileManager.default.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            ).first
+
+            XCTAssertEqual(urls.first, applicationSupport)
+        }
+
         func testPersistentStoreDirectoryCandidatesUseStableApplicationSupportRoots() throws {
             let urls = try StartupRecoveryStore.persistentStoreDirectoryCandidates(
                 bundleIdentifier: "com.example.vxAtelierPro",
@@ -240,7 +286,8 @@ final class QueryManagerCommandTests: XCTestCase {
                 appName: "vxAtelier Pro"
             )
 
-            XCTAssertEqual(urls.count, 3)
+            XCTAssertEqual(urls.count, 4)
+            XCTAssertEqual(urls.first?.lastPathComponent, "Application Support")
             XCTAssertTrue(urls.contains { $0.lastPathComponent == "com.example.vxAtelierPro" })
             XCTAssertTrue(urls.contains { $0.lastPathComponent == "vxAtelierPro" })
             XCTAssertTrue(urls.contains { $0.lastPathComponent == "vxAtelier Pro" })

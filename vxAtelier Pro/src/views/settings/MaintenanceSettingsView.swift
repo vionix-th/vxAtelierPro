@@ -17,13 +17,13 @@ struct MaintenanceSettingsView: View {
     }
 
     private func resetToDefaults() {
-        AppRecoveryService.resetUserDefaults()
+        AppDefaults.resetUserDefaults()
         showCompletion(message: "Application settings reset to defaults.")
     }
 
     private func cleanLocalStorage() {
         do {
-            try AppRecoveryService.cleanLocalStorage(using: queryManager)
+            try queryManager.cleanLocalStorage()
             showCompletion(message: "Local storage cleaned.")
         } catch {
             showCompletion(message: "Failed to clean local storage: \(error.localizedDescription)")
@@ -64,7 +64,7 @@ struct MaintenanceSettingsView: View {
                 ) {
                     Task { @MainActor in
                         do {
-                            let data = try await AppRecoveryService.createBackup(from: modelContext)
+                            let data = try await DataManager.shared.createBackup(from: modelContext)
                             backupDocument = BackupDocument(backupData: data)
                             showBackupExporter = true
                         } catch {
@@ -114,7 +114,7 @@ struct MaintenanceSettingsView: View {
                 guard let url = urls.first else { return }
                 Task { @MainActor in
                     do {
-                        try await AppRecoveryService.restoreBackup(from: url, into: modelContext)
+                        try await DataManager.shared.restoreBackup(from: url, into: modelContext)
                         queryManager.ensureSystemConversation()
                         showCompletion(message: "Database restored successfully")
                     } catch {

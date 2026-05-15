@@ -7,34 +7,6 @@ import SwiftData
 
 @MainActor
 enum AppRecoveryService {
-    static func resetUserDefaults() {
-        AppDefaults.resetUserDefaults()
-    }
-
-    static func cleanLocalStorage(using queryManager: QueryManager) throws {
-        try queryManager.cleanLocalStorage()
-    }
-
-    static func createBackup(from context: ModelContext) async throws -> Data {
-        try await DataManager.shared.createBackup(from: context)
-    }
-
-    static func restoreBackup(from data: Data, into context: ModelContext) async throws {
-        try await DataManager.shared.restoreBackup(from: data, into: context)
-    }
-
-    static func restoreBackup(from url: URL, into context: ModelContext) async throws {
-        try await DataManager.shared.restoreBackup(from: url, into: context)
-    }
-
-    static func importData(from data: Data, into context: ModelContext) async throws -> Any {
-        try await DataManager.shared.importData(from: data, into: context)
-    }
-
-    static func importData(from url: URL, into context: ModelContext) async throws -> Any {
-        try await DataManager.shared.importData(from: url, into: context)
-    }
-
     static func validateBackup(from url: URL) async throws {
         let bootstrap = AppBootstrap.inMemory()
         try await DataManager.shared.restoreBackup(from: url, into: bootstrap.modelContainer.mainContext)
@@ -57,6 +29,15 @@ enum AppRecoveryService {
 }
 
 enum StartupRecoveryStore {
+    private static let storeFileNames = [
+        "default.store",
+        "default.store-shm",
+        "default.store-wal",
+        "default.sqlite",
+        "default.sqlite-shm",
+        "default.sqlite-wal",
+    ]
+
     static func persistentStoreDirectoryCandidates(
         bundleIdentifier: String? = Bundle.main.bundleIdentifier,
         executableName: String? = Bundle.main.object(forInfoDictionaryKey: "CFBundleExecutable") as? String,
@@ -77,7 +58,7 @@ enum StartupRecoveryStore {
             }
 
         var seen = Set<String>()
-        return names.compactMap { name in
+        return [applicationSupport] + names.compactMap { name in
             guard seen.insert(name).inserted else { return nil }
             return applicationSupport.appendingPathComponent(name, isDirectory: true)
         }
@@ -96,23 +77,27 @@ enum StartupRecoveryStore {
             fileManager: fileManager
         )
 
-        let storeCandidates = rootCandidates.flatMap { root in
-            [
-                root,
-                root.appendingPathExtension("store"),
-                root.appendingPathExtension("sqlite"),
-                root.appendingPathExtension("sqlite-shm"),
-                root.appendingPathExtension("sqlite-wal"),
-                root.appendingPathExtension("store-shm"),
-                root.appendingPathExtension("store-wal"),
-            ]
-        }
+        try wipePersistentStore(at: rootCandidates, fileManager: fileManager)
+    }
 
-        for url in storeCandidates {
-            if fileManager.fileExists(atPath: url.path) {
-                try fileManager.removeItem(at: url)
-                vxAtelierPro.log.notice("Removed persistent store item: \(url.path)")
-            }
+    static func wipePersistentStore(
+        at rootCandidates: [URL],
+        fileManager: FileManager = .default
+    ) throws {
+        for root in rootCandidates {
+            try wipePersistentStore(in: root, fileManager: fileManager)
+        }
+    }
+
+    static func wipePersistentStore(
+        in root: URL,
+        fileManager: FileManager = .default
+    ) throws {
+        for fileName in Self.storeFileNames {
+            let url = root.appendingPathComponent(fileName)
+            guard fileManager.fileExists(atPath: url.path) else { continue }
+            try fileManager.removeItem(at: url)
+            vxAtelierPro.log.notice("Removed persistent store item: \(url.path)")
         }
     }
 
@@ -121,7 +106,11 @@ enum StartupRecoveryStore {
             let openURL = URL(fileURLWithPath: "/usr/bin/open")
             let process = Process()
             process.executableURL = openURL
-            process.arguments = ["-n", "-a", Bundle.main.bundleURL.path]
+            process.arguments = [
+                "-n",
+                "-a",
+                Bundle.main.bundleURL.path,
+            ]
             try process.run()
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
