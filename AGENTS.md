@@ -5,6 +5,8 @@
 - Prefer @Observable over ObservableObject
 - Prefer @Environment over @EnvironmentObject
 - Apply SwiftUI and SwiftData best practices.
+- Do not keep deleteable `PersistentModel` instances as durable view state; use `PersistentIdentifier` or immutable value snapshots in views and resolve fresh models at the point of use.
+- When a view can outlive a delete mutation, assume any captured SwiftData object may be detached on the next render pass.
 - Fully implement requested functionality: no new TODOs, placeholders, or missing pieces.
 - Do **not** add `#Preview` blocks or any other SwiftUI preview-related code.
 - Do not make assumptions about existing types/properties/functions; verify in the codebase first.
