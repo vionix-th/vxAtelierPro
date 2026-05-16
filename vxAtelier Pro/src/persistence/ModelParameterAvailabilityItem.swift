@@ -99,7 +99,7 @@ final class ModelParameterAvailabilityItem {
             defaultValue: descriptor.defaultValue,
             isCustomized: isCustomized
         )
-        options = descriptor.options ?? semanticParameterID.options
+        options = descriptor.options ?? semanticParameterIDEnum.options
     }
 
     func apply(_ descriptor: LLMParameterAvailabilityDescriptor, markCustomized: Bool) {

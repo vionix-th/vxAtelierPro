@@ -78,6 +78,7 @@ enum ConversationParameterProjection {
             controls.append(control(
                 for: parameterID,
                 required: required,
+                options: descriptor?.options,
                 value: value,
                 isAvailable: isAvailable,
                 isMapped: isMapped,
@@ -104,6 +105,7 @@ enum ConversationParameterProjection {
     private static func control(
         for parameterID: LLMParameterID,
         required: Bool,
+        options: [String]?,
         value: JSONValue?,
         isAvailable: Bool,
         isMapped: Bool,
@@ -120,7 +122,7 @@ enum ConversationParameterProjection {
             minValue: parameterID.minValue,
             maxValue: parameterID.maxValue,
             step: presentation.step,
-            options: descriptor?.options ?? parameterID.options,
+            options: options ?? parameterID.options,
             value: value,
             isAvailable: isAvailable,
             isMapped: isMapped,
