@@ -319,6 +319,9 @@ struct ContentView: View {
             onNewProject: addProject,
             onConfigureAPI: {
                 onRequestSettings(.api)
+            },
+            onConfigureSettings: {
+                onRequestSettings(nil)
             }
         )
     }
@@ -445,6 +448,9 @@ struct ContentView: View {
                         onNewProject: addProject,
                         onConfigureAPI: {
                             onRequestSettings(.api)
+                        },
+                        onConfigureSettings: {
+                            onRequestSettings(nil)
                         }
                     )
                 } else {

@@ -5,6 +5,7 @@ struct DetailPlaceholderView: View {
     let onNewConversation: () -> Void
     let onNewProject: () -> Void
     let onConfigureAPI: () -> Void
+    let onConfigureSettings: () -> Void
 
     var body: some View {
         VStack(spacing: AppDefaults.paddingLarge) {
@@ -55,7 +56,9 @@ struct DetailPlaceholderView: View {
                     .buttonStyle(.bordered)
                     .tint(.accentColor)
                     .accessibilityIdentifier("welcome-new-project")
-                } else {
+                }
+
+                if !hasAPIConfiguration {
                     Button(action: {
                         onConfigureAPI()
                     }) {
@@ -64,10 +67,22 @@ struct DetailPlaceholderView: View {
                             .padding(.vertical, AppDefaults.paddingSmall)
                             .padding(.horizontal, AppDefaults.paddingLarge)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.bordered)
                     .tint(.accentColor)
                     .accessibilityIdentifier("welcome-configure-api")
                 }
+
+                Button(action: {
+                    onConfigureSettings()
+                }) {
+                    Label("Application Settings", systemImage: "gear")
+                        .font(.title3.bold())
+                        .padding(.vertical, AppDefaults.paddingSmall)
+                        .padding(.horizontal, AppDefaults.paddingLarge)
+                }
+                .buttonStyle(.bordered)
+                .tint(.accentColor)
+                .accessibilityIdentifier("welcome-application-settings")
             }
             .padding(.bottom, AppDefaults.paddingLarge)
             Spacer()
