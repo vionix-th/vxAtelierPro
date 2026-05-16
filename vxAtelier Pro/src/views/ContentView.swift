@@ -484,10 +484,7 @@ struct ContentView: View {
                     sidebarView
                         .toolbar { sidebarToolbar }
                 } detail: {
-                    detailPlaceholderView
-                }
-                .navigationDestination(for: SidebarSelection.self) { selection in
-                    detailView(for: selection)
+                    detailView(for: router.selection)
                 }
             #endif
         }
