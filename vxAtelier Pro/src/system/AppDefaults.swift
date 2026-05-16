@@ -31,6 +31,7 @@ struct AppDefaults {
     
     // Add new defaults for application settings
     static let shouldTerminateAfterLastWindowClosed = true    
+    static let launchInRecoveryMode = false
     static let conversationTextEditButtonSize = 24.0
     static let disableAvatar = false
     static let defaultAvatarSize = 40
@@ -166,6 +167,7 @@ extension AppDefaults {
         defaults.set(
             AppDefaults.shouldTerminateAfterLastWindowClosed,
             forKey: AppSettings.Keys.shouldTerminateAfterLastWindowClosed)
+        defaults.set(AppDefaults.launchInRecoveryMode, forKey: AppSettings.Keys.launchInRecoveryMode)
         defaults.set(
             AppDefaults.conversationTextEditButtonSize,
             forKey: AppSettings.Keys.conversationTextEditButtonSize)

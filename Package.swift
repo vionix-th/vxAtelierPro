@@ -155,6 +155,7 @@ let package = Package(
                 "utilities/URLExtensions.swift",
                 "viewmodels/AppSceneModel.swift",
                 "views/AppShellView.swift",
+                "views/recovery/StartupRecoveryView.swift",
                 "views/ContentView.swift",
                 "views/content/ContentRouting.swift",
                 "views/content/NavigationRouter.swift",

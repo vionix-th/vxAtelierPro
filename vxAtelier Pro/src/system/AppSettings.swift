@@ -90,6 +90,7 @@ enum AppSettings {
 
         // Lifecycle
         static let shouldTerminateAfterLastWindowClosed = "shouldTerminateAfterLastWindowClosed"
+        static let launchInRecoveryMode = "LaunchInRecoveryMode"
 
         // Logging filters
         static let popupLogTypeFilters = "popupLogTypeFilters"
