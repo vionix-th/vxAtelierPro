@@ -224,12 +224,15 @@ struct SettingsToggleRow: View {
     }
 
     var body: some View {
-        LabeledContent {
+        HStack(alignment: .center, spacing: AppDefaults.paddingMedium) {
+            SettingsRowLabel(title: title, subtitle: subtitle)
+                .layoutPriority(1)
+
+            Spacer(minLength: 0)
+
             Toggle(title, isOn: $isOn)
                 .labelsHidden()
                 .toggleStyle(.switch)
-        } label: {
-            SettingsRowLabel(title: title, subtitle: subtitle)
         }
     }
 }

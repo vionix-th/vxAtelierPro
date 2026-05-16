@@ -6,15 +6,15 @@ struct AppShellView: View {
     @Environment(QueryManager.self) private var queryManager
     @Environment(TTSQueue.self) private var ttsQueue
     @Environment(AppSceneModel.self) private var sceneModel
-    #if os(macOS)
-        @Environment(\.openWindow) private var openWindow
-        @Environment(\.openSettings) private var openSettings
-    #endif
+#if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
+#endif
     @AppStorage(AppSettings.Keys.statusBarVisible) private var statusBarVisible: Bool = AppDefaults.statusBarVisible
-
+    
     var body: some View {
         @Bindable var scene = sceneModel
-
+        
         VStack(spacing: 0) {
             ContentView(
                 onRequestOptions: scene.requestOptions(for:),
@@ -25,7 +25,7 @@ struct AppShellView: View {
                 onRequestTTS: scene.requestTTS,
                 onRequestLogHistory: scene.requestLogHistory
             )
-
+            
             if statusBarVisible {
                 StatusBar(
                     onRequestLogHistory: scene.requestLogHistory,
@@ -33,39 +33,44 @@ struct AppShellView: View {
                 )
             }
         }
-        #if os(iOS)
-            .onChange(of: ttsQueue.isPlaying) {
-                sceneModel.handleTTSPlayback(isPlaying: ttsQueue.isPlaying)
-            }
-        #else
-            .onChange(of: ttsQueue.isPlaying) { _, _ in
-                sceneModel.handleTTSPlayback(isPlaying: ttsQueue.isPlaying)
-            }
-        #endif
+#if os(iOS)
+        .onChange(of: ttsQueue.isPlaying) {
+            sceneModel.handleTTSPlayback(isPlaying: ttsQueue.isPlaying)
+        }
+#else
+        .onChange(of: ttsQueue.isPlaying) { _, _ in
+            sceneModel.handleTTSPlayback(isPlaying: ttsQueue.isPlaying)
+        }
+#endif
         .task(id: scene.exportTaskID) { await scene.exportTask() }
         .task(id: scene.importRequestFlag) { await scene.importTask() }
-        #if os(macOS)
-            .onChange(of: scene.openSettingsSceneRequestID) { _, requestID in
-                guard requestID != nil else { return }
-                openSettings()
-            }
-            .onChange(of: scene.utilityPanelRequestID) { _, requestID in
-                guard requestID != nil else { return }
-                openWindow(id: "utilityPanel")
-            }
-        #endif
+#if os(macOS)
+        .onChange(of: scene.openSettingsSceneRequestID) { _, requestID in
+            guard requestID != nil else { return }
+            openSettings()
+        }
+        .onChange(of: scene.utilityPanelRequestID) { _, requestID in
+            guard requestID != nil else { return }
+            openWindow(id: "utilityPanel")
+        }
+#endif
         .sheet(item: $scene.presentedSheet) { sheet in
             switch sheet {
             case .logHistory(_):
                 LogHistorySheet()
-            #if os(iOS)
+#if os(iOS)
             case .applicationSettings(let initialTab, _):
                 IOSApplicationSettingsSheetView(initialDestination: initialTab)
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
-            #endif
             case .conversationOptions(let conversationID, _):
                 conversationOptionsSheet(for: conversationID)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+#else
+            case .conversationOptions(let conversationID, _):
+                conversationOptionsSheet(for: conversationID)
+#endif
             case .modelSelection(let conversationID, _):
                 modelSelectionSheet(for: conversationID)
             case .tts(_):
@@ -74,7 +79,7 @@ struct AppShellView: View {
             }
         }
     }
-
+    
     @ViewBuilder
     private func conversationOptionsSheet(for conversationID: PersistentIdentifier) -> some View {
         if let conversation = queryManager.conversation(with: conversationID) {
@@ -113,15 +118,15 @@ struct AppShellView: View {
             }
         }
     }
-
+    
     @ViewBuilder
     private func modelSelectionSheet(for conversationID: PersistentIdentifier) -> some View {
         if let conversation = queryManager.conversation(with: conversationID),
            let apiConfiguration = conversation.options.apiConfiguration {
             ModelSelectionView(
                 selectedModel: conversation.options.selectedModelID
-                    ?? apiConfiguration.defaultModelID
-                    ?? "",
+                ?? apiConfiguration.defaultModelID
+                ?? "",
                 onModelSelected: { newModel in
                     do {
                         try queryManager.setModel(newModel, for: conversation)
