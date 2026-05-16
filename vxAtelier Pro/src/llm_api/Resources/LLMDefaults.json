@@ -448,23 +448,23 @@
           "parameter": "max_output_tokens"
         },
         {
-          "parameter": "temperature"
+          "parameter": "temperature",
+          "defaultValue": 1
         },
         {
-          "parameter": "top_p"
+          "parameter": "top_p",
+          "defaultValue": 1
         },
         {
           "parameter": "response_format"
         },
         {
           "parameter": "reasoning_effort",
-          "enabled": true,
-          "defaultValue": "medium"
+          "enabled": true
         },
         {
           "parameter": "reasoning_summary",
-          "enabled": true,
-          "defaultValue": "auto"
+          "enabled": true
         },
         {
           "parameter": "service_tier",
@@ -552,6 +552,36 @@
     },
     {
       "match": {
+        "providerRegex": "^(openAIPlatform|openAICodexChatGPTSubscription)$",
+        "adapterID": "openAIResponses",
+        "modelRegex": "^gpt-5\\.(1|2)(?:-.*)?$|^gpt-5\\.4(?:-mini|-nano)?$"
+      },
+      "parameterAvailability": [
+        {
+          "parameter": "reasoning_effort",
+          "enabled": true,
+          "defaultValue": "none",
+          "options": ["none", "low", "medium", "high", "xhigh"]
+        }
+      ]
+    },
+    {
+      "match": {
+        "providerRegex": "^(openAIPlatform|openAICodexChatGPTSubscription)$",
+        "adapterID": "openAIResponses",
+        "modelRegex": "^gpt-5\\.5$"
+      },
+      "parameterAvailability": [
+        {
+          "parameter": "reasoning_effort",
+          "enabled": true,
+          "defaultValue": "medium",
+          "options": ["none", "low", "medium", "high", "xhigh"]
+        }
+      ]
+    },
+    {
+      "match": {
         "providerRegex": "^openAICodexChatGPTSubscription$",
         "adapterID": "openAIResponses"
       },
@@ -595,10 +625,12 @@
           "parameter": "max_output_tokens"
         },
         {
-          "parameter": "temperature"
+          "parameter": "temperature",
+          "defaultValue": 1
         },
         {
-          "parameter": "top_p"
+          "parameter": "top_p",
+          "defaultValue": 1
         },
         {
           "parameter": "stop_sequences"
@@ -770,10 +802,12 @@
           "parameter": "max_output_tokens"
         },
         {
-          "parameter": "temperature"
+          "parameter": "temperature",
+          "defaultValue": 1
         },
         {
-          "parameter": "top_p"
+          "parameter": "top_p",
+          "defaultValue": 1
         },
         {
           "parameter": "stop_sequences"
@@ -830,10 +864,12 @@
           "parameter": "max_output_tokens"
         },
         {
-          "parameter": "top_k"
+          "parameter": "top_k",
+          "defaultValue": 0
         },
         {
-          "parameter": "service_tier"
+          "parameter": "service_tier",
+          "defaultValue": "auto"
         },
         {
           "parameter": "store"
@@ -979,10 +1015,12 @@
           "parameter": "max_output_tokens"
         },
         {
-          "parameter": "temperature"
+          "parameter": "temperature",
+          "defaultValue": 1
         },
         {
-          "parameter": "top_p"
+          "parameter": "top_p",
+          "defaultValue": 1
         },
         {
           "parameter": "stop_sequences"
@@ -1057,7 +1095,8 @@
           "required": true
         },
         {
-          "parameter": "temperature"
+          "parameter": "temperature",
+          "defaultValue": 1
         },
         {
           "parameter": "top_p"
