@@ -24,6 +24,10 @@ enum LLMParameterStructuredPreset: String, Codable, CaseIterable, Identifiable {
     case openAIChatResponseFormat
     case openAIResponsesTextFormat
     case openAIResponsesReasoning
+    case openAIResponsesTextVerbosity
+    case openAIResponsesReasoningSummary
+    case openRouterReasoning
+    case anthropicThinking
 
     /// Exposes the raw preset key as the SwiftUI identity.
     var id: String { rawValue }
@@ -34,6 +38,10 @@ enum LLMParameterStructuredPreset: String, Codable, CaseIterable, Identifiable {
         case .openAIChatResponseFormat: return "OpenAI Chat Response Format"
         case .openAIResponsesTextFormat: return "OpenAI Responses Text Format"
         case .openAIResponsesReasoning: return "OpenAI Responses Reasoning"
+        case .openAIResponsesTextVerbosity: return "OpenAI Responses Text Verbosity"
+        case .openAIResponsesReasoningSummary: return "OpenAI Responses Reasoning Summary"
+        case .openRouterReasoning: return "OpenRouter Reasoning"
+        case .anthropicThinking: return "Anthropic Thinking"
         }
     }
 }
@@ -123,6 +131,8 @@ extension LLMGenerationOptions {
             return systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : .string(systemPrompt)
         case .maxOutputTokens:
             return maxOutputTokens.map { .integer($0) }
+        case .topK:
+            return topK.map { .integer($0) }
         case .temperature:
             return temperature.map { .number($0) }
         case .topP:
@@ -133,8 +143,14 @@ extension LLMGenerationOptions {
             return .string(responseFormat.semanticRawValue)
         case .reasoningEffort:
             return reasoning.flatMap { $0.isEmpty ? nil : .string($0) }
+        case .reasoningSummary:
+            return reasoningSummary.flatMap { $0.isEmpty ? nil : .string($0) }
+        case .reasoningBudgetTokens:
+            return reasoningBudgetTokens.map { .integer($0) }
         case .serviceTier:
             return serviceTier.flatMap { $0.isEmpty ? nil : .string($0) }
+        case .textVerbosity:
+            return textVerbosity.flatMap { $0.isEmpty ? nil : .string($0) }
         case .stream:
             switch streamMode {
             case .enabled:
@@ -148,14 +164,12 @@ extension LLMGenerationOptions {
              .promptCacheKey,
              .previousResponseID,
              .include,
-             .textVerbosity,
              .frequencyPenalty,
              .presencePenalty,
              .logitBias,
              .seed,
              .user,
-             .safetyIdentifier,
-             .reasoningSummary:
+             .safetyIdentifier:
             return providerExtras[parameterID.rawValue]
         }
     }

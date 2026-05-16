@@ -49,6 +49,11 @@ final class ConversationOptions: Equatable {
         set { setParameterValue(.maxOutputTokens, value: newValue.map { .integer($0) }) }
     }
 
+    var topK: Int? {
+        get { parameterValue(.topK)?.integerValue }
+        set { setParameterValue(.topK, value: newValue.map { .integer($0) }) }
+    }
+
     var stopSequences: [String] {
         get { Self.stopSequences(from: parameterValue(.stopSequences)) }
         set { setParameterValue(.stopSequences, value: newValue.isEmpty ? nil : .array(newValue.map { .string($0) })) }
@@ -64,9 +69,24 @@ final class ConversationOptions: Equatable {
         set { setParameterValue(.reasoningEffort, value: newValue.map { .string($0) }) }
     }
 
+    var reasoningSummary: String? {
+        get { parameterValue(.reasoningSummary)?.stringValue }
+        set { setParameterValue(.reasoningSummary, value: newValue.map { .string($0) }) }
+    }
+
+    var reasoningBudgetTokens: Int? {
+        get { parameterValue(.reasoningBudgetTokens)?.integerValue }
+        set { setParameterValue(.reasoningBudgetTokens, value: newValue.map { .integer($0) }) }
+    }
+
     var serviceTier: String? {
         get { parameterValue(.serviceTier)?.stringValue }
         set { setParameterValue(.serviceTier, value: newValue.map { .string($0) }) }
+    }
+
+    var textVerbosity: String? {
+        get { parameterValue(.textVerbosity)?.stringValue }
+        set { setParameterValue(.textVerbosity, value: newValue.map { .string($0) }) }
     }
 
     var streamModeRaw: String {
@@ -281,10 +301,14 @@ final class ConversationOptions: Equatable {
             temperature: enabledValue(.temperature)?.doubleValue,
             topP: enabledValue(.topP)?.doubleValue,
             maxOutputTokens: enabledValue(.maxOutputTokens)?.integerValue,
+            topK: enabledValue(.topK)?.integerValue,
             stop: Self.stopSequences(from: enabledValue(.stopSequences)),
             responseFormat: enabledValue(.responseFormat)?.stringValue.map(LLMGenerationOptions.ResponseFormat.fromSemanticRawValue) ?? .text,
             reasoning: enabledValue(.reasoningEffort)?.stringValue.flatMap { $0.isEmpty ? nil : $0 },
+            reasoningSummary: enabledValue(.reasoningSummary)?.stringValue.flatMap { $0.isEmpty ? nil : $0 },
+            reasoningBudgetTokens: enabledValue(.reasoningBudgetTokens)?.integerValue,
             serviceTier: enabledValue(.serviceTier)?.stringValue.flatMap { $0.isEmpty ? nil : $0 },
+            textVerbosity: enabledValue(.textVerbosity)?.stringValue.flatMap { $0.isEmpty ? nil : $0 },
             streamMode: enabledValue(.stream)?.boolValue == true ? .enabled : .disabled,
             retryPolicy: retryPolicy,
             providerExtras: extras
@@ -362,7 +386,7 @@ final class ConversationOptions: Equatable {
              .serviceTier, .toolChoice, .promptCacheKey, .previousResponseID, .include,
              .textVerbosity, .logitBias, .user, .safetyIdentifier:
             return value.stringValue.map { .string($0) } ?? value
-        case .maxOutputTokens, .seed:
+        case .maxOutputTokens, .topK, .reasoningBudgetTokens, .seed:
             return value.integerValue.map { .integer($0) } ?? value
         case .temperature, .topP, .frequencyPenalty, .presencePenalty:
             return value.doubleValue.map { .number($0) } ?? value
@@ -390,14 +414,12 @@ final class ConversationOptions: Equatable {
         .promptCacheKey,
         .previousResponseID,
         .include,
-        .textVerbosity,
         .frequencyPenalty,
         .presencePenalty,
         .logitBias,
         .seed,
         .user,
-        .safetyIdentifier,
-        .reasoningSummary
+        .safetyIdentifier
     ]
 
     private static func stopSequences(from value: JSONValue?) -> [String] {

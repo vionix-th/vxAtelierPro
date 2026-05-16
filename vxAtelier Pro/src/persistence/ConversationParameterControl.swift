@@ -120,7 +120,7 @@ enum ConversationParameterProjection {
             minValue: parameterID.minValue,
             maxValue: parameterID.maxValue,
             step: presentation.step,
-            options: parameterID.options,
+            options: descriptor?.options ?? parameterID.options,
             value: value,
             isAvailable: isAvailable,
             isMapped: isMapped,

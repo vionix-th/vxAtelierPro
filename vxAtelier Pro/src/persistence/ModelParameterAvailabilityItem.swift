@@ -53,7 +53,8 @@ final class ModelParameterAvailabilityItem {
             isAvailable: isAvailable,
             isRequired: isRequired,
             isEnabled: isEnabled,
-            defaultValue: defaultJSONValue
+            defaultValue: defaultJSONValue,
+            options: options
         )
     }
 
@@ -98,6 +99,7 @@ final class ModelParameterAvailabilityItem {
             defaultValue: descriptor.defaultValue,
             isCustomized: isCustomized
         )
+        options = descriptor.options ?? semanticParameterID.options
     }
 
     func apply(_ descriptor: LLMParameterAvailabilityDescriptor, markCustomized: Bool) {
@@ -107,6 +109,7 @@ final class ModelParameterAvailabilityItem {
         isRequired = descriptor.isRequired
         isEnabled = descriptor.isEnabled
         defaultJSONValue = descriptor.defaultValue
+        options = descriptor.options ?? semanticParameterIDEnum.options
         isCustomized = markCustomized
     }
 

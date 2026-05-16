@@ -37,6 +37,13 @@ enum AiParameterPresentationCatalog {
                 controlType: .stepper,
                 step: 1
             )
+        case .topK:
+            return .init(
+                displayName: "Top K",
+                description: "Sample only from the top K tokens",
+                controlType: .stepper,
+                step: 1
+            )
         case .temperature:
             return .init(
                 displayName: "Temperature",
@@ -67,19 +74,32 @@ enum AiParameterPresentationCatalog {
             return .init(
                 displayName: "Reasoning Effort",
                 description: "Reasoning effort control",
-                controlType: .textField
+                controlType: .picker
             )
         case .reasoningSummary:
             return .init(
                 displayName: "Reasoning Summary",
                 description: "Reasoning summary detail level",
-                controlType: .textField
+                controlType: .picker
+            )
+        case .reasoningBudgetTokens:
+            return .init(
+                displayName: "Reasoning Budget Tokens",
+                description: "Anthropic thinking budget in tokens",
+                controlType: .stepper,
+                step: 1
             )
         case .serviceTier:
             return .init(
                 displayName: "Service Tier",
                 description: "Provider service tier",
-                controlType: .textField
+                controlType: .picker
+            )
+        case .textVerbosity:
+            return .init(
+                displayName: "Text Verbosity",
+                description: "Response verbosity level",
+                controlType: .picker
             )
         case .stream:
             return .init(
@@ -121,12 +141,6 @@ enum AiParameterPresentationCatalog {
             return .init(
                 displayName: "Include",
                 description: "Additional provider response fields to include",
-                controlType: .textField
-            )
-        case .textVerbosity:
-            return .init(
-                displayName: "Text Verbosity",
-                description: "Provider text verbosity",
                 controlType: .textField
             )
         case .frequencyPenalty:

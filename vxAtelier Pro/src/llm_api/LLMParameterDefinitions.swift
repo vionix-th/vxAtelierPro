@@ -11,7 +11,9 @@ enum LLMParameterID: String, Codable, CaseIterable, Identifiable {
     case responseFormat = "response_format"
     case reasoningEffort = "reasoning_effort"
     case reasoningSummary = "reasoning_summary"
+    case reasoningBudgetTokens = "reasoning_budget_tokens"
     case serviceTier = "service_tier"
+    case topK = "top_k"
     case stream
     case store
     case toolChoice = "tool_choice"
@@ -102,15 +104,33 @@ enum LLMParameterDefinitionCatalog {
         case .responseFormat:
             return .init(id: parameterID, valueType: .string, options: ["text", "json_object", "json_schema"])
         case .reasoningEffort:
-            return .init(id: parameterID, valueType: .string)
+            return .init(
+                id: parameterID,
+                valueType: .string,
+                options: ["none", "minimal", "low", "medium", "high", "xhigh"]
+            )
         case .reasoningSummary:
-            return .init(id: parameterID, valueType: .string)
+            return .init(
+                id: parameterID,
+                valueType: .string,
+                options: ["auto", "concise", "detailed"]
+            )
+        case .reasoningBudgetTokens:
+            return .init(id: parameterID, valueType: .integer, minValue: 1024, maxValue: 200_000)
         case .serviceTier:
-            return .init(id: parameterID, valueType: .string)
+            return .init(
+                id: parameterID,
+                valueType: .string,
+                options: ["auto", "default", "flex", "priority"]
+            )
+        case .topK:
+            return .init(id: parameterID, valueType: .integer, minValue: 0)
         case .stream, .store, .parallelToolCalls:
             return .init(id: parameterID, valueType: .boolean)
-        case .toolChoice, .promptCacheKey, .previousResponseID, .include, .textVerbosity, .logitBias, .user, .safetyIdentifier:
+        case .toolChoice, .promptCacheKey, .previousResponseID, .include, .logitBias, .user, .safetyIdentifier:
             return .init(id: parameterID, valueType: .string)
+        case .textVerbosity:
+            return .init(id: parameterID, valueType: .string, options: ["low", "medium", "high"])
         case .frequencyPenalty, .presencePenalty:
             return .init(id: parameterID, valueType: .float, minValue: -2, maxValue: 2)
         case .seed:

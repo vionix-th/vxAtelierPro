@@ -10,6 +10,7 @@ struct LLMParameterAvailabilityDescriptor: Codable, Equatable, Identifiable {
     var isRequired: Bool
     var isEnabled: Bool
     var defaultValue: JSONValue?
+    var options: [String]?
 
     /// Creates model-level sendability metadata for a semantic parameter at one adapter.
     init(
@@ -18,7 +19,8 @@ struct LLMParameterAvailabilityDescriptor: Codable, Equatable, Identifiable {
         isAvailable: Bool = true,
         isRequired: Bool = false,
         isEnabled: Bool = false,
-        defaultValue: JSONValue? = nil
+        defaultValue: JSONValue? = nil,
+        options: [String]? = nil
     ) {
         self.adapterID = adapterID
         self.semanticParameterID = semanticParameterID
@@ -26,6 +28,7 @@ struct LLMParameterAvailabilityDescriptor: Codable, Equatable, Identifiable {
         self.isRequired = isRequired
         self.isEnabled = isEnabled
         self.defaultValue = defaultValue
+        self.options = options
     }
 }
 
@@ -124,6 +127,8 @@ private extension LLMGenerationOptions {
             break
         case .maxOutputTokens:
             maxOutputTokens = nil
+        case .topK:
+            topK = nil
         case .temperature:
             temperature = nil
         case .topP:
@@ -134,8 +139,14 @@ private extension LLMGenerationOptions {
             responseFormat = .text
         case .reasoningEffort:
             reasoning = nil
+        case .reasoningSummary:
+            reasoningSummary = nil
+        case .reasoningBudgetTokens:
+            reasoningBudgetTokens = nil
         case .serviceTier:
             serviceTier = nil
+        case .textVerbosity:
+            textVerbosity = nil
         case .stream:
             streamMode = .disabled
         case .store,
@@ -144,14 +155,12 @@ private extension LLMGenerationOptions {
              .promptCacheKey,
              .previousResponseID,
              .include,
-             .textVerbosity,
              .frequencyPenalty,
              .presencePenalty,
              .logitBias,
              .seed,
              .user,
-             .safetyIdentifier,
-             .reasoningSummary:
+             .safetyIdentifier:
             providerExtras.removeValue(forKey: parameterID.rawValue)
         }
     }
@@ -165,6 +174,8 @@ private extension LLMGenerationOptions {
             systemPrompt = value.stringValue ?? ""
         case .maxOutputTokens:
             maxOutputTokens = value.integerValue
+        case .topK:
+            topK = value.integerValue
         case .temperature:
             temperature = value.doubleValue
         case .topP:
@@ -179,8 +190,14 @@ private extension LLMGenerationOptions {
             responseFormat = LLMGenerationOptions.ResponseFormat.fromSemanticRawValue(value.stringValue ?? "text")
         case .reasoningEffort:
             reasoning = value.stringValue
+        case .reasoningSummary:
+            reasoningSummary = value.stringValue
+        case .reasoningBudgetTokens:
+            reasoningBudgetTokens = value.integerValue
         case .serviceTier:
             serviceTier = value.stringValue
+        case .textVerbosity:
+            textVerbosity = value.stringValue
         case .stream:
             if let bool = value.boolValue {
                 streamMode = bool ? .enabled : .disabled
@@ -193,14 +210,12 @@ private extension LLMGenerationOptions {
              .promptCacheKey,
              .previousResponseID,
              .include,
-             .textVerbosity,
              .frequencyPenalty,
              .presencePenalty,
              .logitBias,
              .seed,
              .user,
-             .safetyIdentifier,
-             .reasoningSummary:
+             .safetyIdentifier:
             providerExtras[parameterID.rawValue] = value
         }
     }

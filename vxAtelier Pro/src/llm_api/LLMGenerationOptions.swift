@@ -26,10 +26,14 @@ struct LLMGenerationOptions: Codable, Equatable {
     var temperature: Double?
     var topP: Double?
     var maxOutputTokens: Int?
+    var topK: Int?
     var stop: [String]
     var responseFormat: ResponseFormat
     var reasoning: String?
+    var reasoningSummary: String?
+    var reasoningBudgetTokens: Int?
     var serviceTier: String?
+    var textVerbosity: String?
     var streamMode: StreamMode
     var retryPolicy: RetryPolicy
     var providerExtras: [String: JSONValue]
@@ -41,10 +45,14 @@ struct LLMGenerationOptions: Codable, Equatable {
         temperature: Double? = nil,
         topP: Double? = nil,
         maxOutputTokens: Int? = nil,
+        topK: Int? = nil,
         stop: [String] = [],
         responseFormat: ResponseFormat = .text,
         reasoning: String? = nil,
+        reasoningSummary: String? = nil,
+        reasoningBudgetTokens: Int? = nil,
         serviceTier: String? = nil,
+        textVerbosity: String? = nil,
         streamMode: StreamMode = .disabled,
         retryPolicy: RetryPolicy = .disabled,
         providerExtras: [String: JSONValue] = [:]
@@ -54,10 +62,14 @@ struct LLMGenerationOptions: Codable, Equatable {
         self.temperature = temperature
         self.topP = topP
         self.maxOutputTokens = maxOutputTokens
+        self.topK = topK
         self.stop = stop
         self.responseFormat = responseFormat
         self.reasoning = reasoning
+        self.reasoningSummary = reasoningSummary
+        self.reasoningBudgetTokens = reasoningBudgetTokens
         self.serviceTier = serviceTier
+        self.textVerbosity = textVerbosity
         self.streamMode = streamMode
         self.retryPolicy = retryPolicy
         self.providerExtras = providerExtras

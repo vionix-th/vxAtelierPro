@@ -60,6 +60,12 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
         )
         try LLMParameterRequestEncoder.applyScalarOptions(
             request.options, to: &body, mappings: mappings)
+        if let budgetTokens = request.options.reasoningBudgetTokens {
+            body["thinking"] = .object([
+                "type": .string("enabled"),
+                "budget_tokens": .integer(budgetTokens)
+            ])
+        }
         if !request.tools.isEmpty {
             body["tools"] = .array(
                 request.tools.map { tool in

@@ -80,6 +80,25 @@ enum OpenAICompatibleEncoding {
             if let effort = value.stringValue, !effort.isEmpty {
                 body["reasoning"] = .object(["effort": .string(effort)])
             }
+        case .openAIResponsesTextVerbosity:
+            if let verbosity = value.stringValue, !verbosity.isEmpty {
+                body["text"] = .object(["verbosity": .string(verbosity)])
+            }
+        case .openAIResponsesReasoningSummary:
+            if let summary = value.stringValue, !summary.isEmpty {
+                body["reasoning"] = .object(["summary": .string(summary)])
+            }
+        case .openRouterReasoning:
+            if let effort = value.stringValue, !effort.isEmpty {
+                body["reasoning"] = .object(["effort": .string(effort)])
+            }
+        case .anthropicThinking:
+            if let budgetTokens = value.integerValue {
+                body["thinking"] = .object([
+                    "type": .string("enabled"),
+                    "budget_tokens": .integer(budgetTokens)
+                ])
+            }
         }
     }
 
