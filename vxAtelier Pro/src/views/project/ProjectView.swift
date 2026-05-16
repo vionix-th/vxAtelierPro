@@ -305,15 +305,16 @@ struct ProjectView: View {
         }))
         .sheet(isPresented: $projectOptionsIsPresented) {
             if let project = self.project {
-                ConversationOptionsView(options: Binding(get: { project.defaultOptions }, set: { project.defaultOptions = $0 }))
-                    .onDisappear {
-                        do {
-                            try queryManager.saveContext()
-                            vxAtelierPro.log.debug("ProjectView: Saved context after ConversationOptionsView dismissed for project '\(project.name)'.") 
-                        } catch {
-                            vxAtelierPro.log.error("ProjectView: Failed to save context after ConversationOptionsView dismissed: \(error.localizedDescription)")
-                        }
+                ConversationOptionsSheetView(initialOptions: project.defaultOptions) { updatedOptions in
+                    guard let project = queryManager.project(with: projectID) else { return }
+                    project.defaultOptions = updatedOptions
+                    do {
+                        try queryManager.saveContext()
+                        vxAtelierPro.log.debug("ProjectView: Saved context after ConversationOptionsView dismissed for project '\(project.name)'.")
+                    } catch {
+                        vxAtelierPro.log.error("ProjectView: Failed to save context after ConversationOptionsView dismissed: \(error.localizedDescription)")
                     }
+                }
             }
         }
         .toolbar() {

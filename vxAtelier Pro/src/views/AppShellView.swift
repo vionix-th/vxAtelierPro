@@ -78,25 +78,26 @@ struct AppShellView: View {
     @ViewBuilder
     private func conversationOptionsSheet(for conversationID: PersistentIdentifier) -> some View {
         if let conversation = queryManager.conversation(with: conversationID) {
-            ConversationOptionsView(
-                options: Binding(get: { conversation.options }, set: { conversation.options = $0 })
-            )
-            .onAppear {
-                vxAtelierPro.log.debug(
-                    "AppShellView: options sheet presented for conversation '\(conversation.title)' (id: \(conversation.id))"
-                )
-            }
-            .onDisappear {
+            ConversationOptionsSheetView(
+                initialOptions: conversation.options
+            ) { updatedOptions in
+                guard let resolvedConversation = queryManager.conversation(with: conversationID) else { return }
+                resolvedConversation.options = updatedOptions
                 do {
                     try queryManager.saveContext()
                     vxAtelierPro.log.debug(
-                        "AppShellView: Saved context after options dismissed for conversation '\(conversation.title)'."
+                        "AppShellView: Saved context after options dismissed for conversation '\(resolvedConversation.title)'."
                     )
                 } catch {
                     vxAtelierPro.log.error(
                         "AppShellView: Failed to save context after options dismissed: \(error.localizedDescription)"
                     )
                 }
+            }
+            .onAppear {
+                vxAtelierPro.log.debug(
+                    "AppShellView: options sheet presented for conversation '\(conversation.title)' (id: \(conversation.id))"
+                )
             }
         } else {
             VStack(spacing: AppDefaults.paddingMedium) {

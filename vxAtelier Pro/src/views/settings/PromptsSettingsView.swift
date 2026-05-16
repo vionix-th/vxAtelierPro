@@ -20,7 +20,8 @@ struct PromptsSettingsView: View {
     /// In-memory state for a prompt template being edited.
     struct EditingTemplate: Identifiable {
         let id = UUID()
-        var template: PromptTemplate
+        var templateID: PersistentIdentifier?
+        var draft: PromptTemplateDraft
         var isNew: Bool
     }
 
@@ -48,7 +49,16 @@ struct PromptsSettingsView: View {
                     onDeselect: { selectedTemplateIDs.remove($0) },
                     onTemplateActivated: { templateID in
                         guard let template = queryManager.promptTemplate(with: templateID) else { return }
-                        editingTemplate = EditingTemplate(template: template, isNew: false)
+                        editingTemplate = EditingTemplate(
+                            templateID: template.id,
+                            draft: PromptTemplateDraft(
+                                name: template.name,
+                                category: template.category,
+                                summary: template.summary,
+                                prompt: template.prompt
+                            ),
+                            isNew: false
+                        )
                     },
                     onDelete: confirmDeleteTemplate
                 )
@@ -101,14 +111,15 @@ struct PromptsSettingsView: View {
         .sheet(item: $editingTemplate) { editing in
             NavigationStack {
                 PromptTemplateEditView(
-                    template: editing.template,
+                    templateID: editing.templateID,
+                    draft: editing.draft,
                     isNewTemplate: editing.isNew,
-                    templates: promptTemplates,
+                    existingTemplates: promptTemplates.map { PromptTemplateIdentity(id: $0.id, name: $0.name) },
                     onCancel: {
                         editingTemplate = nil
                     },
-                    onSave: { draft in
-                        saveTemplate(editing, draft: draft)
+                    onSave: { templateID, draft in
+                        saveTemplate(templateID: templateID, draft: draft)
                     }
                 )
             }
@@ -173,34 +184,31 @@ struct PromptsSettingsView: View {
 
     private func addTemplate() {
         editingTemplate = EditingTemplate(
-            template: PromptTemplate(name: "New Template", summary: "", prompt: "", category: .User),
+            templateID: nil,
+            draft: PromptTemplateDraft(name: "New Template", category: .User, summary: "", prompt: ""),
             isNew: true
         )
     }
 
-    private func saveTemplate(_ editing: EditingTemplate, draft: PromptTemplateDraft) -> String? {
-        let oldName = editing.template.name
-        let oldCategory = editing.template.category
-        let oldSummary = editing.template.summary
-        let oldPrompt = editing.template.prompt
-
-        editing.template.name = draft.name
-        editing.template.category = draft.category
-        editing.template.summary = draft.summary
-        editing.template.prompt = draft.prompt
-
+    private func saveTemplate(templateID: PersistentIdentifier?, draft: PromptTemplateDraft) -> String? {
         do {
-            if editing.isNew {
-                try queryManager.insert(editing.template)
-            } else {
+            if let templateID, let template = queryManager.promptTemplate(with: templateID) {
+                template.name = draft.name
+                template.category = draft.category
+                template.summary = draft.summary
+                template.prompt = draft.prompt
                 try queryManager.saveContext()
+            } else {
+                let template = PromptTemplate(
+                    name: draft.name,
+                    summary: draft.summary,
+                    prompt: draft.prompt,
+                    category: draft.category
+                )
+                try queryManager.insert(template)
             }
             return nil
         } catch {
-            editing.template.name = oldName
-            editing.template.category = oldCategory
-            editing.template.summary = oldSummary
-            editing.template.prompt = oldPrompt
             return "Failed to save template: \(error.localizedDescription)"
         }
     }

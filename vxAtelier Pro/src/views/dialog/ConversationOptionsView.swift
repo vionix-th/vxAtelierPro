@@ -294,6 +294,25 @@ struct ConversationOptionsView: View {
     }
 }
 
+/// Sheet wrapper that keeps conversation options in local draft state until dismissal.
+struct ConversationOptionsSheetView: View {
+    let onSave: (ConversationOptions) -> Void
+
+    @State private var draftOptions: ConversationOptions
+
+    init(initialOptions: ConversationOptions, onSave: @escaping (ConversationOptions) -> Void) {
+        self.onSave = onSave
+        _draftOptions = State(initialValue: initialOptions)
+    }
+
+    var body: some View {
+        ConversationOptionsView(options: $draftOptions)
+            .onDisappear {
+                onSave(draftOptions)
+            }
+    }
+}
+
 // MARK: - System Prompt Editor
 /// A view for editing system prompts with template support.
 /// Provides a single-line view with a popover editor and template selection.

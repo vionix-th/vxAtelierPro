@@ -9,14 +9,20 @@ struct PromptTemplateDraft {
     let prompt: String
 }
 
+/// Snapshot used for duplicate-name validation without retaining live models.
+struct PromptTemplateIdentity: Identifiable {
+    let id: PersistentIdentifier
+    let name: String
+}
+
 /// Editor for prompt template records.
 struct PromptTemplateEditView: View {
     @Environment(\.dismiss) private var dismiss
-    let template: PromptTemplate
+    let templateID: PersistentIdentifier?
     let isNewTemplate: Bool
-    let templates: [PromptTemplate]
+    let existingTemplates: [PromptTemplateIdentity]
     var onCancel: () -> Void
-    var onSave: (PromptTemplateDraft) -> String?
+    var onSave: (PersistentIdentifier?, PromptTemplateDraft) -> String?
 
     @State private var name: String
     @State private var category: PromptTemplate.Category
@@ -26,21 +32,22 @@ struct PromptTemplateEditView: View {
     @State private var errorMessage = ""
 
     init(
-        template: PromptTemplate,
+        templateID: PersistentIdentifier?,
+        draft: PromptTemplateDraft,
         isNewTemplate: Bool,
-        templates: [PromptTemplate],
+        existingTemplates: [PromptTemplateIdentity],
         onCancel: @escaping () -> Void,
-        onSave: @escaping (PromptTemplateDraft) -> String?
+        onSave: @escaping (PersistentIdentifier?, PromptTemplateDraft) -> String?
     ) {
-        self.template = template
+        self.templateID = templateID
         self.isNewTemplate = isNewTemplate
-        self.templates = templates
+        self.existingTemplates = existingTemplates
         self.onCancel = onCancel
         self.onSave = onSave
-        _name = State(initialValue: template.name)
-        _category = State(initialValue: template.category)
-        _summary = State(initialValue: template.summary)
-        _prompt = State(initialValue: template.prompt)
+        _name = State(initialValue: draft.name)
+        _category = State(initialValue: draft.category)
+        _summary = State(initialValue: draft.summary)
+        _prompt = State(initialValue: draft.prompt)
     }
 
     var body: some View {
@@ -90,13 +97,13 @@ struct PromptTemplateEditView: View {
                     }
                     
                     let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let existingTemplate = templates.first { item in
+                    let existingTemplate = existingTemplates.first { item in
                         item.name.lowercased() == trimmedName.lowercased() &&
-                        item.persistentModelID != template.persistentModelID
+                        item.id != templateID
                     }
                     
                     if existingTemplate != nil {
-                        vxAtelierPro.log.warning("Duplicate template name attempted: '\(template.name)'")
+                        vxAtelierPro.log.warning("Duplicate template name attempted: '\(trimmedName)'")
                         errorMessage = "A template with this name already exists."
                         showError = true
                         return
@@ -108,7 +115,7 @@ struct PromptTemplateEditView: View {
                         summary: summary.trimmingCharacters(in: .whitespacesAndNewlines),
                         prompt: prompt
                     )
-                    if let saveError = onSave(draft) {
+                    if let saveError = onSave(templateID, draft) {
                         errorMessage = saveError
                         showError = true
                     } else {
