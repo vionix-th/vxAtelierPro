@@ -82,6 +82,13 @@ final class QueryManager {
         return fetch(descriptor).first
     }
 
+    func model(with id: PersistentIdentifier) -> ModelItem? {
+        var descriptor = FetchDescriptor<ModelItem>(sortBy: [])
+        descriptor.fetchLimit = 1
+        descriptor.predicate = #Predicate { $0.id == id }
+        return fetch(descriptor).first
+    }
+
     private func fetchConversations(predicate: Predicate<ConversationItem>? = nil) -> [ConversationItem] {
         fetch(ConversationItem.self, predicate: predicate, sort: conversationSort)
     }

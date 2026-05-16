@@ -417,7 +417,7 @@ struct ConversationInfoHeader: View {
 
     private var selectedModel: ModelItem? {
         guard let apiConfiguration = conversation.options.apiConfiguration else { return nil }
-        return apiConfiguration.models.first { $0.modelID == modelName }
+        return queryManager.model(with: modelName, for: apiConfiguration)
     }
     
     private var isStreamingEnabled: Bool {

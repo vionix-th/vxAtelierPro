@@ -22,8 +22,13 @@ struct ModelsSettingsView: View {
 
     /// Display wrapper for a persisted model row.
     struct ModelRowItem: Identifiable {
-        let model: ModelItem
-        var id: PersistentIdentifier { model.persistentModelID }
+        let id: PersistentIdentifier
+        let modelID: String
+        let providerName: String
+        let providerDisplayName: String
+        let contextSize: Int
+        let capabilitySystemImages: [String]
+        let searchCorpus: String
     }
 
     private var normalizedSearchText: String {
@@ -32,16 +37,36 @@ struct ModelsSettingsView: View {
 
     private var filteredModels: [ModelRowItem] {
         models
-            .filter(modelMatchesSearch)
-            .sorted {
-                let lhsProvider = $0.apiConfiguration?.name ?? ""
-                let rhsProvider = $1.apiConfiguration?.name ?? ""
-                if lhsProvider == rhsProvider {
-                    return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
-                }
-                return lhsProvider.localizedCaseInsensitiveCompare(rhsProvider) == .orderedAscending
+            .map { model in
+                ModelRowItem(
+                    id: model.persistentModelID,
+                    modelID: model.modelID,
+                    providerName: model.apiConfiguration?.name ?? "No API Configuration",
+                    providerDisplayName: model.apiConfiguration?.providerIDEnum.displayName ?? "Unknown",
+                    contextSize: model.contextSize,
+                    capabilitySystemImages: model.metadataIconSystemNames,
+                    searchCorpus: [
+                        model.modelID,
+                        model.displayName,
+                        model.apiConfiguration?.name ?? "",
+                        model.apiConfiguration?.providerIDEnum.displayName ?? "",
+                        String(model.contextSize),
+                        model.capabilities.map(\.rawValue).joined(separator: " ")
+                    ]
+                    .joined(separator: " ")
+                    .lowercased()
+                )
             }
-            .map(ModelRowItem.init)
+            .filter { row in
+                guard !normalizedSearchText.isEmpty else { return true }
+                return row.searchCorpus.contains(normalizedSearchText)
+            }
+            .sorted {
+                if $0.providerName == $1.providerName {
+                    return $0.modelID.localizedCaseInsensitiveCompare($1.modelID) == .orderedAscending
+                }
+                return $0.providerName.localizedCaseInsensitiveCompare($1.providerName) == .orderedAscending
+            }
     }
 
     var body: some View {
@@ -148,26 +173,28 @@ struct ModelsSettingsView: View {
                 emptySystemImage: "cpu",
                 emptyDescription: "Use Update Model List to fetch models from your API providers.",
                 selectionAction: { row in
-                    editingModel = EditingModel(model: row.model, isNew: false)
+                    guard let model = queryManager.model(with: row.id) else { return }
+                    editingModel = EditingModel(model: model, isNew: false)
                 }
             ) { row in
                 SettingsEntityRow(
-                    title: row.model.name,
-                    subtitle: row.model.apiConfiguration?.name ?? "No API Configuration",
-                    metadata: "Provider: \(row.model.apiConfiguration?.providerIDEnum.displayName ?? "Unknown")  Context: \(row.model.contextSize)",
-                    systemImages: row.model.metadataIconSystemNames
+                    title: row.modelID,
+                    subtitle: row.providerName,
+                    metadata: "Provider: \(row.providerDisplayName)  Context: \(row.contextSize)",
+                    systemImages: row.capabilitySystemImages
                 )
             } actions: { row in
                 [
                     SettingsEntityAction(title: "Edit", systemImage: "pencil") {
-                        editingModel = EditingModel(model: row.model, isNew: false)
+                        guard let model = queryManager.model(with: row.id) else { return }
+                        editingModel = EditingModel(model: model, isNew: false)
                     },
                     SettingsEntityAction(title: "Delete", systemImage: "trash", role: .destructive) {
                         confirmation = SettingsConfirmation(
                             title: "Delete Model",
-                            message: "Delete \"\(row.model.name)\"? This action cannot be undone.",
+                            message: "Delete \"\(row.modelID)\"? This action cannot be undone.",
                             confirmTitle: "Delete",
-                            action: { deleteModel(row.model) }
+                            action: { deleteModel(id: row.id) }
                         )
                     }
                 ]
@@ -191,25 +218,11 @@ struct ModelsSettingsView: View {
         }
     }
 
-    private func modelMatchesSearch(_ model: ModelItem) -> Bool {
-        guard !normalizedSearchText.isEmpty else { return true }
-
-        let searchCorpus = [
-            model.modelID,
-            model.displayName,
-            model.apiConfiguration?.name ?? "",
-            model.apiConfiguration?.providerIDEnum.displayName ?? "",
-            String(model.contextSize),
-            model.capabilities.map(\.rawValue).joined(separator: " ")
-        ]
-        .joined(separator: " ")
-        .lowercased()
-
-        return searchCorpus.contains(normalizedSearchText)
-    }
-
-    private func deleteModel(_ model: ModelItem) {
+    private func deleteModel(id: PersistentIdentifier) {
         do {
+            editingModel = nil
+            confirmation = nil
+            guard let model = queryManager.model(with: id) else { return }
             try queryManager.delete(model)
         } catch {
             presentCompletionAlert("Failed to delete model: \(error.localizedDescription)")
@@ -218,6 +231,8 @@ struct ModelsSettingsView: View {
 
     private func deleteAllModels() {
         do {
+            editingModel = nil
+            confirmation = nil
             let count = try queryManager.deleteAllModels()
             presentCompletionAlert("Successfully deleted \(count) models")
         } catch {
