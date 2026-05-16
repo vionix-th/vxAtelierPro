@@ -124,6 +124,14 @@ The LLM subsystem is split by reuse boundary. `llm_api` contains the reusable pr
 *   **Concrete Tool Files (`llm_runtime/*Tool.swift`, `llm_runtime/ConversationTools.swift`, `llm_runtime/ShortcutTools.swift`)**: vxAtelier-specific tools for conversations, settings, shortcuts, web search, and website reading.
 *   **Provider & Capability Utilities (`llm_api/LLMModelProviderUtils.swift`)**: Provides provider/model-name capability inference for persisted `ModelItem` records and UI filtering.
 
+Model and parameter baseline rules are layered and ordered in `src/llm_api/Resources/LLMDefaults.json`.
+
+* Rules are evaluated in file order.
+* `providerRegex` and `modelRegex` are regex matches; `adapterID` is exact.
+* Later matching rules override earlier rules for the same semantic parameter.
+* Broad provider and adapter rules establish the baseline; narrower model-specific rules refine it.
+* `LLMModelMetadataDecoder` may overlay fetched model metadata such as context window and capabilities, but it does not invent parameter mappings or availability.
+
 ### Search (`search/`)
 
 The `search/` module provides web search capabilities to the application, primarily for use by AI tools. It follows a protocol-oriented architecture so different search providers can be used interchangeably.
