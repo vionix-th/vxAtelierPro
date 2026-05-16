@@ -38,7 +38,7 @@
         "providerRegex": "^openAIPlatform$"
       },
       "modelDefaults": {
-        "contextWindow": 128000,
+        "contextSize": 128000,
         "capabilities": [
           "text",
           "image",
@@ -57,7 +57,7 @@
         "modelRegex": "^gpt-4\\.1(-.*)?$"
       },
       "modelDefaults": {
-        "contextWindow": 1047576,
+        "contextSize": 1047576,
         "capabilities": [
           "text",
           "image",
@@ -87,7 +87,7 @@
         "modelRegex": "^gpt-5(\\.[0-3])?(-mini|-nano)?$|^gpt-5\\.4-(mini|nano)$"
       },
       "modelDefaults": {
-        "contextWindow": 400000,
+        "contextSize": 400000,
         "capabilities": [
           "text",
           "image",
@@ -108,7 +108,7 @@
         "modelRegex": "^gpt-5\\.(4|5)(-pro)?$|^gpt-5\\.5$"
       },
       "modelDefaults": {
-        "contextWindow": 1050000,
+        "contextSize": 1050000,
         "capabilities": [
           "text",
           "image",
@@ -128,7 +128,7 @@
         "providerRegex": "^openAICodexChatGPTSubscription$"
       },
       "modelDefaults": {
-        "contextWindow": 400000,
+        "contextSize": 400000,
         "capabilities": [
           "text",
           "image",
@@ -149,7 +149,7 @@
         "modelRegex": "^gpt-5\\.5$"
       },
       "modelDefaults": {
-        "contextWindow": 1050000
+        "contextSize": 1050000
       }
     },
     {
@@ -157,7 +157,7 @@
         "providerRegex": "^anthropic$"
       },
       "modelDefaults": {
-        "contextWindow": 200000,
+        "contextSize": 200000,
         "capabilities": [
           "text",
           "image",
@@ -174,7 +174,7 @@
         "modelRegex": "^claude-(opus-4-7|sonnet-4-6)$"
       },
       "modelDefaults": {
-        "contextWindow": 1000000,
+        "contextSize": 1000000,
         "capabilities": [
           "text",
           "image",
@@ -203,7 +203,7 @@
         "providerRegex": "^openRouter$"
       },
       "modelDefaults": {
-        "contextWindow": 128000,
+        "contextSize": 128000,
         "capabilities": [
           "text",
           "jsonObject",
@@ -218,7 +218,7 @@
         "modelRegex": "^openai/gpt-4\\.1(-.*)?$"
       },
       "modelDefaults": {
-        "contextWindow": 1047576,
+        "contextSize": 1047576,
         "capabilities": [
           "text",
           "image",
@@ -238,7 +238,7 @@
         "modelRegex": "^openai/gpt-5(\\.[0-3])?(-mini|-nano)?$|^openai/gpt-5\\.4-(mini|nano)$"
       },
       "modelDefaults": {
-        "contextWindow": 400000,
+        "contextSize": 400000,
         "capabilities": [
           "text",
           "image",
@@ -259,7 +259,7 @@
         "modelRegex": "^openai/gpt-5\\.(4|5)(-pro)?$|^openai/gpt-5\\.5$"
       },
       "modelDefaults": {
-        "contextWindow": 1050000,
+        "contextSize": 1050000,
         "capabilities": [
           "text",
           "image",
@@ -280,7 +280,7 @@
         "modelRegex": "^anthropic/claude-(opus-4-7|sonnet-4-6)$"
       },
       "modelDefaults": {
-        "contextWindow": 1000000,
+        "contextSize": 1000000,
         "capabilities": [
           "text",
           "image",
@@ -300,7 +300,7 @@
         "modelRegex": "^x-ai/grok-4\\.(3|20)"
       },
       "modelDefaults": {
-        "contextWindow": 1000000,
+        "contextSize": 1000000,
         "capabilities": [
           "text",
           "image",
@@ -321,7 +321,7 @@
         "modelRegex": "^x-ai/grok-4\\.20"
       },
       "modelDefaults": {
-        "contextWindow": 2000000,
+        "contextSize": 2000000,
         "capabilities": [
           "text",
           "image",
@@ -356,7 +356,7 @@
         "providerRegex": "^(lmStudio|ollama|customOpenAICompatible)$"
       },
       "modelDefaults": {
-        "contextWindow": 4096,
+        "contextSize": 4096,
         "capabilities": [
           "text",
           "tools",
@@ -371,7 +371,7 @@
         "providerRegex": "^xAI$"
       },
       "modelDefaults": {
-        "contextWindow": 1000000,
+        "contextSize": 1000000,
         "capabilities": [
           "text",
           "image",
@@ -391,7 +391,7 @@
         "modelRegex": "^grok-4\\.20"
       },
       "modelDefaults": {
-        "contextWindow": 2000000,
+        "contextSize": 2000000,
         "capabilities": [
           "text",
           "image",
@@ -411,7 +411,7 @@
         "providerRegex": "^deepSeek$"
       },
       "modelDefaults": {
-        "contextWindow": 1000000,
+        "contextSize": 1000000,
         "capabilities": [
           "text",
           "tools",
@@ -427,7 +427,7 @@
         "modelRegex": "^deepseek-(reasoner|v4-pro)$"
       },
       "modelDefaults": {
-        "contextWindow": 1000000,
+        "contextSize": 1000000,
         "capabilities": [
           "text",
           "tools",

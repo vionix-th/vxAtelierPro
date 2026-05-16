@@ -441,7 +441,7 @@ struct ModelEditorView: View {
     private var contextSection: some View {
         editorSection(
             icon: "rectangle.expand.vertical",
-            title: "Context Window",
+            title: "Context Size",
             subtitle: "Maximum tokens the model can process in a single request."
         ) {
             VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
@@ -746,7 +746,7 @@ struct ModelEditorView: View {
             for: name,
             providerID: selectedConfiguration.providerIDEnum
         )
-        contextSize = candidate.contextWindow ?? AppDefaults.ModelContextSizes.defaultSize
+        contextSize = candidate.contextSize ?? AppDefaults.ModelContextSizes.defaultSize
         capabilities = candidate.capabilities
     }
 

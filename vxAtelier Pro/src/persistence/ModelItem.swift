@@ -39,7 +39,7 @@ final class ModelItem {
                 id: modelID,
                 displayName: displayName,
                 providerID: apiConfiguration?.providerIDEnum ?? .customOpenAICompatible,
-                contextWindow: contextSize,
+                contextSize: contextSize,
                 capabilities: capabilities,
                 rawMetadataJSON: rawMetadataJSON
             )
@@ -47,7 +47,7 @@ final class ModelItem {
         set {
             modelID = newValue.id
             displayName = newValue.displayName
-            contextSize = newValue.contextWindow ?? AppDefaults.ModelContextSizes.defaultSize
+            contextSize = newValue.contextSize ?? AppDefaults.ModelContextSizes.defaultSize
             capabilitiesRaw = newValue.capabilities.map(\.rawValue)
             rawMetadataJSON = newValue.rawMetadataJSON
             self.materializeDefaultParameterMappings(preserveCustomized: true)
@@ -78,7 +78,7 @@ final class ModelItem {
             for: modelID,
             providerID: apiConfiguration?.providerIDEnum ?? .customOpenAICompatible
         )
-        self.contextSize = defaultCandidate.contextWindow ?? contextSize
+        self.contextSize = defaultCandidate.contextSize ?? contextSize
         self.capabilitiesRaw = defaultCandidate.capabilities.map(\.rawValue)
         self.materializeDefaultParameterMappings(preserveCustomized: true)
         self.materializeDefaultParameterAvailability(preserveCustomized: true)
@@ -123,7 +123,7 @@ final class ModelItem {
     convenience init(descriptor: LLMModelDescriptor, apiConfiguration: APIConfigurationItem? = nil) {
         self.init(
             modelID: descriptor.id,
-            contextSize: descriptor.contextWindow ?? AppDefaults.ModelContextSizes.defaultSize,
+            contextSize: descriptor.contextSize ?? AppDefaults.ModelContextSizes.defaultSize,
             apiConfiguration: apiConfiguration
         )
         self.descriptor = descriptor

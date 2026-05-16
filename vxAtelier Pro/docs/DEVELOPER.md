@@ -130,7 +130,7 @@ Model and parameter baseline rules are layered and ordered in `src/llm_api/Resou
 * `providerRegex` and `modelRegex` are regex matches; `adapterID` is exact.
 * Later matching rules override earlier rules for the same semantic parameter.
 * Broad provider and adapter rules establish the baseline; narrower model-specific rules refine it.
-* `LLMModelMetadataDecoder` may overlay fetched model metadata such as context window and capabilities, but it does not invent parameter mappings or availability.
+* `LLMModelMetadataDecoder` may overlay fetched model metadata such as context size and capabilities, but it does not invent parameter mappings or availability.
 
 ### Search (`search/`)
 

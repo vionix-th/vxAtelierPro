@@ -41,23 +41,23 @@ final class LLMCoreTypesTests: XCTestCase {
         let defaults = LLMDefaultsCatalog.bundled
 
         let openAI = defaults.modelDefaults(providerID: .openAIPlatform, modelID: "gpt-5.4-nano")
-        XCTAssertEqual(openAI?.contextWindow, 400000)
+        XCTAssertEqual(openAI?.contextSize, 400000)
         XCTAssertTrue(openAI?.capabilities?.contains(.text) ?? false)
         XCTAssertTrue(openAI?.capabilities?.contains(.image) ?? false)
         XCTAssertTrue(openAI?.capabilities?.contains(.file) ?? false)
         XCTAssertTrue(openAI?.capabilities?.contains(.reasoning) ?? false)
 
         let anthropic = defaults.modelDefaults(providerID: .anthropic, modelID: "claude-sonnet-4-6")
-        XCTAssertEqual(anthropic?.contextWindow, 1000000)
+        XCTAssertEqual(anthropic?.contextSize, 1000000)
         XCTAssertTrue(anthropic?.capabilities?.contains(.text) ?? false)
         XCTAssertTrue(anthropic?.capabilities?.contains(.image) ?? false)
 
         let xAI = defaults.modelDefaults(providerID: .xAI, modelID: "grok-4.3")
-        XCTAssertEqual(xAI?.contextWindow, 1000000)
+        XCTAssertEqual(xAI?.contextSize, 1000000)
         XCTAssertTrue(xAI?.capabilities?.contains(.jsonSchema) ?? false)
 
         let deepSeek = defaults.modelDefaults(providerID: .deepSeek, modelID: "deepseek-v4-flash")
-        XCTAssertEqual(deepSeek?.contextWindow, 1000000)
+        XCTAssertEqual(deepSeek?.contextSize, 1000000)
         XCTAssertTrue(deepSeek?.capabilities?.contains(.tools) ?? false)
     }
 
@@ -346,7 +346,7 @@ final class LLMCoreTypesTests: XCTestCase {
             profile: profile
         )
 
-        XCTAssertEqual(models.first?.contextWindow, 999)
+        XCTAssertEqual(models.first?.contextSize, 999)
         XCTAssertTrue(models.first?.capabilities.contains(.image) ?? false)
         XCTAssertTrue(models.first?.capabilities.contains(.tools) ?? false)
     }
@@ -358,7 +358,7 @@ final class LLMCoreTypesTests: XCTestCase {
             profile: profile
         )
 
-        XCTAssertEqual(models.first?.contextWindow, 128000)
+        XCTAssertEqual(models.first?.contextSize, 128000)
         XCTAssertTrue(models.first?.capabilities.contains(.text) ?? false)
         XCTAssertTrue(models.first?.capabilities.contains(.streaming) ?? false)
     }

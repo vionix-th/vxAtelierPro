@@ -47,7 +47,7 @@ enum LLMModelMetadataDecoder {
     }
 
     /// Reads known context-window fields from provider metadata.
-    private static func contextWindow(from object: [String: JSONValue]) -> Int? {
+    private static func contextSize(from object: [String: JSONValue]) -> Int? {
         object.int("context_length")
             ?? object.int("context_window")
             ?? object.int("max_context_length")
@@ -56,8 +56,8 @@ enum LLMModelMetadataDecoder {
 
     /// Applies direct provider metadata over already-resolved bundled defaults.
     private static func applyProviderMetadata(from object: [String: JSONValue], to candidate: inout LLMModelDescriptor) {
-        if let contextWindow = contextWindow(from: object) {
-            candidate.contextWindow = contextWindow
+        if let contextSize = contextSize(from: object) {
+            candidate.contextSize = contextSize
         }
 
         let directCapabilities = explicitCapabilities(from: object)

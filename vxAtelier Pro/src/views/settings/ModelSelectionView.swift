@@ -223,7 +223,7 @@ private struct ModelSelectionOption: Identifiable {
         self.id = "descriptor-\(descriptor.providerID.rawValue)-\(descriptor.id)"
         self.name = descriptor.id
         self.provider = descriptor.providerID.displayName
-        self.contextSize = descriptor.contextWindow ?? 0
+        self.contextSize = descriptor.contextSize ?? 0
         self.capabilities = descriptor.capabilities
         self.metadataSearchTerms = descriptor.capabilities.map(\.displayName)
         self.groupName = groupName

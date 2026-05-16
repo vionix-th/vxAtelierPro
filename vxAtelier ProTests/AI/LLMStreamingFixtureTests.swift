@@ -162,7 +162,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         )
         XCTAssertEqual(openRouterModels.first?.id, "openai/gpt-4o-mini")
         XCTAssertEqual(openRouterModels.first?.displayName, "GPT-4o Mini")
-        XCTAssertEqual(openRouterModels.first?.contextWindow, 128000)
+        XCTAssertEqual(openRouterModels.first?.contextSize, 128000)
         XCTAssertEqual(openRouterModels.first?.capabilities, [.text])
 
         let lmStudioData = try fixtureJSON(name: "lmstudio_models").objectValue?.array("data") ?? []

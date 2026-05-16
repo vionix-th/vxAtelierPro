@@ -207,8 +207,12 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
             return .string("high")
         case .reasoningSummary:
             return .string("auto")
+        case .reasoningBudgetTokens:
+            return .integer(4096)
         case .serviceTier:
             return .string("priority")
+        case .topK:
+            return .integer(40)
         case .stream:
             return .boolean(true)
         case .store:
@@ -260,8 +264,12 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
             return .string("high")
         case .reasoningSummary:
             return .string("auto")
+        case .reasoningBudgetTokens:
+            return .integer(4096)
         case .serviceTier:
             return .string("priority")
+        case .topK:
+            return .integer(40)
         case .stream:
             return .boolean(true)
         case .store:
@@ -313,8 +321,12 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
             return .string("high")
         case .reasoningSummary:
             return .string("auto")
+        case .reasoningBudgetTokens:
+            return .integer(4096)
         case .serviceTier:
             return .string("priority")
+        case .topK:
+            return .integer(40)
         case .stream:
             return .boolean(true)
         case .store:

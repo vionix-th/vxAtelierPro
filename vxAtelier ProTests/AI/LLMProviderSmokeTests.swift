@@ -305,14 +305,14 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         XCTContext.runActivity(named: "LLMDefaults completion for live model") { activity in
             activity.add(XCTAttachment(string: [
                 "modelID=\(descriptor.id)",
-                "context=\(descriptor.contextWindow.map(String.init) ?? "nil")",
+                "context=\(descriptor.contextSize.map(String.init) ?? "nil")",
                 "capabilities=\(descriptor.capabilities.map(\.rawValue).joined(separator: ","))",
                 "rawMetadata=\(descriptor.rawMetadataJSON == nil ? "missing" : "present")"
             ].joined(separator: "\n")))
         }
 
-        if let contextWindow = defaults.contextWindow {
-            XCTAssertEqual(descriptor.contextWindow, contextWindow)
+        if let contextSize = defaults.contextSize {
+            XCTAssertEqual(descriptor.contextSize, contextSize)
         }
         if let capabilities = defaults.capabilities {
             XCTAssertEqual(Set(descriptor.capabilities), Set(capabilities))

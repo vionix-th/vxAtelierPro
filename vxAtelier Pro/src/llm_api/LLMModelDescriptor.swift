@@ -37,7 +37,7 @@ struct LLMModelDescriptor: Codable, Equatable, Identifiable {
     var id: String
     var displayName: String
     var providerID: LLMProviderID
-    var contextWindow: Int?
+    var contextSize: Int?
     var capabilities: [LLMModelCapability]
     var rawMetadataJSON: String?
 
@@ -46,14 +46,14 @@ struct LLMModelDescriptor: Codable, Equatable, Identifiable {
         id: String,
         displayName: String? = nil,
         providerID: LLMProviderID,
-        contextWindow: Int? = nil,
+        contextSize: Int? = nil,
         capabilities: [LLMModelCapability] = [.text],
         rawMetadataJSON: String? = nil
     ) {
         self.id = id
         self.displayName = displayName ?? id
         self.providerID = providerID
-        self.contextWindow = contextWindow
+        self.contextSize = contextSize
         self.capabilities = capabilities
         self.rawMetadataJSON = rawMetadataJSON
     }

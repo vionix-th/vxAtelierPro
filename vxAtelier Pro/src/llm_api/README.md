@@ -64,7 +64,7 @@ Conversation storage may hold semantic values and user enable/disable intent for
 - Later matching rules override earlier rules for the same semantic parameter.
 - Broad provider and adapter rules should appear before narrower model-specific rules.
 - Unknown models inherit the broader provider or adapter baseline instead of failing.
-- Fetched model metadata may refine model descriptors such as context window and capabilities, but it does not create parameter mappings or availability rules.
+- Fetched model metadata may refine model descriptors such as context size and capabilities, but it does not create parameter mappings or availability rules.
 
 For baseline model creation and fetch normalization, the intended stack is:
 

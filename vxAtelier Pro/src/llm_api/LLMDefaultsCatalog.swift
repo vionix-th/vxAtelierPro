@@ -76,7 +76,7 @@ struct LLMDefaultsCatalog {
             id: modelID,
             displayName: displayName,
             providerID: providerID,
-            contextWindow: defaults?.contextWindow,
+            contextSize: defaults?.contextSize,
             capabilities: defaults?.capabilities ?? [.text],
             rawMetadataJSON: rawMetadataJSON
         )
@@ -185,11 +185,11 @@ struct LLMDefaultsCatalog {
 
 /// Fully resolved model metadata defaults after regex rule application.
 struct LLMResolvedModelDefaults: Equatable {
-    var contextWindow: Int?
+    var contextSize: Int?
     var capabilities: [LLMModelCapability]?
 
     mutating func apply(_ defaults: LLMModelDefaultsPayload) {
-        if let contextWindow = defaults.contextWindow { self.contextWindow = contextWindow }
+        if let contextSize = defaults.contextSize { self.contextSize = contextSize }
         if let capabilities = defaults.capabilities { self.capabilities = capabilities }
     }
 }
@@ -296,7 +296,7 @@ private struct LLMCompiledRegex {
 }
 
 struct LLMModelDefaultsPayload: Decodable, Equatable {
-    var contextWindow: Int?
+    var contextSize: Int?
     var capabilities: [LLMModelCapability]?
 }
 
