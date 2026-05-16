@@ -187,6 +187,19 @@
     },
     {
       "match": {
+        "providerRegex": "^anthropic$",
+        "modelRegex": "^claude-opus-4-7$",
+        "adapterID": "anthropicMessages"
+      },
+      "parameterAvailability": [
+        {
+          "parameter": "reasoning_budget_tokens",
+          "available": false
+        }
+      ]
+    },
+    {
+      "match": {
         "providerRegex": "^openRouter$"
       },
       "modelDefaults": {
@@ -594,11 +607,6 @@
           "parameter": "response_format"
         },
         {
-          "parameter": "reasoning_effort",
-          "enabled": true,
-          "defaultValue": "medium"
-        },
-        {
           "parameter": "parallel_tool_calls",
           "enabled": true,
           "defaultValue": true
@@ -646,11 +654,6 @@
           "preset": "openAIChatResponseFormat"
         },
         {
-          "parameter": "reasoning_effort",
-          "encoding": "scalarKey",
-          "wireKey": "reasoning_effort"
-        },
-        {
           "parameter": "parallel_tool_calls",
           "encoding": "scalarKey",
           "wireKey": "parallel_tool_calls"
@@ -682,6 +685,79 @@
         {
           "parameter": "reasoning_effort",
           "available": false
+        }
+      ]
+    },
+    {
+      "match": {
+        "providerRegex": "^openAIPlatform$",
+        "modelRegex": "^gpt-5(\\.[0-3])?(-mini|-nano)?$|^gpt-5\\.4-(mini|nano)$",
+        "adapterID": "openAIChatCompletions"
+      },
+      "parameterAvailability": [
+        {
+          "parameter": "reasoning_effort",
+          "enabled": true,
+          "defaultValue": "none",
+          "options": ["none", "low", "medium", "high", "xhigh"]
+        }
+      ]
+    },
+    {
+      "match": {
+        "providerRegex": "^openAIPlatform$",
+        "modelRegex": "^gpt-5\\.4$",
+        "adapterID": "openAIChatCompletions"
+      },
+      "parameterAvailability": [
+        {
+          "parameter": "reasoning_effort",
+          "enabled": true,
+          "defaultValue": "none",
+          "options": ["none", "low", "medium", "high", "xhigh"]
+        }
+      ]
+    },
+    {
+      "match": {
+        "providerRegex": "^openAIPlatform$",
+        "modelRegex": "^gpt-5\\.4-pro$",
+        "adapterID": "openAIChatCompletions"
+      },
+      "parameterAvailability": [
+        {
+          "parameter": "reasoning_effort",
+          "enabled": true,
+          "options": ["medium", "high", "xhigh"]
+        }
+      ]
+    },
+    {
+      "match": {
+        "providerRegex": "^openAIPlatform$",
+        "modelRegex": "^gpt-5\\.5$",
+        "adapterID": "openAIChatCompletions"
+      },
+      "parameterAvailability": [
+        {
+          "parameter": "reasoning_effort",
+          "enabled": true,
+          "defaultValue": "medium",
+          "options": ["none", "low", "medium", "high", "xhigh"]
+        }
+      ]
+    },
+    {
+      "match": {
+        "providerRegex": "^openAIPlatform$",
+        "modelRegex": "^gpt-5\\.5-pro$",
+        "adapterID": "openAIChatCompletions"
+      },
+      "parameterAvailability": [
+        {
+          "parameter": "reasoning_effort",
+          "enabled": true,
+          "options": ["medium", "high", "xhigh"]
         }
       ]
     },
@@ -825,12 +901,6 @@
           "parameter": "parallel_tool_calls",
           "enabled": true,
           "defaultValue": true
-        },
-        {
-          "parameter": "reasoning_effort",
-          "enabled": true,
-          "defaultValue": "low",
-          "options": ["none", "low", "medium", "high"]
         }
       ],
       "parameterMappings": [
@@ -848,32 +918,21 @@
           "parameter": "parallel_tool_calls",
           "encoding": "scalarKey",
           "wireKey": "parallel_tool_calls"
-        },
-        {
-          "parameter": "reasoning_effort",
-          "encoding": "scalarKey",
-          "wireKey": "reasoning_effort"
         }
       ]
     },
     {
       "match": {
         "providerRegex": "^xAI$",
-        "modelRegex": "^grok-4\\.(3|20)",
+        "modelRegex": "^grok-4\\.3$",
         "adapterID": "openAICompatibleChatCompletions"
       },
       "parameterAvailability": [
         {
-          "parameter": "stop_sequences",
-          "available": false
-        },
-        {
-          "parameter": "frequency_penalty",
-          "available": false
-        },
-        {
-          "parameter": "presence_penalty",
-          "available": false
+          "parameter": "reasoning_effort",
+          "enabled": true,
+          "defaultValue": "low",
+          "options": ["none", "low", "medium", "high"]
         }
       ]
     },
