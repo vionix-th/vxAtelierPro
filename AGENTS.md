@@ -38,6 +38,11 @@
 
 ## Build / Test
 - Do not needlessly compile or test; those are token expensive operations and they can pollute context.
+- Treat tests as exception-only work, not routine work.
+- Update tests only for breaking changes or when existing behavior materially changes.
+- Run tests only when the Caesar explicitly asks to run a test, or when fixing a bug and test output will materially inform the fix.
+- Do not add, update, or expand tests for early-stage implementation work unless a breaking change forces it.
+- If test execution is not clearly useful for the current task, skip it.
 - Maintain `Package.swift` only for VS Code/SourceKit IntelliSense and SwiftPM dependency graph support.
 - Xcode / `xcodebuild` is the exclusive build and test authority for the application.
 - Do not add SwiftPM test targets, SwiftPM test resources, or project guidance that recommends `swift test`.
