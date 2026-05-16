@@ -44,17 +44,14 @@ struct ConversationRunContextResolver {
             adapterID: adapterID,
             availability: model.parameterAvailability.map(\.descriptor)
         )
+        conversation.options.reconcileParameters(apiConfiguration: apiConfig, modelID: modelID)
         let rawOptions = conversation.options.generationOptions(resolvedModelID: modelID)
         let sendableAvailability = LLMParameterAvailabilityResolver.sendableModelAvailability(
             for: rawOptions,
             conversationPreferences: conversation.options.parameterInclusionPreferences,
             modelAvailability: availability
         )
-        let options = LLMParameterAvailabilityResolver.resolvedOptions(
-            from: rawOptions,
-            conversationPreferences: conversation.options.parameterInclusionPreferences,
-            modelAvailability: availability
-        )
+        let options = rawOptions
         let sendableModelMappings = mappings.filter { entry in
             sendableAvailability[entry.key] != nil && entry.value.encodingKind != .disabled
         }
@@ -94,7 +91,7 @@ struct ConversationRunContextResolver {
 struct LLMRequestFactory {
     /// Creates a request with concrete streaming mode resolved before final validation.
     func makeRequest(from context: ConversationRunContext) throws -> LLMRequest {
-        var request = LLMRequest(
+        let request = LLMRequest(
             providerID: context.providerID,
             adapterID: context.adapterID,
             modelID: context.modelID,
@@ -105,11 +102,6 @@ struct LLMRequestFactory {
             tools: context.tools,
             options: context.options
         )
-        let streamEnabled = try LLMCapabilityValidator.resolveStreamEnabled(
-            for: request,
-            profile: context.providerProfile
-        )
-        request.options.streamMode = streamEnabled ? .enabled : .disabled
         try LLMCapabilityValidator.validate(request, profile: context.providerProfile)
         return request
     }

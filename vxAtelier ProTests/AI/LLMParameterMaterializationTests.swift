@@ -138,6 +138,7 @@ final class LLMParameterMaterializationTests: XCTestCase {
         config.models = [ModelItem(modelID: "gpt-4.1-nano", apiConfiguration: config)]
         let options = ConversationOptions(apiConfiguration: config)
         options.temperature = 0.7
+        options.setParameterEnabled(.temperature, enabled: true)
 
         let controls = ConversationParameterProjection.controls(
             for: options,
@@ -150,6 +151,82 @@ final class LLMParameterMaterializationTests: XCTestCase {
         XCTAssertEqual(temperature?.displayName, AiParameterPresentationCatalog.displayName(for: .temperature))
         XCTAssertEqual(temperature?.value, .number(0.7))
         XCTAssertTrue(temperature?.isEnabled ?? false)
+        XCTAssertTrue(temperature?.isAvailable ?? false)
+        XCTAssertTrue(temperature?.isMapped ?? false)
+        XCTAssertTrue(temperature?.canToggleEnabled ?? false)
+        XCTAssertTrue(temperature?.isValueEditable ?? false)
+    }
+
+    func testConversationProjectionSeparatesAvailabilityRequiredAndEnabledState() {
+        let config = APIConfigurationItem(
+            name: "OpenAI",
+            apiKey: "key",
+            baseURL: "https://unit.test",
+            defaultModel: "unit-model",
+            providerID: .openAIPlatform
+        )
+        config.defaultAdapterIDEnum = .openAIChatCompletions
+        let model = ModelItem(modelID: "unit-model", apiConfiguration: config)
+        model.parameterAvailability = [
+            ModelParameterAvailabilityItem(
+                adapterID: .openAIChatCompletions,
+                semanticParameterID: .maxOutputTokens,
+                isAvailable: true,
+                isRequired: true
+            ),
+            ModelParameterAvailabilityItem(
+                adapterID: .openAIChatCompletions,
+                semanticParameterID: .temperature,
+                isAvailable: false
+            ),
+            ModelParameterAvailabilityItem(
+                adapterID: .openAIChatCompletions,
+                semanticParameterID: .topP,
+                isAvailable: true
+            )
+        ]
+        model.parameterMappings = [
+            ModelParameterMappingItem(
+                adapterID: .openAIChatCompletions,
+                semanticParameterID: .maxOutputTokens,
+                wireKey: "max_tokens"
+            ),
+            ModelParameterMappingItem(
+                adapterID: .openAIChatCompletions,
+                semanticParameterID: .topP,
+                wireKey: "top_p"
+            )
+        ]
+        config.models = [model]
+        let options = ConversationOptions(apiConfiguration: config)
+        options.selectedModelID = "unit-model"
+        options.setParameterEnabled(.topP, enabled: false)
+
+        let controls = ConversationParameterProjection.controls(
+            for: options,
+            apiConfiguration: config
+        )
+
+        let required = controls.first { $0.parameterID == .maxOutputTokens }
+        XCTAssertTrue(required?.required ?? false)
+        XCTAssertTrue(required?.isEnabled ?? false)
+        XCTAssertFalse(required?.canToggleEnabled ?? true)
+        XCTAssertTrue(required?.isValueEditable ?? false)
+
+        let optional = controls.first { $0.parameterID == .topP }
+        XCTAssertFalse(optional?.required ?? true)
+        XCTAssertTrue(optional?.isAvailable ?? false)
+        XCTAssertTrue(optional?.isMapped ?? false)
+        XCTAssertFalse(optional?.isEnabled ?? true)
+        XCTAssertTrue(optional?.canToggleEnabled ?? false)
+        XCTAssertTrue(optional?.isValueEditable ?? false)
+
+        let unavailable = controls.first { $0.parameterID == .temperature }
+        XCTAssertFalse(unavailable?.isAvailable ?? true)
+        XCTAssertFalse(unavailable?.isMapped ?? true)
+        XCTAssertFalse(unavailable?.isEnabled ?? true)
+        XCTAssertFalse(unavailable?.canToggleEnabled ?? true)
+        XCTAssertFalse(unavailable?.isValueEditable ?? true)
     }
 
     func testDisabledOptionalParameterDoesNotReachGenerationOptions() {
@@ -170,5 +247,134 @@ final class LLMParameterMaterializationTests: XCTestCase {
         )
 
         XCTAssertNil(generationOptions.temperature)
+    }
+
+    func testConversationOptionsNormalizeAddsAllKnownParameterEnabledStates() {
+        let options = ConversationOptions()
+        options.parameterEnabledStates = [:]
+
+        options.normalizeKnownParameters()
+
+        for parameterID in LLMParameterID.allCases {
+            XCTAssertNotNil(options.parameterEnabledStates[parameterID.rawValue], parameterID.rawValue)
+        }
+    }
+
+    func testConversationOptionsNormalizationPreservesUnknownParameterValues() {
+        let options = ConversationOptions()
+        options.parameterValuesJSON = #"{"future_parameter":{"nested":true}}"#
+
+        options.normalizeKnownParameters()
+
+        XCTAssertTrue(options.parameterValuesJSON.contains("future_parameter"))
+        XCTAssertTrue(options.parameterValuesJSON.contains("nested"))
+    }
+
+    func testConversationOptionsReconcileAppliesAvailabilityWithoutDeletingValues() {
+        let config = APIConfigurationItem(
+            name: "OpenAI",
+            apiKey: "key",
+            baseURL: "https://unit.test",
+            defaultModel: "unit-model",
+            providerID: .openAIPlatform
+        )
+        config.defaultAdapterIDEnum = .openAIChatCompletions
+        let model = ModelItem(modelID: "unit-model", apiConfiguration: config)
+        model.parameterAvailability = [
+            ModelParameterAvailabilityItem(
+                adapterID: .openAIChatCompletions,
+                semanticParameterID: .maxOutputTokens,
+                isAvailable: true,
+                isRequired: true,
+                isEnabled: false,
+                defaultValue: .integer(1024)
+            ),
+            ModelParameterAvailabilityItem(
+                adapterID: .openAIChatCompletions,
+                semanticParameterID: .temperature,
+                isAvailable: false,
+                isRequired: false,
+                isEnabled: true,
+                defaultValue: .number(0.2)
+            ),
+            ModelParameterAvailabilityItem(
+                adapterID: .openAIChatCompletions,
+                semanticParameterID: .topP,
+                isAvailable: true,
+                isRequired: false,
+                isEnabled: true,
+                defaultValue: .number(0.8)
+            ),
+            ModelParameterAvailabilityItem(
+                adapterID: .openAIChatCompletions,
+                semanticParameterID: .stream,
+                isAvailable: true,
+                isRequired: true,
+                isEnabled: false,
+                defaultValue: .boolean(true)
+            )
+        ]
+        config.models = [model]
+
+        let options = ConversationOptions(apiConfiguration: config)
+        options.selectedModelID = "unit-model"
+        options.temperature = 0.7
+        options.setParameterEnabled(.temperature, enabled: true)
+        options.setParameterEnabled(.topP, enabled: false)
+
+        options.reconcileParameters(apiConfiguration: config, modelID: "unit-model")
+
+        XCTAssertTrue(options.isParameterEnabled(.maxOutputTokens))
+        XCTAssertEqual(options.maxOutputTokens, 1024)
+        XCTAssertFalse(options.isParameterEnabled(.temperature))
+        XCTAssertEqual(options.temperature, 0.7)
+        XCTAssertFalse(options.isParameterEnabled(.topP))
+        XCTAssertEqual(options.topP, 0.8)
+        XCTAssertTrue(options.isParameterEnabled(.stream))
+        XCTAssertEqual(options.streamMode, .enabled)
+    }
+
+    func testConversationOptionsReconcilePreservesValuesAcrossModelSwitch() {
+        let config = APIConfigurationItem(
+            name: "OpenAI",
+            apiKey: "key",
+            baseURL: "https://unit.test",
+            defaultModel: "model-a",
+            providerID: .openAIPlatform
+        )
+        config.defaultAdapterIDEnum = .openAIChatCompletions
+        let modelA = ModelItem(modelID: "model-a", apiConfiguration: config)
+        modelA.parameterAvailability = [
+            ModelParameterAvailabilityItem(
+                adapterID: .openAIChatCompletions,
+                semanticParameterID: .temperature,
+                isAvailable: true,
+                isRequired: false,
+                isEnabled: true,
+                defaultValue: .number(0.3)
+            )
+        ]
+        let modelB = ModelItem(modelID: "model-b", apiConfiguration: config)
+        modelB.parameterAvailability = [
+            ModelParameterAvailabilityItem(
+                adapterID: .openAIChatCompletions,
+                semanticParameterID: .temperature,
+                isAvailable: false,
+                isRequired: false,
+                isEnabled: false,
+                defaultValue: .number(0.9)
+            )
+        ]
+        config.models = [modelA, modelB]
+
+        let options = ConversationOptions(apiConfiguration: config)
+        options.selectedModelID = "model-a"
+        options.temperature = 0.6
+        options.setParameterEnabled(.temperature, enabled: true)
+
+        options.selectedModelID = "model-b"
+
+        XCTAssertFalse(options.isParameterEnabled(.temperature))
+        XCTAssertEqual(options.temperature, 0.6)
     }
 }

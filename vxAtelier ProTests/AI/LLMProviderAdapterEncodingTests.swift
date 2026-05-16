@@ -380,7 +380,10 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
             providerID: .openAICodexChatGPTSubscription,
             adapterID: .openAIResponses,
             modelID: "gpt-5.4-mini",
-            options: LLMGenerationOptions(maxOutputTokens: 16)
+            options: LLMGenerationOptions(
+                maxOutputTokens: 16,
+                streamMode: .enabled
+            )
         )
         let request = LLMRequest(
             providerID: .openAICodexChatGPTSubscription,

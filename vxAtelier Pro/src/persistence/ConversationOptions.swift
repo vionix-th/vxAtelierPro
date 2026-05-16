@@ -9,25 +9,99 @@ final class ConversationOptions: Equatable {
     var avatarImageData: Data? = nil
     var enabledToolsDict: [String: Bool]
     var toolConfigurations: [String: String]
-    @Attribute(originalName: "enabledParameterOverrides") var parameterInclusionPreferences: [String: Bool]
+    @Attribute(originalName: "enabledParameterOverrides") var parameterEnabledStates: [String: Bool]
+    var parameterValuesJSON: String
     var isMarkdownEnabled: Bool = AppDefaults.isMarkdownEnabled
-
-    var systemPrompt: String
-    var selectedModelID: String?
-    var temperature: Double?
-    var topP: Double?
-    var maxOutputTokens: Int?
-    var stopSequences: [String]
-    var responseFormatRaw: String
-    @Attribute(originalName: "reasoning") var reasoningEffort: String?
-    var serviceTier: String?
-    var streamModeRaw: String
     var retryPolicyRaw: String
-    var providerExtrasJSON: String
+
+    var parameterInclusionPreferences: [String: Bool] {
+        get { parameterEnabledStates }
+        set { parameterEnabledStates = newValue }
+    }
+
+    var selectedModelID: String? {
+        get {
+            parameterValue(.model)?.stringValue.flatMap {
+                let trimmed = $0.trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed.isEmpty ? nil : trimmed
+            }
+        }
+        set { setParameterValue(.model, value: newValue.map { .string($0) }) }
+    }
+
+    var systemPrompt: String {
+        get { parameterValue(.systemPrompt)?.stringValue ?? "" }
+        set { setParameterValue(.systemPrompt, value: .string(newValue)) }
+    }
+
+    var temperature: Double? {
+        get { parameterValue(.temperature)?.doubleValue }
+        set { setParameterValue(.temperature, value: newValue.map { .number($0) }) }
+    }
+
+    var topP: Double? {
+        get { parameterValue(.topP)?.doubleValue }
+        set { setParameterValue(.topP, value: newValue.map { .number($0) }) }
+    }
+
+    var maxOutputTokens: Int? {
+        get { parameterValue(.maxOutputTokens)?.integerValue }
+        set { setParameterValue(.maxOutputTokens, value: newValue.map { .integer($0) }) }
+    }
+
+    var stopSequences: [String] {
+        get { Self.stopSequences(from: parameterValue(.stopSequences)) }
+        set { setParameterValue(.stopSequences, value: newValue.isEmpty ? nil : .array(newValue.map { .string($0) })) }
+    }
+
+    var responseFormatRaw: String {
+        get { parameterValue(.responseFormat)?.stringValue ?? LLMGenerationOptions.ResponseFormat.text.rawValue }
+        set { setParameterValue(.responseFormat, value: .string(newValue)) }
+    }
+
+    var reasoningEffort: String? {
+        get { parameterValue(.reasoningEffort)?.stringValue }
+        set { setParameterValue(.reasoningEffort, value: newValue.map { .string($0) }) }
+    }
+
+    var serviceTier: String? {
+        get { parameterValue(.serviceTier)?.stringValue }
+        set { setParameterValue(.serviceTier, value: newValue.map { .string($0) }) }
+    }
+
+    var streamModeRaw: String {
+        get { streamMode.rawValue }
+        set { streamMode = LLMGenerationOptions.StreamMode(rawValue: newValue) ?? .disabled }
+    }
+
+    var providerExtrasJSON: String {
+        get {
+            let extras = decodedParameterValues.filter { key, _ in
+                guard let parameterID = LLMParameterID(rawValue: key) else { return true }
+                return Self.providerExtraParameters.contains(parameterID)
+            }
+            guard let data = try? JSONEncoder().encode(extras),
+                  let json = String(data: data, encoding: .utf8) else {
+                return "{}"
+            }
+            return json
+        }
+        set {
+            guard let data = newValue.data(using: .utf8),
+                  let extras = try? JSONDecoder().decode([String: JSONValue].self, from: data) else {
+                return
+            }
+            var values = decodedParameterValues
+            for (key, value) in extras {
+                values[key] = value
+            }
+            decodedParameterValues = values
+        }
+    }
 
     var streamMode: LLMGenerationOptions.StreamMode {
-        get { LLMGenerationOptions.StreamMode(rawValue: streamModeRaw) ?? .auto }
-        set { streamModeRaw = newValue.rawValue }
+        get { (parameterValue(.stream)?.boolValue ?? false) ? .enabled : .disabled }
+        set { setStreamMode(newValue) }
     }
 
     var retryPolicy: LLMGenerationOptions.RetryPolicy {
@@ -36,28 +110,20 @@ final class ConversationOptions: Equatable {
     }
 
     var responseFormat: LLMGenerationOptions.ResponseFormat {
-        get { LLMGenerationOptions.ResponseFormat(rawValue: responseFormatRaw) ?? .text }
-        set { responseFormatRaw = newValue.rawValue }
+        get { LLMGenerationOptions.ResponseFormat.fromSemanticRawValue(responseFormatRaw) }
+        set { responseFormatRaw = newValue.semanticRawValue }
     }
 
     convenience init(from: ConversationOptions) {
         self.init(avatarImageData: from.avatarImageData, apiConfiguration: from.apiConfiguration)
         enabledToolsDict = from.enabledToolsDict
         toolConfigurations = from.toolConfigurations
-        parameterInclusionPreferences = from.parameterInclusionPreferences
+        parameterEnabledStates = from.parameterEnabledStates
+        parameterValuesJSON = from.parameterValuesJSON
         isMarkdownEnabled = from.isMarkdownEnabled
-        systemPrompt = from.systemPrompt
-        selectedModelID = from.selectedModelID
-        temperature = from.temperature
-        topP = from.topP
-        maxOutputTokens = from.maxOutputTokens
-        stopSequences = from.stopSequences
-        responseFormatRaw = from.responseFormatRaw
-        reasoningEffort = from.reasoningEffort
-        serviceTier = from.serviceTier
-        streamModeRaw = from.streamModeRaw
         retryPolicyRaw = from.retryPolicyRaw
-        providerExtrasJSON = from.providerExtrasJSON
+        normalizeKnownParameters()
+        reconcileParameters()
     }
 
     init(
@@ -68,24 +134,72 @@ final class ConversationOptions: Equatable {
         self.apiConfiguration = apiConfiguration
         self.toolConfigurations = [:]
         self.enabledToolsDict = [:]
-        self.parameterInclusionPreferences = [:]
-        self.systemPrompt = ""
-        self.selectedModelID = nil
-        self.temperature = nil
-        self.topP = nil
-        self.maxOutputTokens = nil
-        self.stopSequences = []
-        self.responseFormatRaw = LLMGenerationOptions.ResponseFormat.text.rawValue
-        self.reasoningEffort = nil
-        self.serviceTier = nil
-        self.streamModeRaw = LLMGenerationOptions.StreamMode.auto.rawValue
+        self.parameterEnabledStates = [:]
+        self.parameterValuesJSON = "{}"
         self.retryPolicyRaw = LLMGenerationOptions.RetryPolicy.disabled.rawValue
-        self.providerExtrasJSON = "{}"
+        self.isMarkdownEnabled = AppDefaults.isMarkdownEnabled
         applyAPIConfigurationDefaults(replaceSelectedModel: false)
+        if apiConfiguration == nil {
+            normalizeKnownParameters()
+        }
     }
 
     func copy() -> ConversationOptions {
         ConversationOptions(from: self)
+    }
+
+    func normalizeKnownParameters() {
+        var enabledStates = parameterEnabledStates
+        for parameterID in LLMParameterID.allCases where enabledStates[parameterID.rawValue] == nil {
+            enabledStates[parameterID.rawValue] = Self.defaultEnabledState(for: parameterID)
+        }
+        parameterEnabledStates = enabledStates
+    }
+
+    func reconcileParameters(
+        apiConfiguration: APIConfigurationItem? = nil,
+        modelID explicitModelID: String? = nil
+    ) {
+        let configuration = apiConfiguration ?? self.apiConfiguration
+        let previousEnabledStates = parameterEnabledStates
+        normalizeKnownParameters()
+        guard let configuration else { return }
+
+        let selectedModel = explicitModelID ?? selectedModelID ?? configuration.defaultModelID
+        guard let modelID = selectedModel,
+              let model = configuration.models.first(where: { $0.modelID == modelID }) else {
+            return
+        }
+
+        let adapterID = configuration.defaultAdapterIDEnum
+        let availability = LLMParameterAvailabilityMappingResolver.resolve(
+            adapterID: adapterID,
+            availability: model.parameterAvailability.map(\.descriptor)
+        )
+        var enabledStates = parameterEnabledStates
+
+        for parameterID in LLMParameterID.allCases {
+            guard parameterID.isProviderMappable else {
+                enabledStates[parameterID.rawValue] = true
+                continue
+            }
+            guard let descriptor = availability[parameterID] else {
+                enabledStates[parameterID.rawValue] = false
+                continue
+            }
+            if descriptor.isRequired {
+                enabledStates[parameterID.rawValue] = true
+            } else if !descriptor.isAvailable {
+                enabledStates[parameterID.rawValue] = false
+            } else if previousEnabledStates[parameterID.rawValue] == nil {
+                enabledStates[parameterID.rawValue] = descriptor.isEnabled
+            }
+            if parameterValue(parameterID) == nil, let defaultValue = descriptor.defaultValue {
+                setParameterValue(parameterID, value: defaultValue, reconcileAfterModelChange: false)
+            }
+        }
+
+        parameterEnabledStates = enabledStates
     }
 
     func applyAPIConfigurationDefaults(replaceSelectedModel: Bool) {
@@ -93,148 +207,93 @@ final class ConversationOptions: Equatable {
         let defaultModel = apiConfiguration.defaultModelID
         let currentModel = selectedModelID?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if replaceSelectedModel || currentModel.isEmpty {
-            selectedModelID = defaultModel
+            setSelectedModelID(defaultModel, reconcileAfterModelChange: false)
         }
+        reconcileParameters(apiConfiguration: apiConfiguration, modelID: selectedModelID)
     }
 
     func setSelectedModelID(_ model: String?) {
+        setSelectedModelID(model, reconcileAfterModelChange: true)
+    }
+
+    private func setSelectedModelID(_ model: String?, reconcileAfterModelChange: Bool) {
         let trimmed = model?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        selectedModelID = trimmed.isEmpty ? nil : trimmed
-    }
-
-    func setStreamMode(_ mode: LLMGenerationOptions.StreamMode) {
-        streamMode = mode
-    }
-
-    func parameterValue(_ parameter: LLMParameterID) -> JSONValue? {
-        switch parameter {
-        case .model:
-            return selectedModelID.flatMap { $0.isEmpty ? nil : .string($0) }
-        case .systemPrompt:
-            return .string(systemPrompt)
-        case .maxOutputTokens:
-            return maxOutputTokens.map { .integer($0) }
-        case .temperature:
-            return temperature.map { .number($0) }
-        case .topP:
-            return topP.map { .number($0) }
-        case .stopSequences:
-            return stopSequences.isEmpty ? nil : .string(stopSequences.joined(separator: "\n"))
-        case .responseFormat:
-            return .string(responseFormat.semanticRawValue)
-        case .reasoningEffort:
-            return reasoningEffort.flatMap { $0.isEmpty ? nil : .string($0) }
-        case .serviceTier:
-            return serviceTier.flatMap { $0.isEmpty ? nil : .string($0) }
-        case .stream:
-            switch streamMode {
-            case .enabled:
-                return .boolean(true)
-            case .disabled:
-                return .boolean(false)
-            case .auto:
-                return nil
-            }
-        case .store,
-             .toolChoice,
-             .parallelToolCalls,
-             .promptCacheKey,
-             .previousResponseID,
-             .include,
-             .textVerbosity,
-             .frequencyPenalty,
-             .presencePenalty,
-             .logitBias,
-             .seed,
-             .user,
-             .safetyIdentifier,
-             .reasoningSummary:
-            return decodedProviderExtras[parameter.rawValue]
+        setParameterValue(.model, value: trimmed.isEmpty ? nil : .string(trimmed), reconcileAfterModelChange: false)
+        if reconcileAfterModelChange {
+            reconcileParameters(modelID: selectedModelID)
         }
     }
 
+    func setStreamMode(_ mode: LLMGenerationOptions.StreamMode) {
+        setParameterValue(.stream, value: .boolean(mode == .enabled), reconcileAfterModelChange: false)
+        setParameterEnabled(.stream, enabled: true)
+    }
+
+    func parameterValue(_ parameter: LLMParameterID) -> JSONValue? {
+        decodedParameterValues[parameter.rawValue]
+    }
+
     func setParameterValue(_ parameter: LLMParameterID, value: JSONValue?) {
-        switch parameter {
-        case .model:
-            setSelectedModelID(value?.stringValue)
-        case .systemPrompt:
-            systemPrompt = value?.stringValue ?? ""
-        case .maxOutputTokens:
-            maxOutputTokens = value?.integerValue
-        case .temperature:
-            temperature = value?.doubleValue
-        case .topP:
-            topP = value?.doubleValue
-        case .stopSequences:
-            stopSequences = Self.stopSequences(from: value)
-        case .responseFormat:
-            responseFormat = value?.stringValue.map(LLMGenerationOptions.ResponseFormat.fromSemanticRawValue) ?? .text
-        case .reasoningEffort:
-            let trimmed = value?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            reasoningEffort = trimmed.isEmpty ? nil : trimmed
-        case .serviceTier:
-            let trimmed = value?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            serviceTier = trimmed.isEmpty ? nil : trimmed
-        case .stream:
-            if let bool = value?.boolValue {
-                streamMode = bool ? .enabled : .disabled
-            } else if let rawValue = value?.stringValue {
-                streamMode = LLMGenerationOptions.StreamMode(rawValue: rawValue) ?? .auto
-            } else {
-                streamMode = .auto
-            }
-        case .store,
-             .toolChoice,
-             .parallelToolCalls,
-             .promptCacheKey,
-             .previousResponseID,
-             .include,
-             .textVerbosity,
-             .frequencyPenalty,
-             .presencePenalty,
-             .logitBias,
-             .seed,
-             .user,
-             .safetyIdentifier,
-             .reasoningSummary:
-            var extras = decodedProviderExtras
-            extras[parameter.rawValue] = value
-            decodedProviderExtras = extras
+        setParameterValue(parameter, value: value, reconcileAfterModelChange: parameter == .model)
+    }
+
+    private func setParameterValue(
+        _ parameter: LLMParameterID,
+        value: JSONValue?,
+        reconcileAfterModelChange: Bool
+    ) {
+        var values = decodedParameterValues
+        if let value {
+            values[parameter.rawValue] = normalizedValue(value, for: parameter)
+        } else {
+            values.removeValue(forKey: parameter.rawValue)
+        }
+        decodedParameterValues = values
+        if reconcileAfterModelChange {
+            reconcileParameters(modelID: selectedModelID)
         }
     }
 
     func setParameterEnabled(_ parameter: LLMParameterID, enabled: Bool) {
-        var preferences = parameterInclusionPreferences
-        preferences[parameter.rawValue] = enabled
-        parameterInclusionPreferences = preferences
+        var states = parameterEnabledStates
+        states[parameter.rawValue] = enabled
+        parameterEnabledStates = states
     }
 
     func parameterInclusionPreference(_ parameter: LLMParameterID) -> Bool? {
-        parameterInclusionPreferences[parameter.rawValue]
+        parameterEnabledStates[parameter.rawValue]
+    }
+
+    func isParameterEnabled(_ parameter: LLMParameterID) -> Bool {
+        parameterEnabledStates[parameter.rawValue] ?? Self.defaultEnabledState(for: parameter)
     }
 
     func generationOptions(
         resolvedModelID: String?
     ) -> LLMGenerationOptions {
-        LLMGenerationOptions(
+        normalizeKnownParameters()
+        let modelID = selectedModelID ?? resolvedModelID
+        let extras = enabledProviderExtras()
+
+        return LLMGenerationOptions(
             systemPrompt: systemPrompt,
-            modelID: selectedModelID ?? resolvedModelID,
-            temperature: temperature,
-            topP: topP,
-            maxOutputTokens: maxOutputTokens,
-            stop: stopSequences,
-            responseFormat: responseFormat,
-            reasoning: reasoningEffort.flatMap { $0.isEmpty ? nil : $0 },
-            serviceTier: serviceTier.flatMap { $0.isEmpty ? nil : $0 },
-            streamMode: streamMode,
+            modelID: modelID,
+            temperature: enabledValue(.temperature)?.doubleValue,
+            topP: enabledValue(.topP)?.doubleValue,
+            maxOutputTokens: enabledValue(.maxOutputTokens)?.integerValue,
+            stop: Self.stopSequences(from: enabledValue(.stopSequences)),
+            responseFormat: enabledValue(.responseFormat)?.stringValue.map(LLMGenerationOptions.ResponseFormat.fromSemanticRawValue) ?? .text,
+            reasoning: enabledValue(.reasoningEffort)?.stringValue.flatMap { $0.isEmpty ? nil : $0 },
+            serviceTier: enabledValue(.serviceTier)?.stringValue.flatMap { $0.isEmpty ? nil : $0 },
+            streamMode: enabledValue(.stream)?.boolValue == true ? .enabled : .disabled,
             retryPolicy: retryPolicy,
-            providerExtras: decodedProviderExtras
+            providerExtras: extras
         )
     }
 
-    var decodedProviderExtras: [String: JSONValue] {
+    var decodedParameterValues: [String: JSONValue] {
         get {
-            guard let data = providerExtrasJSON.data(using: .utf8),
+            guard let data = parameterValuesJSON.data(using: .utf8),
                   let decoded = try? JSONDecoder().decode([String: JSONValue].self, from: data) else {
                 return [:]
             }
@@ -243,10 +302,10 @@ final class ConversationOptions: Equatable {
         set {
             guard let data = try? JSONEncoder().encode(newValue),
                   let json = String(data: data, encoding: .utf8) else {
-                providerExtrasJSON = "{}"
+                parameterValuesJSON = "{}"
                 return
             }
-            providerExtrasJSON = json
+            parameterValuesJSON = json
         }
     }
 
@@ -281,6 +340,66 @@ final class ConversationOptions: Equatable {
         toolConfigurations = updatedConfigs
     }
 
+    private func enabledValue(_ parameter: LLMParameterID) -> JSONValue? {
+        guard isParameterEnabled(parameter) else { return nil }
+        return parameterValue(parameter)
+    }
+
+    private func enabledProviderExtras() -> [String: JSONValue] {
+        decodedParameterValues.reduce(into: [:]) { result, entry in
+            guard let parameterID = LLMParameterID(rawValue: entry.key),
+                  Self.providerExtraParameters.contains(parameterID),
+                  isParameterEnabled(parameterID) else {
+                return
+            }
+            result[entry.key] = entry.value
+        }
+    }
+
+    private func normalizedValue(_ value: JSONValue, for parameter: LLMParameterID) -> JSONValue {
+        switch parameter {
+        case .model, .systemPrompt, .responseFormat, .reasoningEffort, .reasoningSummary,
+             .serviceTier, .toolChoice, .promptCacheKey, .previousResponseID, .include,
+             .textVerbosity, .logitBias, .user, .safetyIdentifier:
+            return value.stringValue.map { .string($0) } ?? value
+        case .maxOutputTokens, .seed:
+            return value.integerValue.map { .integer($0) } ?? value
+        case .temperature, .topP, .frequencyPenalty, .presencePenalty:
+            return value.doubleValue.map { .number($0) } ?? value
+        case .stream, .store, .parallelToolCalls:
+            return value.boolValue.map { .boolean($0) } ?? value
+        case .stopSequences:
+            let stops = Self.stopSequences(from: value)
+            return stops.isEmpty ? .array([]) : .array(stops.map { .string($0) })
+        }
+    }
+
+    private static func defaultEnabledState(for parameter: LLMParameterID) -> Bool {
+        switch parameter {
+        case .model, .systemPrompt:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private static let providerExtraParameters: Set<LLMParameterID> = [
+        .store,
+        .toolChoice,
+        .parallelToolCalls,
+        .promptCacheKey,
+        .previousResponseID,
+        .include,
+        .textVerbosity,
+        .frequencyPenalty,
+        .presencePenalty,
+        .logitBias,
+        .seed,
+        .user,
+        .safetyIdentifier,
+        .reasoningSummary
+    ]
+
     private static func stopSequences(from value: JSONValue?) -> [String] {
         guard let value else { return [] }
         if let array = value.arrayValue {
@@ -298,19 +417,9 @@ final class ConversationOptions: Equatable {
             && lhs.avatarImageData == rhs.avatarImageData
             && lhs.enabledToolsDict == rhs.enabledToolsDict
             && lhs.toolConfigurations == rhs.toolConfigurations
-            && lhs.parameterInclusionPreferences == rhs.parameterInclusionPreferences
+            && lhs.parameterEnabledStates == rhs.parameterEnabledStates
+            && lhs.parameterValuesJSON == rhs.parameterValuesJSON
             && lhs.isMarkdownEnabled == rhs.isMarkdownEnabled
-            && lhs.systemPrompt == rhs.systemPrompt
-            && lhs.selectedModelID == rhs.selectedModelID
-            && lhs.temperature == rhs.temperature
-            && lhs.topP == rhs.topP
-            && lhs.maxOutputTokens == rhs.maxOutputTokens
-            && lhs.stopSequences == rhs.stopSequences
-            && lhs.responseFormatRaw == rhs.responseFormatRaw
-            && lhs.reasoningEffort == rhs.reasoningEffort
-            && lhs.serviceTier == rhs.serviceTier
-            && lhs.streamModeRaw == rhs.streamModeRaw
             && lhs.retryPolicyRaw == rhs.retryPolicyRaw
-            && lhs.providerExtrasJSON == rhs.providerExtrasJSON
     }
 }

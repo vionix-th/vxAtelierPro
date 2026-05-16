@@ -37,9 +37,7 @@ struct ConversationOptionsView: View {
 
     @ViewBuilder
     private func apiConfigurationPicker() -> some View {
-        HStack {
-            Text("API Configuration")
-                .frame(width: 150, alignment: .leading)
+        LabeledContent("API Configuration") {
             Picker("", selection: $options.apiConfiguration) {
                 ForEach(apiConfigurations) { config in
                     Text(config.name).tag(config as APIConfigurationItem?)
@@ -51,216 +49,29 @@ struct ConversationOptionsView: View {
     }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            // MARK: Parameters Tab (Tab 0)
-            VStack {
-                ScrollView {
-                    VStack(spacing: AppDefaults.paddingLarge) {
-                        apiConfigurationPicker()
-                        
-                        SettingsCardView(title: "Model Parameters") {
-                            VStack(spacing: AppDefaults.paddingMedium) {
-                                let controls = parameterControls
-                                if !controls.isEmpty {
-                                    ForEach(controls) { control in
-                                        ParameterControlView(
-                                            control: control,
-                                            apiConfiguration: options.apiConfiguration,
-                                            onValueChanged: { value in
-                                                options.setParameterValue(control.parameterID, value: value)
-                                            },
-                                            onEnabledChanged: { isEnabled in
-                                                options.setParameterEnabled(control.parameterID, enabled: isEnabled)
-                                            }
-                                        )
-                                    }
-                                } else {
-                                    Text("No parameters configured")
-                                        .foregroundColor(.gray)
-                                        .italic()
-                                }
-                            }
-                        }.disabled(options.apiConfiguration == nil)
-                    }
-                    .padding(.vertical, AppDefaults.paddingLarge)
+        VStack(alignment: .leading, spacing: 0) {
+            header
+
+            Divider()
+
+            selectedPane
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            Divider()
+
+            HStack {
+                Spacer()
+                Button("Done") {
+                    vxAtelierPro.log.debug("Done button pressed")
+                    dismiss()
                 }
+                .keyboardShortcut(.defaultAction)
             }
-            .tabItem {
-                Label("Parameters", systemImage: "slider.horizontal.3")
-            }
-            .tag(0)
-
-            // MARK: Tools Tab (Tab 1)
-            VStack {
-                ScrollView {
-                    VStack(spacing: AppDefaults.paddingLarge) {
-                        SettingsCardView(title: "Available Tools") {
-                            // Move Enable/Disable buttons inside
-                            HStack {
-                                Button("Enable All Tools") {
-                                    for tool in LLMToolRegistry.shared.getTools() {
-                                        options.setToolEnabled(tool.name, enabled: true)
-                                    }
-                                }
-                                .buttonStyle(.bordered)
-                                .padding(.horizontal, AppDefaults.paddingSmall)
-
-                                Button("Disable All Tools") {
-                                    for tool in LLMToolRegistry.shared.getTools() {
-                                        options.setToolEnabled(tool.name, enabled: false)
-                                    }
-                                }
-                                .buttonStyle(.bordered)
-                                .padding(.horizontal, AppDefaults.paddingSmall)
-                            }
-                            .padding(.bottom, AppDefaults.paddingMedium) // Add some spacing below buttons
-
-                            // Existing tools list VStack
-                            VStack(spacing: 0) {
-                                if LLMToolRegistry.shared.getTools().isEmpty {
-                                    Text("No tools available")
-                                        .foregroundColor(.gray)
-                                        .italic()
-                                        .frame(maxWidth: .infinity, alignment: .center)
-                                        .padding()
-                                } else {
-                                    ForEach(LLMToolRegistry.shared.getTools(), id: \.name) { tool in
-                                        VStack(spacing: 0) {
-                                            HStack {
-                                                VStack(alignment: .leading, spacing: 4) {
-                                                    Text(tool.name)
-                                                        .font(.headline)
-                                                    Text(tool.description)
-                                                        .font(.caption)
-                                                        .foregroundColor(.secondary)
-                                                }
-                                                Spacer()
-                                                Toggle("", isOn: Binding(
-                                                    get: { options.isToolEnabled(tool.name) },
-                                                    set: { isEnabled in
-                                                        options.setToolEnabled(tool.name, enabled: isEnabled)
-                                                    }
-                                                ))
-                                                .labelsHidden()
-                                                .toggleStyle(SwitchToggleStyle(tint: .accentColor))
-                                            }
-                                            .padding(.vertical, 8)
-                                            
-                                            if options.isToolEnabled(tool.name) {
-                                                if let configurableTool = tool as? any ConfigurableLLMTool {
-                                                    ToolConfigurationView(
-                                                        tool: configurableTool,
-                                                        configuration: Binding(
-                                                            get: { 
-                                                                options.getToolConfiguration(tool.name) ?? configurableTool.defaultConfiguration()
-                                                            },
-                                                            set: { 
-                                                                options.setToolConfiguration(tool.name, configuration: $0) 
-                                                            }
-                                                        )
-                                                    )
-                                                    .padding(.leading, 34)
-                                                    .padding(.bottom, 8)
-                                                }
-                                            }
-                                            
-                                            if tool.name != LLMToolRegistry.shared.getTools().last?.name {
-                                                Divider()
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .padding(.vertical, AppDefaults.paddingLarge)
-                }
-            }
-            .tabItem {
-                Label("Tools", systemImage: "wrench.and.screwdriver")
-            }
-            .tag(1)
-
-            // MARK: General Tab (Tab 2)
-            VStack {
-                ScrollView {
-                    VStack(spacing: AppDefaults.paddingLarge) {
-                        SettingsCardView(title: "General Options") { 
-                            VStack(spacing: AppDefaults.paddingMedium) {
-                                // Display Options
-                                VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
-                                    Text("Display")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                    
-                                    Toggle("Enable Markdown Rendering", isOn: $options.isMarkdownEnabled)
-                                        .padding(.vertical, 4)
-                                    
-                                    Text("When enabled, messages will be rendered with Markdown formatting including code blocks, lists, and formatting.")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                
-                                Divider()
-                                    .padding(.vertical, AppDefaults.paddingMedium)
-                                
-                                // Avatar
-                                VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
-                                    Text("Avatar")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                    
-                                    HStack {
-                                        Spacer()
-                                        
-                                        // Ensure AvatarView uses the bound options data
-                                        AvatarView(
-                                            imageData: options.avatarImageData, 
-                                            size: AppDefaults.avatarImageSize, 
-                                            strokeWidth: AppDefaults.avatarStrokeWidth
-                                        )
-                                        
-                                        Spacer()
-                                    }
-                                    .padding(.vertical, AppDefaults.paddingSmall)
-
-                                    HStack {
-                                        Spacer()
-                                        
-                                        Button(action: {
-                                            vxAtelierPro.log.debug("Avatar image button tapped")
-                                            isAvatarImageImporting = true
-                                        }) {
-                                            Text(options.avatarImageData == nil ? "Add Avatar" : "Change Avatar")
-                                        }
-                                        .buttonStyle(.bordered)
-
-                                        if options.avatarImageData != nil {
-                                            Button(role: .destructive) {
-                                                vxAtelierPro.log.debug("Avatar image removed")
-                                                // Update bound options data
-                                                options.avatarImageData = nil
-                                            } label: {
-                                                Text("Remove Avatar")
-                                            }
-                                            .buttonStyle(.bordered)
-                                        }
-                                        
-                                        Spacer()
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .padding(.vertical, AppDefaults.paddingLarge)
-                }
-            }
-            .tabItem {
-                Label("General", systemImage: "gearshape")
-            }
-            .tag(2)
+            .padding()
         }
-        .padding(AppDefaults.paddingMedium)
+        #if os(macOS)
+            .presentationSizing(.page)
+        #endif
         .onChange(of: options.apiConfiguration) {
             if let config = options.apiConfiguration {
                 vxAtelierPro.log.info("API configuration changed, updating defaults")
@@ -270,15 +81,6 @@ struct ConversationOptionsView: View {
                 vxAtelierPro.log.info("Set default model to \(defaultModel) for provider \(provider.displayName)")
             }
         }
-        .toolbar {
-            ToolbarItem {
-                Button("Close") {
-                    vxAtelierPro.log.debug("Close button pressed")
-                    dismiss()
-                }
-            }
-        }
-        .navigationTitle("Conversation Options")
         #if os(macOS)
             .fileImporter(isPresented: $isAvatarImageImporting, allowedContentTypes: [.image]) { result in
                 switch result {
@@ -317,6 +119,179 @@ struct ConversationOptionsView: View {
             }
         #endif
     }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Conversation Options")
+                .font(.title2)
+                .fontWeight(.semibold)
+
+            Picker("Options Section", selection: $selectedTab) {
+                Label("Parameters", systemImage: "slider.horizontal.3").tag(0)
+                Label("Tools", systemImage: "wrench.and.screwdriver").tag(1)
+                Label("General", systemImage: "gearshape").tag(2)
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var selectedPane: some View {
+        switch selectedTab {
+        case 0:
+            parametersPane
+        case 1:
+            toolsPane
+        default:
+            generalPane
+        }
+    }
+
+    private var parametersPane: some View {
+        Form {
+            apiConfigurationPicker()
+
+            Section("Model Parameters") {
+                let controls = parameterControls
+                if !controls.isEmpty {
+                    ForEach(controls) { control in
+                        ParameterControlView(
+                            control: control,
+                            apiConfiguration: options.apiConfiguration,
+                            onValueChanged: { value in
+                                options.setParameterValue(control.parameterID, value: value)
+                            },
+                            onEnabledChanged: { isEnabled in
+                                options.setParameterEnabled(control.parameterID, enabled: isEnabled)
+                            }
+                        )
+                    }
+                } else {
+                    Text("No parameters configured")
+                        .foregroundColor(.gray)
+                        .italic()
+                }
+            }
+            .disabled(options.apiConfiguration == nil)
+        }
+        .formStyle(.grouped)
+    }
+
+    private var toolsPane: some View {
+        Form {
+            Section("Available Tools") {
+                HStack {
+                    Button("Enable All Tools") {
+                        for tool in LLMToolRegistry.shared.getTools() {
+                            options.setToolEnabled(tool.name, enabled: true)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button("Disable All Tools") {
+                        for tool in LLMToolRegistry.shared.getTools() {
+                            options.setToolEnabled(tool.name, enabled: false)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                if LLMToolRegistry.shared.getTools().isEmpty {
+                    Text("No tools available")
+                        .foregroundColor(.gray)
+                        .italic()
+                } else {
+                    ForEach(LLMToolRegistry.shared.getTools(), id: \.name) { tool in
+                        LabeledContent {
+                            Toggle("", isOn: Binding(
+                                get: { options.isToolEnabled(tool.name) },
+                                set: { isEnabled in
+                                    options.setToolEnabled(tool.name, enabled: isEnabled)
+                                }
+                            ))
+                            .labelsHidden()
+                            .toggleStyle(SwitchToggleStyle(tint: .accentColor))
+                        } label: {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(tool.name)
+                                Text(tool.description)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        if options.isToolEnabled(tool.name),
+                           let configurableTool = tool as? any ConfigurableLLMTool {
+                            LabeledContent {
+                                ToolConfigurationView(
+                                    tool: configurableTool,
+                                    configuration: Binding(
+                                        get: {
+                                            options.getToolConfiguration(tool.name) ?? configurableTool.defaultConfiguration()
+                                        },
+                                        set: {
+                                            options.setToolConfiguration(tool.name, configuration: $0)
+                                        }
+                                    )
+                                )
+                            } label: {
+                                Text("\(tool.name) Configuration")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private var generalPane: some View {
+        Form {
+            Section("Display") {
+                Toggle("Enable Markdown Rendering", isOn: $options.isMarkdownEnabled)
+
+                Text("When enabled, messages will be rendered with Markdown formatting including code blocks, lists, and formatting.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Section("Avatar") {
+                LabeledContent("Current Avatar") {
+                    AvatarView(
+                        imageData: options.avatarImageData,
+                        size: AppDefaults.avatarImageSize,
+                        strokeWidth: AppDefaults.avatarStrokeWidth
+                    )
+                }
+
+                LabeledContent("Avatar Image") {
+                    HStack {
+                        Button(action: {
+                            vxAtelierPro.log.debug("Avatar image button tapped")
+                            isAvatarImageImporting = true
+                        }) {
+                            Text(options.avatarImageData == nil ? "Add" : "Change")
+                        }
+                        .buttonStyle(.bordered)
+
+                        if options.avatarImageData != nil {
+                            Button(role: .destructive) {
+                                vxAtelierPro.log.debug("Avatar image removed")
+                                options.avatarImageData = nil
+                            } label: {
+                                Text("Remove")
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
 }
 
 // MARK: - System Prompt Editor
@@ -330,8 +305,9 @@ private struct SystemPromptEditor: View {
 
     var body: some View {
         HStack {
-            TextField("System Prompt", text: $promptValue)
+            TextField("", text: $promptValue)
                 .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("System Prompt")
             
             Button {
                 isEditorPresented = true
@@ -395,46 +371,94 @@ struct ParameterControlView: View {
     @State private var isModelPickerPresented: Bool = false
 
     var body: some View {
-        HStack(spacing: AppDefaults.paddingMedium) {
-            Text(control.displayName)
-                .frame(width: 130, alignment: .leading)
-                .help(control.description)
-                .foregroundColor(control.isEnabled ? .primary : .secondary)
-
-            if control.isEnabled {
-                switch control.controlType {
-                case .textField:
-                    if control.parameterID == .systemPrompt {
-                        SystemPromptEditor(promptValue: stringBinding)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    } else {
-                        textFieldControl(for: control.valueType)
-                    }
-                case .stepper:
-                    stepperControl(for: control.valueType)
-                case .slider:
-                    sliderControl(for: control.valueType)
-                case .toggle:
-                    toggleControl()
-                case .picker:
-                    pickerControl(for: control.valueType)
+        LabeledContent {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: AppDefaults.paddingMedium) {
+                    parameterValueControl
+                        .layoutPriority(1)
+                    enabledToggle
                 }
-            } else {
-                Text("Not used")
-                    .foregroundColor(.secondary)
-                    .italic()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
 
-            if !control.required {
-                Toggle("", isOn: Binding(
-                    get: { control.isEnabled },
-                    set: onEnabledChanged
-                ))
-                .labelsHidden()
-                .toggleStyle(SwitchToggleStyle(tint: .accentColor))
+                VStack(alignment: .trailing, spacing: AppDefaults.paddingSmall) {
+                    parameterValueControl
+                    enabledToggle
+                }
+            }
+            .disabled(!control.isValueEditable)
+            .opacity(control.isValueEditable ? 1 : 0.55)
+        } label: {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(control.displayName)
+                    .font(.body)
+                    .help(control.description)
+                    .foregroundColor(control.isValueEditable ? .primary : .secondary)
+                parameterStateBadges
             }
         }
+    }
+
+    private var enabledToggle: some View {
+        Toggle("", isOn: Binding(
+            get: { control.isEnabled },
+            set: onEnabledChanged
+        ))
+        .labelsHidden()
+        .toggleStyle(SwitchToggleStyle(tint: .accentColor))
+        .disabled(!control.canToggleEnabled)
+        .help(enabledToggleHelp)
+    }
+
+    @ViewBuilder
+    private var parameterValueControl: some View {
+        switch control.controlType {
+        case .textField:
+            if control.parameterID == .systemPrompt {
+                SystemPromptEditor(promptValue: stringBinding)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                textFieldControl(for: control.valueType)
+            }
+        case .stepper:
+            stepperControl(for: control.valueType)
+        case .slider:
+            sliderControl(for: control.valueType)
+        case .toggle:
+            toggleControl()
+        case .picker:
+            pickerControl(for: control.valueType)
+        }
+    }
+
+    @ViewBuilder
+    private var parameterStateBadges: some View {
+        HStack(spacing: 6) {
+            if control.required {
+                Text("Required")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            Text(control.isAvailable ? "Available" : "Unavailable")
+                .font(.caption2)
+                .foregroundColor(control.isAvailable ? .secondary : .red)
+            if !control.isMapped {
+                Text("Unmapped")
+                    .font(.caption2)
+                    .foregroundColor(.orange)
+            }
+        }
+    }
+
+    private var enabledToggleHelp: String {
+        if control.required {
+            return "Required parameters are always enabled."
+        }
+        if !control.isAvailable {
+            return "Unavailable parameters cannot be sent."
+        }
+        if !control.isMapped {
+            return "Unmapped parameters cannot be sent."
+        }
+        return "Controls whether this parameter is sent with requests."
     }
 
     private var stringBinding: Binding<String> {
@@ -464,11 +488,12 @@ struct ParameterControlView: View {
         case .string:
             if control.parameterID == .model {
                 HStack {
-                    TextField(control.parameterID.rawValue, text: Binding(
+                    TextField("", text: Binding(
                         get: { control.value?.stringValue ?? "" },
                         set: { onValueChanged(.string($0)) }
                     ))
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel(control.displayName)
 
                     Button {
                         vxAtelierPro.log.debug("Opening model picker")
@@ -494,31 +519,35 @@ struct ParameterControlView: View {
                     }
                 }
             } else {
-                TextField(control.parameterID.rawValue, text: stringBinding)
+                TextField("", text: stringBinding)
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityLabel(control.displayName)
             }
         case .integer:
-            TextField(control.parameterID.rawValue, value: Binding(
+            TextField("", value: Binding(
                 get: { control.value?.integerValue ?? 0 },
                 set: { onValueChanged(.integer($0)) }
             ), formatter: NumberFormatter())
             .textFieldStyle(.roundedBorder)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityLabel(control.displayName)
         case .float:
-            TextField(control.parameterID.rawValue, value: Binding(
+            TextField("", value: Binding(
                 get: { control.value?.doubleValue ?? 0 },
                 set: { onValueChanged(.number($0)) }
             ), formatter: NumberFormatter())
             .textFieldStyle(.roundedBorder)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityLabel(control.displayName)
         case .boolean:
-            TextField(control.parameterID.rawValue, text: Binding(
+            TextField("", text: Binding(
                 get: { (control.value?.boolValue ?? false) ? "true" : "false" },
                 set: { onValueChanged(.boolean($0.lowercased() == "true")) }
             ))
             .textFieldStyle(.roundedBorder)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityLabel(control.displayName)
         }
     }
 
@@ -536,8 +565,7 @@ struct ParameterControlView: View {
     private func numericControl(for valueType: LLMParameterValueType, useStepper: Bool) -> some View {
         switch valueType {
         case .integer:
-            HybridNumericInputView(
-                label: nil,
+            numericInput(
                 value: intBinding,
                 minValue: control.minValue ?? 0,
                 maxValue: control.maxValue ?? 10,
@@ -546,8 +574,7 @@ struct ParameterControlView: View {
                 useStepper: useStepper
             )
         case .float:
-            HybridNumericInputView(
-                label: nil,
+            numericInput(
                 value: doubleBinding,
                 minValue: control.minValue ?? 0,
                 maxValue: control.maxValue ?? 1,
@@ -559,6 +586,32 @@ struct ParameterControlView: View {
             Text("Unsupported numeric parameter")
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    @ViewBuilder
+    private func numericInput(
+        value: Binding<Double>,
+        minValue: Double,
+        maxValue: Double,
+        step: Double,
+        isInteger: Bool,
+        useStepper: Bool
+    ) -> some View {
+        HStack(spacing: AppDefaults.paddingMedium) {
+            if useStepper {
+                Stepper(value: value, in: minValue...maxValue, step: step) {
+                    TextField("", value: value, formatter: HybridNumericInputView.numberFormatter(isInteger: isInteger))
+                        .textFieldStyle(.roundedBorder)
+                }
+            } else {
+                Slider(value: value, in: minValue...maxValue, step: step)
+                    .frame(maxWidth: .infinity)
+
+                TextField("", value: value, formatter: HybridNumericInputView.numberFormatter(isInteger: isInteger))
+                    .textFieldStyle(.roundedBorder)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder

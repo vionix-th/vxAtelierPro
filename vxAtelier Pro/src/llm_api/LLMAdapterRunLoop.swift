@@ -23,7 +23,7 @@ enum LLMAdapterRunLoop {
             let task = Task {
                 do {
                     try LLMCapabilityValidator.validate(request, profile: profile)
-                    let streamEnabled = try LLMCapabilityValidator.resolveStreamEnabled(for: request, profile: profile)
+                    let streamEnabled = LLMCapabilityValidator.streamEnabled(for: request)
                     let body = try makeBody(streamEnabled)
                     let httpConfig = httpClient.makeConfiguration(for: configuration)
                     continuation.yield(.runStarted(requestID: nil))

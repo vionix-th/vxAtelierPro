@@ -13,7 +13,6 @@ struct LLMGenerationOptions: Codable, Equatable {
     enum StreamMode: String, Codable, CaseIterable {
         case disabled
         case enabled
-        case auto
     }
 
     /// Retry behavior allowed before the run reaches tool execution.
@@ -46,7 +45,7 @@ struct LLMGenerationOptions: Codable, Equatable {
         responseFormat: ResponseFormat = .text,
         reasoning: String? = nil,
         serviceTier: String? = nil,
-        streamMode: StreamMode = .auto,
+        streamMode: StreamMode = .disabled,
         retryPolicy: RetryPolicy = .disabled,
         providerExtras: [String: JSONValue] = [:]
     ) {

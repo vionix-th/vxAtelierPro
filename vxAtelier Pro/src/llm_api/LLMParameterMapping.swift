@@ -141,8 +141,6 @@ extension LLMGenerationOptions {
                 return .boolean(true)
             case .disabled:
                 return .boolean(false)
-            case .auto:
-                return nil
             }
         case .store,
              .toolChoice,

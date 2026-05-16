@@ -8,7 +8,7 @@ import XCTest
 
 @MainActor
 final class ConversationCompletionUseCaseTests: LLMTestCase {
-    func testStreamModeAutoUsesNonStreamingWhenModelDoesNotSupportStreaming() async throws {
+    func testStreamModeDisabledUsesNonStreamingWhenModelDoesNotSupportStreaming() async throws {
         URLProtocol.registerClass(MockLLMURLProtocol.self)
         defer {
             URLProtocol.unregisterClass(MockLLMURLProtocol.self)
@@ -50,7 +50,7 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         )
         let options = ConversationOptions(apiConfiguration: config)
         options.selectedModelID = "gpt-test"
-        options.streamMode = .auto
+        options.streamMode = .disabled
         let conversation = ConversationItem("Auto stream", options: options)
         let model = ModelItem(modelID: "gpt-test", apiConfiguration: config)
         model.capabilitiesRaw = [LLMModelCapability.text.rawValue, LLMModelCapability.usage.rawValue]

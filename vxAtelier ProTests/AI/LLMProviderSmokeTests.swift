@@ -768,7 +768,7 @@ private struct LiveSmokeStreamPolicy {
         if modelSupportsStreaming, allowsStreaming {
             return .enabled
         }
-        return .auto
+        return .disabled
     }
 }
 

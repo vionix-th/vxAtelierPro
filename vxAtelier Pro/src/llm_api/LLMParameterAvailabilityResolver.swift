@@ -137,7 +137,7 @@ private extension LLMGenerationOptions {
         case .serviceTier:
             serviceTier = nil
         case .stream:
-            streamMode = .auto
+            streamMode = .disabled
         case .store,
              .toolChoice,
              .parallelToolCalls,
@@ -185,7 +185,7 @@ private extension LLMGenerationOptions {
             if let bool = value.boolValue {
                 streamMode = bool ? .enabled : .disabled
             } else if let string = value.stringValue {
-                streamMode = LLMGenerationOptions.StreamMode(rawValue: string) ?? .auto
+                streamMode = LLMGenerationOptions.StreamMode(rawValue: string) ?? .disabled
             }
         case .store,
              .toolChoice,

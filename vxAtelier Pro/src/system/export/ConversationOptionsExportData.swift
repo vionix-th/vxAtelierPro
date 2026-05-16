@@ -8,8 +8,9 @@ struct ConversationOptionsExportData: Codable {
     let apiConfiguration: APIConfigurationExportData?
     let enabledToolsDict: [String: Bool]
     let toolConfigurations: [String: String]
-    // Keep export key stable for existing backups; model code names this parameterInclusionPreferences.
+    // Keep export key stable for existing backups; model code names this parameterEnabledStates.
     let enabledParameterOverrides: [String: Bool]
+    let parameterValuesJSON: String?
     let isMarkdownEnabled: Bool
     let systemPrompt: String?
     let selectedModelID: String?
@@ -30,6 +31,7 @@ struct ConversationOptionsExportData: Codable {
         self.enabledToolsDict = options.enabledToolsDict
         self.toolConfigurations = options.toolConfigurations
         self.enabledParameterOverrides = options.parameterInclusionPreferences
+        self.parameterValuesJSON = options.parameterValuesJSON
         self.isMarkdownEnabled = options.isMarkdownEnabled
         self.systemPrompt = options.systemPrompt
         self.selectedModelID = options.selectedModelID
@@ -54,19 +56,24 @@ struct ConversationOptionsExportData: Codable {
         options.enabledToolsDict = enabledToolsDict
         options.toolConfigurations = toolConfigurations
         options.parameterInclusionPreferences = enabledParameterOverrides
+        options.parameterValuesJSON = parameterValuesJSON ?? options.parameterValuesJSON
         options.isMarkdownEnabled = isMarkdownEnabled
-        options.systemPrompt = systemPrompt ?? ""
-        options.selectedModelID = selectedModelID
-        options.temperature = temperature
-        options.topP = topP
-        options.maxOutputTokens = maxOutputTokens
-        options.stopSequences = stopSequences ?? []
-        options.responseFormatRaw = responseFormatRaw ?? LLMGenerationOptions.ResponseFormat.text.rawValue
-        options.reasoningEffort = reasoningEffort
-        options.serviceTier = serviceTier
-        options.streamModeRaw = streamModeRaw ?? LLMGenerationOptions.StreamMode.auto.rawValue
+        if parameterValuesJSON == nil {
+            options.systemPrompt = systemPrompt ?? ""
+            options.selectedModelID = selectedModelID
+            options.temperature = temperature
+            options.topP = topP
+            options.maxOutputTokens = maxOutputTokens
+            options.stopSequences = stopSequences ?? []
+            options.responseFormatRaw = responseFormatRaw ?? LLMGenerationOptions.ResponseFormat.text.rawValue
+            options.reasoningEffort = reasoningEffort
+            options.serviceTier = serviceTier
+            options.streamModeRaw = streamModeRaw ?? LLMGenerationOptions.StreamMode.disabled.rawValue
+            options.providerExtrasJSON = providerExtrasJSON ?? "{}"
+        }
         options.retryPolicyRaw = retryPolicyRaw ?? LLMGenerationOptions.RetryPolicy.disabled.rawValue
-        options.providerExtrasJSON = providerExtrasJSON ?? "{}"
+        options.normalizeKnownParameters()
+        options.reconcileParameters()
         
         return options
     }

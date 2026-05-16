@@ -14,7 +14,17 @@ struct ConversationParameterControl: Identifiable, Equatable {
     var step: Double?
     var options: [String]?
     var value: JSONValue?
+    var isAvailable: Bool
+    var isMapped: Bool
     var isEnabled: Bool
+
+    var canToggleEnabled: Bool {
+        isAvailable && isMapped && !required
+    }
+
+    var isValueEditable: Bool {
+        isAvailable && isMapped
+    }
 }
 
 enum ConversationParameterProjection {
@@ -39,55 +49,64 @@ enum ConversationParameterProjection {
             availability: model?.parameterAvailability.map(\.descriptor) ?? []
         )
 
-        var controls = [
-            control(
-                for: .model,
-                required: true,
-                value: options.parameterValue(.model) ?? .string(modelID),
-                isEnabled: true
-            ),
-            control(
-                for: .systemPrompt,
-                required: true,
-                value: options.parameterValue(.systemPrompt),
-                isEnabled: true
-            )
-        ]
-
-        for descriptor in availability.values.sorted(by: {
-            AiParameterPresentationCatalog.displayName(for: $0.semanticParameterID)
-                < AiParameterPresentationCatalog.displayName(for: $1.semanticParameterID)
-        }) {
-            guard descriptor.isAvailable,
-                  descriptor.semanticParameterID.isProviderMappable,
-                  mappings[descriptor.semanticParameterID]?.encodingKind != .disabled else { continue }
-            let value = options.parameterValue(descriptor.semanticParameterID) ?? descriptor.defaultValue
-            controls.append(control(
-                for: descriptor.semanticParameterID,
-                required: descriptor.isRequired,
-                value: value,
-                isEnabled: LLMParameterAvailabilityResolver.isParameterSendable(
-                    descriptor.semanticParameterID,
-                    value: options.parameterValue(descriptor.semanticParameterID),
-                    conversationPreference: options.parameterInclusionPreference(descriptor.semanticParameterID),
+        var controls: [ConversationParameterControl] = []
+        for parameterID in LLMParameterID.allCases {
+            let descriptor = availability[parameterID]
+            let mapping = mappings[parameterID]
+            let isProviderMappable = parameterID.isProviderMappable
+            let isAvailable = !isProviderMappable || descriptor?.isAvailable == true
+            let isMapped = !isProviderMappable || (mapping != nil && mapping?.encodingKind != .disabled)
+            let required = !isProviderMappable || descriptor?.isRequired == true
+            let value = options.parameterValue(parameterID)
+                ?? descriptor?.defaultValue
+                ?? (parameterID == .model ? .string(modelID) : nil)
+            let isEnabled: Bool
+            if !isAvailable || !isMapped {
+                isEnabled = false
+            } else if required {
+                isEnabled = true
+            } else if let descriptor {
+                isEnabled = LLMParameterAvailabilityResolver.isParameterSendable(
+                    parameterID,
+                    value: options.parameterValue(parameterID),
+                    conversationPreference: options.parameterInclusionPreference(parameterID),
                     modelAvailability: descriptor
                 )
+            } else {
+                isEnabled = options.isParameterEnabled(parameterID)
+            }
+            controls.append(control(
+                for: parameterID,
+                required: required,
+                value: value,
+                isAvailable: isAvailable,
+                isMapped: isMapped,
+                isEnabled: isEnabled
             ))
         }
 
         return controls.sorted { lhs, rhs in
-            if lhs.required != rhs.required { return lhs.required }
-            if !lhs.required && !rhs.required && lhs.isEnabled != rhs.isEnabled {
-                return lhs.isEnabled
+            let lhsGroup = sortGroup(for: lhs)
+            let rhsGroup = sortGroup(for: rhs)
+            if lhsGroup != rhsGroup {
+                return lhsGroup < rhsGroup
             }
             return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
         }
+    }
+
+    private static func sortGroup(for control: ConversationParameterControl) -> Int {
+        if control.isEnabled { return 0 }
+        if control.isAvailable && control.isMapped { return 1 }
+        return 2
     }
 
     private static func control(
         for parameterID: LLMParameterID,
         required: Bool,
         value: JSONValue?,
+        isAvailable: Bool,
+        isMapped: Bool,
         isEnabled: Bool
     ) -> ConversationParameterControl {
         let presentation = AiParameterPresentationCatalog.presentation(for: parameterID)
@@ -103,6 +122,8 @@ enum ConversationParameterProjection {
             step: presentation.step,
             options: parameterID.options,
             value: value,
+            isAvailable: isAvailable,
+            isMapped: isMapped,
             isEnabled: isEnabled
         )
     }

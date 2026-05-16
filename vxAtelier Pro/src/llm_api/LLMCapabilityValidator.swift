@@ -8,25 +8,27 @@ struct LLMCapabilityValidator {
             throw LLMProviderError.authUnavailable("\(profile.name) is disabled.")
         }
         try validateEndpoint(request, profile: profile)
-        _ = try resolveStreamEnabled(for: request, profile: profile)
+        try validateStreaming(for: request, profile: profile)
         try validateParameters(request, profile: profile)
         try validateContent(request, profile: profile)
         try validateToolReplay(request)
     }
 
-    /// Resolves `.auto` streaming behavior and rejects unsupported forced streaming.
-    static func resolveStreamEnabled(for request: LLMRequest, profile: LLMProviderProfile) throws -> Bool {
-        let supportsStreaming = supportsCapability(.streaming, request: request)
+    /// Rejects unsupported forced streaming.
+    static func validateStreaming(for request: LLMRequest, profile: LLMProviderProfile) throws {
+        guard request.options.streamMode == .enabled else { return }
+        guard supportsCapability(.streaming, request: request) else {
+            throw LLMProviderError.unsupportedCapability("\(profile.name) does not support streaming for \(request.modelID).")
+        }
+    }
+
+    /// Returns the explicit stream flag selected by conversation parameters.
+    static func streamEnabled(for request: LLMRequest) -> Bool {
         switch request.options.streamMode {
         case .disabled:
             return false
         case .enabled:
-            guard supportsStreaming else {
-                throw LLMProviderError.unsupportedCapability("\(profile.name) does not support streaming for \(request.modelID).")
-            }
             return true
-        case .auto:
-            return supportsStreaming
         }
     }
 

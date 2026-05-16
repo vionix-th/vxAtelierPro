@@ -42,6 +42,7 @@ final class ConversationRunContextResolverTests: XCTestCase {
         let options = ConversationOptions(apiConfiguration: configB)
         options.selectedModelID = "gpt-test"
         options.maxOutputTokens = 256
+        options.setParameterEnabled(.maxOutputTokens, enabled: true)
         let conversation = ConversationItem("Scoped model", options: options)
 
         env.modelContext.insert(configA)
