@@ -41,7 +41,7 @@ struct MaintenanceSettingsView: View {
                         title: "Reset to Defaults",
                         message: "Are you sure you want to reset all settings to their default values?",
                         confirmTitle: "Reset",
-                        action: resetToDefaults
+                        action: { _ in resetToDefaults() }
                     )
                 }
 
@@ -54,7 +54,7 @@ struct MaintenanceSettingsView: View {
                         title: "Clear Local Storage",
                         message: "Are you sure you want to clear all local storage? This action cannot be undone.",
                         confirmTitle: "Clear",
-                        action: cleanLocalStorage
+                        action: { _ in cleanLocalStorage() }
                     )
                 }
 
@@ -82,7 +82,7 @@ struct MaintenanceSettingsView: View {
                         title: "Restore Database",
                         message: "Are you sure you want to restore the database? This action cannot be undone.",
                         confirmTitle: "Restore",
-                        action: { showBackupImporter = true }
+                        action: { _ in showBackupImporter = true }
                     )
                 }
             }

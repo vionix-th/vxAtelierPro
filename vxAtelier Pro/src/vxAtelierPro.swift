@@ -333,7 +333,7 @@ struct vxAtelierPro: App {
                                 title: "Reset Settings",
                                 message: "Reset all application settings to their default values? The app will remain in recovery mode.",
                                 confirmTitle: "Reset",
-                                action: {
+                                action: { _ in
                                     AppDefaults.resetUserDefaults()
                                     showCompletion(
                                         message: "Application settings reset to defaults. Quit recovery mode and relaunch normally when ready."
@@ -351,7 +351,7 @@ struct vxAtelierPro: App {
                                 title: "Wipe Store",
                                 message: "Delete the local SwiftData store and relaunch the app into a fresh empty state?",
                                 confirmTitle: "Wipe",
-                                action: {
+                                action: { _ in
                                     Task { @MainActor in
                                         await wipeStoreAndRelaunch()
                                     }
@@ -368,7 +368,7 @@ struct vxAtelierPro: App {
                                 title: "Restore Backup",
                                 message: "Choose a full backup file next. The current local store will be replaced after the file is validated.",
                                 confirmTitle: "Choose File",
-                                action: {
+                                action: { _ in
                                     selectedImportMode = .backup
                                     showFileImporter = true
                                 }
@@ -384,7 +384,7 @@ struct vxAtelierPro: App {
                                 title: "Generic Import",
                                 message: "Choose a project, conversation, prompt, voice, or model JSON file next. The current local store will be replaced after validation.",
                                 confirmTitle: "Choose File",
-                                action: {
+                                action: { _ in
                                     selectedImportMode = .genericImport
                                     showFileImporter = true
                                 }

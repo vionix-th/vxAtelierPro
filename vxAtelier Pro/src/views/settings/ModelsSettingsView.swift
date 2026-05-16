@@ -135,7 +135,7 @@ struct ModelsSettingsView: View {
                 title: "Delete All Models",
                 message: "Are you sure you want to delete all models? This action cannot be undone.",
                 confirmTitle: "Delete",
-                action: deleteAllModels
+                action: { _ in deleteAllModels() }
             )
         } label: {
             Label("Remove All Models", systemImage: "trash")
@@ -194,7 +194,11 @@ struct ModelsSettingsView: View {
                             title: "Delete Model",
                             message: "Delete \"\(row.modelID)\"? This action cannot be undone.",
                             confirmTitle: "Delete",
-                            action: { deleteModel(id: row.id) }
+                            itemID: row.id,
+                            action: { id in
+                                guard let id else { return }
+                                deleteModel(id: id)
+                            }
                         )
                     }
                 ]

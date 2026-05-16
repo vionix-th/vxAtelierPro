@@ -15,8 +15,14 @@ struct ConversationView: View {
     @State private var isSelectingMessages: Bool = false
     @State private var draftStore = ConversationDraftStore()
     @State private var errorAlert: ErrorAlert?
-    @State private var bookmarkMessage: MessageItem?
+    @State private var bookmarkContext: BookmarkContext?
     @State private var bookmarkMessageLabel: String = ""
+
+    private struct BookmarkContext {
+        let conversationID: PersistentIdentifier
+        let turnID: PersistentIdentifier
+        let messageID: PersistentIdentifier
+    }
 
     init(
         conversationID: PersistentIdentifier,
@@ -113,25 +119,19 @@ struct ConversationView: View {
         .errorAlert(error: $errorAlert)
         .sheet(
             isPresented: Binding(
-                get: { bookmarkMessage != nil },
-                set: { if !$0 { bookmarkMessage = nil } }
+                get: { bookmarkContext != nil },
+                set: { if !$0 { bookmarkContext = nil } }
             )
         ) {
-            if let message = bookmarkMessage,
-               let (turn, event) = turnAndEvent(for: message) {
-                BookmarkSheetView(
-                    label: $bookmarkMessageLabel,
-                    turn: turn,
-                    event: event,
-                    onBookmark: { _, _, label in
-                        insertBookmark(label: label, message: message)
-                        bookmarkMessage = nil
-                    },
-                    onCancel: {
-                        bookmarkMessage = nil
-                    }
-                )
-            }
+            BookmarkSheetView(
+                label: $bookmarkMessageLabel,
+                onBookmark: {
+                    confirmBookmark()
+                },
+                onCancel: {
+                    bookmarkContext = nil
+                }
+            )
         }
         .onTapGesture { hideKeyboard() }
         .onKeyPress(.escape, action: {
@@ -313,7 +313,11 @@ struct ConversationView: View {
         switch action {
         case .bookmark:
             bookmarkMessageLabel = ""
-            bookmarkMessage = message
+            bookmarkContext = BookmarkContext(
+                conversationID: conversationID,
+                turnID: turn.id,
+                messageID: message.id
+            )
         case .removeBookmark:
             removeBookmarkForMessage(message)
         case .fork:
@@ -471,16 +475,19 @@ struct ConversationView: View {
         }
     }
 
-    private func insertBookmark(label: String, message: MessageItem) {
-        guard conversation != nil else { return }
-        guard let (turn, event) = turnAndEvent(for: message) else { return }
-
-        if let event {
-            let bookmark = BookmarkItem(label, turn: turn, event: event)
-            try? queryManager.insert(bookmark)
-        } else {
-            let bookmark = BookmarkItem(label, turn: turn)
-            try? queryManager.insert(bookmark)
+    private func confirmBookmark() {
+        guard let context = bookmarkContext else { return }
+        do {
+            try queryManager.insertBookmark(
+                label: bookmarkMessageLabel,
+                conversationID: context.conversationID,
+                turnID: context.turnID,
+                messageID: context.messageID
+            )
+            bookmarkContext = nil
+        } catch {
+            errorAlert = ErrorAlert(error: error)
+            bookmarkContext = nil
         }
     }
 

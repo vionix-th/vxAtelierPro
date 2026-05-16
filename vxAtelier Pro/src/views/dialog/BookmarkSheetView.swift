@@ -1,11 +1,8 @@
 import SwiftUI
-import SwiftData
 
 struct BookmarkSheetView: View {
     @Binding var label: String
-    let turn: ConversationTurn
-    let event: TurnEvent?
-    let onBookmark: (ConversationTurn, TurnEvent?, String) -> Void
+    let onBookmark: () -> Void
     let onCancel: () -> Void
 
     private var backgroundColor: Color {
@@ -36,9 +33,9 @@ struct BookmarkSheetView: View {
                     }
                     .buttonStyle(.bordered)
                     Spacer()
-                    Button("Bookmark") {
-                        onBookmark(turn, event, label)
-                    }
+                Button("Bookmark") {
+                    onBookmark()
+                }
                     .buttonStyle(.borderedProminent)
                     .tint(.accentColor)
                     .disabled(label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)

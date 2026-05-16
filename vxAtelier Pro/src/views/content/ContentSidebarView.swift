@@ -2,15 +2,21 @@ import SwiftData
 import SwiftUI
 
 struct ContentSidebarActions {
-    let deleteItem: (any PersistentModel) -> Void
-    let restoreItem: (any PersistentModel) -> Void
-    let archiveItem: (any PersistentModel) -> Void
-    let assignConversationToProject: (ConversationItem, ProjectItem?) -> Void
-    let requestExportProject: (ProjectItem) -> Void
-    let requestExportConversation: (ConversationItem) -> Void
-    let deleteBookmarkFromContext: (BookmarkItem) -> Void
-    let deleteBookmarkFromSwipe: (BookmarkItem) -> Void
-    let selectBookmark: (BookmarkItem) -> Void
+    let deleteProject: (PersistentIdentifier) -> Void
+    let restoreProject: (PersistentIdentifier) -> Void
+    let archiveProject: (PersistentIdentifier) -> Void
+    let renameProject: (PersistentIdentifier, String) -> Void
+    let requestExportProject: (PersistentIdentifier) -> Void
+    let deleteConversation: (PersistentIdentifier) -> Void
+    let restoreConversation: (PersistentIdentifier) -> Void
+    let archiveConversation: (PersistentIdentifier) -> Void
+    let renameConversation: (PersistentIdentifier, String) -> Void
+    let assignConversationToProject: (PersistentIdentifier, PersistentIdentifier?) -> Void
+    let requestExportConversation: (PersistentIdentifier) -> Void
+    let deleteBookmarkFromContext: (PersistentIdentifier) -> Void
+    let deleteBookmarkFromSwipe: (PersistentIdentifier) -> Void
+    let renameBookmark: (PersistentIdentifier, String) -> Void
+    let selectBookmark: (PersistentIdentifier) -> Void
 }
 
 struct ContentSidebarView: View {
@@ -26,7 +32,7 @@ struct ContentSidebarView: View {
     let showEmptySections: Bool
     let actions: ContentSidebarActions
     let availableProjects: [ProjectItem]
-    
+
     private var titleForProjects: String {
         switch contentFilter {
         case .active: return "Projects"
@@ -34,7 +40,7 @@ struct ContentSidebarView: View {
         case .trashed: return "Trashed Projects"
         }
     }
-    
+
     private var titleForConversations: String {
         switch contentFilter {
         case .active: return "Standalone Conversations"
@@ -45,15 +51,8 @@ struct ContentSidebarView: View {
 
     var body: some View {
         List(selection: $selection) {
-            projectSection(
-                title: titleForProjects,
-                projects: projects
-            )
-
-            conversationSection(
-                title: titleForConversations,
-                conversations: conversations
-            )
+            projectSection(title: titleForProjects, projects: projects)
+            conversationSection(title: titleForConversations, conversations: conversations)
 
             if contentFilter == .active {
                 bookmarkSection(title: "Bookmarks", bookmarks: bookmarks)
@@ -61,35 +60,25 @@ struct ContentSidebarView: View {
         }
     }
 
-    // MARK: - Navigation Links
     func projectNavigationLink(for project: ProjectItem) -> some View {
         NavigationLink(value: SidebarSelection.project(project.id)) {
             NavigationItem(
-                title: Binding(get: { project.name }, set: { project.name = $0 }),
-                subtitle: project.timestamp.formatted(
-                    .dateTime.year().month().day().hour().minute()),
-                onDelete: {
-                    actions.deleteItem(project)
-                },
-                onRename: { project.name = $0 },
-                onRestore: project.status != .active
-                    ? {
-                        actions.restoreItem(project)
-                    } : nil,
-                onPermanentDelete: project.status == .trashed
-                    ? {
-                        actions.deleteItem(project)
-                    } : nil,
-                onArchive: project.status == .active
-                    ? {
-                        actions.archiveItem(project)
-                    } : nil,
+                itemID: project.id,
+                title: project.name,
+                subtitle: project.timestamp.formatted(.dateTime.year().month().day().hour().minute()),
+                onDelete: actions.deleteProject,
+                onRename: actions.renameProject,
+                onRestore: project.status != .active ? actions.restoreProject : nil,
+                onPermanentDelete: project.status == .trashed ? actions.deleteProject : nil,
+                onArchive: project.status == .active ? actions.archiveProject : nil,
                 imageName: "folder",
-                onProjectAssign: { _ in },
-                onExport: {
-                    actions.requestExportProject(project)
-                },
-                project: project
+                onProjectAssign: nil,
+                onExport: actions.requestExportProject,
+                details: NavigationItemDetails(
+                    lastMessageTimestamp: lastMessageTimestamp(for: project),
+                    createdTimestamp: project.timestamp,
+                    isUtilityConversation: false
+                )
             )
         }
     }
@@ -97,54 +86,41 @@ struct ContentSidebarView: View {
     func conversationNavigationLink(for conversation: ConversationItem) -> some View {
         NavigationLink(value: SidebarSelection.conversation(conversation.id)) {
             NavigationItem(
-                title: Binding(get: { conversation.title }, set: { conversation.title = $0 }),
-                subtitle: conversation.timestamp.formatted(
-                    .dateTime.year().month().day().hour().minute()),
-                onDelete: {
-                    actions.deleteItem(conversation)
-                },
-                onRename: { conversation.title = $0 },
-                onRestore: conversation.status != .active
-                    ? {
-                        actions.restoreItem(conversation)
-                    } : nil,
-                onPermanentDelete: conversation.status == .trashed
-                    ? {
-                        actions.deleteItem(conversation)
-                    } : nil,
-                onArchive: conversation.status == .active
-                    ? {
-                        actions.archiveItem(conversation)
-                    } : nil,
+                itemID: conversation.id,
+                title: conversation.title,
+                subtitle: conversation.timestamp.formatted(.dateTime.year().month().day().hour().minute()),
+                onDelete: actions.deleteConversation,
+                onRename: actions.renameConversation,
+                onRestore: conversation.status != .active ? actions.restoreConversation : nil,
+                onPermanentDelete: conversation.status == .trashed ? actions.deleteConversation : nil,
+                onArchive: conversation.status == .active ? actions.archiveConversation : nil,
                 imageName: AppDefaults.conversationImageSystemName,
-                onProjectAssign: conversation.status == .active
-                    ? { project in
-                        actions.assignConversationToProject(conversation, project)
-                    } : nil,
-                onExport: {
-                    actions.requestExportConversation(conversation)
-                },
-                conversation: conversation,
-                availableProjects: availableProjects
+                onProjectAssign: conversation.status == .active ? actions.assignConversationToProject : nil,
+                onExport: actions.requestExportConversation,
+                details: NavigationItemDetails(
+                    lastMessageTimestamp: lastMessageTimestamp(for: conversation),
+                    createdTimestamp: conversation.timestamp,
+                    isUtilityConversation: conversation.isUtilityConversation
+                ),
+                availableProjects: availableProjects.map {
+                    NavigationProjectOption(id: $0.id, name: $0.name)
+                }
             )
         }
     }
 
     func bookmarkRow(for bookmark: BookmarkItem) -> some View {
         NavigationItem(
-            title: Binding(get: { bookmark.label }, set: { bookmark.label = $0 }),
+            itemID: bookmark.id,
+            title: bookmark.label,
             subtitle: bookmark.turn?.conversation?.title ?? "(missing)",
-            onDelete: {
-                actions.deleteBookmarkFromContext(bookmark)
-            },
-            onRename: {
-                bookmark.label = $0
-            },
+            onDelete: actions.deleteBookmarkFromContext,
+            onRename: actions.renameBookmark,
             imageName: "bookmark"
         )
         .contentShape(Rectangle())
         .onTapGesture {
-            actions.selectBookmark(bookmark)
+            actions.selectBookmark(bookmark.id)
         }
     }
 
@@ -154,21 +130,17 @@ struct ContentSidebarView: View {
             let sorted = ProjectSorter.sort(
                 projects,
                 descending: sidebarProjectsSortDescending,
-                sortType: SidebarSortType(rawValue: sidebarProjectsSortTypeRaw)
-                    ?? .alphabetically,
+                sortType: SidebarSortType(rawValue: sidebarProjectsSortTypeRaw) ?? .alphabetically,
                 contentFilter: contentFilter
             )
             Section {
-                ForEach(
-                    sorted
-                ) { project in
+                ForEach(sorted) { project in
                     projectNavigationLink(for: project)
                 }
                 .onDelete { indexSet in
                     indexSet.forEach { index in
                         if index < sorted.count {
-                            let project = sorted[index]
-                            actions.deleteItem(project)
+                            actions.deleteProject(sorted[index].id)
                         } else {
                             vxAtelierPro.log.warning(
                                 "ContentSidebarView: Invalid index \(index) encountered in projectSection.onDelete for projects array count \(projects.count)."
@@ -181,7 +153,8 @@ struct ContentSidebarView: View {
                     SidebarSortButton(
                         sortDescending: $sidebarProjectsSortDescending,
                         sortTypeRaw: $sidebarProjectsSortTypeRaw,
-                        allowedTypes: [.alphabetically])
+                        allowedTypes: [.alphabetically]
+                    )
                     Text(title)
                 }
             }
@@ -194,20 +167,16 @@ struct ContentSidebarView: View {
             let sorted = ConversationSorter.sort(
                 conversations,
                 descending: sidebarConversationsSortDescending,
-                sortType: SidebarSortType(rawValue: sidebarConversationsSortTypeRaw)
-                    ?? .conversationDate
+                sortType: SidebarSortType(rawValue: sidebarConversationsSortTypeRaw) ?? .conversationDate
             )
             Section {
-                ForEach(
-                    sorted
-                ) { conversation in
+                ForEach(sorted) { conversation in
                     conversationNavigationLink(for: conversation)
                 }
                 .onDelete { indexSet in
                     indexSet.forEach { index in
                         if index < sorted.count {
-                            let conversation = sorted[index]
-                            actions.deleteItem(conversation)
+                            actions.deleteConversation(sorted[index].id)
                         } else {
                             vxAtelierPro.log.warning(
                                 "ContentSidebarView: Invalid index \(index) encountered in conversationSection.onDelete for conversations array count \(conversations.count)."
@@ -220,7 +189,8 @@ struct ContentSidebarView: View {
                     SidebarSortButton(
                         sortDescending: $sidebarConversationsSortDescending,
                         sortTypeRaw: $sidebarConversationsSortTypeRaw,
-                        allowedTypes: SidebarSortType.allCases)
+                        allowedTypes: SidebarSortType.allCases
+                    )
                     Text(title)
                 }
             }
@@ -237,8 +207,7 @@ struct ContentSidebarView: View {
                 .onDelete { indexSet in
                     indexSet.forEach { index in
                         if index < bookmarks.count {
-                            let bookmark = bookmarks[index]
-                            actions.deleteBookmarkFromSwipe(bookmark)
+                            actions.deleteBookmarkFromSwipe(bookmarks[index].id)
                         } else {
                             vxAtelierPro.log.warning(
                                 "ContentSidebarView: Invalid index \(index) encountered in bookmarkSection.onDelete for bookmarks array count \(bookmarks.count)."
@@ -248,5 +217,15 @@ struct ContentSidebarView: View {
                 }
             }
         }
+    }
+
+    private func lastMessageTimestamp(for conversation: ConversationItem) -> Date? {
+        let sortedTurns = conversation.turns.sorted { $0.sequenceNumber < $1.sequenceNumber }
+        guard let lastTurn = sortedTurns.last else { return nil }
+        return lastTurn.events.last?.message.timestamp ?? lastTurn.userMessage.timestamp
+    }
+
+    private func lastMessageTimestamp(for project: ProjectItem) -> Date? {
+        ProjectSorter.lastTurnTimestamp(for: project)
     }
 }

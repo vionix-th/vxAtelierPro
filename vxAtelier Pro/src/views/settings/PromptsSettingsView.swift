@@ -46,7 +46,8 @@ struct PromptsSettingsView: View {
                     selectedIDs: selectedTemplateIDs,
                     onSelect: { selectedTemplateIDs.insert($0) },
                     onDeselect: { selectedTemplateIDs.remove($0) },
-                    onTemplateActivated: { template in
+                    onTemplateActivated: { templateID in
+                        guard let template = queryManager.promptTemplate(with: templateID) else { return }
                         editingTemplate = EditingTemplate(template: template, isNew: false)
                     },
                     onDelete: confirmDeleteTemplate
@@ -204,8 +205,9 @@ struct PromptsSettingsView: View {
         }
     }
 
-    private func deleteTemplate(_ template: PromptTemplate) {
+    private func deleteTemplate(id: PersistentIdentifier) {
         do {
+            guard let template = queryManager.promptTemplate(with: id) else { return }
             try queryManager.delete(template)
         } catch {
             promptTemplateErrorMessage = "Failed to delete template: \(error.localizedDescription)"
@@ -213,12 +215,17 @@ struct PromptsSettingsView: View {
         }
     }
 
-    private func confirmDeleteTemplate(_ template: PromptTemplate) {
+    private func confirmDeleteTemplate(_ templateID: PersistentIdentifier) {
+        guard let template = queryManager.promptTemplate(with: templateID) else { return }
         confirmation = SettingsConfirmation(
             title: "Delete Prompt Template",
             message: "Delete \"\(template.name)\"? This action cannot be undone.",
             confirmTitle: "Delete",
-            action: { deleteTemplate(template) }
+            itemID: templateID,
+            action: { id in
+                guard let id else { return }
+                deleteTemplate(id: id)
+            }
         )
     }
 

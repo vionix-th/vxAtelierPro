@@ -305,7 +305,8 @@ struct ModelEditorView: View {
                                         title: "Delete Model",
                                         message: "Delete \"\(model.name)\"? This action cannot be undone.",
                                         confirmTitle: "Delete",
-                                        action: deleteModel
+                                        itemID: model.persistentModelID,
+                                        action: { _ in deleteModel() }
                                     )
                                 } label: {
                                     Label("Delete Model", systemImage: "trash")

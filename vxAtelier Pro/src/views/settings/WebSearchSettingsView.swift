@@ -30,7 +30,7 @@ struct WebSearchSettingsView: View {
                     emptySystemImage: "magnifyingglass",
                     emptyDescription: "Add a web search configuration to enable the search tool.",
                     selectionAction: { config in
-                        editingConfig = EditingConfig(config: config, isNew: false)
+                        editConfiguration(id: config.id)
                     }
                 ) { config in
                     SettingsEntityRow(
@@ -40,16 +40,22 @@ struct WebSearchSettingsView: View {
                         systemImages: config.isDefault ? ["star.fill"] : []
                     )
                 } actions: { config in
-                    [
+                    let configID = config.id
+                    let configName = config.name
+                    return [
                         SettingsEntityAction(title: "Edit", systemImage: "pencil") {
-                            editingConfig = EditingConfig(config: config, isNew: false)
+                            editConfiguration(id: configID)
                         },
                         SettingsEntityAction(title: "Delete", systemImage: "trash", role: .destructive) {
                             confirmation = SettingsConfirmation(
                                 title: "Delete Web Search Configuration",
-                                message: "Delete \"\(config.name)\"? This action cannot be undone.",
+                                message: "Delete \"\(configName)\"? This action cannot be undone.",
                                 confirmTitle: "Delete",
-                                action: { deleteWebSearchConfiguration(config) }
+                                itemID: configID,
+                                action: { id in
+                                    guard let id else { return }
+                                    deleteWebSearchConfiguration(id: id)
+                                }
                             )
                         }
                     ]
@@ -100,11 +106,18 @@ struct WebSearchSettingsView: View {
         return values.isEmpty ? nil : values.joined(separator: "  ")
     }
 
-    private func deleteWebSearchConfiguration(_ config: WebSearchConfigurationItem) {
+    private func editConfiguration(id: PersistentIdentifier) {
+        guard let config = webSearchConfigurations.first(where: { $0.id == id }) else { return }
+        editingConfig = EditingConfig(config: config, isNew: false)
+    }
+
+    private func deleteWebSearchConfiguration(id: PersistentIdentifier) {
         do {
+            guard let config = webSearchConfigurations.first(where: { $0.id == id }) else { return }
             try queryManager.delete(config)
         } catch {
-            webSearchConfigErrorMessage = "Failed to delete configuration \(config.name): \(error.localizedDescription)"
+            let configName = webSearchConfigurations.first(where: { $0.id == id })?.name ?? "configuration"
+            webSearchConfigErrorMessage = "Failed to delete configuration \(configName): \(error.localizedDescription)"
             showWebSearchConfigError = true
         }
     }

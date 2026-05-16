@@ -1,23 +1,36 @@
+import Foundation
 import SwiftData
 import SwiftUI
 
+struct NavigationProjectOption: Identifiable {
+    let id: PersistentIdentifier
+    let name: String
+}
+
+struct NavigationItemDetails {
+    let lastMessageTimestamp: Date?
+    let createdTimestamp: Date
+    let isUtilityConversation: Bool
+}
+
 struct NavigationItem: View {
-    @Binding var title: String
-    var subtitle: String
-    let onDelete: () -> Void
-    let onRename: (String) -> Void
-    var onRestore: (() -> Void)?
-    var onPermanentDelete: (() -> Void)?
-    var onArchive: (() -> Void)?
+    let itemID: PersistentIdentifier
+    let title: String
+    let subtitle: String
+    let onDelete: (PersistentIdentifier) -> Void
+    let onRename: (PersistentIdentifier, String) -> Void
+    var onRestore: ((PersistentIdentifier) -> Void)?
+    var onPermanentDelete: ((PersistentIdentifier) -> Void)?
+    var onArchive: ((PersistentIdentifier) -> Void)?
     var imageName: String = ""
-    var onProjectAssign: ((ProjectItem?) -> Void)?
-    var onExport: (() -> Void)?
-    var conversation: ConversationItem? = nil
-    var project: ProjectItem? = nil
-    var availableProjects: [ProjectItem] = []
+    var onProjectAssign: ((PersistentIdentifier, PersistentIdentifier?) -> Void)?
+    var onExport: ((PersistentIdentifier) -> Void)?
+    var details: NavigationItemDetails?
+    var availableProjects: [NavigationProjectOption] = []
 
     @State private var isHoveringItem: Bool = false
     @State private var isEditing: Bool = false
+    @State private var draftTitle: String = ""
     @FocusState private var isEditingFocus: Bool
 
     @AppStorage(AppSettings.Keys.showConversationLastMessageLabel) private var showConversationLastMessageLabel: Bool = true
@@ -26,20 +39,19 @@ struct NavigationItem: View {
     @ViewBuilder
     private var navigationItemContextMenu: some View {
         Group {
-            // Status-dependent actions
             if let onRestore = onRestore {
                 Button {
-                    onRestore()
+                    onRestore(itemID)
                 } label: {
                     MenuItemStyle.label("Restore", systemImage: "arrow.uturn.left")
                 }
                 .help("Restore this item")
             }
 
-            // Rename action (only for active or archived items, not for trashed)
             if onPermanentDelete == nil {
                 Button {
                     isEditing = true
+                    draftTitle = title
                     isEditingFocus = true
                 } label: {
                     MenuItemStyle.label("Rename", systemImage: "pencil")
@@ -47,15 +59,12 @@ struct NavigationItem: View {
                 .help("Rename this item")
             }
 
-            // Only show project assignment for non-trashed items
             if let onProjectAssign = onProjectAssign, onPermanentDelete == nil {
-                // Project assignment submenu
                 Menu {
                     Button {
-                        onProjectAssign(nil)
+                        onProjectAssign(itemID, nil)
                     } label: {
-                        MenuItemStyle.label(
-                            "Remove from Project", systemImage: "folder.badge.minus")
+                        MenuItemStyle.label("Remove from Project", systemImage: "folder.badge.minus")
                     }
                     .help("Remove from current project")
 
@@ -63,7 +72,7 @@ struct NavigationItem: View {
                         Divider()
                         ForEach(availableProjects) { project in
                             Button {
-                                onProjectAssign(project)
+                                onProjectAssign(itemID, project.id)
                             } label: {
                                 MenuItemStyle.label(project.name, systemImage: "folder")
                             }
@@ -79,19 +88,18 @@ struct NavigationItem: View {
                 Divider()
 
                 Button {
-                    onExport()
+                    onExport(itemID)
                 } label: {
                     MenuItemStyle.label("Export as JSON", systemImage: "arrow.up.doc")
                 }
                 .help("Export this item to JSON")
             }
 
-            // Delete actions
             Divider()
 
             if let onArchive = onArchive {
                 Button {
-                    onArchive()
+                    onArchive(itemID)
                 } label: {
                     MenuItemStyle.label("Move to Archive", systemImage: "archivebox")
                 }
@@ -100,14 +108,14 @@ struct NavigationItem: View {
 
             if let onPermanentDelete = onPermanentDelete {
                 Button(role: .destructive) {
-                    onPermanentDelete()
+                    onPermanentDelete(itemID)
                 } label: {
                     MenuItemStyle.label("Delete Permanently", systemImage: "trash.fill")
                 }
                 .help("Permanently delete this item")
             } else {
                 Button(role: .destructive) {
-                    onDelete()
+                    onDelete(itemID)
                 } label: {
                     MenuItemStyle.label("Move to Trash", systemImage: "trash")
                 }
@@ -122,61 +130,50 @@ struct NavigationItem: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 24, height: 24)
+
             VStack(alignment: .leading) {
                 if isEditing {
-                    TextField("Enter title", text: $title)
+                    TextField("Enter title", text: $draftTitle)
                         .font(.headline)
                         .textFieldStyle(.roundedBorder)
                         .focused($isEditingFocus)
                         .onSubmit {
-                            isEditing = false
-                            onRename(title)
+                            commitRename()
                         }
                         #if os(macOS)
                             .onExitCommand {
-                                isEditing = false
-                                onRename(title)
+                                commitRename()
                             }
                         #endif
                 } else {
-                    Text(title)
-                        .font(.headline)
+                    HStack(spacing: 6) {
+                        if details?.isUtilityConversation == true {
+                            Image(systemName: "menubar.dock.rectangle")
+                                .foregroundColor(.green)
+                                .font(.caption)
+                                .help("Linked to utility panel")
+                        }
+
+                        Text(title)
+                            .font(.headline)
+                    }
                 }
-                if let conversation = conversation {
-                    let sortedTurns = conversation.turns.sorted { $0.sequenceNumber < $1.sequenceNumber }
+
+                if let details {
                     if showConversationLastMessageLabel {
-                        if sortedTurns.isEmpty {
-                            Text("no messages")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        } else {
-                            let lastTurn = sortedTurns.last!
-                            let lastTimestamp: Date =
-                                lastTurn.events.last?.message.timestamp ?? lastTurn.userMessage.timestamp
+                        if let lastTimestamp = details.lastMessageTimestamp {
                             Text(lastTimestamp.formatted(.dateTime.year().month().day().hour().minute()))
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
-                        }
-                    }
-                    if showConversationCreatedLabel {
-                        Text(conversation.timestamp.formatted(.dateTime.year().month().day().hour().minute()))
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                } else if let project = project {
-                    if showConversationLastMessageLabel {
-                        if let lastMsg = ProjectSorter.lastTurnTimestamp(for: project) {
-                            Text(lastMsg.formatted(.dateTime.year().month().day().hour().minute()))
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
                         } else {
                             Text("no messages")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }
                     }
+
                     if showConversationCreatedLabel {
-                        Text(project.timestamp.formatted(.dateTime.year().month().day().hour().minute()))
+                        Text(details.createdTimestamp.formatted(.dateTime.year().month().day().hour().minute()))
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
@@ -210,5 +207,10 @@ struct NavigationItem: View {
             navigationItemContextMenu
         }
         .frame(minHeight: 60)
+    }
+
+    private func commitRename() {
+        isEditing = false
+        onRename(itemID, draftTitle)
     }
 }

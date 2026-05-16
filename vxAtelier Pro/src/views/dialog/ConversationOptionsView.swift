@@ -299,6 +299,7 @@ struct ConversationOptionsView: View {
 /// Provides a single-line view with a popover editor and template selection.
 private struct SystemPromptEditor: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(QueryManager.self) private var queryManager
     @Binding var promptValue: String
     @State private var isTemplatesPresented: Bool = false
     @State private var isEditorPresented: Bool = false
@@ -337,7 +338,8 @@ private struct SystemPromptEditor: View {
                         }
                         .buttonStyle(.plain)
                         .popover(isPresented: $isTemplatesPresented) {
-                            PromptTemplateListView(category: PromptTemplate.Category.System) { template in
+                            PromptTemplateListView(category: PromptTemplate.Category.System) { templateID in
+                                guard let template = queryManager.promptTemplate(with: templateID) else { return }
                                 vxAtelierPro.log.info("Applied template: \(template.name)")
                                 promptValue = expandVariables(template.prompt)
                                 isTemplatesPresented = false

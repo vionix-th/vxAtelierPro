@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 /// Presentation mode that decides whether settings actions live inline or in the navigation toolbar.
@@ -343,19 +344,22 @@ struct SettingsConfirmation: Identifiable {
     let message: String
     let confirmTitle: String
     let role: ButtonRole?
-    let action: () -> Void
+    let itemID: PersistentIdentifier?
+    let action: (PersistentIdentifier?) -> Void
 
     init(
         title: String,
         message: String,
         confirmTitle: String,
         role: ButtonRole? = .destructive,
-        action: @escaping () -> Void
+        itemID: PersistentIdentifier? = nil,
+        action: @escaping (PersistentIdentifier?) -> Void
     ) {
         self.title = title
         self.message = message
         self.confirmTitle = confirmTitle
         self.role = role
+        self.itemID = itemID
         self.action = action
     }
 }
@@ -371,7 +375,7 @@ extension View {
             presenting: confirmation.wrappedValue
         ) { confirmation in
             Button(confirmation.confirmTitle, role: confirmation.role) {
-                confirmation.action()
+                confirmation.action(confirmation.itemID)
             }
             Button("Cancel", role: .cancel) { }
         } message: { confirmation in

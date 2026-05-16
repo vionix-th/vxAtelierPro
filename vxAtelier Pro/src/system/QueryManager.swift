@@ -89,6 +89,36 @@ final class QueryManager {
         return fetch(descriptor).first
     }
 
+    func promptTemplate(with id: PersistentIdentifier) -> PromptTemplate? {
+        var descriptor = FetchDescriptor<PromptTemplate>(sortBy: [])
+        descriptor.fetchLimit = 1
+        descriptor.predicate = #Predicate { $0.id == id }
+        return fetch(descriptor).first
+    }
+
+    func bookmark(with id: PersistentIdentifier) -> BookmarkItem? {
+        var descriptor = FetchDescriptor<BookmarkItem>(sortBy: [])
+        descriptor.fetchLimit = 1
+        descriptor.predicate = #Predicate { $0.id == id }
+        return fetch(descriptor).first
+    }
+
+    func turn(with id: PersistentIdentifier, in conversation: ConversationItem) -> ConversationTurn? {
+        conversation.turns.first { $0.id == id }
+    }
+
+    func turn(with id: PersistentIdentifier, in conversationID: PersistentIdentifier) -> ConversationTurn? {
+        guard let conversation = conversation(with: conversationID) else { return nil }
+        return turn(with: id, in: conversation)
+    }
+
+    func message(with id: PersistentIdentifier, in turn: ConversationTurn) -> MessageItem? {
+        if turn.userMessage.id == id {
+            return turn.userMessage
+        }
+        return turn.events.first(where: { $0.message.id == id })?.message
+    }
+
     private func fetchConversations(predicate: Predicate<ConversationItem>? = nil) -> [ConversationItem] {
         fetch(ConversationItem.self, predicate: predicate, sort: conversationSort)
     }
@@ -499,6 +529,31 @@ final class QueryManager {
             try insert(bookmark)
         } catch {
             vxAtelierPro.log.error("Failed to insert bookmark: \(error.localizedDescription)")
+        }
+    }
+
+    func insertBookmark(
+        label: String,
+        conversationID: PersistentIdentifier,
+        turnID: PersistentIdentifier,
+        messageID: PersistentIdentifier
+    ) throws {
+        guard let conversation = conversation(with: conversationID) else {
+            throw AppError.invalidOperation("Conversation not available")
+        }
+        guard let turn = turn(with: turnID, in: conversation) else {
+            throw AppError.invalidOperation("Turn not available")
+        }
+        guard let message = message(with: messageID, in: turn) else {
+            throw AppError.invalidOperation("Message not available")
+        }
+
+        if turn.userMessage.id == message.id {
+            insertBookmark(label: label, turn: turn)
+        } else if let event = turn.events.first(where: { $0.message.id == message.id }) {
+            insertBookmark(label: label, turn: turn, event: event)
+        } else {
+            throw AppError.invalidOperation("Message not available")
         }
     }
 

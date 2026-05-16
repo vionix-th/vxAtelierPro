@@ -48,7 +48,7 @@ public struct SelfSignedCertWhitelistView: View {
                         title: "Delete Whitelist Pattern",
                         message: "Delete this self-signed certificate whitelist pattern?",
                         confirmTitle: "Delete",
-                        action: { deletePattern(at: item.index) }
+                        action: { _ in deletePattern(at: item.index) }
                     )
                 }
             ]

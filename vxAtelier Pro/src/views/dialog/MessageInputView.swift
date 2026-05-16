@@ -1,5 +1,6 @@
-import SwiftUI
 import Observation
+import SwiftData
+import SwiftUI
 
 @MainActor
 @Observable
@@ -35,7 +36,8 @@ private final class MessageInputController {
         self.isInputFocused = focusOnAppear
     }
 
-    func applyTemplate(_ template: PromptTemplate, conversation: ConversationItem?) {
+    func applyTemplate(id: PersistentIdentifier, conversation: ConversationItem?) {
+        guard let template = queryManager.promptTemplate(with: id) else { return }
         message = expandVariables(template.prompt, conversation: conversation)
     }
 
@@ -181,8 +183,8 @@ struct MessageInputView: View {
                     .popover(isPresented: $controller.isPromptTemplatesPresented) {
                         PromptTemplateListView(
                             category: PromptTemplate.Category.User,
-                            onTemplateActivated: { template in
-                                controller.applyTemplate(template, conversation: contextConversation)
+                            onTemplateActivated: { templateID in
+                                controller.applyTemplate(id: templateID, conversation: contextConversation)
                                 controller.isPromptTemplatesPresented = false
                                 controller.isInputFocused = true
 

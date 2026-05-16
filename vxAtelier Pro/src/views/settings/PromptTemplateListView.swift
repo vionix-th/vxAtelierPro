@@ -8,8 +8,8 @@ struct PromptTemplateListView: View {
     let selectedIDs: Set<PersistentIdentifier>
     let onSelect: (PersistentIdentifier) -> Void
     let onDeselect: (PersistentIdentifier) -> Void
-    let onTemplateActivated: (PromptTemplate) -> Void
-    let onDelete: ((PromptTemplate) -> Void)?
+    let onTemplateActivated: (PersistentIdentifier) -> Void
+    let onDelete: ((PersistentIdentifier) -> Void)?
 
     @Query(sort: [SortDescriptor(\PromptTemplate.name)]) private var promptTemplates: [PromptTemplate]
 
@@ -39,10 +39,10 @@ struct PromptTemplateListView: View {
             guard !selectionMode, let onDelete else { return [] }
             return [
                 SettingsEntityAction(title: "Edit", systemImage: "pencil") {
-                    onTemplateActivated(template)
+                    onTemplateActivated(template.id)
                 },
                 SettingsEntityAction(title: "Delete", systemImage: "trash", role: .destructive) {
-                    onDelete(template)
+                    onDelete(template.id)
                 }
             ]
         }
@@ -54,8 +54,8 @@ struct PromptTemplateListView: View {
         selectedIDs: Set<PersistentIdentifier> = [],
         onSelect: @escaping (PersistentIdentifier) -> Void = { _ in },
         onDeselect: @escaping (PersistentIdentifier) -> Void = { _ in },
-        onTemplateActivated: @escaping (PromptTemplate) -> Void,
-        onDelete: ((PromptTemplate) -> Void)? = nil
+        onTemplateActivated: @escaping (PersistentIdentifier) -> Void,
+        onDelete: ((PersistentIdentifier) -> Void)? = nil
     ) {
         self.category = category
         self.selectionMode = selectionMode
@@ -70,7 +70,7 @@ struct PromptTemplateListView: View {
         if selectionMode {
             selectedIDs.contains(template.id) ? onDeselect(template.id) : onSelect(template.id)
         } else {
-            onTemplateActivated(template)
+            onTemplateActivated(template.id)
         }
     }
 }

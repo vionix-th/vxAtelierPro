@@ -33,7 +33,7 @@ struct APISettingsView: View {
                     emptySystemImage: "key",
                     emptyDescription: "Add an API configuration to enable chatting and model fetching.",
                     selectionAction: { config in
-                        editingConfig = EditingConfig(config: config, isNew: false)
+                        editConfiguration(id: config.id)
                     }
                 ) { config in
                     SettingsEntityRow(
@@ -43,16 +43,22 @@ struct APISettingsView: View {
                         systemImages: config.isDefault ? ["star.fill"] : []
                     )
                 } actions: { config in
-                    [
+                    let configID = config.id
+                    let configName = config.name
+                    return [
                         SettingsEntityAction(title: "Edit", systemImage: "pencil") {
-                            editingConfig = EditingConfig(config: config, isNew: false)
+                            editConfiguration(id: configID)
                         },
                         SettingsEntityAction(title: "Delete", systemImage: "trash", role: .destructive) {
                             confirmation = SettingsConfirmation(
                                 title: "Delete API Configuration",
-                                message: "Delete \"\(config.name)\"? Models using this configuration will be cleaned up.",
+                                message: "Delete \"\(configName)\"? Models using this configuration will be cleaned up.",
                                 confirmTitle: "Delete",
-                                action: { deleteAPIConfiguration(config) }
+                                itemID: configID,
+                                action: { id in
+                                    guard let id else { return }
+                                    deleteAPIConfiguration(id: id)
+                                }
                             )
                         }
                     ]
@@ -114,12 +120,19 @@ struct APISettingsView: View {
         return config.apiKey.isEmpty ? nil : "API Key: \(config.apiKey.prefix(4))...\(config.apiKey.suffix(4))"
     }
 
-    private func deleteAPIConfiguration(_ config: APIConfigurationItem) {
+    private func editConfiguration(id: PersistentIdentifier) {
+        guard let configuration = apiConfigurations.first(where: { $0.id == id }) else { return }
+        editingConfig = EditingConfig(config: configuration, isNew: false)
+    }
+
+    private func deleteAPIConfiguration(id: PersistentIdentifier) {
         do {
+            guard let config = apiConfigurations.first(where: { $0.id == id }) else { return }
             try queryManager.cleanupReferences(for: config)
             try queryManager.delete(config)
         } catch {
-            apiConfigErrorMessage = "Failed to delete configuration \(config.name): \(error.localizedDescription)"
+            let configName = apiConfigurations.first(where: { $0.id == id })?.name ?? "configuration"
+            apiConfigErrorMessage = "Failed to delete configuration \(configName): \(error.localizedDescription)"
             showApiConfigError = true
         }
     }

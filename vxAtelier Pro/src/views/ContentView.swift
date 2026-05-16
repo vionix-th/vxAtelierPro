@@ -105,9 +105,71 @@ struct ContentView: View {
         }
     }
 
+    private func deleteProject(id: PersistentIdentifier) {
+        guard let project = queryManager.project(with: id) else { return }
+        deleteItem(for: project)
+    }
+
+    private func restoreProject(id: PersistentIdentifier) {
+        guard let project = queryManager.project(with: id) else { return }
+        restoreItem(project)
+    }
+
+    private func archiveProject(id: PersistentIdentifier) {
+        guard let project = queryManager.project(with: id) else { return }
+        archiveItem(project)
+    }
+
+    private func renameProject(id: PersistentIdentifier, newTitle: String) {
+        guard let project = queryManager.project(with: id) else { return }
+        project.name = newTitle
+        do {
+            try queryManager.saveContext()
+        } catch {
+            vxAtelierPro.log.error(
+                "ContentView: Failed to rename project '\(project.name)': \(error.localizedDescription)"
+            )
+        }
+    }
+
+    private func requestExportProject(id: PersistentIdentifier) {
+        guard let project = queryManager.project(with: id) else { return }
+        onRequestExportProject(project)
+    }
+
+    private func deleteConversation(id: PersistentIdentifier) {
+        guard let conversation = queryManager.conversation(with: id) else { return }
+        deleteItem(for: conversation)
+    }
+
+    private func restoreConversation(id: PersistentIdentifier) {
+        guard let conversation = queryManager.conversation(with: id) else { return }
+        restoreItem(conversation)
+    }
+
+    private func archiveConversation(id: PersistentIdentifier) {
+        guard let conversation = queryManager.conversation(with: id) else { return }
+        archiveItem(conversation)
+    }
+
+    private func renameConversation(id: PersistentIdentifier, newTitle: String) {
+        guard let conversation = queryManager.conversation(with: id) else { return }
+        conversation.title = newTitle
+        do {
+            try queryManager.saveContext()
+        } catch {
+            vxAtelierPro.log.error(
+                "ContentView: Failed to rename conversation '\(conversation.title)': \(error.localizedDescription)"
+            )
+        }
+    }
+
     private func assignConversationToProject(
-        _ conversation: ConversationItem, _ project: ProjectItem?
+        conversationID: PersistentIdentifier,
+        projectID: PersistentIdentifier?
     ) {
+        guard let conversation = queryManager.conversation(with: conversationID) else { return }
+        let project = projectID.flatMap { queryManager.project(with: $0) }
         let isShowingConversation = router.activeConversationID == conversation.id
         do {
             try queryManager.assignConversation(conversation, to: project)
@@ -122,8 +184,50 @@ struct ContentView: View {
         }
     }
 
-    private func selectConversationFromBookmark(_ bookmark: BookmarkItem) {
-        guard let conversation = bookmark.turn?.conversation else {
+    private func requestExportConversation(id: PersistentIdentifier) {
+        guard let conversation = queryManager.conversation(with: id) else { return }
+        onRequestExportConversation(conversation)
+    }
+
+    private func deleteBookmarkFromContext(id: PersistentIdentifier) {
+        guard let bookmark = queryManager.bookmark(with: id) else { return }
+        do {
+            try queryManager.delete(bookmark)
+            vxAtelierPro.log.debug("Deleted bookmark '\(bookmark.label)' via context menu.")
+        } catch {
+            vxAtelierPro.log.error(
+                "Failed to delete bookmark \(bookmark.label) from context menu: \(error.localizedDescription)"
+            )
+        }
+    }
+
+    private func deleteBookmarkFromSwipe(id: PersistentIdentifier) {
+        guard let bookmark = queryManager.bookmark(with: id) else { return }
+        do {
+            try queryManager.delete(bookmark)
+            vxAtelierPro.log.debug("Deleted bookmark '\(bookmark.label)' via swipe.")
+        } catch {
+            vxAtelierPro.log.error(
+                "ContentView: Failed during swipe delete for bookmark '\(bookmark.label)': \(error.localizedDescription)"
+            )
+        }
+    }
+
+    private func renameBookmark(id: PersistentIdentifier, newTitle: String) {
+        guard let bookmark = queryManager.bookmark(with: id) else { return }
+        bookmark.label = newTitle
+        do {
+            try queryManager.saveContext()
+        } catch {
+            vxAtelierPro.log.error(
+                "ContentView: Failed to rename bookmark '\(bookmark.label)': \(error.localizedDescription)"
+            )
+        }
+    }
+
+    private func selectBookmark(id: PersistentIdentifier) {
+        guard let bookmark = queryManager.bookmark(with: id),
+              let conversation = bookmark.turn?.conversation else {
             vxAtelierPro.log.error("Bookmark selection failed: missing conversation.")
             return
         }
@@ -135,53 +239,23 @@ struct ContentView: View {
         }
     }
 
-    private func deleteBookmarkFromContext(_ bookmark: BookmarkItem) {
-        do {
-            try queryManager.delete(bookmark)
-            vxAtelierPro.log.debug(
-                "Deleted bookmark '\(bookmark.label)' via context menu.")
-        } catch {
-            vxAtelierPro.log.error(
-                "Failed to delete bookmark \(bookmark.label) from context menu: \(error.localizedDescription)"
-            )
-        }
-    }
-
-    private func deleteBookmarkFromSwipe(_ bookmark: BookmarkItem) {
-        do {
-            try queryManager.delete(bookmark)
-            vxAtelierPro.log.debug(
-                "Deleted bookmark '\(bookmark.label)' via swipe.")
-        } catch {
-            vxAtelierPro.log.error(
-                "ContentView: Failed during swipe delete for bookmark '\(bookmark.label)': \(error.localizedDescription)"
-            )
-        }
-    }
-
     private var sidebarActions: ContentSidebarActions {
         ContentSidebarActions(
-            deleteItem: { deleteItem(for: $0) },
-            restoreItem: { restoreItem($0) },
-            archiveItem: { archiveItem($0) },
-            assignConversationToProject: { conversation, project in
-                assignConversationToProject(conversation, project)
-            },
-            requestExportProject: { project in
-                onRequestExportProject(project)
-            },
-            requestExportConversation: { conversation in
-                onRequestExportConversation(conversation)
-            },
-            deleteBookmarkFromContext: { bookmark in
-                deleteBookmarkFromContext(bookmark)
-            },
-            deleteBookmarkFromSwipe: { bookmark in
-                deleteBookmarkFromSwipe(bookmark)
-            },
-            selectBookmark: { bookmark in
-                selectConversationFromBookmark(bookmark)
-            }
+            deleteProject: deleteProject(id:),
+            restoreProject: restoreProject(id:),
+            archiveProject: archiveProject(id:),
+            renameProject: renameProject(id:newTitle:),
+            requestExportProject: requestExportProject(id:),
+            deleteConversation: deleteConversation(id:),
+            restoreConversation: restoreConversation(id:),
+            archiveConversation: archiveConversation(id:),
+            renameConversation: renameConversation(id:newTitle:),
+            assignConversationToProject: assignConversationToProject(conversationID:projectID:),
+            requestExportConversation: requestExportConversation(id:),
+            deleteBookmarkFromContext: deleteBookmarkFromContext(id:),
+            deleteBookmarkFromSwipe: deleteBookmarkFromSwipe(id:),
+            renameBookmark: renameBookmark(id:newTitle:),
+            selectBookmark: selectBookmark(id:)
         )
     }
 
@@ -225,12 +299,8 @@ struct ContentView: View {
                     ProjectView(
                         projectID: project.id,
                         onRequestOptions: onRequestOptions,
-                        onDeleteConversation: { conversation in
-                            deleteItem(for: conversation)
-                        },
-                        onExportProject: { project in
-                            onRequestExportProject(project)
-                        }
+                        onDeleteConversation: deleteConversation(id:),
+                        onExportProject: requestExportProject(id:)
                     )
                     .id(project.id)
                 } else {

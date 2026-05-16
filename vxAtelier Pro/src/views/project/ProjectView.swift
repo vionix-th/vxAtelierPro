@@ -15,8 +15,8 @@ struct ProjectView: View {
     private let projectID: PersistentIdentifier
     
     var onRequestOptions: (PersistentIdentifier) -> Void = { _ in }
-    var onDeleteConversation: (ConversationItem) -> Void
-    var onExportProject: (ProjectItem) -> Void
+    var onDeleteConversation: (PersistentIdentifier) -> Void
+    var onExportProject: (PersistentIdentifier) -> Void
 
     // Computed property to resolve project by ID
     private var project: ProjectItem? {
@@ -49,8 +49,8 @@ struct ProjectView: View {
     init(
         projectID: PersistentIdentifier,
         onRequestOptions: @escaping (PersistentIdentifier) -> Void = { _ in },
-        onDeleteConversation: @escaping (ConversationItem) -> Void,
-        onExportProject: @escaping (ProjectItem) -> Void
+        onDeleteConversation: @escaping (PersistentIdentifier) -> Void,
+        onExportProject: @escaping (PersistentIdentifier) -> Void
     ) {
         self.projectID = projectID
         self.onRequestOptions = onRequestOptions
@@ -121,7 +121,8 @@ struct ProjectView: View {
         .padding(.trailing, 12)
         .buttonStyle(PlainButtonStyle())
         .popover(isPresented: $isPromptTemplatesPresented) {
-            PromptTemplateListView(category: PromptTemplate.Category.System, onTemplateActivated: { template in
+            PromptTemplateListView(category: PromptTemplate.Category.System, onTemplateActivated: { templateID in
+                guard let template = queryManager.promptTemplate(with: templateID) else { return }
                 vxAtelierPro.log.debug("Applied system prompt template: \(template.name)")
                 systemPromptBinding.wrappedValue = expandVariables(template.prompt)
                 isPromptTemplatesPresented = false
@@ -193,35 +194,27 @@ struct ProjectView: View {
                 ForEach(filteredConversations) { conversation in
                     NavigationLink(value: ProjectRoute.conversation(conversation.id)) {
                         NavigationItem(
-                            title: Binding(get: { conversation.title} , set: { conversation.title = $0 }),
+                            itemID: conversation.id,
+                            title: conversation.title,
                             subtitle: conversation.timestamp.formatted(.dateTime.year().month().day().hour().minute()),
-                            onDelete: {
-                                onDeleteConversation(conversation)
+                            onDelete: { conversationID in
+                                onDeleteConversation(conversationID)
                             },
-                            onRename: { conversation.title = $0 },
+                            onRename: { conversationID, newTitle in
+                                renameConversation(id: conversationID, title: newTitle)
+                            },
                             imageName: "document",
-                            onProjectAssign: { targetProject in
-                                vxAtelierPro.log.debug("Assigning conversation '\(conversation.title)' to project '\(targetProject?.name ?? "<nil>")'")
-                                let isShowingConversation = router.activeConversationID == conversation.id
-                                do {
-                                    try queryManager.assignConversation(conversation, to: targetProject)
-                                    if isShowingConversation {
-                                        router.openConversation(conversation.id, in: targetProject?.id)
-                                    }
-                                } catch {
-                                    vxAtelierPro.log.error("ProjectView: Failed to assign conversation to project: \(error.localizedDescription)")
-                                }
+                            onProjectAssign: { conversationID, targetProjectID in
+                                assignConversation(id: conversationID, toProjectID: targetProjectID)
                             },
-                            onExport: {
-                                if let project = self.project {
-                                    onExportProject(project)
-                                } else {
-                                    vxAtelierPro.log.warning(
-                                        "ProjectView: Export requested but project not resolved for id \(projectID)."
-                                    )
-                                }
+                            onExport: { projectID in
+                                onExportProject(projectID)
                             },
-                            conversation: conversation
+                            details: NavigationItemDetails(
+                                lastMessageTimestamp: conversationLastMessageTimestamp(conversation),
+                                createdTimestamp: conversation.timestamp,
+                                isUtilityConversation: conversation.isUtilityConversation
+                            )
                         )
                     }
                 }                
@@ -229,7 +222,7 @@ struct ProjectView: View {
                     for index in indexSet {
                         if index < filteredConversations.count {
                             let conversation = filteredConversations[index]
-                            onDeleteConversation(conversation)
+                            onDeleteConversation(conversation.id)
                         } else {
                             vxAtelierPro.log.warning("ProjectView: Invalid index \(index) encountered in sectionDialogs.onDelete for filteredConversations count \(filteredConversations.count).")
                         }
@@ -296,7 +289,8 @@ struct ProjectView: View {
                         return try queryManager.createConversation(in: project)
                     },
                     didSend: { conversation in
-                        vxAtelierPro.log.debug("Created new conversation '\(conversation.title)' in project '\(project.name)'")
+                        let projectName = queryManager.project(with: projectID)?.name ?? project.name
+                        vxAtelierPro.log.debug("Created new conversation '\(conversation.title)' in project '\(projectName)'")
                         router.setPath([.conversation(conversation.id)], for: projectID)
                     }
                 )
@@ -346,6 +340,37 @@ struct ProjectView: View {
             try queryManager.saveContext()
         } catch {
             vxAtelierPro.log.error("ProjectView: Failed to save context after changing system prompt: \(error.localizedDescription)")
+        }
+    }
+
+    private func conversationLastMessageTimestamp(_ conversation: ConversationItem) -> Date? {
+        let sortedTurns = conversation.turns.sorted { $0.sequenceNumber < $1.sequenceNumber }
+        guard let lastTurn = sortedTurns.last else { return nil }
+        return lastTurn.events.last?.message.timestamp ?? lastTurn.userMessage.timestamp
+    }
+
+    private func renameConversation(id: PersistentIdentifier, title: String) {
+        guard let conversation = queryManager.conversation(with: id) else { return }
+        conversation.title = title
+        do {
+            try queryManager.saveContext()
+        } catch {
+            vxAtelierPro.log.error("ProjectView: Failed to rename conversation: \(error.localizedDescription)")
+        }
+    }
+
+    private func assignConversation(id: PersistentIdentifier, toProjectID: PersistentIdentifier?) {
+        guard let conversation = queryManager.conversation(with: id) else { return }
+        let targetProject = toProjectID.flatMap { queryManager.project(with: $0) }
+        let isShowingConversation = router.activeConversationID == conversation.id
+
+        do {
+            try queryManager.assignConversation(conversation, to: targetProject)
+            if isShowingConversation {
+                router.openConversation(conversation.id, in: targetProject?.id)
+            }
+        } catch {
+            vxAtelierPro.log.error("ProjectView: Failed to assign conversation to project: \(error.localizedDescription)")
         }
     }
 }

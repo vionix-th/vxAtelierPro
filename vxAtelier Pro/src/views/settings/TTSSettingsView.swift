@@ -48,6 +48,7 @@ struct TTSSettingsView: View {
                         }
                     } else {
                         ForEach(voiceConfigurations) { config in
+                            let configID = config.id
                             SettingsEntityRow(
                                 title: config.role.capitalized,
                                 subtitle: Locale.current.localizedString(forIdentifier: config.language) ?? config.language,
@@ -56,28 +57,28 @@ struct TTSSettingsView: View {
                             )
                             .contentShape(Rectangle())
                             .onTapGesture {
-                                editConfiguration(config)
+                                editConfiguration(id: configID)
                             }
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                 Button {
-                                    editConfiguration(config)
+                                    editConfiguration(id: configID)
                                 } label: {
                                     Label("Edit", systemImage: "pencil")
                                 }
                                 Button(role: .destructive) {
-                                    confirmDelete(config)
+                                    confirmDelete(id: configID)
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
                             }
                             .contextMenu {
                                 Button {
-                                    editConfiguration(config)
+                                    editConfiguration(id: configID)
                                 } label: {
                                     Label("Edit", systemImage: "pencil")
                                 }
                                 Button(role: .destructive) {
-                                    confirmDelete(config)
+                                    confirmDelete(id: configID)
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
@@ -131,16 +132,22 @@ struct TTSSettingsView: View {
         return voice.name
     }
 
-    private func editConfiguration(_ config: VoiceConfigurationItem) {
+    private func editConfiguration(id: PersistentIdentifier) {
+        guard let config = voiceConfigurations.first(where: { $0.id == id }) else { return }
         editingConfig = EditingConfig(config: config, isNew: false)
     }
 
-    private func confirmDelete(_ config: VoiceConfigurationItem) {
+    private func confirmDelete(id: PersistentIdentifier) {
+        guard let config = voiceConfigurations.first(where: { $0.id == id }) else { return }
         confirmation = SettingsConfirmation(
             title: "Delete Voice Configuration",
             message: "Delete the \(config.role) voice for \(Locale.current.localizedString(forIdentifier: config.language) ?? config.language)?",
             confirmTitle: "Delete",
-            action: { deleteConfiguration(config) }
+            itemID: id,
+            action: { itemID in
+                guard let itemID else { return }
+                deleteConfiguration(id: itemID)
+            }
         )
     }
 
@@ -174,8 +181,9 @@ struct TTSSettingsView: View {
         }
     }
 
-    private func deleteConfiguration(_ config: VoiceConfigurationItem) {
+    private func deleteConfiguration(id: PersistentIdentifier) {
         do {
+            guard let config = voiceConfigurations.first(where: { $0.id == id }) else { return }
             try queryManager.delete(config)
         } catch {
             errorMessage = "Failed to delete configuration: \(error.localizedDescription)"
