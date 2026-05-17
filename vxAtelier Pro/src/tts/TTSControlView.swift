@@ -40,8 +40,8 @@ struct TTSControlView: View {
                             Text("Add messages to build this playlist.")
                                 .foregroundStyle(.secondary)
                         } else {
-                            ForEach(Array(currentEntries.enumerated()), id: \.element.id) { index, item in
-                                playlistEntryRow(index: index, item: item)
+                            ForEach(currentEntries) { item in
+                                playlistEntryRow(item: item)
                             }
                         }
                     }
@@ -347,13 +347,13 @@ struct TTSControlView: View {
         }
     }
 
-    private func playlistEntryRow(index: Int, item: TTSPlaylistEntry) -> some View {
+    private func playlistEntryRow(item: TTSPlaylistEntry) -> some View {
         HStack(spacing: 12) {
-            if index == ttsQueue.currentIndex && item.id == ttsQueue.currentItem?.id {
+            if item.id == ttsQueue.currentItem?.id {
                 Image(systemName: "speaker.wave.2.fill")
                     .foregroundColor(.accentColor)
             } else {
-                Text("\(index + 1)")
+                Text("\(item.orderIndex + 1)")
                     .foregroundColor(.secondary)
                     .frame(width: 20)
             }
@@ -379,7 +379,26 @@ struct TTSControlView: View {
 
             Spacer()
 
+            Button {
+                moveEntry(item, by: -1)
+            } label: {
+                Image(systemName: "chevron.up")
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+            .disabled(!canMoveEntry(item, by: -1))
+
+            Button {
+                moveEntry(item, by: 1)
+            } label: {
+                Image(systemName: "chevron.down")
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+            .disabled(!canMoveEntry(item, by: 1))
+
             Button(role: .destructive) {
+                guard let index = ttsQueue.currentPlaylistOrderedEntries().firstIndex(where: { $0.id == item.id }) else { return }
                 ttsQueue.remove(at: index)
             } label: {
                 Image(systemName: "trash")
@@ -390,8 +409,22 @@ struct TTSControlView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
+            guard let index = ttsQueue.currentPlaylistOrderedEntries().firstIndex(where: { $0.id == item.id }) else { return }
             ttsQueue.jumpTo(index)
         }
+    }
+
+    private func moveEntry(_ item: TTSPlaylistEntry, by offset: Int) {
+        guard let index = ttsQueue.currentPlaylistOrderedEntries().firstIndex(where: { $0.id == item.id }) else { return }
+        let destination = index + offset
+        guard destination >= 0, destination < ttsQueue.currentPlaylistEntryCount() else { return }
+        ttsQueue.moveEntries(from: IndexSet(integer: index), to: destination)
+    }
+
+    private func canMoveEntry(_ item: TTSPlaylistEntry, by offset: Int) -> Bool {
+        guard let index = ttsQueue.currentPlaylistOrderedEntries().firstIndex(where: { $0.id == item.id }) else { return false }
+        let destination = index + offset
+        return destination >= 0 && destination < ttsQueue.currentPlaylistEntryCount()
     }
 
     private func progressWidth(totalWidth: CGFloat) -> CGFloat {

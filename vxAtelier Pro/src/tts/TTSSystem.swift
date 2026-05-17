@@ -567,6 +567,36 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
         vxAtelierPro.log.debug("🗑️ Removed item at index \(index), playlist now has \(updatedEntries.count) items")
     }
 
+    func moveEntries(from source: IndexSet, to destination: Int) {
+        guard let playlist = activePlaylist(createIfNeeded: false) else { return }
+        let entries = orderedEntries(in: playlist)
+        guard !source.isEmpty else { return }
+        guard source.allSatisfy({ $0 >= 0 && $0 < entries.count }) else {
+            vxAtelierPro.log.error("❌ Invalid reorder source indexes: \(source)")
+            return
+        }
+
+        let currentEntryID = currentItem?.id
+        var reorderedEntries = entries
+        reorderedEntries.move(fromOffsets: source, toOffset: destination)
+
+        for (index, entry) in reorderedEntries.enumerated() {
+            entry.orderIndex = index
+        }
+
+        playlist.updatedAt = Date()
+        saveContext()
+
+        if let currentEntryID,
+           let currentPosition = reorderedEntries.firstIndex(where: { $0.id == currentEntryID }) {
+            currentIndex = currentPosition
+        } else {
+            currentIndex = min(currentIndex, max(0, reorderedEntries.count - 1))
+        }
+
+        vxAtelierPro.log.debug("↕️ Reordered \(source.count) playlist item(s)")
+    }
+
     func clear() {
         stop()
         if let playlist = activePlaylist(createIfNeeded: false) {
