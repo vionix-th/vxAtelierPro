@@ -664,3 +664,15 @@ struct ContentView: View {
     }
 
 }
+
+#Preview {
+    ContentView(
+        onRequestOptions: { _ in },
+        onRequestExportProject: { _ in },
+        onRequestExportConversation: { _ in },
+        onRequestImport: {},
+        onRequestSettings: { _ in },
+        onRequestTTS: {},
+        onRequestLogHistory: {}
+    ).bootstrapped(with: .preview())
+}

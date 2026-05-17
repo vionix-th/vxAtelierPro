@@ -107,3 +107,14 @@ struct DetailPlaceholderView: View {
         .padding()
     }
 }
+
+#Preview {
+    DetailPlaceholderView(
+        hasAPIConfiguration: false,
+        onNewConversation: {},
+        onNewProject: {},
+        onConfigureAPI: {},
+        onConfigureSettings: {}
+    )
+    .frame(width: 800, height: 600)
+}
