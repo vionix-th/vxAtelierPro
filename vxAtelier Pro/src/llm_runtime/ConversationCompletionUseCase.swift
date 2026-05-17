@@ -60,7 +60,7 @@ final class ConversationCompletionUseCase {
         } catch {
             let normalizedError = ConversationRunError.normalized(error)
             draftSink.fail(normalizedError, conversationID: conversation.id)
-            if turn.responseRuns.isEmpty {
+            if turn.events.isEmpty {
                 try runStore.rollbackTurn(turn, from: conversation)
             }
             throw normalizedError
