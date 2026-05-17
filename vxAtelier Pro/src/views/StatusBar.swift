@@ -10,6 +10,7 @@ struct StatusBar: View {
     @State private var statusBarLogTypeFilters: Set<LoggingService.LogType> = []
     @State private var displayedMessage: String = ""
     let onRequestLogHistory: () -> Void
+    let onRequestOptions: (PersistentIdentifier) -> Void
     let onRequestModelSelection: (PersistentIdentifier) -> Void
     private let messageAnimation: Animation = .easeInOut(duration: 0.18)
     
@@ -71,9 +72,11 @@ struct StatusBar: View {
     // MARK: - Initialization
     init(
         onRequestLogHistory: @escaping () -> Void,
+        onRequestOptions: @escaping (PersistentIdentifier) -> Void,
         onRequestModelSelection: @escaping (PersistentIdentifier) -> Void
     ) {
         self.onRequestLogHistory = onRequestLogHistory
+        self.onRequestOptions = onRequestOptions
         self.onRequestModelSelection = onRequestModelSelection
     }
 
@@ -162,6 +165,7 @@ struct StatusBar: View {
                             conversation: conversation,
                             isCompact: false,
                             queryManager: queryManager,
+                            onRequestOptions: onRequestOptions,
                             onRequestModelSelection: onRequestModelSelection
                         )
                             .layoutPriority(1)
@@ -178,6 +182,7 @@ struct StatusBar: View {
                     conversation: conversation,
                     isCompact: true,
                     queryManager: queryManager,
+                    onRequestOptions: onRequestOptions,
                     onRequestModelSelection: onRequestModelSelection
                 )
                     .padding(.horizontal, 8)
@@ -407,6 +412,7 @@ struct ConversationInfoHeader: View {
     let conversation: ConversationItem
     let isCompact: Bool
     let queryManager: QueryManager
+    let onRequestOptions: (PersistentIdentifier) -> Void
     let onRequestModelSelection: (PersistentIdentifier) -> Void
 
     private var modelName: String {
@@ -436,10 +442,16 @@ struct ConversationInfoHeader: View {
                     .frame(height: 14)
             }
             
-            Text(conversation.options.apiConfiguration?.name ?? "No API Config")
-                .fontWeight(.medium)
-                .lineLimit(1)
-                .truncationMode(.middle)
+            Button {
+                onRequestOptions(conversation.id)
+            } label: {
+                Text(conversation.options.apiConfiguration?.name ?? "No API Config")
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .buttonStyle(.plain)
+            .help("Open conversation options")
                 
             Divider()
                 .frame(height: 14)
