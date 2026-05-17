@@ -35,11 +35,17 @@ struct ConversationOptionsView: View {
         )
     }
 
+    private var sortedAPIConfigurations: [APIConfigurationItem] {
+        apiConfigurations.sorted {
+            $0.name.localizedStandardCompare($1.name) == .orderedAscending
+        }
+    }
+
     @ViewBuilder
     private func apiConfigurationPicker() -> some View {
         LabeledContent("API Configuration") {
             Picker("", selection: $options.apiConfiguration) {
-                ForEach(apiConfigurations) { config in
+                ForEach(sortedAPIConfigurations) { config in
                     Text(config.name).tag(config as APIConfigurationItem?)
                 }
             }

@@ -99,6 +99,12 @@ struct APIConfigurationEditView: View {
         currentProfile.supportedAdapterIDs
     }
 
+    private var sortedAPIPresets: [APIPreset] {
+        APIPreset.allCases.sorted {
+            $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
+        }
+    }
+
     var body: some View {
         SettingsPage(title: isNewConfiguration ? AppDefaults.newApiConfigurationName : "Edit Configuration") {
             SettingsFormSection("Connection") {
@@ -112,7 +118,7 @@ struct APIConfigurationEditView: View {
                 }
 
                 SettingsPickerRow("Provider", selection: $selectedPreset) {
-                    ForEach(APIPreset.allCases, id: \.self) { preset in
+                    ForEach(sortedAPIPresets, id: \.self) { preset in
                         Label(preset.displayName, systemImage: preset.iconName)
                             .tag(preset)
                     }
