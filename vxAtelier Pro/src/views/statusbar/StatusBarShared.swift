@@ -9,7 +9,7 @@ struct StatusBarFilterButton: View {
         Button(action: action) {
             Image(systemName: "line.3.horizontal.decrease.circle")
                 .foregroundColor(isActive ? .blue : .secondary)
-                .padding(4)
+                .padding(AppDefaults.paddingSmall)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -24,7 +24,7 @@ struct StatusBarFilterPopover: View {
     let onClear: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
             HStack {
                 Text(title)
                     .font(.headline)
@@ -38,10 +38,10 @@ struct StatusBarFilterPopover: View {
                         .font(.caption)
                 }
                 .buttonStyle(.plain)
-                .padding(.vertical, 2)
-                .padding(.horizontal, 6)
+                .padding(.vertical, AppDefaults.paddingSmall / 2)
+                .padding(.horizontal, AppDefaults.paddingMedium)
                 .background(Color.secondary.opacity(0.1))
-                .cornerRadius(4)
+                .cornerRadius(AppDefaults.cornerRadiusSmall)
             }
 
             Text("Show message types:")
@@ -68,10 +68,10 @@ struct StatusBarFilterPopover: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .italic()
-                    .padding(.top, 4)
+                    .padding(.top, AppDefaults.paddingSmall)
             }
         }
-        .padding(10)
+        .padding(AppDefaults.paddingMedium)
     }
 }
 
@@ -81,7 +81,7 @@ struct StatusBarFilterRow: View {
     let onTap: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: AppDefaults.paddingMedium) {
             Image(systemName: logType.systemImage)
                 .foregroundColor(logType.color)
 
@@ -94,10 +94,10 @@ struct StatusBarFilterRow: View {
                     .foregroundColor(.blue)
             }
         }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 8)
+        .padding(.vertical, AppDefaults.paddingSmall)
+        .padding(.horizontal, AppDefaults.paddingMedium)
         .background(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
-        .cornerRadius(4)
+        .cornerRadius(AppDefaults.cornerRadiusSmall)
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
     }
@@ -150,7 +150,7 @@ struct StatusBarTokenDisplay: View {
     }
 
     var body: some View {
-        HStack(spacing: 3) {
+        HStack(spacing: AppDefaults.paddingSmall) {
             Image(systemName: type.systemImage)
                 .foregroundColor(.secondary)
                 .font(.caption)
@@ -160,10 +160,10 @@ struct StatusBarTokenDisplay: View {
                 .foregroundColor(.secondary)
                 .lineLimit(1)
         }
-        .padding(.horizontal, compactMode ? 4 : 6)
-        .padding(.vertical, 2)
+        .padding(.horizontal, compactMode ? AppDefaults.paddingSmall : AppDefaults.paddingMedium)
+        .padding(.vertical, AppDefaults.paddingSmall / 2)
         .background(type.backgroundColor)
-        .cornerRadius(4)
+        .cornerRadius(AppDefaults.cornerRadiusSmall)
         .help("\(type.helpText): \(count)")
     }
 }
@@ -193,10 +193,10 @@ struct StatusBarModelPill: View {
             .foregroundColor(.secondary)
             .lineLimit(1)
             .truncationMode(.middle)
-            .padding(.horizontal, compactMode ? 6 : 8)
-            .padding(.vertical, 2)
+            .padding(.horizontal, compactMode ? AppDefaults.paddingSmall : AppDefaults.paddingMedium)
+            .padding(.vertical, AppDefaults.paddingSmall / 2)
             .background(Color.secondary.opacity(0.1))
-            .cornerRadius(4)
+            .cornerRadius(AppDefaults.cornerRadiusSmall)
     }
 }
 
@@ -269,7 +269,7 @@ struct StatusBarInfoRow: View {
     @ViewBuilder
     var body: some View {
         if conversation != nil {
-            HStack(spacing: dense ? 4 : 6) {
+            HStack(spacing: AppDefaults.paddingSmall) {
                 if isUtilityConversation {
                     Image(systemName: "menubar.dock.rectangle")
                         .foregroundColor(.green)
@@ -292,29 +292,29 @@ struct StatusBarInfoRow: View {
                     action: canSelectModel ? onRequestModelSelection : nil
                 )
 
-                HStack(spacing: 6) {
+                HStack(spacing: AppDefaults.paddingSmall) {
                     StatusBarTokenDisplay(count: tokenCount, type: .context, compactMode: dense)
                     StatusBarTokenDisplay(count: usedTokenCount, type: .total, compactMode: dense)
                 }
-                .padding(.horizontal, 2)
+                .padding(.horizontal, AppDefaults.paddingSmall)
 
                 if !dense {
                     if allowsStreamingToggle && supportsStreaming, let onToggleStreaming {
-                        HStack(spacing: 4) {
+                        HStack(spacing: AppDefaults.paddingSmall) {
                             Image(systemName: isStreamingEnabled ? "sparkles" : "text.alignleft")
                                 .font(.caption)
                             Text(isStreamingEnabled ? "Stream" : "Block")
                                 .font(.caption)
                         }
                         .foregroundColor(isStreamingEnabled ? .blue : .secondary)
-                        .padding(.horizontal, 2)
+                        .padding(.horizontal, AppDefaults.paddingSmall)
                         .onTapGesture {
                             onToggleStreaming(!isStreamingEnabled)
                         }
                     }
 
                     if !capabilities.isEmpty {
-                        HStack(spacing: 3) {
+                        HStack(spacing: AppDefaults.paddingSmall) {
                             ForEach(capabilities) { capability in
                                 Image(systemName: capability.systemName)
                                     .foregroundColor(.blue)
@@ -322,7 +322,7 @@ struct StatusBarInfoRow: View {
                                     .help(capability.displayName)
                             }
                         }
-                        .padding(.horizontal, 2)
+                        .padding(.horizontal, AppDefaults.paddingSmall)
                     }
                 }
             }

@@ -14,7 +14,7 @@ struct StatusBarInline: View {
     let onToggleStreaming: (PersistentIdentifier, Bool) -> Void
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: AppDefaults.paddingSmall) {
             StatusBarLogStrip(
                 message: logMessage,
                 logType: logType,
@@ -26,7 +26,7 @@ struct StatusBarInline: View {
 
             if let conversationID {
                 Spacer(minLength: 0)
-                
+
                 StatusBarInfoStrip(
                     conversationID: conversationID,
                     allowsStreamingToggle: true,
@@ -105,9 +105,9 @@ private struct StatusBarInfoStrip: View {
             onRequestModelSelection: onRequestModelSelection,
             onToggleStreaming: onToggleStreaming
         )
-        .padding(.horizontal, 2)
-        .padding(.vertical, 4)
-        .background(Color.secondary.opacity(0.05))
+        .padding(.horizontal, AppDefaults.paddingMedium)
+        .padding(.vertical, AppDefaults.paddingSmall)
+        .background(Color.secondary.opacity(AppDefaults.sectionBackgroundOpacity / 2))
     }
 }
 
@@ -120,7 +120,7 @@ struct StatusBarLogStrip: View {
     let onRequestLogHistory: () -> Void
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: AppDefaults.paddingSmall) {
             StatusBarFilterButton(isActive: !statusBarLogTypeFilters.isEmpty) {
                 isStatusBarFilterPopoverOpen.toggle()
             }
@@ -141,13 +141,13 @@ struct StatusBarLogStrip: View {
             Text(message)
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .padding(.horizontal, 2)
+                .padding(.horizontal, AppDefaults.paddingSmall)
                 .foregroundColor(.primary)
                 .contentShape(Rectangle())
                 .onTapGesture {
                     onRequestLogHistory()
                 }
         }
-        .padding(.leading, 8)
+        .padding(.leading, AppDefaults.paddingMedium)
     }
 }
