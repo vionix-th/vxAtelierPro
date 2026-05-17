@@ -25,6 +25,8 @@ struct StatusBarInline: View {
             )
 
             if let conversationID {
+                Spacer(minLength: 0)
+                
                 StatusBarInfoStrip(
                     conversationID: conversationID,
                     allowsStreamingToggle: true,
@@ -55,24 +57,32 @@ struct StatusBarStacked: View {
     var body: some View {
         VStack(spacing: 0) {
             if let conversationID {
-                StatusBarInfoStrip(
-                    conversationID: conversationID,
-                    allowsStreamingToggle: false,
-                    dense: true,
-                    onRequestOptions: { onRequestOptions(conversationID) },
-                    onRequestModelSelection: { onRequestModelSelection(conversationID) },
-                    onToggleStreaming: { onToggleStreaming(conversationID, $0) }
-                )
+                HStack {
+                    Spacer()
+                    
+                    StatusBarInfoStrip(
+                        conversationID: conversationID,
+                        allowsStreamingToggle: false,
+                        dense: true,
+                        onRequestOptions: { onRequestOptions(conversationID) },
+                        onRequestModelSelection: { onRequestModelSelection(conversationID) },
+                        onToggleStreaming: { onToggleStreaming(conversationID, $0) }
+                    )
+                }
             }
 
-            StatusBarLogStrip(
-                message: logMessage,
-                logType: logType,
-                isStatusBarFilterPopoverOpen: $isStatusBarFilterPopoverOpen,
-                statusBarLogTypeFilters: $statusBarLogTypeFilters,
-                onClearFilters: onClearFilters,
-                onRequestLogHistory: onRequestLogHistory
-            )
+            HStack{
+                StatusBarLogStrip(
+                    message: logMessage,
+                    logType: logType,
+                    isStatusBarFilterPopoverOpen: $isStatusBarFilterPopoverOpen,
+                    statusBarLogTypeFilters: $statusBarLogTypeFilters,
+                    onClearFilters: onClearFilters,
+                    onRequestLogHistory: onRequestLogHistory
+                )
+                
+                Spacer()
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -95,7 +105,7 @@ private struct StatusBarInfoStrip: View {
             onRequestModelSelection: onRequestModelSelection,
             onToggleStreaming: onToggleStreaming
         )
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 2)
         .padding(.vertical, 4)
         .background(Color.secondary.opacity(0.05))
     }
