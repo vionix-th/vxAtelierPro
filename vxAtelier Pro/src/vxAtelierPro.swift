@@ -68,7 +68,7 @@ struct vxAtelierPro: App {
         static var stages: [MigrationStage] = []  // Empty stages = lightweight migration
 
         enum CurrentSchema: VersionedSchema {
-            static var versionIdentifier = Schema.Version(1, 0, 0)
+            static var versionIdentifier = Schema.Version(1, 1, 0)
             static var models: [any PersistentModel.Type] {
                 [
                     ConversationItem.self,
@@ -76,6 +76,8 @@ struct vxAtelierPro: App {
                     BookmarkItem.self,
                     PromptTemplate.self,
                     VoiceConfigurationItem.self,
+                    TTSPlaylist.self,
+                    TTSPlaylistEntry.self,
                     APIConfigurationItem.self,
                     ModelItem.self,
                     ModelParameterMappingItem.self,

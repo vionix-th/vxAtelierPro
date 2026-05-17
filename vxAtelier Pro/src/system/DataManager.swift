@@ -17,6 +17,7 @@ class DataManager {
         bookmarks: [BookmarkItem],
         promptTemplates: [PromptTemplate],
         voiceConfigurations: [VoiceConfigurationItem],
+        ttsPlaylists: [TTSPlaylist],
         apiConfigurations: [APIConfigurationItem],
         models: [ModelItem],
         webSearchConfigurations: [WebSearchConfigurationItem]
@@ -26,6 +27,7 @@ class DataManager {
         let bookmarkExports = bookmarks.map { BookmarkExportData($0) }
         let templateExports = promptTemplates.map { PromptTemplateExportData($0) }
         let voiceConfigExports = voiceConfigurations.map { VoiceConfigurationExportData($0) }
+        let ttsPlaylistExports = ttsPlaylists.map { TTSPlaylistExportData($0) }
         let apiConfigExports = apiConfigurations.map { APIConfigurationExportData($0) }
         let modelExports = models.map { ModelExportData($0) }
         let webSearchConfigExports = webSearchConfigurations.map { WebSearchConfigurationExportData($0) }
@@ -36,6 +38,7 @@ class DataManager {
             bookmarks: bookmarkExports,
             promptTemplates: templateExports,
             voiceConfigurations: voiceConfigExports,
+            ttsPlaylists: ttsPlaylistExports,
             apiConfigurations: apiConfigExports,
             models: modelExports,
             webSearchConfigurations: webSearchConfigExports
@@ -52,6 +55,7 @@ class DataManager {
         bookmarks: [BookmarkItem],
         promptTemplates: [PromptTemplate],
         voiceConfigurations: [VoiceConfigurationItem],
+        ttsPlaylists: [TTSPlaylist],
         apiConfigurations: [APIConfigurationItem],
         models: [ModelItem],
         webSearchConfigurations: [WebSearchConfigurationItem]
@@ -62,6 +66,7 @@ class DataManager {
             bookmarks: bookmarks,
             promptTemplates: promptTemplates,
             voiceConfigurations: voiceConfigurations,
+            ttsPlaylists: ttsPlaylists,
             apiConfigurations: apiConfigurations,
             models: models,
             webSearchConfigurations: webSearchConfigurations
@@ -117,6 +122,8 @@ class DataManager {
             try context.delete(model: BookmarkItem.self)
             try context.delete(model: PromptTemplate.self)
             try context.delete(model: VoiceConfigurationItem.self)
+            try context.delete(model: TTSPlaylistEntry.self)
+            try context.delete(model: TTSPlaylist.self)
             try context.delete(model: APIConfigurationItem.self)
             try context.delete(model: ModelItem.self)
             try context.delete(model: WebSearchConfigurationItem.self)
@@ -177,6 +184,11 @@ class DataManager {
                 let voiceConfig = voiceConfigData.toDataItem()
                 context.insert(voiceConfig)
             }
+
+            for playlistData in backup.ttsPlaylists {
+                let playlist = playlistData.toDataItem()
+                context.insert(playlist)
+            }
             
             let restoredApiConfigurations = try context.fetch(FetchDescriptor<APIConfigurationItem>())
             for modelData in backup.models {
@@ -234,6 +246,7 @@ class DataManager {
         let bookmarks = try context.fetch(FetchDescriptor<BookmarkItem>())
         let promptTemplates = try context.fetch(FetchDescriptor<PromptTemplate>())
         let voiceConfigurations = try context.fetch(FetchDescriptor<VoiceConfigurationItem>())
+        let ttsPlaylists = try context.fetch(FetchDescriptor<TTSPlaylist>())
         let apiConfigurations = try context.fetch(FetchDescriptor<APIConfigurationItem>())
         let models = try context.fetch(FetchDescriptor<ModelItem>())
         let webSearchConfigurations = try context.fetch(FetchDescriptor<WebSearchConfigurationItem>())
@@ -244,6 +257,7 @@ class DataManager {
             bookmarks: bookmarks,
             promptTemplates: promptTemplates,
             voiceConfigurations: voiceConfigurations,
+            ttsPlaylists: ttsPlaylists,
             apiConfigurations: apiConfigurations,
             models: models,
             webSearchConfigurations: webSearchConfigurations
@@ -262,6 +276,12 @@ class DataManager {
     func exportConversation(_ conversation: ConversationItem) async throws {
         let data = try JsonSerializer.exportConversation(conversation)
         try await FileHelper.shared.save(data: data, filename: "\(conversation.title).json")
+    }
+
+    @MainActor
+    func exportPlaylist(_ playlist: TTSPlaylist) async throws {
+        let data = try JsonSerializer.exportPlaylist(playlist)
+        try await FileHelper.shared.save(data: data, filename: "\(playlist.name).json")
     }
     
     @MainActor
@@ -354,6 +374,22 @@ class DataManager {
         } catch {
             throw DataManagerError.importFailed(
                 reason: "Could not save imported conversation",
+                underlyingErrors: [error]
+            )
+        }
+
+        do {
+            let playlist = try JsonSerializer.importPlaylist(from: data)
+            context.insert(playlist)
+            let queryManager = QueryManager(modelContext: context)
+            try await normalizeModelContext(context)
+            try queryManager.saveContext()
+            return playlist
+        } catch let error as DecodingError {
+            vxAtelierPro.log.debug("Failed to import as playlist: \(error.localizedDescription)")
+        } catch {
+            throw DataManagerError.importFailed(
+                reason: "Could not save imported playlist",
                 underlyingErrors: [error]
             )
         }

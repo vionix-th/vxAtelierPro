@@ -74,7 +74,7 @@ struct AppDefaults {
     static let selfSignedCertWhitelist = "[]"
         
     // TTS Settings
-    static let ttsAutoplay = true
+    static let ttsEntryPauseMs = 1000
     static let ttsRepeatMode = "none"  // "none", "one", or "all"
     
     // NOTE: Speech rate and pitch settings are managed through voice configurations.
@@ -206,7 +206,7 @@ extension AppDefaults {
             forKey: AppSettings.Keys.allowSelfSignedCertificates)
         defaults.set(AppDefaults.selfSignedCertWhitelist, forKey: AppSettings.Keys.selfSignedCertWhitelist)
         // TTS
-        defaults.set(AppDefaults.ttsAutoplay, forKey: AppSettings.Keys.ttsAutoplay)
+        defaults.set(AppDefaults.ttsEntryPauseMs, forKey: AppSettings.Keys.ttsEntryPauseMs)
         defaults.set(AppDefaults.ttsRepeatMode, forKey: AppSettings.Keys.ttsRepeatMode)
         // Sidebar sort
         defaults.set(

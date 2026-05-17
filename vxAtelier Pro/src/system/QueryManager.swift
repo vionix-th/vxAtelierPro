@@ -354,6 +354,8 @@ final class QueryManager {
         _ = try deleteAll(of: WebSearchConfigurationItem.self)
         _ = try deleteAll(of: ModelItem.self)
         _ = try deleteAll(of: VoiceConfigurationItem.self)
+        _ = try deleteAll(of: TTSPlaylistEntry.self)
+        _ = try deleteAll(of: TTSPlaylist.self)
         _ = try deleteAll(of: PromptTemplate.self)
         ensureSystemConversation()
     }

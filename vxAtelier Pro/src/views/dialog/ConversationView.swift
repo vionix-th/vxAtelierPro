@@ -188,13 +188,11 @@ struct ConversationView: View {
 
         Divider()
 
-        Button {
-            addSelectedToPlaylist()
-        } label: {
-            MenuItemStyle.label("Add to Playlist", systemImage: "speaker.wave.2.bubble")
-        }
-        .help("Add selected messages to the text-to-speech queue")
-        .disabled(selectedMessages.isEmpty)
+        playlistAddMenu(
+            isDisabled: selectedMessages.isEmpty,
+            newPlaylistAction: { addSelectedToNewPlaylist() },
+            playlistAction: { playlist in addSelectedToPlaylist(playlist) }
+        )
 
         Divider()
 
@@ -247,13 +245,11 @@ struct ConversationView: View {
 
         Divider()
 
-        Button {
-            addAllToPlaylist()
-        } label: {
-            MenuItemStyle.label("Add to Playlist", systemImage: "speaker.wave.2.bubble")
-        }
-        .help("Add all messages to the text-to-speech queue")
-        .disabled(conversation?.turns.isEmpty ?? true)
+        playlistAddMenu(
+            isDisabled: conversation?.turns.isEmpty ?? true,
+            newPlaylistAction: { addAllToNewPlaylist() },
+            playlistAction: { playlist in addAllToPlaylist(playlist) }
+        )
 
         if conversation?.status == .active {
             Divider()
@@ -334,7 +330,7 @@ struct ConversationView: View {
             }
         case .addToPlaylist:
             vxAtelierPro.log.info("Adding single message to playlist. ID: \(message.id)")
-            ttsQueue.add(message, conversationTitle: conversation.title, messageIndex: 0, projectName: conversation.project?.name)
+            ttsQueue.add(message, conversationID: conversationID)
         case .select:
             isSelectingMessages = true
             selectedMessages.insert(message.id)
@@ -375,7 +371,38 @@ struct ConversationView: View {
         selectedMessages.removeAll()
     }
 
-    private func addToPlaylist(_ messageIDs: Set<PersistentIdentifier>) {
+    @ViewBuilder
+    private func playlistAddMenu(
+        isDisabled: Bool,
+        newPlaylistAction: @escaping () -> Void,
+        playlistAction: @escaping (TTSPlaylist) -> Void
+    ) -> some View {
+        Menu {
+            Button {
+                newPlaylistAction()
+            } label: {
+                MenuItemStyle.label("New Playlist", systemImage: "plus.square.on.square")
+            }
+
+            let playlists = ttsQueue.playlists()
+            if !playlists.isEmpty {
+                Divider()
+                ForEach(playlists) { playlist in
+                    Button {
+                        playlistAction(playlist)
+                    } label: {
+                        MenuItemStyle.label(playlist.name, systemImage: "music.note.list")
+                    }
+                }
+            }
+        } label: {
+            MenuItemStyle.label("Add to Playlist", systemImage: "speaker.wave.2.bubble")
+        }
+        .help("Add messages to a playlist")
+        .disabled(isDisabled)
+    }
+
+    private func addToPlaylist(_ messageIDs: Set<PersistentIdentifier>, playlist: TTSPlaylist) {
         guard !messageIDs.isEmpty else {
             vxAtelierPro.log.debug("No messages selected to add to playlist")
             return
@@ -387,34 +414,67 @@ struct ConversationView: View {
         }
 
         let messagesToAdd = selectedMessagesOrdered(in: conversation, messageIDs: messageIDs)
-        for (index, message) in messagesToAdd.enumerated() {
-            ttsQueue.add(
-                message,
-                conversationTitle: conversation.title,
-                messageIndex: index,
-                projectName: conversation.project?.name
-            )
-        }
+        ttsQueue.selectPlaylist(id: playlist.id)
+        ttsQueue.add(messagesToAdd, conversationID: conversationID)
     }
 
-    private func addSelectedToPlaylist() {
-        guard !selectedMessages.isEmpty else {
-            vxAtelierPro.log.debug("No messages selected to add to playlist")
+    private func addToNewPlaylist(_ messageIDs: Set<PersistentIdentifier>) {
+        guard !messageIDs.isEmpty else {
+            vxAtelierPro.log.debug("No messages selected to add to new playlist")
             return
         }
-
-        addToPlaylist(selectedMessages)
-        exitSelectionMode()
-    }
-
-    private func addAllToPlaylist() {
-        vxAtelierPro.log.info("Adding all messages to playlist.")
         guard let conversation else {
             vxAtelierPro.log.error("Cannot add to playlist: conversation not found")
             errorAlert = ErrorAlert(error: AppError.invalidOperation("Conversation not found"))
             return
         }
-        addToPlaylist(allMessageIDs(in: conversation))
+
+        let messagesToAdd = selectedMessagesOrdered(in: conversation, messageIDs: messageIDs)
+        _ = ttsQueue.createPlaylist(named: conversation.title)
+        ttsQueue.add(messagesToAdd, conversationID: conversationID)
+    }
+
+    private func addSelectedToNewPlaylist() {
+        guard !selectedMessages.isEmpty else {
+            vxAtelierPro.log.debug("No messages selected to add to new playlist")
+            return
+        }
+
+        addToNewPlaylist(selectedMessages)
+        exitSelectionMode()
+    }
+
+    private func addAllToNewPlaylist() {
+        vxAtelierPro.log.info("Adding all messages to new playlist.")
+        guard let conversation else {
+            vxAtelierPro.log.error("Cannot add to playlist: conversation not found")
+            errorAlert = ErrorAlert(error: AppError.invalidOperation("Conversation not found"))
+            return
+        }
+        addToNewPlaylist(allMessageIDs(in: conversation))
+    }
+
+    private func addAllToPlaylist(_ playlist: TTSPlaylist) {
+        guard let conversation else {
+            vxAtelierPro.log.error("Cannot add to playlist: conversation not found")
+            errorAlert = ErrorAlert(error: AppError.invalidOperation("Conversation not found"))
+            return
+        }
+
+        let messages = allMessageIDs(in: conversation)
+        let selectedMessages = selectedMessagesOrdered(in: conversation, messageIDs: messages)
+        ttsQueue.selectPlaylist(id: playlist.id)
+        ttsQueue.add(selectedMessages, conversationID: conversationID)
+    }
+
+    private func addSelectedToPlaylist(_ playlist: TTSPlaylist) {
+        guard !selectedMessages.isEmpty else {
+            vxAtelierPro.log.debug("No messages selected to add to playlist")
+            return
+        }
+
+        addToPlaylist(selectedMessages, playlist: playlist)
+        exitSelectionMode()
     }
 
     private func copySelectedAsText() {

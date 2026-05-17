@@ -40,6 +40,22 @@ class JsonSerializer {
         let conversationData = try decoder.decode(ConversationExportData.self, from: data)
         return try conversationData.toDataItem(context: context)
     }
+
+    static func exportPlaylist(_ playlist: TTSPlaylist) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+        encoder.dateEncodingStrategy = .iso8601
+
+        let exportData = TTSPlaylistExportData(playlist)
+        return try encoder.encode(exportData)
+    }
+
+    static func importPlaylist(from data: Data) throws -> TTSPlaylist {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let playlistData = try decoder.decode(TTSPlaylistExportData.self, from: data)
+        return playlistData.toDataItem()
+    }
     
     static func exportMessages(_ messages: [MessageItem]) throws -> Data {
         let encoder = JSONEncoder()
@@ -114,6 +130,10 @@ class JsonSerializer {
         // Then try conversation
         if let conversation = try? importConversation(from: data, context: context) {
             return conversation
+        }
+
+        if let playlist = try? importPlaylist(from: data) {
+            return playlist
         }
         
         // Try voice configuration

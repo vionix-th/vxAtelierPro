@@ -6,7 +6,7 @@ import SwiftUI
 struct TTSSettingsView: View {
     @Environment(QueryManager.self) private var queryManager
     @Query(sort: [SortDescriptor(\VoiceConfigurationItem.language)]) private var voiceConfigurations: [VoiceConfigurationItem]
-    @AppStorage(AppSettings.Keys.ttsAutoplay) private var ttsAutoplay: Bool = AppDefaults.ttsAutoplay
+    @AppStorage(AppSettings.Keys.ttsEntryPauseMs) private var ttsEntryPauseMs: Int = AppDefaults.ttsEntryPauseMs
     @AppStorage(AppSettings.Keys.ttsRepeatMode) private var ttsRepeatMode: String = AppDefaults.ttsRepeatMode
     @State private var editingConfig: EditingConfig?
     @State private var showError = false
@@ -24,7 +24,12 @@ struct TTSSettingsView: View {
         SettingsInsetGroupedListPage(title: "Speech") {
             List {
                 Section {
-                    SettingsToggleRow("Autoplay Next", isOn: $ttsAutoplay)
+                    SettingsStepperRow(
+                        title: "Pause Between Entries (ms)",
+                        bounds: 0...5000,
+                        step: 100,
+                        value: $ttsEntryPauseMs
+                    )
                     SettingsPickerRow("Repeat Mode", selection: $ttsRepeatMode) {
                         Text("None").tag("none")
                         Text("One").tag("one")

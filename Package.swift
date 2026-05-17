@@ -117,6 +117,7 @@ let package = Package(
                 "system/AppearanceStyle.swift",
                 "system/DataManager.swift",
                 "system/AppBootstrap.swift",
+                "system/AppBootstrapPreviewData.swift",
                 "system/ModifierKeyState.swift",
                 "system/RecoveryService.swift",
                 "system/export/APIConfigurationExportData.swift",
@@ -130,6 +131,7 @@ let package = Package(
                 "system/export/ProjectExportData.swift",
                 "system/export/PromptTemplateExportData.swift",
                 "system/export/PromptExportDocument.swift",
+                "system/export/TTSPlaylistExportData.swift",
                 "system/export/VoiceConfigurationExportData.swift",
                 "system/export/WebSearchConfigurationExportData.swift",
                 "system/JsonSerializer.swift",
@@ -141,6 +143,7 @@ let package = Package(
                 "system/StatusBarLayoutStyle.swift",
                 // TTS
                 "tts/TTSControlView.swift",
+                "tts/TTSPlaylistModels.swift",
                 "tts/TTSSystem.swift",
                 // Logging
                 "log/LogSource.swift",

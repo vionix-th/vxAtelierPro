@@ -86,7 +86,7 @@ enum AppSettings {
         static let selfSignedCertWhitelist = "selfSignedCertWhitelist"
 
         // TTS
-        static let ttsAutoplay = "TTSAutoplay"
+        static let ttsEntryPauseMs = "TTSEntryPauseMs"
         static let ttsRepeatMode = "TTSRepeatMode"
 
         // Lifecycle
@@ -136,7 +136,7 @@ enum AppSettings {
             allowedValues: ["conversationDate", "lastMessageDate", "alphabetically"]
         ),
         Keys.autoSendConversationTemplates: .init(key: Keys.autoSendConversationTemplates, type: Bool.self),
-        Keys.ttsAutoplay: .init(key: Keys.ttsAutoplay, type: Bool.self),
+        Keys.ttsEntryPauseMs: .init(key: Keys.ttsEntryPauseMs, type: Int.self, intRange: 0...5000),
         Keys.ttsRepeatMode: .init(key: Keys.ttsRepeatMode, type: String.self, allowedValues: ["none", "one", "all"]),
         Keys.allowSelfSignedCertificates: .init(key: Keys.allowSelfSignedCertificates, type: Bool.self),
         Keys.selfSignedCertWhitelist: .init(key: Keys.selfSignedCertWhitelist, type: String.self)

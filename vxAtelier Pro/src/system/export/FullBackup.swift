@@ -7,7 +7,7 @@ import SwiftUI
 
 // Add version constant at the top level
 private enum BackupVersion {
-    static let current = 1  // Initial version
+    static let current = 2
 }
 
 struct FullBackup: Codable {
@@ -18,6 +18,7 @@ struct FullBackup: Codable {
     let bookmarks: [BookmarkExportData]    
     let promptTemplates: [PromptTemplateExportData]
     let voiceConfigurations: [VoiceConfigurationExportData]
+    let ttsPlaylists: [TTSPlaylistExportData]
     let apiConfigurations: [APIConfigurationExportData]
     let models: [ModelExportData]
     let webSearchConfigurations: [WebSearchConfigurationExportData]
@@ -29,6 +30,7 @@ struct FullBackup: Codable {
         bookmarks: [BookmarkExportData],
         promptTemplates: [PromptTemplateExportData],
         voiceConfigurations: [VoiceConfigurationExportData],
+        ttsPlaylists: [TTSPlaylistExportData],
         apiConfigurations: [APIConfigurationExportData],
         models: [ModelExportData],
         webSearchConfigurations: [WebSearchConfigurationExportData]
@@ -40,6 +42,7 @@ struct FullBackup: Codable {
         self.bookmarks = bookmarks
         self.promptTemplates = promptTemplates
         self.voiceConfigurations = voiceConfigurations
+        self.ttsPlaylists = ttsPlaylists
         self.apiConfigurations = apiConfigurations
         self.models = models
         self.webSearchConfigurations = webSearchConfigurations
@@ -64,6 +67,7 @@ struct FullBackup: Codable {
         bookmarks = try container.decode([BookmarkExportData].self, forKey: .bookmarks)
         promptTemplates = try container.decode([PromptTemplateExportData].self, forKey: .promptTemplates)
         voiceConfigurations = try container.decode([VoiceConfigurationExportData].self, forKey: .voiceConfigurations)
+        ttsPlaylists = try container.decode([TTSPlaylistExportData].self, forKey: .ttsPlaylists)
         apiConfigurations = try container.decode([APIConfigurationExportData].self, forKey: .apiConfigurations)
         models = try container.decode([ModelExportData].self, forKey: .models)
         webSearchConfigurations = try container.decodeIfPresent([WebSearchConfigurationExportData].self, forKey: .webSearchConfigurations) ?? []
@@ -79,6 +83,7 @@ struct FullBackup: Codable {
         try container.encode(bookmarks, forKey: .bookmarks)
         try container.encode(promptTemplates, forKey: .promptTemplates)
         try container.encode(voiceConfigurations, forKey: .voiceConfigurations)
+        try container.encode(ttsPlaylists, forKey: .ttsPlaylists)
         try container.encode(apiConfigurations, forKey: .apiConfigurations)
         try container.encode(models, forKey: .models)
         try container.encode(webSearchConfigurations, forKey: .webSearchConfigurations)
@@ -86,7 +91,7 @@ struct FullBackup: Codable {
     
     // Updated CodingKeys
     private enum CodingKeys: String, CodingKey {
-        case version, timestamp, projects, conversations, bookmarks, promptTemplates, voiceConfigurations, apiConfigurations, models, webSearchConfigurations
+        case version, timestamp, projects, conversations, bookmarks, promptTemplates, voiceConfigurations, ttsPlaylists, apiConfigurations, models, webSearchConfigurations
     }
 }
 

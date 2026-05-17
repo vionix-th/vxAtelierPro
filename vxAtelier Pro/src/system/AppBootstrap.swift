@@ -53,7 +53,8 @@ struct AppBootstrap {
         )
 
         if seedPreviewData {
-            bootstrap.seedPreviewData()
+            vxAtelierPro.log.debug("Seeding preview data")
+            AppBootstrapPreviewData.seedPreviewData(into: modelContainer.mainContext)
         }
 
         return bootstrap
@@ -77,6 +78,8 @@ struct AppBootstrap {
             BookmarkItem.self,
             PromptTemplate.self,
             VoiceConfigurationItem.self,
+            TTSPlaylist.self,
+            TTSPlaylistEntry.self,
             WebSearchConfigurationItem.self,
         ])
 
@@ -154,49 +157,6 @@ struct AppBootstrap {
         registry.registerTool(WriteSettingTool())
         registry.registerTool(WebSearchTool(queryManager: queryManager))
         registry.registerTool(ReadWebsiteTool())
-    }
-
-    private func seedPreviewData() {
-        vxAtelierPro.log.debug("Seeding preview data")
-        let context = modelContainer.mainContext
-
-        let apiConfiguration = APIConfigurationItem(
-            name: "Preview API",
-            apiKey: "preview-key",
-            baseURL: "https://example.invalid",
-            isDefault: true,
-            defaultModel: "preview-model",
-            providerID: .openAIPlatform
-        )
-
-        let previewModel = ModelItem(modelID: "preview-model", apiConfiguration: apiConfiguration)
-        previewModel.displayName = "Preview Model"
-
-        let conversationOptions = ConversationOptions(apiConfiguration: apiConfiguration)
-        conversationOptions.selectedModelID = previewModel.modelID
-
-        let project = ProjectItem(
-            "Preview Project",
-            defaultOptions: ConversationOptions(apiConfiguration: apiConfiguration)
-        )
-        let conversation = ConversationItem("Preview Conversation", options: conversationOptions)
-        conversation.project = project
-
-        let userMessage = MessageItem(role: "user", text: "Show the preview-ready settings view.")
-        let turn = ConversationTurn(sequenceNumber: 0, userMessage: userMessage, conversation: conversation)
-        conversation.turns.append(turn)
-
-        context.insert(apiConfiguration)
-        context.insert(previewModel)
-        context.insert(project)
-        context.insert(conversation)
-
-        do {
-            try context.save()
-            vxAtelierPro.log.debug("Preview data seeded")
-        } catch {
-            vxAtelierPro.log.error("Failed to seed preview data: \(error.localizedDescription)")
-        }
     }
 
     func applyingDependencies<V: View>(to content: V) -> some View {

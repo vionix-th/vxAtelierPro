@@ -210,6 +210,10 @@ final class AppSceneModel {
                         "Successfully imported voice configuration '\(voiceConfiguration.language)' for role '\(voiceConfiguration.role)'."
                     )
                 }
+            } else if let playlist = importedItem as? TTSPlaylist {
+                await MainActor.run {
+                    vxAtelierPro.log.info("Successfully imported playlist '\(playlist.name)'.")
+                }
             } else if let model = importedItem as? ModelItem {
                 await MainActor.run {
                     vxAtelierPro.log.info("Successfully imported model '\(model.modelID)'.")

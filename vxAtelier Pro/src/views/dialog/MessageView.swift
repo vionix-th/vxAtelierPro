@@ -8,6 +8,7 @@ import AppKit
 
 struct MessageView: View {
     @Environment(QueryManager.self) private var queryManager
+    @Environment(TTSQueue.self) private var ttsQueue
     
     let messageID: PersistentIdentifier?
     let turnID: PersistentIdentifier
@@ -47,6 +48,10 @@ struct MessageView: View {
         }()
         return AvatarView(imageData: imageData, size: defaultAvatarSize, strokeWidth: nil)
             .padding(.top, AppDefaults.paddingMedium)
+    }
+
+    private var playlistCreationName: String {
+        queryManager.conversation(with: conversationID)?.title ?? "Playlist"
     }
 
     var body: some View {
@@ -353,8 +358,25 @@ struct MessageView: View {
                 MenuItemStyle.label("Fork from Here", systemImage: "arrow.branch")
             }
             .help("Create a new conversation forked from all turns preceding the turn containing this message")
-            Button {
-                onAction(.addToPlaylist)
+            Menu {
+                Button {
+                    _ = ttsQueue.createPlaylist(named: playlistCreationName)
+                    onAction(.addToPlaylist)
+                } label: {
+                    MenuItemStyle.label("New Playlist", systemImage: "plus.square.on.square")
+                }
+                let playlists = ttsQueue.playlists()
+                if !playlists.isEmpty {
+                    Divider()
+                    ForEach(playlists) { playlist in
+                        Button {
+                            ttsQueue.selectPlaylist(id: playlist.id)
+                            onAction(.addToPlaylist)
+                        } label: {
+                            MenuItemStyle.label(playlist.name, systemImage: "music.note.list")
+                        }
+                    }
+                }
             } label: {
                 MenuItemStyle.label("Add to Playlist", systemImage: "speaker.wave.2.bubble")
             }

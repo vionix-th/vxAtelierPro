@@ -9,4 +9,4 @@ enum MessageAction {
     case copyText
     case copyJSON
     case delete
-} 
+}
