@@ -117,6 +117,7 @@ let package = Package(
                 "system/AppearanceStyle.swift",
                 "system/DataManager.swift",
                 "system/AppBootstrap.swift",
+                "system/ModifierKeyState.swift",
                 "system/RecoveryService.swift",
                 "system/export/APIConfigurationExportData.swift",
                 "system/export/BookmarkExportData.swift",

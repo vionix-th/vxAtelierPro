@@ -162,7 +162,7 @@ struct MessageInputView: View {
                     .focused($isInputFocused)
                     #if os(macOS)
                     .onKeyPress(.return) {
-                        if NSEvent.modifierFlags.contains(.shift) {
+                        if ModifierKeyState.isShiftPressed() {
                             return .ignored
                         }
                         controller.send(autoNameConversations: autoNameConversations)

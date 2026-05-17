@@ -55,7 +55,7 @@ struct ConversationOptionsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let content = VStack(alignment: .leading, spacing: 0) {
             header
 
             Divider()
@@ -75,9 +75,18 @@ struct ConversationOptionsView: View {
             }
             .padding()
         }
-        #if os(macOS)
-            .presentationSizing(.page)
-        #endif
+
+        Group {
+            #if os(macOS)
+                if #available(macOS 15.0, *) {
+                    content.presentationSizing(.page)
+                } else {
+                    content
+                }
+            #else
+                content
+            #endif
+        }
         .onChange(of: options.apiConfiguration) {
             if let config = options.apiConfiguration {
                 vxAtelierPro.log.info("API configuration changed, updating defaults")

@@ -7,22 +7,22 @@ struct ContentView: View {
     @Environment(QueryManager.self) private var queryManager
     @Environment(NavigationRouter.self) private var router
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-
+    
     @Query(sort: [SortDescriptor(\ProjectItem.name)]) private var projects: [ProjectItem]
     @Query(sort: [SortDescriptor(\ConversationItem.timestamp, order: .reverse)]) private var conversations: [ConversationItem]
     @Query(sort: [SortDescriptor(\BookmarkItem.label)]) private var bookmarks: [BookmarkItem]
-
+    
     // MARK: - View Options (UserDefaults-backed)
     @AppStorage(AppSettings.Keys.showEmptySections) private var showEmptySections: Bool = AppDefaults.showEmptySections
     @AppStorage(AppSettings.Keys.showSystemConversations) private var showSystemConversations: Bool = AppDefaults.showSystemConversations
     @AppStorage(AppSettings.Keys.contentFilter) private var contentFilter: ContentFilter = .active
     @AppStorage(AppSettings.Keys.sidebarConversationsSortDescending) private var sidebarConversationsSortDescending: Bool = true
     @AppStorage(AppSettings.Keys.sidebarConversationsSortType) private var sidebarConversationsSortTypeRaw: String =
-        SidebarSortType.conversationDate.rawValue
+    SidebarSortType.conversationDate.rawValue
     @AppStorage(AppSettings.Keys.sidebarProjectsSortDescending) private var sidebarProjectsSortDescending: Bool = false
     @AppStorage(AppSettings.Keys.sidebarProjectsSortType) private var sidebarProjectsSortTypeRaw: String =
-        SidebarSortType.alphabetically.rawValue
-
+    SidebarSortType.alphabetically.rawValue
+    
     // MARK: - State & Bindings
     let onRequestOptions: (PersistentIdentifier) -> Void
     let onRequestExportProject: (ProjectItem) -> Void
@@ -31,7 +31,7 @@ struct ContentView: View {
     let onRequestSettings: (SettingsDestination?) -> Void
     let onRequestTTS: () -> Void
     let onRequestLogHistory: () -> Void
-
+    
     private var filteredProjects: [ProjectItem] {
         switch contentFilter {
         case .active:
@@ -42,7 +42,7 @@ struct ContentView: View {
             return projects.filter { $0.status == .trashed }
         }
     }
-
+    
     private var standaloneConversations: [ConversationItem] {
         conversations.filter { conversation in
             guard conversation.project == nil else { return false }
@@ -60,7 +60,7 @@ struct ContentView: View {
             return true
         }
     }
-
+    
     private var visibleBookmarks: [BookmarkItem] {
         contentFilter == .active ? bookmarks : []
     }
@@ -84,7 +84,7 @@ struct ContentView: View {
     private var archivedProjectsCount: Int {
         projects.filter { $0.status == .archived }.count
     }
-
+    
     // MARK: - Helper Methods
     // MARK: - Actions
     private func addConversation() {
@@ -96,6 +96,16 @@ struct ContentView: View {
         }
     }
 
+    private func addConversationAndOpenOptions() {
+        do {
+            let conversation = try queryManager.createConversation()
+            router.setSelection(.conversation(conversation.id))
+            onRequestOptions(conversation.id)
+        } catch {
+            vxAtelierPro.log.error("Failed to create conversation: \(error.localizedDescription)")
+        }
+    }
+    
     private func addProject() {
         do {
             let project = try queryManager.createProject()
@@ -104,22 +114,22 @@ struct ContentView: View {
             vxAtelierPro.log.error("Failed to create project: \(error.localizedDescription)")
         }
     }
-
+    
     private func deleteProject(id: PersistentIdentifier) {
         guard let project = queryManager.project(with: id) else { return }
         deleteItem(for: project)
     }
-
+    
     private func restoreProject(id: PersistentIdentifier) {
         guard let project = queryManager.project(with: id) else { return }
         restoreItem(project)
     }
-
+    
     private func archiveProject(id: PersistentIdentifier) {
         guard let project = queryManager.project(with: id) else { return }
         archiveItem(project)
     }
-
+    
     private func renameProject(id: PersistentIdentifier, newTitle: String) {
         guard let project = queryManager.project(with: id) else { return }
         project.name = newTitle
@@ -131,27 +141,27 @@ struct ContentView: View {
             )
         }
     }
-
+    
     private func requestExportProject(id: PersistentIdentifier) {
         guard let project = queryManager.project(with: id) else { return }
         onRequestExportProject(project)
     }
-
+    
     private func deleteConversation(id: PersistentIdentifier) {
         guard let conversation = queryManager.conversation(with: id) else { return }
         deleteItem(for: conversation)
     }
-
+    
     private func restoreConversation(id: PersistentIdentifier) {
         guard let conversation = queryManager.conversation(with: id) else { return }
         restoreItem(conversation)
     }
-
+    
     private func archiveConversation(id: PersistentIdentifier) {
         guard let conversation = queryManager.conversation(with: id) else { return }
         archiveItem(conversation)
     }
-
+    
     private func renameConversation(id: PersistentIdentifier, newTitle: String) {
         guard let conversation = queryManager.conversation(with: id) else { return }
         conversation.title = newTitle
@@ -163,7 +173,7 @@ struct ContentView: View {
             )
         }
     }
-
+    
     private func assignConversationToProject(
         conversationID: PersistentIdentifier,
         projectID: PersistentIdentifier?
@@ -183,12 +193,12 @@ struct ContentView: View {
             )
         }
     }
-
+    
     private func requestExportConversation(id: PersistentIdentifier) {
         guard let conversation = queryManager.conversation(with: id) else { return }
         onRequestExportConversation(conversation)
     }
-
+    
     private func deleteBookmarkFromContext(id: PersistentIdentifier) {
         guard let bookmark = queryManager.bookmark(with: id) else { return }
         do {
@@ -200,7 +210,7 @@ struct ContentView: View {
             )
         }
     }
-
+    
     private func deleteBookmarkFromSwipe(id: PersistentIdentifier) {
         guard let bookmark = queryManager.bookmark(with: id) else { return }
         do {
@@ -212,7 +222,7 @@ struct ContentView: View {
             )
         }
     }
-
+    
     private func renameBookmark(id: PersistentIdentifier, newTitle: String) {
         guard let bookmark = queryManager.bookmark(with: id) else { return }
         bookmark.label = newTitle
@@ -224,21 +234,21 @@ struct ContentView: View {
             )
         }
     }
-
+    
     private func selectBookmark(id: PersistentIdentifier) {
         guard let bookmark = queryManager.bookmark(with: id),
               let conversation = bookmark.turn?.conversation else {
             vxAtelierPro.log.error("Bookmark selection failed: missing conversation.")
             return
         }
-
+        
         if let project = conversation.project {
             router.openConversation(conversation.id, in: project.id)
         } else {
             router.openConversation(conversation.id, in: nil)
         }
     }
-
+    
     private var sidebarActions: ContentSidebarActions {
         ContentSidebarActions(
             deleteProject: deleteProject(id:),
@@ -258,7 +268,7 @@ struct ContentView: View {
             selectBookmark: selectBookmark(id:)
         )
     }
-
+    
     // MARK: - View Components
     private var sidebarView: some View {
         ContentSidebarView(
@@ -279,7 +289,7 @@ struct ContentView: View {
             availableProjects: projects.filter { $0.status == .active }
         )
     }
-
+    
     @ViewBuilder
     private func detailView(for selection: SidebarSelection?) -> some View {
         if let selection {
@@ -311,7 +321,7 @@ struct ContentView: View {
             detailPlaceholderView
         }
     }
-
+    
     private var detailPlaceholderView: some View {
         DetailPlaceholderView(
             hasAPIConfiguration: queryManager.defaultApiConfiguration != nil,
@@ -325,9 +335,9 @@ struct ContentView: View {
             }
         )
     }
-
+    
     // MARK: - Toolbar Menus
-
+    
     /// Menu items for creating new content.
     @ViewBuilder
     private var newItemMenu: some View {
@@ -337,14 +347,18 @@ struct ContentView: View {
                     "Attempted to create conversation from menu without API configuration")
                 return
             }
-            addConversation()
+            if ModifierKeyState.isOptionPressed() {
+                addConversationAndOpenOptions()
+            } else {
+                addConversation()
+            }
         } label: {
             MenuItemStyle.label("New Conversation", systemImage: "plus.bubble")
         }
-        .help("Create a new conversation")
+        .help("Create a new conversation. Hold Option to open conversation options.")
         .keyboardShortcut("n", modifiers: [.command])
         .disabled(queryManager.defaultApiConfiguration == nil)
-
+        
         Button {
             if queryManager.defaultApiConfiguration == nil {
                 vxAtelierPro.log.info(
@@ -358,7 +372,7 @@ struct ContentView: View {
         .help("Create a new project")
         .disabled(queryManager.defaultApiConfiguration == nil)
     }
-
+    
     /// Menu items for importing and exporting data.
     @ViewBuilder
     private var importExportMenu: some View {
@@ -378,9 +392,9 @@ struct ContentView: View {
         }
         .keyboardShortcut("e", modifiers: [.command, .shift])
         .help("Show or hide empty sections in the navigation")
-
+        
         Divider()
-
+        
         Button {
             setContentFilter(.active, contentFilter: $contentFilter)
         } label: {
@@ -388,7 +402,7 @@ struct ContentView: View {
         }
         .keyboardShortcut("1", modifiers: [.command])
         .help("Show active conversations")
-
+        
         Button {
             setContentFilter(.archived, contentFilter: $contentFilter)
         } label: {
@@ -396,7 +410,7 @@ struct ContentView: View {
         }
         .keyboardShortcut("2", modifiers: [.command])
         .help("Show archived items")
-
+        
         Button {
             setContentFilter(.trashed, contentFilter: $contentFilter)
         } label: {
@@ -405,7 +419,7 @@ struct ContentView: View {
         .keyboardShortcut("3", modifiers: [.command])
         .help("Show items in trash")
     }
-
+    
     /// Menu items for utility actions like TTS and logs.
     @ViewBuilder
     private var utilityActionsMenu: some View {
@@ -415,7 +429,7 @@ struct ContentView: View {
             MenuItemStyle.label("Speech Playlist", systemImage: "text.bubble")
         }
         .help("Open text-to-speech queue")
-
+        
         Button {
             onRequestLogHistory()
         } label: {
@@ -424,7 +438,7 @@ struct ContentView: View {
         .help("View application log history")
         .keyboardShortcut("l", modifiers: [.command, .option])
     }
-
+    
     /// Menu item for opening application settings.
     @ViewBuilder
     private var settingsMenu: some View {
@@ -436,60 +450,60 @@ struct ContentView: View {
         .help("Open application settings")
         .keyboardShortcut(",", modifiers: [.command])
     }
-
+    
     // MARK: - Body
     var body: some View {
         Group {
-            #if os(iOS)
-                if horizontalSizeClass == .compact && !hasVisibleSidebarItems {
-                    DetailPlaceholderView(
-                        hasAPIConfiguration: queryManager.defaultApiConfiguration != nil,
-                        onNewConversation: addConversation,
-                        onNewProject: addProject,
-                        onConfigureAPI: {
-                            onRequestSettings(.api)
-                        },
-                        onConfigureSettings: {
-                            onRequestSettings(nil)
-                        }
-                    )
-                } else {
-                    mainContentView
-                }
-            #else
+#if os(iOS)
+            if horizontalSizeClass == .compact && !hasVisibleSidebarItems {
+                DetailPlaceholderView(
+                    hasAPIConfiguration: queryManager.defaultApiConfiguration != nil,
+                    onNewConversation: addConversation,
+                    onNewProject: addProject,
+                    onConfigureAPI: {
+                        onRequestSettings(.api)
+                    },
+                    onConfigureSettings: {
+                        onRequestSettings(nil)
+                    }
+                )
+            } else {
                 mainContentView
-            #endif
+            }
+#else
+            mainContentView
+#endif
         }
         .onChange(of: contentFilter) { _, _ in
             let visibleSelections = filteredProjects.map { SidebarSelection.project($0.id) }
-                + standaloneConversations.map { SidebarSelection.conversation($0.id) }
+            + standaloneConversations.map { SidebarSelection.conversation($0.id) }
             if let selection = router.selection, !visibleSelections.contains(selection) {
                 router.setSelection(nil)
             }
         }
     }
-
+    
     /// Shared main content view for all platforms (except iOS compact/empty placeholder)
     private var mainContentView: some View {
         VStack(spacing: 0) {
-            #if os(macOS)
-                NavigationSplitView {
-            sidebarView
-            .toolbar { sidebarToolbar }
-        } detail: {
-            detailView(for: router.selection)
-        }
-            #else
-                NavigationSplitView {
-                    sidebarView
-                        .toolbar { sidebarToolbar }
-                } detail: {
-                    detailView(for: router.selection)
-                }
-            #endif
+#if os(macOS)
+            NavigationSplitView {
+                sidebarView
+                    .toolbar { sidebarToolbar }
+            } detail: {
+                detailView(for: router.selection)
+            }
+#else
+            NavigationSplitView {
+                sidebarView
+                    .toolbar { sidebarToolbar }
+            } detail: {
+                detailView(for: router.selection)
+            }
+#endif
         }
     }
-
+    
     // MARK: - Toolbar Content
     private var sidebarToolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
@@ -500,12 +514,12 @@ struct ContentView: View {
                         do {
                             // Store current state before emptying trash
                             let hadTrashedItems =
-                                trashedConversationsCount > 0
-                                || trashedProjectsCount > 0
-
+                            trashedConversationsCount > 0
+                            || trashedProjectsCount > 0
+                            
                             // Empty trash
                             try queryManager.emptyTrash()
-
+                            
                             // Reset navigation if we had items to empty
                             if hadTrashedItems {
                                 setContentFilter(
@@ -529,7 +543,7 @@ struct ContentView: View {
                 }
                 .help("Permanently delete all trashed items")
             }
-
+            
             Menu {
                 newItemMenu
                 Divider()
@@ -547,20 +561,20 @@ struct ContentView: View {
             }
         }
     }
-
+    
     private func deleteItem(for item: any PersistentModel) {
         let itemId = item.persistentModelID
         let itemType = type(of: item)
-
+        
         clearNavigationIfNeeded(for: item)
-
+        
         do {
             if contentFilter == .trashed {
                 try queryManager.deleteItemPermanently(item)
                 vxAtelierPro.log.debug(
                     "Successfully initiated permanent deletion for item (ID: \(itemId), Type: \(itemType)) via swipe/delete from trash."
                 )
-
+                
                 // Only reset navigation if there are NO trashed items remaining (both conversations and projects)
                 let remainingTrashedItems = trashedConversationsCount + trashedProjectsCount
                 if remainingTrashedItems == 0 {
@@ -587,23 +601,23 @@ struct ContentView: View {
             )
         }
     }
-
+    
     private func archiveItem(_ item: any PersistentModel) {
         let itemId = item.persistentModelID
         let itemType = type(of: item)
         let wasInArchive = contentFilter == .archived
-
+        
         do {
             try queryManager.archiveItem(item)
             vxAtelierPro.log.debug("Successfully archived item (ID: \(itemId), Type: \(itemType)).")
-
+            
             if clearNavigationIfNeeded(for: item) {
-
+                
                 // If we're in archive view and this was the last item, return to Show Conversations
                 if wasInArchive {
                     let remainingArchivedItems = archivedProjectsCount
                     let remainingArchivedConversations = archivedConversationsCount
-
+                    
                     if remainingArchivedItems == 0 && remainingArchivedConversations == 0 {
                         setContentFilter(
                             .active,
@@ -620,36 +634,36 @@ struct ContentView: View {
             )
         }
     }
-
+    
     @discardableResult
     private func clearNavigationIfNeeded(for item: any PersistentModel) -> Bool {
         let itemId = item.persistentModelID
         let itemType = type(of: item)
-
+        
         if let conversation = item as? ConversationItem {
             if router.clearIfShowing(conversationID: conversation.id, projectID: conversation.project?.id) {
                 vxAtelierPro.log.debug("Conversation navigation (ID: \(itemId), Type: \(itemType)) cleared.")
                 return true
             }
-
+            
             vxAtelierPro.log.debug("Conversation (ID: \(itemId), Type: \(itemType)) was not active; navigation unchanged.")
             return false
         }
-
+        
         if let project = item as? ProjectItem {
             if router.clearIfShowing(projectID: project.id) {
                 vxAtelierPro.log.debug("Project navigation (ID: \(itemId), Type: \(itemType)) cleared.")
                 return true
             }
-
+            
             vxAtelierPro.log.debug("Project (ID: \(itemId), Type: \(itemType)) was not active; navigation unchanged.")
             return false
         }
-
+        
         vxAtelierPro.log.debug("Item (ID: \(itemId), Type: \(itemType)) was not active; navigation unchanged.")
         return false
     }
-
+    
     private func restoreItem(_ item: any PersistentModel) {
         let itemId = item.persistentModelID
         let itemType = type(of: item)
@@ -662,7 +676,7 @@ struct ContentView: View {
             )
         }
     }
-
+    
 }
 
 #Preview {
