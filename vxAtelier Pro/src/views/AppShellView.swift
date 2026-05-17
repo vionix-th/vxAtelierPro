@@ -14,7 +14,7 @@ struct AppShellView: View {
     
     var body: some View {
         @Bindable var scene = sceneModel
-        
+
         VStack(spacing: 0) {
             ContentView(
                 onRequestOptions: scene.requestOptions(for:),
@@ -25,20 +25,14 @@ struct AppShellView: View {
                 onRequestTTS: scene.requestTTS,
                 onRequestLogHistory: scene.requestLogHistory
             )
-            
+
             if statusBarVisible {
                 StatusBar()
             }
         }
-#if os(iOS)
-        .onChange(of: ttsQueue.isPlaying) {
-            sceneModel.handleTTSPlayback(isPlaying: ttsQueue.isPlaying)
-        }
-#else
         .onChange(of: ttsQueue.isPlaying) { _, _ in
             sceneModel.handleTTSPlayback(isPlaying: ttsQueue.isPlaying)
         }
-#endif
         .task(id: scene.exportTaskID) { await scene.exportTask() }
         .task(id: scene.importRequestFlag) { await scene.importTask() }
 #if os(macOS)

@@ -6,6 +6,7 @@ struct GeneralSettingsView: View {
     @AppStorage(AppSettings.Keys.showRowToolButtons) private var showRowToolButtons: Bool = AppDefaults.showRowToolButtons
     @AppStorage(AppSettings.Keys.autoNameConversations) private var autoNameConversations: Bool = AppDefaults.autoNameConversations
     @AppStorage(AppSettings.Keys.statusBarVisible) private var statusBarVisible: Bool = AppDefaults.statusBarVisible
+    @AppStorage(AppSettings.Keys.statusBarLayoutStyle) private var statusBarLayoutStyleRaw: String = AppDefaults.statusBarLayoutStyle
     @AppStorage(AppSettings.Keys.showConversationLastMessageLabel) private var showConversationLastMessageLabel: Bool = AppDefaults.showConversationLastMessageLabel
     @AppStorage(AppSettings.Keys.showConversationCreatedLabel) private var showConversationCreatedLabel: Bool = AppDefaults.showConversationCreatedLabel
     @AppStorage(AppSettings.Keys.shouldTerminateAfterLastWindowClosed) private var shouldTerminateAfterLastWindowClosed: Bool = AppDefaults.shouldTerminateAfterLastWindowClosed
@@ -27,6 +28,11 @@ struct GeneralSettingsView: View {
                 SettingsToggleRow("Show Context Menu Button for Lists", isOn: $showRowToolButtons)
                 SettingsToggleRow("Automatically name new conversations", isOn: $autoNameConversations)
                 SettingsToggleRow("Show Status Bar", isOn: $statusBarVisible)
+                SettingsPickerRow("Status Bar Layout", selection: $statusBarLayoutStyleRaw) {
+                    ForEach(StatusBarLayoutStyle.allCases) { style in
+                        Text(style.rawValue).tag(style.rawValue)
+                    }
+                }
                 SettingsToggleRow("Last Message Timestamp", isOn: $showConversationLastMessageLabel)
                 SettingsToggleRow("Creation Timestamp", isOn: $showConversationCreatedLabel)
 #if os(macOS)

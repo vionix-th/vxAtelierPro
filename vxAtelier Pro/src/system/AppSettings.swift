@@ -33,6 +33,7 @@ enum AppSettings {
         static let showEmptySections = "ShowEmptySections"
         static let contentFilter = "ContentFilter"
         static let statusBarVisible = "statusBarVisible"
+        static let statusBarLayoutStyle = "statusBarLayoutStyle"
         static let appearanceStyle = "appearanceStyle"
         static let showRowToolButtons = "showRowToolButtons"
         static let showSystemConversations = "ShowSystemConversations"
@@ -107,6 +108,11 @@ enum AppSettings {
         Keys.bubbleFontSize: .init(key: Keys.bubbleFontSize, type: Double.self, doubleRange: 8...28),
         Keys.autoNameConversations: .init(key: Keys.autoNameConversations, type: Bool.self),
         Keys.statusBarVisible: .init(key: Keys.statusBarVisible, type: Bool.self),
+        Keys.statusBarLayoutStyle: .init(
+            key: Keys.statusBarLayoutStyle,
+            type: String.self,
+            allowedValues: StatusBarLayoutStyle.allCases.map(\.rawValue)
+        ),
         Keys.showConversationLastMessageLabel: .init(key: Keys.showConversationLastMessageLabel, type: Bool.self),
         Keys.showConversationCreatedLabel: .init(key: Keys.showConversationCreatedLabel, type: Bool.self),
         Keys.defaultAvatarData: .init(key: Keys.defaultAvatarData, type: Data.self, isWritable: false),

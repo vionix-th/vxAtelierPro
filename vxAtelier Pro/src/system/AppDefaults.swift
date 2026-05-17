@@ -41,6 +41,7 @@ struct AppDefaults {
     static let isMarkdownEnabled = true
     static let isMarkdownTextSelectable = false
     static let statusBarVisible = true
+    static let statusBarLayoutStyle = StatusBarLayoutStyle.automatic.rawValue
     static let showSystemConversations = false
     static let selectedSettingsDestination = SettingsDestination.general.rawValue
     static let selectedMacSettingsSection = MacOSSettingsSection.general.rawValue
@@ -158,6 +159,7 @@ extension AppDefaults {
         defaults.set(AppDefaults.showRowToolButtons, forKey: AppSettings.Keys.showRowToolButtons)
         defaults.set(AppDefaults.autoNameConversations, forKey: AppSettings.Keys.autoNameConversations)
         defaults.set(AppDefaults.statusBarVisible, forKey: AppSettings.Keys.statusBarVisible)
+        defaults.set(AppDefaults.statusBarLayoutStyle, forKey: AppSettings.Keys.statusBarLayoutStyle)
         defaults.set(
             AppDefaults.showConversationLastMessageLabel,
             forKey: AppSettings.Keys.showConversationLastMessageLabel)

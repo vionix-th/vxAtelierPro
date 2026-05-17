@@ -5,6 +5,7 @@ import Foundation
 // MARK: - ConversationView
 struct ConversationView: View {
     @Environment(QueryManager.self) private var queryManager
+    @Environment(AppSceneModel.self) private var sceneModel
     @Environment(TTSQueue.self) private var ttsQueue
 
     let conversationID: PersistentIdentifier
@@ -89,11 +90,15 @@ struct ConversationView: View {
                     }
                 }
                 .onAppear {
+                    sceneModel.focusConversation(conversationID)
                     if let conversation {
                         vxAtelierPro.log.debug("ConversationView.onAppear: \(conversation.title)")
                     } else {
                         vxAtelierPro.log.debug("ConversationView.onAppear: no conversation available")
                     }
+                }
+                .onDisappear {
+                    sceneModel.clearConversationFocus(conversationID)
                 }
 
                 if !isSelectingMessages, let conversation {
@@ -623,4 +628,3 @@ enum ConversationDraftRenderPolicy {
         return draft.isActive || draftFailed || latestRunFailed
     }
 }
-

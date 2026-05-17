@@ -138,6 +138,7 @@ let package = Package(
                 "system/PermissionManager.swift",
                 "system/AppSettings.swift",
                 "system/QueryManager.swift",
+                "system/StatusBarLayoutStyle.swift",
                 // TTS
                 "tts/TTSControlView.swift",
                 "tts/TTSSystem.swift",
@@ -163,7 +164,10 @@ let package = Package(
                 "views/content/ContentRouting.swift",
                 "views/content/NavigationRouter.swift",
                 "views/content/ContentSidebarView.swift",
-                "views/StatusBar.swift",
+                "views/components/FilterButton.swift",
+                "views/statusbar/StatusBarShared.swift",
+                "views/statusbar/StatusBarRoots.swift",
+                "views/statusbar/StatusBar.swift",
                 // Views - Components
                 "views/components/AvatarView.swift",
                 "views/components/AvatarPickerView.swift",

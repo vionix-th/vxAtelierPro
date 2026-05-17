@@ -48,6 +48,7 @@ final class AppSceneModel {
     var exportRequest: ExportRequest?
     var importRequested: Bool = false
     var utilityPanelRequestID: UUID?
+    var focusedConversationID: PersistentIdentifier?
     #if os(macOS)
         var openSettingsSceneRequestID: UUID?
     #endif
@@ -105,6 +106,16 @@ final class AppSceneModel {
 
     func requestLogHistory() {
         presentSheet(.logHistory(UUID()))
+    }
+
+    func focusConversation(_ conversationID: PersistentIdentifier) {
+        guard focusedConversationID != conversationID else { return }
+        focusedConversationID = conversationID
+    }
+
+    func clearConversationFocus(_ conversationID: PersistentIdentifier) {
+        guard focusedConversationID == conversationID else { return }
+        focusedConversationID = nil
     }
 
     func requestUtilityPanel() {
