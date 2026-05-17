@@ -13,7 +13,11 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
     }
 
     /// Executes a Responses request through the shared adapter run loop.
-    func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration) -> AsyncThrowingStream<LLMStreamEvent, Error> {
+    func stream(
+        _ request: LLMRequest,
+        configuration: LLMProviderConfiguration,
+        toolExecutor: LLMToolExecutionHandler?
+    ) -> AsyncThrowingStream<LLMStreamEvent, Error> {
         return LLMAdapterRunLoop.stream(
             request: request,
             configuration: configuration,

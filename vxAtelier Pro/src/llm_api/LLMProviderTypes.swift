@@ -1,9 +1,17 @@
 import Foundation
 
+/// High-level transport class used by a provider profile.
+enum LLMProviderTransportKind: String, Codable, CaseIterable {
+    case remoteHTTP
+    case localSystem
+    case localFile
+}
+
 /// Stable identifier for a supported LLM provider profile.
 enum LLMProviderID: String, Codable, CaseIterable, Identifiable {
     case openAIPlatform
     case openAICodexChatGPTSubscription
+    case appleIntelligence
     case openRouter
     case lmStudio
     case ollama
@@ -20,6 +28,7 @@ enum LLMProviderID: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .openAIPlatform: return "OpenAI Platform"
         case .openAICodexChatGPTSubscription: return "Codex ChatGPT Subscription"
+        case .appleIntelligence: return "Apple Intelligence"
         case .openRouter: return "OpenRouter"
         case .lmStudio: return "LM Studio"
         case .ollama: return "Ollama"
@@ -37,6 +46,7 @@ enum LLMAdapterID: String, Codable, CaseIterable, Identifiable {
     case openAIChatCompletions
     case openAICompatibleChatCompletions
     case anthropicMessages
+    case foundationModels
 
     /// Exposes the raw adapter key as the SwiftUI identity.
     var id: String { rawValue }
@@ -48,6 +58,7 @@ enum LLMAdapterID: String, Codable, CaseIterable, Identifiable {
         case .openAIChatCompletions: return "OpenAI Chat Completions"
         case .openAICompatibleChatCompletions: return "OpenAI-Compatible Chat Completions"
         case .anthropicMessages: return "Anthropic Messages"
+        case .foundationModels: return "Foundation Models"
         }
     }
 }
@@ -66,9 +77,41 @@ enum LLMAuthKind: String, Codable, CaseIterable {
 struct LLMProviderProfile: Codable, Identifiable, Equatable {
     var id: LLMProviderID
     var name: String
+    var transportKind: LLMProviderTransportKind
     var defaultBaseURL: String
     var authKind: LLMAuthKind
     var defaultAdapterID: LLMAdapterID
     var supportedAdapterIDs: [LLMAdapterID]
     var isEnabled: Bool
+
+    var requiresBaseURL: Bool {
+        transportKind == .remoteHTTP
+    }
+
+    var requiresCredential: Bool {
+        switch transportKind {
+        case .remoteHTTP:
+            return authKind != .none
+        case .localSystem, .localFile:
+            return false
+        }
+    }
+
+    var supportsRemoteModelListing: Bool {
+        switch transportKind {
+        case .remoteHTTP:
+            return true
+        case .localSystem, .localFile:
+            return false
+        }
+    }
+
+    var supportsSessionState: Bool {
+        switch transportKind {
+        case .remoteHTTP:
+            return false
+        case .localSystem, .localFile:
+            return true
+        }
+    }
 }

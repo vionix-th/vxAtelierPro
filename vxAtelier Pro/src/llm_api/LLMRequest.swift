@@ -44,6 +44,7 @@ enum LLMStreamEvent: Equatable {
     case reasoningDelta(String)
     case toolCallDelta(LLMToolCall)
     case toolCallCompleted(LLMToolCall)
+    case toolOutputCompleted(LLMToolOutput)
     case usage(LLMUsage)
     case runCompleted(responseID: String?, modelID: String?)
 }

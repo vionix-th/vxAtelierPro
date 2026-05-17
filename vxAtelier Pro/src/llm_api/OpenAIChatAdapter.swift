@@ -16,7 +16,11 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
     }
 
     /// Executes a Chat Completions request through the shared adapter run loop.
-    func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration) -> AsyncThrowingStream<LLMStreamEvent, Error> {
+    func stream(
+        _ request: LLMRequest,
+        configuration: LLMProviderConfiguration,
+        toolExecutor: LLMToolExecutionHandler?
+    ) -> AsyncThrowingStream<LLMStreamEvent, Error> {
         do {
             try validateAdapterID(request.adapterID)
             return LLMAdapterRunLoop.stream(
@@ -204,8 +208,12 @@ struct OpenAICompatibleChatCompletionsAdapter: LLMProviderAdapter {
     }
 
     /// Executes a compatible Chat Completions request through the shared chat implementation.
-    func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration) -> AsyncThrowingStream<LLMStreamEvent, Error> {
-        chatAdapter.stream(request, configuration: configuration)
+    func stream(
+        _ request: LLMRequest,
+        configuration: LLMProviderConfiguration,
+        toolExecutor: LLMToolExecutionHandler?
+    ) -> AsyncThrowingStream<LLMStreamEvent, Error> {
+        chatAdapter.stream(request, configuration: configuration, toolExecutor: toolExecutor)
     }
 
     /// Fetches OpenAI-compatible model metadata and maps it into candidates.

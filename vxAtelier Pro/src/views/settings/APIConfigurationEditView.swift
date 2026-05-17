@@ -121,10 +121,12 @@ struct APIConfigurationEditView: View {
                     applySelectedPreset()
                 }
 
-                LabeledContent("API URL") {
-                    TextField("", text: $baseURL)
-                        .textFieldStyle(.roundedBorder)
-                        .onChange(of: baseURL) { _, _ in invalidateFetchedModelCandidates() }
+                if currentProfile.requiresBaseURL {
+                    LabeledContent("API URL") {
+                        TextField("", text: $baseURL)
+                            .textFieldStyle(.roundedBorder)
+                            .onChange(of: baseURL) { _, _ in invalidateFetchedModelCandidates() }
+                    }
                 }
 
                 if selectableAdapterIDs.count > 1 {
@@ -138,9 +140,14 @@ struct APIConfigurationEditView: View {
             }
 
             SettingsFormSection("Credentials") {
-                if isCodexChatGPTSubscription {
+                if currentProfile.transportKind == .localSystem {
+                    LabeledContent("Status") {
+                        Text(localProviderStatusText)
+                            .foregroundStyle(.secondary)
+                    }
+                } else if isCodexChatGPTSubscription {
                     codexChatGPTAuthControls
-                } else {
+                } else if currentProfile.requiresCredential {
                     LabeledContent("API Key") {
                         HStack(spacing: AppDefaults.paddingSmall) {
                             apiKeyField
@@ -386,6 +393,7 @@ struct APIConfigurationEditView: View {
     }
 
     private func validateEndpoint() -> Bool {
+        guard currentProfile.requiresBaseURL else { return true }
         if !baseURL.hasPrefix("http://") && !baseURL.hasPrefix("https://") {
             validationErrorMessage = "Base URL must start with http:// or https://"
             showValidationError = true
@@ -563,7 +571,11 @@ struct APIConfigurationEditView: View {
             configuration.authKind = (codexTokenSet?.authMethod ?? .codexChatGPTOAuth).rawValue
             configuration.apiKey = ""
             configuration.credentialJSON = codexCredentialJSON
+        } else if profile.requiresCredential {
+            configuration.credentialJSON = "{}"
         } else {
+            configuration.apiKey = ""
+            configuration.baseURL = ""
             configuration.credentialJSON = "{}"
         }
 
@@ -602,6 +614,11 @@ struct APIConfigurationEditView: View {
         defaultAdapterID = LLMProviderRegistry.shared.profile(for: preset.providerID).defaultAdapterID
         if preset.providerID == .openAICodexChatGPTSubscription {
             apiKey = ""
+        } else if !LLMProviderRegistry.shared.profile(for: preset.providerID).requiresCredential {
+            apiKey = ""
+        }
+        if !LLMProviderRegistry.shared.profile(for: preset.providerID).requiresBaseURL {
+            baseURL = ""
         }
 
         defaultModel = APIConfigurationEditView.suggestedDefaultModel(for: preset.providerID)
@@ -680,12 +697,17 @@ struct APIConfigurationEditView: View {
         deviceCodeChallenge = nil
         invalidateFetchedModelCandidates()
     }
+
+    private var localProviderStatusText: String {
+        LLMProviderRegistry.shared.localStatusText(for: providerID) ?? "On-device model"
+    }
 }
 
 /// Preset provider options used to seed API configuration fields.
 enum APIPreset: String, CaseIterable {
     case openAI = "OpenAI"
     case codexChatGPTSubscription = "Codex ChatGPT Subscription"
+    case appleIntelligence = "Apple Intelligence"
     case anthropic = "Anthropic"
     case xAI = "xAI"
     case deepSeek = "DeepSeek"
@@ -702,6 +724,7 @@ enum APIPreset: String, CaseIterable {
         switch self {
         case .openAI: return "sparkles"
         case .codexChatGPTSubscription: return "terminal"
+        case .appleIntelligence: return "apple.logo"
         case .anthropic: return "person.text.rectangle"
         case .xAI: return "bolt.fill"
         case .deepSeek: return "brain"
@@ -716,6 +739,7 @@ enum APIPreset: String, CaseIterable {
         switch self {
         case .openAI: return .openAIPlatform
         case .codexChatGPTSubscription: return .openAICodexChatGPTSubscription
+        case .appleIntelligence: return .appleIntelligence
         case .anthropic: return .anthropic
         case .xAI: return .xAI
         case .deepSeek: return .deepSeek
@@ -732,6 +756,8 @@ enum APIPreset: String, CaseIterable {
             return .openAI
         case .openAICodexChatGPTSubscription:
             return .codexChatGPTSubscription
+        case .appleIntelligence:
+            return .appleIntelligence
         case .anthropic:
             return .anthropic
         case .xAI:
@@ -753,6 +779,7 @@ enum APIPreset: String, CaseIterable {
         switch self {
         case .openAI: return AppDefaults.OpenAi.baseURL
         case .codexChatGPTSubscription: return CodexChatGPTOAuthService.codexBackendBaseURL
+        case .appleIntelligence: return ""
         case .anthropic: return AppDefaults.Anthropic.baseURL
         case .xAI: return AppDefaults.XAI.baseURL
         case .deepSeek: return AppDefaults.DeepSeek.baseURL

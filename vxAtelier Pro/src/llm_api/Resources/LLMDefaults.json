@@ -9,6 +9,10 @@
       "defaultModel": "gpt-5.5"
     },
     {
+      "provider": "appleIntelligence",
+      "defaultModel": "apple-intelligence-default"
+    },
+    {
       "provider": "anthropic",
       "defaultModel": "claude-sonnet-4-6"
     },
@@ -26,6 +30,53 @@
     }
   ],
   "rules": [
+    {
+      "match": {
+        "providerRegex": "^appleIntelligence$"
+      },
+      "modelDefaults": {
+        "contextSize": 4096,
+        "capabilities": [
+          "text",
+          "tools",
+          "streaming"
+        ]
+      },
+      "parameterAvailability": [
+        {
+          "parameter": "temperature",
+          "enabled": true,
+          "defaultValue": 1
+        },
+        {
+          "parameter": "max_output_tokens",
+          "enabled": true,
+          "defaultValue": 1024
+        },
+        {
+          "parameter": "stream",
+          "enabled": true,
+          "defaultValue": true
+        }
+      ],
+      "parameterMappings": [
+        {
+          "parameter": "temperature",
+          "encoding": "scalarKey",
+          "wireKey": "temperature"
+        },
+        {
+          "parameter": "max_output_tokens",
+          "encoding": "scalarKey",
+          "wireKey": "maximumResponseTokens"
+        },
+        {
+          "parameter": "stream",
+          "encoding": "scalarKey",
+          "wireKey": "stream"
+        }
+      ]
+    },
     {
       "modelDefaults": {
         "capabilities": [

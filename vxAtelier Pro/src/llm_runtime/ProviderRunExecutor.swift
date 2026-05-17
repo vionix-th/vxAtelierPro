@@ -17,6 +17,7 @@ struct ProviderRunExecutor {
         providerConfiguration: LLMProviderConfiguration,
         draftSink: any ConversationDraftSink,
         conversationID: PersistentIdentifier,
+        toolExecutor: LLMToolExecutionHandler? = nil,
         retryPolicy: LLMGenerationOptions.RetryPolicy
     ) async throws -> ProviderRunResult {
         do {
@@ -24,7 +25,8 @@ struct ProviderRunExecutor {
                 request: request,
                 providerConfiguration: providerConfiguration,
                 draftSink: draftSink,
-                conversationID: conversationID
+                conversationID: conversationID,
+                toolExecutor: toolExecutor
             )
         } catch {
             guard retryPolicy == .oneRetryBeforeTools, isRetryable(error) else { throw error }
@@ -35,7 +37,8 @@ struct ProviderRunExecutor {
                 request: request,
                 providerConfiguration: providerConfiguration,
                 draftSink: draftSink,
-                conversationID: conversationID
+                conversationID: conversationID,
+                toolExecutor: toolExecutor
             )
         }
     }
@@ -54,7 +57,8 @@ struct ProviderRunExecutor {
         request: LLMRequest,
         providerConfiguration: LLMProviderConfiguration,
         draftSink: any ConversationDraftSink,
-        conversationID: PersistentIdentifier
+        conversationID: PersistentIdentifier,
+        toolExecutor: LLMToolExecutionHandler?
     ) async throws -> ProviderRunResult {
         guard providerConfiguration.providerID == request.providerID else {
             throw LLMProviderError.invalidConfiguration(
@@ -64,7 +68,7 @@ struct ProviderRunExecutor {
         let adapter = registry.adapter(for: request.adapterID, providerID: request.providerID)
         var result = ProviderRunResult()
 
-        for try await event in adapter.stream(request, configuration: providerConfiguration) {
+        for try await event in adapter.stream(request, configuration: providerConfiguration, toolExecutor: toolExecutor) {
             switch event {
             case .runStarted(let requestID):
                 result.requestID = result.requestID ?? requestID
@@ -82,6 +86,8 @@ struct ProviderRunExecutor {
             case .toolCallCompleted(let call):
                 upsert(call, into: &result.toolCalls)
                 draftSink.updateToolCalls(result.toolCalls, conversationID: conversationID)
+            case .toolOutputCompleted(let output):
+                upsert(output, into: &result.toolOutputs)
             case .usage(let usage):
                 result.usage = usage
             case .runCompleted(let responseID, let modelID):
@@ -102,6 +108,18 @@ struct ProviderRunExecutor {
         } else {
             calls.append(call)
             calls.sort { $0.index < $1.index }
+        }
+    }
+
+    /// Inserts or replaces a streamed native tool output using provider order and identifiers.
+    private func upsert(_ output: LLMToolOutput, into outputs: inout [LLMToolOutput]) {
+        if let existingIndex = outputs.firstIndex(where: { existing in
+            existing.index == output.index || existing.id == output.id || existing.callID == output.callID
+        }) {
+            outputs[existingIndex] = output
+        } else {
+            outputs.append(output)
+            outputs.sort { $0.index < $1.index }
         }
     }
 

@@ -86,6 +86,7 @@ final class ConversationCompletionUseCase {
                     providerConfiguration: context.providerConfiguration,
                     draftSink: draftSink,
                     conversationID: context.conversationID,
+                    toolExecutor: makeToolExecutor(conversation: conversation, turn: turn),
                     retryPolicy: request.options.retryPolicy
                 )
             } catch {
@@ -113,11 +114,25 @@ final class ConversationCompletionUseCase {
                 return
             }
 
-            do {
-                try await executeToolCalls(toolCalls, conversation: conversation, turn: turn)
-            } catch {
-                let normalizedError = try runStore.markRunFailed(run, error: error, conversation: conversation)
-                throw normalizedError
+            if !result.toolOutputs.isEmpty {
+                do {
+                    try await applyNativeToolOutputs(
+                        result.toolOutputs,
+                        assistantMessage: assistantMessage,
+                        conversation: conversation,
+                        turn: turn
+                    )
+                } catch {
+                    let normalizedError = try runStore.markRunFailed(run, error: error, conversation: conversation)
+                    throw normalizedError
+                }
+            } else {
+                do {
+                    try await executeToolCalls(toolCalls, conversation: conversation, turn: turn)
+                } catch {
+                    let normalizedError = try runStore.markRunFailed(run, error: error, conversation: conversation)
+                    throw normalizedError
+                }
             }
 
             try runStore.completeRunAfterTools(run, conversation: conversation)
@@ -156,6 +171,58 @@ final class ConversationCompletionUseCase {
                 try runStore.failToolCall(toolCall, error: error, conversation: conversation)
                 throw error
             }
+        }
+    }
+
+    /// Executes native-provider tool outputs by persisting the tool results already returned by the adapter.
+    private func applyNativeToolOutputs(
+        _ toolOutputs: [LLMToolOutput],
+        assistantMessage: MessageItem,
+        conversation: ConversationItem,
+        turn: ConversationTurn
+    ) async throws {
+        let toolCallsByID = assistantMessage.toolCallItems.reduce(into: [String: ToolCallItem]()) { result, toolCall in
+            result[toolCall.callID] = toolCall
+        }
+        var matchedCallIDs = Set<String>()
+        for output in toolOutputs.sorted(by: { $0.index < $1.index }) {
+            guard let toolCall = toolCallsByID[output.callID] else {
+                throw LLMProviderError.invalidConfiguration(
+                    "Native tool output \(output.callID) has no matching assistant tool call."
+                )
+            }
+            matchedCallIDs.insert(output.callID)
+            try runStore.markToolExecuting(toolCall, conversation: conversation)
+            try runStore.completeToolCall(
+                toolCall,
+                output: output.output,
+                turn: turn,
+                conversation: conversation
+            )
+        }
+        guard matchedCallIDs.count == assistantMessage.toolCallItems.count else {
+            throw LLMProviderError.invalidConfiguration("Native tool execution did not return all assistant tool outputs.")
+        }
+    }
+
+    /// Builds the callback used by native tool-capable providers to execute app tools in-line.
+    private func makeToolExecutor(
+        conversation: ConversationItem,
+        turn: ConversationTurn
+    ) -> LLMToolExecutionHandler {
+        { [toolBatchExecutor] toolName, argumentsJSON in
+            let call = ToolCallItem(
+                callID: UUID().uuidString,
+                index: 0,
+                name: toolName,
+                argumentsJSON: argumentsJSON,
+                status: .executing
+            )
+            return try await toolBatchExecutor.execute(
+                call,
+                conversation: conversation,
+                turn: turn
+            )
         }
     }
 }

@@ -14,6 +14,11 @@ final class LLMCoreTypesTests: XCTestCase {
         XCTAssertEqual(registry.profile(for: .openAIPlatform).defaultAdapterID, .openAIResponses)
         XCTAssertTrue(registry.profile(for: .openAIPlatform).supportedAdapterIDs.contains(.openAIChatCompletions))
         XCTAssertTrue(registry.profile(for: .openAICodexChatGPTSubscription).isEnabled)
+        XCTAssertEqual(registry.profile(for: .appleIntelligence).transportKind, .localSystem)
+        XCTAssertFalse(registry.profile(for: .appleIntelligence).requiresCredential)
+        XCTAssertFalse(registry.profile(for: .appleIntelligence).requiresBaseURL)
+        XCTAssertEqual(registry.profile(for: .appleIntelligence).defaultAdapterID, .foundationModels)
+        XCTAssertEqual(LLMProviderRegistry.providerID(fromProviderName: "Apple Intelligence"), .appleIntelligence)
         XCTAssertEqual(LLMProviderRegistry.providerID(fromProviderName: "LM Studio"), .lmStudio)
         XCTAssertEqual(LLMProviderRegistry.providerID(fromProviderName: "OpenRouter"), .openRouter)
     }
@@ -23,6 +28,7 @@ final class LLMCoreTypesTests: XCTestCase {
 
         XCTAssertEqual(defaults.defaultModelID(for: .openAIPlatform), "gpt-5.4-nano")
         XCTAssertEqual(defaults.defaultModelID(for: .openAICodexChatGPTSubscription), "gpt-5.5")
+        XCTAssertEqual(defaults.defaultModelID(for: .appleIntelligence), "apple-intelligence-default")
         XCTAssertEqual(defaults.defaultModelID(for: .anthropic), "claude-sonnet-4-6")
         XCTAssertEqual(defaults.defaultModelID(for: .openRouter), "openai/gpt-5.4-nano")
         XCTAssertEqual(defaults.defaultModelID(for: .xAI), "grok-4.3")
@@ -51,6 +57,12 @@ final class LLMCoreTypesTests: XCTestCase {
         XCTAssertEqual(anthropic?.contextSize, 1000000)
         XCTAssertTrue(anthropic?.capabilities?.contains(.text) ?? false)
         XCTAssertTrue(anthropic?.capabilities?.contains(.image) ?? false)
+
+        let apple = defaults.modelDefaults(providerID: .appleIntelligence, modelID: "apple-intelligence-default")
+        XCTAssertEqual(apple?.contextSize, 4096)
+        XCTAssertTrue(apple?.capabilities?.contains(.text) ?? false)
+        XCTAssertTrue(apple?.capabilities?.contains(.tools) ?? false)
+        XCTAssertTrue(apple?.capabilities?.contains(.streaming) ?? false)
 
         let xAI = defaults.modelDefaults(providerID: .xAI, modelID: "grok-4.3")
         XCTAssertEqual(xAI?.contextSize, 1000000)

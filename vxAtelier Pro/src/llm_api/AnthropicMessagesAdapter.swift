@@ -9,9 +9,11 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
     private let httpClient = LLMHTTPClient()
 
     /// Executes a Messages request through the shared adapter run loop.
-    func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration)
-        -> AsyncThrowingStream<LLMStreamEvent, Error>
-    {
+    func stream(
+        _ request: LLMRequest,
+        configuration: LLMProviderConfiguration,
+        toolExecutor: LLMToolExecutionHandler?
+    ) -> AsyncThrowingStream<LLMStreamEvent, Error> {
         return LLMAdapterRunLoop.stream(
             request: request,
             configuration: configuration,

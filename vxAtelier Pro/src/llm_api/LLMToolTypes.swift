@@ -35,3 +35,21 @@ struct LLMToolCall: Codable, Equatable, Identifiable {
         self.argumentsJSON = argumentsJSON
     }
 }
+
+/// Provider-neutral tool output produced by a native provider tool execution path.
+struct LLMToolOutput: Codable, Equatable, Identifiable {
+    var id: String
+    var callID: String
+    var index: Int
+    var name: String
+    var output: String
+
+    /// Creates a normalized tool output with the associated call identity.
+    init(id: String, callID: String, index: Int = 0, name: String, output: String) {
+        self.id = id
+        self.callID = callID
+        self.index = index
+        self.name = name
+        self.output = output
+    }
+}

@@ -8,6 +8,59 @@ import XCTest
 
 @MainActor
 final class LLMCapabilityAndRunStateTests: XCTestCase {
+    func testAppleIntelligenceConfigurationUsesLocalTransportDefaults() {
+        let configuration = APIConfigurationItem(
+            name: "Apple Intelligence",
+            apiKey: "should-be-ignored",
+            baseURL: "https://example.invalid",
+            providerID: .appleIntelligence
+        )
+
+        XCTAssertEqual(configuration.apiKey, "")
+        XCTAssertEqual(configuration.baseURL, "")
+
+        let providerConfiguration = configuration.makeLLMProviderConfiguration()
+        XCTAssertEqual(providerConfiguration.baseURL, "")
+        XCTAssertEqual(providerConfiguration.credential, .none)
+        XCTAssertEqual(providerConfiguration.providerID, .appleIntelligence)
+    }
+
+    func testAppleIntelligenceCapabilityValidationAcceptsLocalStreamingRequest() throws {
+        let profile = LLMProviderRegistry.shared.profile(for: .appleIntelligence)
+        let defaultModel = LLMModelDescriptorResolver().catalogDescriptor(
+            for: "apple-intelligence-default",
+            providerID: .appleIntelligence
+        )
+        let mappings = LLMDefaultsCatalog.bundled.parameterMappings(
+            providerID: .appleIntelligence,
+            adapterID: .foundationModels,
+            modelID: defaultModel.id
+        )
+        let availability = LLMDefaultsCatalog.bundled.parameterAvailability(
+            providerID: .appleIntelligence,
+            adapterID: .foundationModels,
+            modelID: defaultModel.id
+        )
+        let request = LLMRequest(
+            providerID: .appleIntelligence,
+            adapterID: .foundationModels,
+            modelID: defaultModel.id,
+            modelCapabilities: defaultModel.capabilities,
+            parameterMappings: mappings,
+            parameterAvailability: availability,
+            messages: [
+                LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Hello")])
+            ],
+            options: LLMGenerationOptions(
+                temperature: 0.4,
+                maxOutputTokens: 128,
+                streamMode: .enabled
+            )
+        )
+
+        XCTAssertNoThrow(try LLMCapabilityValidator.validate(request, profile: profile))
+    }
+
     func testCapabilityValidationRejectsUnsupportedImageContent() {
         let profile = LLMProviderRegistry.shared.profile(for: .lmStudio)
         let request = LLMRequest(

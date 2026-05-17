@@ -13,6 +13,7 @@ public enum LLMModelProviderUtils {
         case meta = "Meta"
         case mistral = "Mistral"
         case custom = "Custom"
+        case appleIntelligence = "Apple Intelligence"
 
         /// Human-facing provider name.
         public var displayName: String {
@@ -43,6 +44,8 @@ public enum LLMModelProviderUtils {
             return Provider.meta.rawValue
         } else if modelName.starts(with: "mixtral-") || modelName.starts(with: "mistral-") {
             return Provider.mistral.rawValue
+        } else if modelName.starts(with: "apple-intelligence") || modelName.contains("foundation-model") {
+            return Provider.appleIntelligence.rawValue
         }
         return Provider.custom.rawValue
     }

@@ -22,6 +22,7 @@ struct ProviderRunResult {
     var text: String = ""
     var reasoning: String = ""
     var toolCalls: [LLMToolCall] = []
+    var toolOutputs: [LLMToolOutput] = []
     var usage: LLMUsage = LLMUsage()
     var metadata: LLMResponseMetadata?
     var requestID: String?

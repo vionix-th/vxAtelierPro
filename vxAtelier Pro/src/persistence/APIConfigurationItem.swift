@@ -84,8 +84,8 @@ final class APIConfigurationItem {
         self.name = name
         self.providerID = providerID.rawValue
         self.authKind = profile.authKind.rawValue
-        self.apiKey = apiKey
-        self.baseURL = baseURL
+        self.apiKey = profile.requiresCredential ? apiKey : ""
+        self.baseURL = profile.requiresBaseURL ? baseURL : ""
         self.isDefault = isDefault
         self.defaultModel = defaultModel
         self.defaultAdapterID = profile.defaultAdapterID.rawValue
@@ -105,11 +105,12 @@ final class APIConfigurationItem {
             }
             headers["originator"] = headers["originator"] ?? "vxatelier_pro"
         }
+        let profile = LLMProviderRegistry.shared.profile(for: providerIDEnum)
         return Self.makeLLMProviderConfiguration(
             providerID: providerIDEnum,
             authKind: authKindEnum,
-            apiKey: credential,
-            baseURL: baseURL,
+            apiKey: profile.requiresCredential ? credential : "",
+            baseURL: profile.requiresBaseURL ? baseURL : "",
             headers: headers,
             options: decodedOptions
         )
@@ -132,7 +133,7 @@ final class APIConfigurationItem {
         return LLMProviderConfiguration(
             providerID: providerID,
             authKind: authKind,
-            baseURL: baseURL.isEmpty ? profile.defaultBaseURL : baseURL,
+            baseURL: profile.requiresBaseURL ? (baseURL.isEmpty ? profile.defaultBaseURL : baseURL) : "",
             credential: apiKey.isEmpty ? .none : .secret(apiKey),
             customHeaders: headers,
             requestTimeout: Self.secondsOption("request_timeout_seconds", in: options, defaultValue: 60),

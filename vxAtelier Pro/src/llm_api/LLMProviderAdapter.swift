@@ -29,11 +29,17 @@ struct LLMStreamCompletionPolicy {
 /// - Emit `.runCompleted` exactly once for complete provider responses, or throw if the provider stream ends before a required completion event.
 /// - Emit tool-call deltas and completed calls using provider order indexes so `LLMToolCallAssembler` can merge fragments deterministically.
 /// - Return model candidates using provider metadata and bundled model defaults; throw for unsupported model listing instead of fabricating models.
+typealias LLMToolExecutionHandler = @Sendable (_ toolName: String, _ argumentsJSON: String) async throws -> String
+
 protocol LLMProviderAdapter {
     var profile: LLMProviderProfile { get }
 
     /// Sends a request and emits normalized events regardless of provider wire format.
-    func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration) -> AsyncThrowingStream<LLMStreamEvent, Error>
+    func stream(
+        _ request: LLMRequest,
+        configuration: LLMProviderConfiguration,
+        toolExecutor: LLMToolExecutionHandler?
+    ) -> AsyncThrowingStream<LLMStreamEvent, Error>
 
     /// Fetches provider model metadata and maps it into normalized candidates.
     func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor]
@@ -45,7 +51,11 @@ struct DisabledLLMProviderAdapter: LLMProviderAdapter {
     let message: String
 
     /// Fails immediately with the configured unavailability reason.
-    func stream(_ request: LLMRequest, configuration: LLMProviderConfiguration) -> AsyncThrowingStream<LLMStreamEvent, Error> {
+    func stream(
+        _ request: LLMRequest,
+        configuration: LLMProviderConfiguration,
+        toolExecutor: LLMToolExecutionHandler?
+    ) -> AsyncThrowingStream<LLMStreamEvent, Error> {
         AsyncThrowingStream { continuation in
             continuation.finish(throwing: LLMProviderError.authUnavailable(message))
         }
