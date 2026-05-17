@@ -27,11 +27,7 @@ struct AppShellView: View {
             )
             
             if statusBarVisible {
-                StatusBar(
-                    onRequestLogHistory: scene.requestLogHistory,
-                    onRequestOptions: scene.requestOptions(for:),
-                    onRequestModelSelection: scene.requestModelSelection(for:)
-                )
+                StatusBar()
             }
         }
 #if os(iOS)

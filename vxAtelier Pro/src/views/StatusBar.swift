@@ -5,13 +5,11 @@ import SwiftUI
 struct StatusBar: View {
     // MARK: - Properties
     @ObservedObject private var loggingService = LoggingService.shared
+    @Environment(AppSceneModel.self) private var sceneModel
     @State private var isStatusBarFilterPopoverOpen: Bool = false
     @State private var popupLogTypeFilters: Set<LoggingService.LogType> = []
     @State private var statusBarLogTypeFilters: Set<LoggingService.LogType> = []
     @State private var displayedMessage: String = ""
-    let onRequestLogHistory: () -> Void
-    let onRequestOptions: (PersistentIdentifier) -> Void
-    let onRequestModelSelection: (PersistentIdentifier) -> Void
     private let messageAnimation: Animation = .easeInOut(duration: 0.18)
     
     // Environment access
@@ -67,17 +65,6 @@ struct StatusBar: View {
         } else {
             displayedMessage = next
         }
-    }
-
-    // MARK: - Initialization
-    init(
-        onRequestLogHistory: @escaping () -> Void,
-        onRequestOptions: @escaping (PersistentIdentifier) -> Void,
-        onRequestModelSelection: @escaping (PersistentIdentifier) -> Void
-    ) {
-        self.onRequestLogHistory = onRequestLogHistory
-        self.onRequestOptions = onRequestOptions
-        self.onRequestModelSelection = onRequestModelSelection
     }
 
     // MARK: - Filter Persistence Methods
@@ -149,14 +136,14 @@ struct StatusBar: View {
                 }
 
                 // Log message display with animation
-                Text(displayedMessage)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .padding(.horizontal, 2)
-                    .frame(minWidth: 100, maxWidth: .infinity, alignment: .leading)
-                    .onTapGesture {
-                        onRequestLogHistory()
-                    }
+                    Text(displayedMessage)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .padding(.horizontal, 2)
+                        .frame(minWidth: 100, maxWidth: .infinity, alignment: .leading)
+                        .onTapGesture {
+                            sceneModel.requestLogHistory()
+                        }
                 
                 if let conversation = activeConversation,
                    !isCompact {
@@ -165,8 +152,7 @@ struct StatusBar: View {
                             conversation: conversation,
                             isCompact: false,
                             queryManager: queryManager,
-                            onRequestOptions: onRequestOptions,
-                            onRequestModelSelection: onRequestModelSelection
+                            sceneModel: sceneModel
                         )
                             .layoutPriority(1)
                     }
@@ -182,8 +168,7 @@ struct StatusBar: View {
                     conversation: conversation,
                     isCompact: true,
                     queryManager: queryManager,
-                    onRequestOptions: onRequestOptions,
-                    onRequestModelSelection: onRequestModelSelection
+                    sceneModel: sceneModel
                 )
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -412,8 +397,7 @@ struct ConversationInfoHeader: View {
     let conversation: ConversationItem
     let isCompact: Bool
     let queryManager: QueryManager
-    let onRequestOptions: (PersistentIdentifier) -> Void
-    let onRequestModelSelection: (PersistentIdentifier) -> Void
+    let sceneModel: AppSceneModel
 
     private var modelName: String {
         conversation.options.selectedModelID
@@ -443,7 +427,7 @@ struct ConversationInfoHeader: View {
             }
             
             Button {
-                onRequestOptions(conversation.id)
+                sceneModel.requestOptions(for: conversation.id)
             } label: {
                 Text(conversation.options.apiConfiguration?.name ?? "No API Config")
                     .fontWeight(.medium)
@@ -464,7 +448,7 @@ struct ConversationInfoHeader: View {
                 .padding(.horizontal, 2)
                 .onTapGesture {
                     if conversation.options.apiConfiguration != nil {
-                        onRequestModelSelection(conversation.id)
+                        sceneModel.requestModelSelection(for: conversation.id)
                     }
                 }
             
