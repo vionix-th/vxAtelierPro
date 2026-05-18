@@ -208,6 +208,7 @@ extension AppDefaults {
         // TTS
         defaults.set(AppDefaults.ttsEntryPauseMs, forKey: AppSettings.Keys.ttsEntryPauseMs)
         defaults.set(AppDefaults.ttsRepeatMode, forKey: AppSettings.Keys.ttsRepeatMode)
+        defaults.removeObject(forKey: AppSettings.Keys.ttsActivePlaylistID)
         // Sidebar sort
         defaults.set(
             AppDefaults.sidebarConversationsSortDescending,

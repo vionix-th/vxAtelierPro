@@ -34,9 +34,10 @@ enum AppBootstrapPreviewData {
         context.insert(previewModel)
         context.insert(project)
         context.insert(conversation)
-        for playlist in previewTTSPlaylists() {
-            context.insert(playlist)
-        }
+        
+//        for playlist in previewTTSPlaylists() {
+//            context.insert(playlist)
+//        }
 
         do {
             try context.save()

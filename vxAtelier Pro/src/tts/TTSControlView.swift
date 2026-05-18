@@ -4,7 +4,6 @@ import SwiftUI
 struct TTSControlView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(TTSQueue.self) private var ttsQueue
-    @Environment(\.colorScheme) private var colorScheme
 
     @Query(sort: [
         SortDescriptor(\TTSPlaylist.updatedAt, order: .reverse),
@@ -13,54 +12,155 @@ struct TTSControlView: View {
     private var playlists: [TTSPlaylist]
 
     @AppStorage(AppSettings.Keys.ttsRepeatMode) private var repeatMode: String = AppDefaults.ttsRepeatMode
-    @State private var playlistEditor: PlaylistEditor?
-    @State private var deletePlaylistID: PersistentIdentifier?
+    @State private var presentedPlaylistEditor: PlaylistEditor?
+    @State private var presentedCustomEntryEditor: CustomPlaylistEntryEditor?
+    @State private var pendingPlaylistDeletionID: PersistentIdentifier?
+    @State private var focusedPlaylistID: PersistentIdentifier?
+    @State private var activeTab: TTSTab = .player
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                nowPlayingSection
-                
-                playerControls
-                
-                List {
-                    Section("Playlists") {
-                        if playlists.isEmpty {
-                            Text("No playlists yet.")
-                                .foregroundStyle(.secondary)
-                        } else {
-                            ForEach(playlists) { playlist in
-                                playlistRow(for: playlist)
-                            }
-                        }
+        VStack(spacing: 0) {
+            sheetTopBar
+            TabView(selection: $activeTab) {
+                playerTab
+                    .tabItem {
+                        Label("Player", systemImage: "play.circle")
                     }
+                    .tag(TTSTab.player)
 
-                    Section(currentPlaylistSectionTitle) {
-                        if currentEntries.isEmpty {
-                            Text("Add messages to build this playlist.")
-                                .foregroundStyle(.secondary)
-                        } else {
-                            ForEach(currentEntries) { item in
-                                playlistEntryRow(item: item)
-                            }
-                        }
+                playlistsTab
+                    .tabItem {
+                        Label("Playlists", systemImage: "music.note.list")
                     }
-                }
-                .listStyle(.plain)
+                    .tag(TTSTab.playlists)
             }
-            .navigationTitle("Text to Speech")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Label("Close Player", systemImage: "xmark.square")
+        }
+        .navigationTitle("Text to Speech")
+        .sheet(item: $presentedPlaylistEditor) { editor in
+            PlaylistEditorSheet(
+                title: editor.title,
+                name: editor.name,
+                onCancel: {
+                    presentedPlaylistEditor = nil
+                },
+                onSave: { name in
+                    if let playlistID = editor.playlistID {
+                        ttsQueue.renamePlaylist(id: playlistID, to: name)
+                    } else {
+                        _ = ttsQueue.createPlaylist(named: name)
+                    }
+                    presentedPlaylistEditor = nil
+                }
+            )
+        }
+        .sheet(item: $presentedCustomEntryEditor) { editor in
+            CustomPlaylistEntryEditorSheet(
+                title: editor.title,
+                onCancel: {
+                    presentedCustomEntryEditor = nil
+                },
+                onSave: { text, role in
+                    if let playlistID = editor.playlistID {
+                        ttsQueue.selectPlaylist(id: playlistID)
+                    }
+                    ttsQueue.addCustomEntry(
+                        text: text,
+                        role: role.rawValue
+                    )
+                    presentedCustomEntryEditor = nil
+                }
+            )
+        }
+        .confirmationDialog(
+            "Delete Playlist",
+            isPresented: Binding(
+                get: { pendingPlaylistDeletionID != nil },
+                set: { if !$0 { pendingPlaylistDeletionID = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                if let pendingPlaylistDeletionID {
+                    ttsQueue.deletePlaylist(id: pendingPlaylistDeletionID)
+                }
+                self.pendingPlaylistDeletionID = nil
+                syncSelection()
+            }
+            Button("Cancel", role: .cancel) {
+                pendingPlaylistDeletionID = nil
+            }
+        } message: {
+            Text("Delete selected playlist and its items.")
+        }
+        .frame(
+            minWidth: 760, idealWidth: 1000, maxWidth: .infinity,
+            minHeight: 560, idealHeight: 760, maxHeight: .infinity
+        )
+        .presentationDetents([.large])
+        .onAppear {
+            syncSelection()
+        }
+        .onChange(of: ttsQueue.currentPlaylistID()) { _, _ in
+            syncSelection()
+        }
+        .onChange(of: playlists.map(\.id)) { _, _ in
+            syncSelection()
+        }
+    }
+
+    private var sheetTopBar: some View {
+        HStack {
+            Spacer(minLength: 0)
+
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.borderless)
+            .help("Close")
+        }
+        .padding(.horizontal, AppDefaults.paddingLarge)
+        .padding(.top, AppDefaults.paddingLarge)
+        .padding(.bottom, AppDefaults.paddingSmall)
+    }
+
+    private var playerTab: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppDefaults.paddingLarge) {
+                if let playlist = displayedPlaylist {
+                    entriesCard(for: playlist)
+                    transportCard
+                } else {
+                    emptyDetailState
+                }
+            }
+            .padding(AppDefaults.paddingLarge)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .background(detailBackground)
+    }
+
+    private var playlistsTab: some View {
+        List(selection: $focusedPlaylistID) {
+            Section("Playlists") {
+                if playlists.isEmpty {
+                    emptySidebarState
+                } else {
+                    ForEach(playlists) { playlist in
+                        playlistRow(for: playlist)
+                            .tag(Optional(playlist.id))
                     }
                 }
-
-                ToolbarItemGroup(placement: .primaryAction) {
+            }
+        }
+        .listStyle(.inset)
+        .safeAreaInset(edge: .bottom) {
+            VStack(spacing: AppDefaults.paddingSmall) {
+                Divider()
+                HStack {
                     Button {
-                        playlistEditor = PlaylistEditor(
+                        presentedPlaylistEditor = PlaylistEditor(
                             title: "New Playlist",
                             name: suggestedPlaylistName(),
                             playlistID: nil
@@ -70,184 +170,40 @@ struct TTSControlView: View {
                     }
 
                     Button {
-                        ttsQueue.clear()
+                        presentCustomEntryEditor(
+                            targetPlaylistID: focusedPlaylistID ?? ttsQueue.currentPlaylistID(),
+                            playlistName: displayedPlaylist?.name
+                        )
                     } label: {
-                        Label("Clear Playlist", systemImage: "eraser")
+                        Label("Add Entry", systemImage: "text.badge.plus")
                     }
-                    .disabled(ttsQueue.currentPlaylistEntryCount() == 0)
-                }
-            }
-            .sheet(item: $playlistEditor) { editor in
-                PlaylistEditorSheet(
-                    title: editor.title,
-                    name: editor.name,
-                    onCancel: {
-                        playlistEditor = nil
-                    },
-                    onSave: { name in
-                        if let playlistID = editor.playlistID {
-                            ttsQueue.renamePlaylist(id: playlistID, to: name)
-                        } else {
-                            _ = ttsQueue.createPlaylist(named: name)
-                        }
-                        playlistEditor = nil
-                    }
-                )
-            }
-            .confirmationDialog(
-                "Delete Playlist",
-                isPresented: Binding(
-                    get: { deletePlaylistID != nil },
-                    set: { if !$0 { deletePlaylistID = nil } }
-                ),
-                titleVisibility: .visible
-            ) {
-                Button("Delete", role: .destructive) {
-                    if let deletePlaylistID {
-                        ttsQueue.deletePlaylist(id: deletePlaylistID)
-                    }
-                    self.deletePlaylistID = nil
-                }
-                Button("Cancel", role: .cancel) {
-                    deletePlaylistID = nil
-                }
-            } message: {
-                Text("Delete selected playlist and its items.")
-            }
-        }
-        .frame(
-            minWidth: 360, idealWidth: 520, maxWidth: .infinity,
-            minHeight: 480, idealHeight: 720, maxHeight: .infinity
-        )
-        .presentationDetents([.medium, .large])
-        .onAppear {
-            ttsQueue.selectFirstPlaylistIfNeeded()
-        }
-    }
 
-    private var nowPlayingSection: some View {
-        VStack(spacing: 12) {
-            if let currentPlaylist = ttsQueue.currentPlaylist {
-                VStack(spacing: 12) {
-                    Circle()
-                        .fill(
-                            colorScheme == .dark
-                                ? Color.white.opacity(0.1) : Color.black.opacity(0.1)
-                        )
-                        .frame(width: 48, height: 48)
-                        .overlay(
-                            Image(systemName: "waveform")
-                                .font(.title)
-                                .foregroundColor(ttsQueue.isPlaying ? .accentColor : .secondary)
-                        )
-                        .padding(.top)
+                    Spacer()
 
-                    Text(currentPlaylist.name)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    if let currentItem = ttsQueue.currentItem {
-                        ScrollView {
-                            Text(currentItem.displayText)
-                                .font(.body)
-                                .padding()
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .frame(height: 120)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(
-                                    colorScheme == .dark
-                                        ? Color.white.opacity(0.05) : Color.black.opacity(0.05))
-                        )
-                        .padding(.horizontal)
-                    } else {
-                        VStack(spacing: 8) {
-                            Text("Playlist is empty")
-                                .font(.headline)
-                            Text("Add messages to start playback.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 120)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(
-                                    colorScheme == .dark
-                                        ? Color.white.opacity(0.05) : Color.black.opacity(0.05))
-                        )
-                        .padding(.horizontal)
-                    }
-                }
-                .frame(height: 240)
-                .frame(maxWidth: .infinity)
-                .background(colorScheme == .dark ? Color.black : Color.white)
-            } else {
-                VStack(spacing: 8) {
-                    Image(systemName: "waveform")
-                        .font(.title2)
-                        .foregroundStyle(.secondary)
-                    Text("No active playlist")
-                        .font(.headline)
-                    Text("Create or select playlist to start playback.")
+                    Text("\(playlists.count) total")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity)
-                .frame(height: 240)
-                .background(colorScheme == .dark ? Color.black : Color.white)
+                .padding(.horizontal, AppDefaults.paddingLarge)
+                .padding(.bottom, AppDefaults.paddingMedium)
             }
+            .background(.regularMaterial)
         }
     }
 
-    private var currentEntries: [TTSPlaylistEntry] {
-        ttsQueue.currentPlaylistOrderedEntries()
-    }
+    private var transportCard: some View {
+        VStack(spacing: AppDefaults.paddingMedium) {
+            progressBar
 
-    private var currentPlaylistSectionTitle: String {
-        ttsQueue.currentPlaylistName().map { "\($0) Items" } ?? "Items"
-    }
-
-    private var playerControls: some View {
-        VStack(spacing: 16) {
-            GeometryReader { geometry in
-                Rectangle()
-                    .fill(Color.accentColor.opacity(0.3))
-                    .frame(
-                        width: progressWidth(totalWidth: geometry.size.width)
-                    )
-                    .frame(height: 2)
-            }
-            .frame(height: 2)
-
-            HStack {
-                Spacer()
-
-                Button {
-                    switch repeatMode {
-                    case "none": repeatMode = "one"
-                    case "one": repeatMode = "all"
-                    case "all": repeatMode = "none"
-                    default: repeatMode = "none"
-                    }
-                } label: {
-                    Image(systemName: repeatModeIcon)
-                        .foregroundColor(repeatMode == "none" ? .secondary : .accentColor)
-                }
-
-                Spacer()
-            }
-            .font(.caption)
-
-            HStack(spacing: 24) {
-                Spacer()
-
+            HStack(spacing: AppDefaults.paddingMedium) {
                 Button(action: { ttsQueue.previous() }) {
                     Image(systemName: "backward.fill")
-                        .font(.title2)
-                        .foregroundColor(previousButtonColor)
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(width: 32, height: 32)
                 }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+                .tint(.secondary)
                 .disabled(previousButtonDisabled)
 
                 Button(action: {
@@ -257,33 +213,81 @@ struct TTSControlView: View {
                         ttsQueue.resume()
                     }
                 }) {
-                    Image(systemName: ttsQueue.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                        .font(.system(size: 44))
-                        .foregroundColor(.accentColor)
+                    Image(systemName: ttsQueue.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .frame(width: 40, height: 40)
                 }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
                 .disabled(ttsQueue.currentPlaylistEntryCount() == 0)
 
                 Button(action: { ttsQueue.next() }) {
                     Image(systemName: "forward.fill")
-                        .font(.title2)
-                        .foregroundColor(nextButtonColor)
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(width: 32, height: 32)
                 }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+                .tint(.secondary)
                 .disabled(nextButtonDisabled)
 
-                Spacer()
+                Spacer(minLength: 0)
+
+                Menu {
+                    Button("Repeat Off") { repeatMode = "none" }
+                    Button("Repeat One") { repeatMode = "one" }
+                    Button("Repeat All") { repeatMode = "all" }
+                } label: {
+                    Image(systemName: repeatModeIcon)
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.bordered)
+                .help(repeatModeTitle)
             }
-            .padding(.vertical, 8)
         }
-        .background(colorScheme == .dark ? Color.black : Color.white)
+        .padding(AppDefaults.paddingLarge)
+        .background(cardBackground, in: RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous))
+    }
+
+    private func entriesCard(for playlist: TTSPlaylist) -> some View {
+        VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
+            HStack {
+                Text(playlist.name)
+                    .font(.headline)
+
+                Spacer(minLength: 0)
+            }
+
+            if playlist.orderedEntries.isEmpty {
+                emptyEntriesState
+            } else {
+                LazyVStack(spacing: AppDefaults.paddingSmall) {
+                    ForEach(playlist.orderedEntries) { item in
+                        playlistEntryRow(item: item)
+                    }
+                }
+            }
+        }
+        .padding(AppDefaults.paddingLarge)
+        .background(cardBackground, in: RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous))
     }
 
     private func playlistRow(for playlist: TTSPlaylist) -> some View {
-        let isSelected = playlist.id == ttsQueue.currentPlaylistID()
-        return HStack(spacing: 12) {
-            Image(systemName: isSelected ? "play.fill" : "music.note.list")
-                .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+        let isSelected = playlist.id == focusedPlaylistID
 
-            VStack(alignment: .leading, spacing: 4) {
+        return HStack(spacing: AppDefaults.paddingMedium) {
+            ZStack {
+                RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium, style: .continuous)
+                    .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.12))
+                    .frame(width: 34, height: 34)
+
+                Image(systemName: isSelected ? "play.fill" : "music.note.list")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
                 Text(playlist.name)
                     .foregroundStyle(.primary)
                 Text("\(playlist.orderedEntries.count) items")
@@ -291,46 +295,35 @@ struct TTSControlView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Spacer()
+            Spacer(minLength: 0)
 
             Button {
                 ttsQueue.playPlaylist(id: playlist.id)
+                focusedPlaylistID = playlist.id
             } label: {
-                Image(systemName: "play.circle")
+                Image(systemName: "play.circle.fill")
+                    .symbolRenderingMode(.hierarchical)
             }
             .buttonStyle(.plain)
             .help("Play playlist")
         }
+        .padding(.vertical, AppDefaults.paddingSmall)
         .contentShape(Rectangle())
+        .listRowBackground(isSelected ? Color.accentColor.opacity(0.10) : Color.clear)
         .onTapGesture {
+            focusedPlaylistID = playlist.id
             ttsQueue.selectPlaylist(id: playlist.id)
-        }
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            Button {
-                playlistEditor = PlaylistEditor(
-                    title: "Rename Playlist",
-                    name: playlist.name,
-                    playlistID: playlist.id
-                )
-            } label: {
-                Label("Rename", systemImage: "pencil")
-            }
-
-            Button(role: .destructive) {
-                deletePlaylistID = playlist.id
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
         }
         .contextMenu {
             Button {
                 ttsQueue.playPlaylist(id: playlist.id)
+                focusedPlaylistID = playlist.id
             } label: {
                 Label("Play", systemImage: "play.circle")
             }
 
             Button {
-                playlistEditor = PlaylistEditor(
+                presentedPlaylistEditor = PlaylistEditor(
                     title: "Rename Playlist",
                     name: playlist.name,
                     playlistID: playlist.id
@@ -340,102 +333,193 @@ struct TTSControlView: View {
             }
 
             Button(role: .destructive) {
-                deletePlaylistID = playlist.id
+                pendingPlaylistDeletionID = playlist.id
             } label: {
                 Label("Delete", systemImage: "trash")
+            }
+
+            Divider()
+
+            Button {
+                presentCustomEntryEditor(
+                    targetPlaylistID: playlist.id,
+                    playlistName: playlist.name
+                )
+            } label: {
+                Label("Add Entry", systemImage: "text.badge.plus")
             }
         }
     }
 
     private func playlistEntryRow(item: TTSPlaylistEntry) -> some View {
-        HStack(spacing: 12) {
-            if item.id == ttsQueue.currentItem?.id {
-                Image(systemName: "speaker.wave.2.fill")
-                    .foregroundColor(.accentColor)
-            } else {
-                Text("\(item.orderIndex + 1)")
-                    .foregroundColor(.secondary)
-                    .frame(width: 20)
-            }
+        let isCurrent = item.id == ttsQueue.currentItem?.id
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(item.displayText)
-                    .lineLimit(1)
-                    .foregroundColor(.primary)
-                HStack {
-                    Text(item.role.capitalized)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text("•")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    if item.sourceConversationIDString != nil {
-                        Text("Source linked")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+        return HStack(spacing: AppDefaults.paddingMedium) {
+            VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
+                HStack(spacing: AppDefaults.paddingSmall) {
+                    if let index = displayedPlaylistEntryIndex(for: item) {
+                        entryIndexBadge(number: index + 1)
                     }
+
+                    if isCurrent {
+                        Label("Now playing", systemImage: "speaker.wave.2.fill")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Color.accentColor)
+                    } else {
+                        Text(item.role.capitalized)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Text(item.displayText)
+                    .font(.body)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                if item.sourceConversationIDString != nil {
+                    Text("Source linked")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 
-            Spacer()
+            Spacer(minLength: AppDefaults.paddingMedium)
 
-            Button {
-                moveEntry(item, by: -1)
-            } label: {
-                Image(systemName: "chevron.up")
-                    .foregroundColor(.secondary)
-            }
-            .buttonStyle(.plain)
-            .disabled(!canMoveEntry(item, by: -1))
+            HStack(spacing: AppDefaults.paddingSmall) {
+                Button {
+                    moveEntry(item, by: -1)
+                } label: {
+                    Image(systemName: "chevron.up")
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.borderless)
+                .disabled(!canMoveEntry(item, by: -1))
+                .help("Move up")
 
-            Button {
-                moveEntry(item, by: 1)
-            } label: {
-                Image(systemName: "chevron.down")
-                    .foregroundColor(.secondary)
-            }
-            .buttonStyle(.plain)
-            .disabled(!canMoveEntry(item, by: 1))
+                Button {
+                    moveEntry(item, by: 1)
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.borderless)
+                .disabled(!canMoveEntry(item, by: 1))
+                .help("Move down")
 
-            Button(role: .destructive) {
-                guard let index = ttsQueue.currentPlaylistOrderedEntries().firstIndex(where: { $0.id == item.id }) else { return }
-                ttsQueue.remove(at: index)
-            } label: {
-                Image(systemName: "trash")
-                    .foregroundColor(.secondary)
+                Button(role: .destructive) {
+                    guard let removeIndex = displayedPlaylistEntryIndex(for: item) else { return }
+                    ttsQueue.remove(at: removeIndex)
+                } label: {
+                    Image(systemName: "trash")
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.borderless)
+                .help("Remove from playlist")
             }
-            .buttonStyle(.plain)
-            .help("Remove from playlist")
         }
+        .padding(AppDefaults.paddingMedium)
+        .background(
+            RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous)
+                .fill(isCurrent ? Color.accentColor.opacity(0.09) : Color.secondary.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous)
+                .stroke(isCurrent ? Color.accentColor.opacity(0.16) : Color.clear, lineWidth: 1)
+        )
         .contentShape(Rectangle())
         .onTapGesture {
-            guard let index = ttsQueue.currentPlaylistOrderedEntries().firstIndex(where: { $0.id == item.id }) else { return }
+            guard let index = displayedPlaylistEntryIndex(for: item) else { return }
             ttsQueue.jumpTo(index)
         }
     }
 
+    private func displayedPlaylistEntryIndex(for item: TTSPlaylistEntry) -> Int? {
+        displayedPlaylistEntries.firstIndex(where: { $0.id == item.id })
+    }
+
+    private func entryIndexBadge(number: Int) -> some View {
+        Text(String(number))
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .frame(width: 24, height: 24)
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium, style: .continuous))
+    }
+
     private func moveEntry(_ item: TTSPlaylistEntry, by offset: Int) {
-        guard let index = ttsQueue.currentPlaylistOrderedEntries().firstIndex(where: { $0.id == item.id }) else { return }
+        guard let index = displayedPlaylistEntryIndex(for: item) else { return }
         let destination = index + offset
-        guard destination >= 0, destination < ttsQueue.currentPlaylistEntryCount() else { return }
+        guard destination >= 0, destination < displayedPlaylistEntries.count else { return }
         ttsQueue.moveEntries(from: IndexSet(integer: index), to: destination)
     }
 
     private func canMoveEntry(_ item: TTSPlaylistEntry, by offset: Int) -> Bool {
-        guard let index = ttsQueue.currentPlaylistOrderedEntries().firstIndex(where: { $0.id == item.id }) else { return false }
+        guard let index = displayedPlaylistEntryIndex(for: item) else { return false }
         let destination = index + offset
-        return destination >= 0 && destination < ttsQueue.currentPlaylistEntryCount()
+        return destination >= 0 && destination < displayedPlaylistEntries.count
     }
 
-    private func progressWidth(totalWidth: CGFloat) -> CGFloat {
-        let count = ttsQueue.currentPlaylistEntryCount()
-        guard count > 0 else { return 0 }
-        let progressIndex = min(ttsQueue.currentIndex + 1, count)
-        return totalWidth * (CGFloat(progressIndex) / CGFloat(count))
+    private func presentCustomEntryEditor(targetPlaylistID: PersistentIdentifier?, playlistName: String?) {
+        presentedCustomEntryEditor = CustomPlaylistEntryEditor(
+            title: playlistName.map { "Add Entry to \($0)" } ?? "Add Entry",
+            playlistID: targetPlaylistID
+        )
     }
 
-    private func suggestedPlaylistName() -> String {
-        "Playlist \(playlists.count + 1)"
+    private func syncSelection() {
+        if let focusedPlaylistID, playlists.contains(where: { $0.id == focusedPlaylistID }) {
+            return
+        }
+
+        if let currentID = ttsQueue.currentPlaylistID(),
+           playlists.contains(where: { $0.id == currentID }) {
+            focusedPlaylistID = currentID
+        } else {
+            focusedPlaylistID = playlists.first?.id
+        }
+    }
+
+    private var displayedPlaylist: TTSPlaylist? {
+        if let focusedPlaylistID,
+           let playlist = playlists.first(where: { $0.id == focusedPlaylistID }) {
+            return playlist
+        }
+        return ttsQueue.currentPlaylist
+    }
+
+    private var displayedPlaylistEntries: [TTSPlaylistEntry] {
+        displayedPlaylist?.orderedEntries ?? []
+    }
+
+    private var cardBackground: some ShapeStyle {
+        .regularMaterial
+    }
+
+    private var detailBackground: some ShapeStyle {
+        LinearGradient(
+            colors: [
+                Color(nsColor: .windowBackgroundColor),
+                Color(nsColor: .controlBackgroundColor)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
+    private var progressBar: some View {
+        GeometryReader { geometry in
+            let count = max(1, displayedPlaylistEntries.count)
+            let progressIndex = min(ttsQueue.currentIndex + 1, count)
+
+            RoundedRectangle(cornerRadius: 99, style: .continuous)
+                .fill(Color.secondary.opacity(0.15))
+                .overlay(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 99, style: .continuous)
+                        .fill(Color.accentColor)
+                        .frame(width: geometry.size.width * (CGFloat(progressIndex) / CGFloat(count)))
+                }
+        }
+        .frame(height: 6)
     }
 
     private var repeatModeIcon: String {
@@ -447,29 +531,73 @@ struct TTSControlView: View {
         }
     }
 
-    private var previousButtonColor: Color {
-        guard ttsQueue.currentPlaylistEntryCount() > 0 else { return .secondary }
-        return (ttsQueue.currentIndex > 0 || repeatMode == "all") ? .primary : .secondary
+    private var repeatModeTitle: String {
+        switch repeatMode {
+        case "none": return "Repeat Off"
+        case "one": return "Repeat One"
+        case "all": return "Repeat All"
+        default: return "Repeat"
+        }
+    }
+
+    private var emptySidebarState: some View {
+        Text("No playlists yet.")
+            .foregroundStyle(.secondary)
+            .padding(.vertical, AppDefaults.paddingLarge)
+    }
+
+    private var emptyDetailState: some View {
+        VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
+            Text("No active playlist")
+                .font(.title3.weight(.semibold))
+            Text("Create a playlist or select one from the Playlists page.")
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 220, alignment: .leading)
+        .padding(AppDefaults.paddingLarge)
+        .background(cardBackground, in: RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous))
+    }
+
+    private var emptyEntriesState: some View {
+        VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
+            Text("No entries")
+                .font(.headline)
+            Text("Add messages from a conversation to populate this playlist.")
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(AppDefaults.paddingLarge)
+        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium, style: .continuous))
     }
 
     private var previousButtonDisabled: Bool {
         ttsQueue.currentPlaylistEntryCount() == 0 || (ttsQueue.currentIndex == 0 && repeatMode != "all")
     }
 
-    private var nextButtonColor: Color {
-        guard ttsQueue.currentPlaylistEntryCount() > 0 else { return .secondary }
-        return (ttsQueue.currentIndex < ttsQueue.currentPlaylistEntryCount() - 1 || repeatMode == "all") ? .primary : .secondary
-    }
-
     private var nextButtonDisabled: Bool {
         ttsQueue.currentPlaylistEntryCount() == 0 || (ttsQueue.currentIndex >= ttsQueue.currentPlaylistEntryCount() - 1 && repeatMode != "all")
     }
+
+    private func suggestedPlaylistName() -> String {
+        "Playlist \(playlists.count + 1)"
+    }
+}
+
+private enum TTSTab: Hashable {
+    case player
+    case playlists
 }
 
 private struct PlaylistEditor: Identifiable {
     let id = UUID()
     let title: String
     let name: String
+    let playlistID: PersistentIdentifier?
+}
+
+private struct CustomPlaylistEntryEditor: Identifiable {
+    let id = UUID()
+    let title: String
     let playlistID: PersistentIdentifier?
 }
 
@@ -489,32 +617,124 @@ private struct PlaylistEditorSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                TextField("Name", text: $draftName)
-            }
-            .navigationTitle(title)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        onCancel()
-                        dismiss()
-                    }
+        VStack(alignment: .leading, spacing: AppDefaults.paddingLarge) {
+            Text(title)
+                .font(.title3.weight(.semibold))
+
+            TextField("Playlist name", text: $draftName)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit(save)
+
+            HStack(spacing: AppDefaults.paddingSmall) {
+                Spacer(minLength: 0)
+
+                Button("Cancel") {
+                    onCancel()
+                    dismiss()
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        onSave(draftName)
-                        dismiss()
-                    }
+
+                Button("Save") {
+                    save()
                 }
+                .keyboardShortcut(.defaultAction)
+                .disabled(!canSave)
             }
         }
-        .frame(minWidth: 320, minHeight: 180)
+        .padding(AppDefaults.paddingLarge)
+        .frame(minWidth: 360, minHeight: 180)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous))
+    }
+
+    private var canSave: Bool {
+        !draftName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func save() {
+        guard canSave else { return }
+        onSave(draftName)
+        dismiss()
     }
 }
 
-//#Preview{
-//    TTSControlView()
-//        .bootstrapped(with: .preview())
-//        
-//}
+private struct CustomPlaylistEntryEditorSheet: View {
+    let title: String
+    let onCancel: () -> Void
+    let onSave: (String, TTSPlaylistRole) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var draftText: String = ""
+    @State private var draftRole: TTSPlaylistRole = .user
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppDefaults.paddingLarge) {
+            Text(title)
+                .font(.title3.weight(.semibold))
+
+            TextEditorWithPlaceholder(
+                text: $draftText,
+                placeholder: "Enter the entry text"
+            )
+            .frame(minHeight: 180)
+
+            Picker("", selection: $draftRole) {
+                ForEach(TTSPlaylistRole.allCases) { role in
+                    Text(role.displayName).tag(role)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            HStack(spacing: AppDefaults.paddingSmall) {
+                Spacer(minLength: 0)
+
+                Button("Cancel") {
+                    onCancel()
+                    dismiss()
+                }
+
+                Button("Save") {
+                    save()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(!canSave)
+            }
+        }
+        .padding(AppDefaults.paddingLarge)
+        .frame(minWidth: 460, minHeight: 340)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous))
+    }
+
+    private var canSave: Bool {
+        !draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func save() {
+        guard canSave else { return }
+        onSave(draftText, draftRole)
+        dismiss()
+    }
+}
+
+private struct TextEditorWithPlaceholder: View {
+    @Binding var text: String
+    let placeholder: String
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous)
+                .fill(Color(nsColor: .textBackgroundColor))
+
+            TextEditor(text: $text)
+                .scrollContentBackground(.hidden)
+                .padding(4)
+
+            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(placeholder)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 11)
+                    .allowsHitTesting(false)
+            }
+        }
+    }
+}

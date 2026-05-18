@@ -429,6 +429,7 @@ struct ContentView: View {
             MenuItemStyle.label("Speech Playlist", systemImage: "text.bubble")
         }
         .help("Open text-to-speech queue")
+        .keyboardShortcut("s", modifiers: [.command])
         
         Button {
             onRequestLogHistory()

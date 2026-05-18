@@ -88,6 +88,7 @@ enum AppSettings {
         // TTS
         static let ttsEntryPauseMs = "TTSEntryPauseMs"
         static let ttsRepeatMode = "TTSRepeatMode"
+        static let ttsActivePlaylistID = "TTSActivePlaylistID"
 
         // Lifecycle
         static let shouldTerminateAfterLastWindowClosed = "shouldTerminateAfterLastWindowClosed"

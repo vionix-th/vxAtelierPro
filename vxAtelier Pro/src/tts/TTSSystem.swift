@@ -23,6 +23,7 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
     private var pendingAdvanceWorkItem: DispatchWorkItem?
     private var currentSegments: [TTSSegment] = []
     private var currentSegmentIndex = 0
+    private let activePlaylistStorageKey = AppSettings.Keys.ttsActivePlaylistID
 
     var isPlaying = false
     var currentIndex = 0
@@ -51,6 +52,41 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
         }
     }
 
+    private func loadPersistedActivePlaylistID() -> PersistentIdentifier? {
+        guard let data = UserDefaults.standard.data(forKey: activePlaylistStorageKey) else {
+            return nil
+        }
+
+        do {
+            return try JSONDecoder().decode(PersistentIdentifier.self, from: data)
+        } catch {
+            vxAtelierPro.log.error("❌ Failed to decode persisted TTS playlist identifier - \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    private func persistActivePlaylistID(_ id: PersistentIdentifier?) {
+        let defaults = UserDefaults.standard
+
+        guard let id else {
+            defaults.removeObject(forKey: activePlaylistStorageKey)
+            return
+        }
+
+        do {
+            let data = try JSONEncoder().encode(id)
+            defaults.set(data, forKey: activePlaylistStorageKey)
+        } catch {
+            vxAtelierPro.log.error("❌ Failed to encode persisted TTS playlist identifier - \(error.localizedDescription)")
+        }
+    }
+
+    private func restorePersistedActivePlaylistIfNeeded() {
+        guard activePlaylistID == nil else { return }
+        guard let persistedID = loadPersistedActivePlaylistID() else { return }
+        activePlaylistID = persistedID
+    }
+
     private func cancelPendingAdvance() {
         pendingAdvanceWorkItem?.cancel()
         pendingAdvanceWorkItem = nil
@@ -74,12 +110,15 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
     }
 
     private func activePlaylist(createIfNeeded: Bool = false, preferredName: String? = nil) -> TTSPlaylist? {
+        restorePersistedActivePlaylistIfNeeded()
+
         if let activePlaylistID, let playlist = fetchPlaylist(with: activePlaylistID) {
             return playlist
         }
 
         if let first = orderedPlaylists().first {
             activePlaylistID = first.id
+            persistActivePlaylistID(first.id)
             currentIndex = 0
             return first
         }
@@ -90,6 +129,8 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
     }
 
     private func activePlaylistForAdding(preferredName: String? = nil) -> TTSPlaylist? {
+        restorePersistedActivePlaylistIfNeeded()
+
         if let activePlaylistID, let playlist = fetchPlaylist(with: activePlaylistID) {
             return playlist
         }
@@ -140,9 +181,11 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
         cancelPendingAdvance()
         if let playlist {
             activePlaylistID = playlist.id
+            persistActivePlaylistID(playlist.id)
             currentIndex = min(currentIndex, max(0, playlist.orderedEntries.count - 1))
         } else {
             activePlaylistID = nil
+            persistActivePlaylistID(nil)
             currentIndex = 0
         }
         currentSegments = []
@@ -370,6 +413,7 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
     }
 
     func selectFirstPlaylistIfNeeded() {
+        restorePersistedActivePlaylistIfNeeded()
         guard activePlaylistID == nil else { return }
         if let first = orderedPlaylists().first {
             selectPlaylist(id: first.id)
@@ -377,19 +421,13 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
     }
 
     func add(_ message: MessageItem, conversationID: PersistentIdentifier, createPlaylistNamed playlistName: String? = nil) {
-        let playlist = activePlaylistForAdding(preferredName: playlistName)
-        guard let playlist else { return }
-
-        let entry = TTSPlaylistEntry(
-            orderIndex: playlist.nextOrderIndex(),
+        addEntry(
             role: message.role,
             text: message.displayText,
             sourceConversationIDString: String(describing: conversationID),
             sourceMessageIDString: String(describing: message.id),
-            playlist: playlist
+            createPlaylistNamed: playlistName
         )
-        playlist.entries.append(entry)
-        notifyPlaylistMutation(playlist)
     }
 
     func add(_ messages: [MessageItem], conversationID: PersistentIdentifier, createPlaylistNamed playlistName: String? = nil) {
@@ -411,6 +449,38 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
 
         playlist.normalizeEntryOrder()
         saveContext()
+    }
+
+    func addCustomEntry(text: String, role: String, createPlaylistNamed playlistName: String? = nil) {
+        addEntry(
+            role: role,
+            text: text,
+            sourceConversationIDString: nil,
+            sourceMessageIDString: nil,
+            createPlaylistNamed: playlistName
+        )
+    }
+
+    private func addEntry(
+        role: String,
+        text: String,
+        sourceConversationIDString: String?,
+        sourceMessageIDString: String?,
+        createPlaylistNamed playlistName: String? = nil
+    ) {
+        let playlist = activePlaylistForAdding(preferredName: playlistName)
+        guard let playlist else { return }
+
+        let entry = TTSPlaylistEntry(
+            orderIndex: playlist.nextOrderIndex(),
+            role: role,
+            text: text,
+            sourceConversationIDString: sourceConversationIDString,
+            sourceMessageIDString: sourceMessageIDString,
+            playlist: playlist
+        )
+        playlist.entries.append(entry)
+        notifyPlaylistMutation(playlist)
     }
 
     func read(_ message: MessageItem) {
@@ -640,7 +710,8 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
     }
 
     func currentPlaylistID() -> PersistentIdentifier? {
-        currentPlaylist?.id
+        _ = activePlaylist()
+        return activePlaylistID
     }
 
     func currentPlaylistEntryCount() -> Int {
@@ -660,6 +731,7 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
     }
 
     func reloadSelectionIfNeeded() {
+        restorePersistedActivePlaylistIfNeeded()
         if let activePlaylistID, fetchPlaylist(with: activePlaylistID) == nil {
             selectPlaylist(orderedPlaylists().first)
         }

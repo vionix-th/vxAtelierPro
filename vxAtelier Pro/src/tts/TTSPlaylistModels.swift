@@ -1,6 +1,18 @@
 import Foundation
 import SwiftData
 
+enum TTSPlaylistRole: String, CaseIterable, Identifiable {
+    case user
+    case assistant
+    case system
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        rawValue.capitalized
+    }
+}
+
 @Model
 final class TTSPlaylist {
     var name: String
