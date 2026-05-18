@@ -20,7 +20,6 @@ struct TTSControlView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            sheetTopBar
             TabView(selection: $activeTab) {
                 playerTab
                     .tabItem {
@@ -108,29 +107,12 @@ struct TTSControlView: View {
         }
     }
 
-    private var sheetTopBar: some View {
-        HStack {
-            Spacer(minLength: 0)
-
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark")
-            }
-            .buttonStyle(.borderless)
-            .help("Close")
-        }
-        .padding(.horizontal, AppDefaults.paddingLarge)
-        .padding(.top, AppDefaults.paddingLarge)
-        .padding(.bottom, AppDefaults.paddingSmall)
-    }
-
     private var playerTab: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppDefaults.paddingLarge) {
                 if let playlist = displayedPlaylist {
-                    entriesCard(for: playlist)
                     transportCard
+                    entriesCard(for: playlist)
                 } else {
                     emptyDetailState
                 }
@@ -193,6 +175,12 @@ struct TTSControlView: View {
 
     private var transportCard: some View {
         VStack(spacing: AppDefaults.paddingMedium) {
+            HStack {
+                Text("Playback")
+                    .font(.headline)
+                
+                Spacer(minLength: 0)
+            }
             progressBar
 
             HStack(spacing: AppDefaults.paddingMedium) {
@@ -484,7 +472,7 @@ struct TTSControlView: View {
            let playlist = playlists.first(where: { $0.id == focusedPlaylistID }) {
             return playlist
         }
-        return ttsQueue.currentPlaylist
+        return ttsQueue.playlist(with: ttsQueue.currentPlaylistID())
     }
 
     private var displayedPlaylistEntries: [TTSPlaylistEntry] {
@@ -737,4 +725,9 @@ private struct TextEditorWithPlaceholder: View {
             }
         }
     }
+}
+
+#Preview{
+    TTSControlView()
+        .bootstrapped(with: .preview())
 }

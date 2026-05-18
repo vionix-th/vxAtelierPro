@@ -34,10 +34,12 @@ enum AppBootstrapPreviewData {
         context.insert(previewModel)
         context.insert(project)
         context.insert(conversation)
-        
-//        for playlist in previewTTSPlaylists() {
-//            context.insert(playlist)
-//        }
+
+        for playlist in previewTTSPlaylists() {
+            context.insert(playlist)
+        }
+
+        UserDefaults.standard.removeObject(forKey: AppSettings.Keys.ttsActivePlaylistID)
 
         do {
             try context.save()
@@ -86,7 +88,7 @@ enum AppBootstrapPreviewData {
                 orderIndex: index,
                 role: entry.role,
                 text: entry.text,
-                sourceConversationIDString: "nil",
+                sourceConversationIDString: "preview",
                 sourceMessageIDString: nil,
                 playlist: playlist
             )

@@ -351,12 +351,8 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
         playlist?.orderedEntries ?? []
     }
 
-    var currentPlaylist: TTSPlaylist? {
-        activePlaylist()
-    }
-
     var currentItem: TTSPlaylistEntry? {
-        guard let playlist = activePlaylist() else {
+        guard let playlist = currentPlaylist else {
             return nil
         }
         let entries = playlist.orderedEntries
@@ -710,8 +706,7 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
     }
 
     func currentPlaylistID() -> PersistentIdentifier? {
-        _ = activePlaylist()
-        return activePlaylistID
+        activePlaylistID ?? loadPersistedActivePlaylistID()
     }
 
     func currentPlaylistEntryCount() -> Int {
@@ -747,6 +742,18 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
         guard let playlist = activePlaylist(createIfNeeded: false) else { return }
         playlist.updatedAt = Date()
         saveContext()
+    }
+
+    private var currentPlaylist: TTSPlaylist? {
+        if let activePlaylistID {
+            return fetchPlaylist(with: activePlaylistID)
+        }
+
+        if let persistedID = loadPersistedActivePlaylistID() {
+            return fetchPlaylist(with: persistedID)
+        }
+
+        return nil
     }
 
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didStart utterance: AVSpeechUtterance) {
