@@ -455,6 +455,28 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
         )
     }
 
+    func updateEntry(
+        id: PersistentIdentifier,
+        in playlistID: PersistentIdentifier?,
+        text: String,
+        role: String
+    ) {
+        let playlist = playlistID.flatMap { fetchPlaylist(with: $0) } ?? orderedPlaylists().first(where: { playlist in
+            playlist.orderedEntries.contains(where: { $0.persistentModelID == id })
+        })
+
+        guard let playlist,
+              let entry = playlist.orderedEntries.first(where: { $0.persistentModelID == id }) else {
+            vxAtelierPro.log.error("❌ Unable to update missing playlist entry \(id)")
+            return
+        }
+
+        entry.text = text
+        entry.role = role
+        playlist.updatedAt = Date()
+        saveContext()
+    }
+
     private func addEntry(
         role: String,
         text: String,

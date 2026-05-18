@@ -13,7 +13,7 @@ struct TTSControlView: View {
 
     @AppStorage(AppSettings.Keys.ttsRepeatMode) private var repeatMode: String = AppDefaults.ttsRepeatMode
     @State private var presentedPlaylistEditor: PlaylistEditor?
-    @State private var presentedCustomEntryEditor: CustomPlaylistEntryEditor?
+    @State private var presentedPlaylistEntryEditor: PlaylistEntryEditor?
     @State private var pendingPlaylistDeletionID: PersistentIdentifier?
     @State private var focusedPlaylistID: PersistentIdentifier?
     @State private var selectedPlaylistID: PersistentIdentifier?
@@ -44,21 +44,35 @@ struct TTSControlView: View {
                 }
             )
         }
-        .sheet(item: $presentedCustomEntryEditor) { editor in
-            CustomPlaylistEntryEditorSheet(
+        .sheet(item: $presentedPlaylistEntryEditor) { editor in
+            PlaylistEntryEditorSheet(
                 title: editor.title,
+                text: editor.text,
+                role: editor.role,
                 onCancel: {
-                    presentedCustomEntryEditor = nil
+                    presentedPlaylistEntryEditor = nil
                 },
                 onSave: { text, role in
-                    if let playlistID = editor.playlistID {
+                    if let entryID = editor.entryID {
+                        ttsQueue.updateEntry(
+                            id: entryID,
+                            in: editor.playlistID,
+                            text: text,
+                            role: role.rawValue
+                        )
+                    } else if let playlistID = editor.playlistID {
                         ttsQueue.selectPlaylist(id: playlistID)
+                        ttsQueue.addCustomEntry(
+                            text: text,
+                            role: role.rawValue
+                        )
+                    } else {
+                        ttsQueue.addCustomEntry(
+                            text: text,
+                            role: role.rawValue
+                        )
                     }
-                    ttsQueue.addCustomEntry(
-                        text: text,
-                        role: role.rawValue
-                    )
-                    presentedCustomEntryEditor = nil
+                    presentedPlaylistEntryEditor = nil
                 }
             )
         }
@@ -197,12 +211,12 @@ struct TTSControlView: View {
                 }
 
                 Button {
-                    presentCustomEntryEditor(
+                    presentPlaylistEntryEditor(
                         targetPlaylistID: focusedPlaylistID ?? ttsQueue.currentPlaylistID(),
                         playlistName: displayedPlaylist?.name
                     )
                 } label: {
-                    Label("Add Custom Entry", systemImage: "text.badge.plus")
+                    Label("Add Entry", systemImage: "text.badge.plus")
                 }
 
                 Spacer()
@@ -341,7 +355,6 @@ struct TTSControlView: View {
         }
         .padding(.vertical, AppDefaults.paddingSmall)
         .contentShape(Rectangle())
-        .listRowBackground(isSelected ? Color.accentColor.opacity(0.10) : Color.clear)
         .onTapGesture {
             focusedPlaylistID = playlist.persistentModelID
             ttsQueue.selectPlaylist(id: playlist.persistentModelID)
@@ -373,15 +386,15 @@ struct TTSControlView: View {
             Divider()
 
             Button {
-                presentCustomEntryEditor(
+                presentPlaylistEntryEditor(
                     targetPlaylistID: playlist.persistentModelID,
                     playlistName: playlist.name
                 )
             } label: {
                 Label("Add Entry", systemImage: "text.badge.plus")
+                }
             }
         }
-    }
 
     private func playlistEntryRow(item: TTSPlaylistEntry) -> some View {
         let isCurrent = item.persistentModelID == ttsQueue.currentItem?.persistentModelID
@@ -408,12 +421,6 @@ struct TTSControlView: View {
                     .font(.body)
                     .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
-
-                if item.sourceConversationIDString != nil {
-                    Text("Source linked")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
             }
 
             Spacer(minLength: AppDefaults.paddingMedium)
@@ -438,16 +445,6 @@ struct TTSControlView: View {
                 .buttonStyle(.borderless)
                 .disabled(!canMoveEntry(item, by: 1))
                 .help("Move down")
-
-                Button(role: .destructive) {
-                    guard let removeIndex = displayedPlaylistEntryIndex(for: item) else { return }
-                    ttsQueue.remove(at: removeIndex)
-                } label: {
-                    Image(systemName: "trash")
-                        .frame(width: 28, height: 28)
-                }
-                .buttonStyle(.borderless)
-                .help("Remove from playlist")
             }
         }
         .padding(AppDefaults.paddingMedium)
@@ -463,6 +460,51 @@ struct TTSControlView: View {
         .onTapGesture {
             guard let index = displayedPlaylistEntryIndex(for: item) else { return }
             ttsQueue.jumpTo(index)
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button {
+                presentEntryEditor(item: item)
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+            .tint(.accentColor)
+
+            Button(role: .destructive) {
+                guard let removeIndex = displayedPlaylistEntryIndex(for: item) else { return }
+                ttsQueue.remove(at: removeIndex)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .contextMenu {
+            Button {
+                presentEntryEditor(item: item)
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+
+            Button {
+                moveEntry(item, by: -1)
+            } label: {
+                Label("Move Up", systemImage: "chevron.up")
+            }
+            .disabled(!canMoveEntry(item, by: -1))
+
+            Button {
+                moveEntry(item, by: 1)
+            } label: {
+                Label("Move Down", systemImage: "chevron.down")
+            }
+            .disabled(!canMoveEntry(item, by: 1))
+
+            Divider()
+
+            Button(role: .destructive) {
+                guard let removeIndex = displayedPlaylistEntryIndex(for: item) else { return }
+                ttsQueue.remove(at: removeIndex)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
         }
     }
 
@@ -491,10 +533,23 @@ struct TTSControlView: View {
         return destination >= 0 && destination < displayedPlaylistEntries.count
     }
 
-    private func presentCustomEntryEditor(targetPlaylistID: PersistentIdentifier?, playlistName: String?) {
-        presentedCustomEntryEditor = CustomPlaylistEntryEditor(
+    private func presentPlaylistEntryEditor(targetPlaylistID: PersistentIdentifier?, playlistName: String?) {
+        presentedPlaylistEntryEditor = PlaylistEntryEditor(
             title: playlistName.map { "Add Entry to \($0)" } ?? "Add Entry",
-            playlistID: targetPlaylistID
+            text: "",
+            role: .user,
+            playlistID: targetPlaylistID,
+            entryID: nil
+        )
+    }
+
+    private func presentEntryEditor(item: TTSPlaylistEntry) {
+        presentedPlaylistEntryEditor = PlaylistEntryEditor(
+            title: "Edit Entry",
+            text: item.displayText,
+            role: TTSPlaylistRole(rawValue: item.role) ?? .user,
+            playlistID: displayedPlaylist?.persistentModelID ?? focusedPlaylistID ?? ttsQueue.currentPlaylistID(),
+            entryID: item.persistentModelID
         )
     }
 
@@ -641,10 +696,13 @@ private struct PlaylistEditor: Identifiable {
     let playlistID: PersistentIdentifier?
 }
 
-private struct CustomPlaylistEntryEditor: Identifiable {
+private struct PlaylistEntryEditor: Identifiable {
     let id = UUID()
     let title: String
+    let text: String
+    let role: TTSPlaylistRole
     let playlistID: PersistentIdentifier?
+    let entryID: PersistentIdentifier?
 }
 
 private struct PlaylistEditorSheet: View {
@@ -702,14 +760,26 @@ private struct PlaylistEditorSheet: View {
     }
 }
 
-private struct CustomPlaylistEntryEditorSheet: View {
+private struct PlaylistEntryEditorSheet: View {
     let title: String
+    let text: String
+    let role: TTSPlaylistRole
     let onCancel: () -> Void
     let onSave: (String, TTSPlaylistRole) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var draftText: String = ""
-    @State private var draftRole: TTSPlaylistRole = .user
+    @State private var draftText: String
+    @State private var draftRole: TTSPlaylistRole
+
+    init(title: String, text: String, role: TTSPlaylistRole, onCancel: @escaping () -> Void, onSave: @escaping (String, TTSPlaylistRole) -> Void) {
+        self.title = title
+        self.text = text
+        self.role = role
+        self.onCancel = onCancel
+        self.onSave = onSave
+        _draftText = State(initialValue: text)
+        _draftRole = State(initialValue: role)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppDefaults.paddingLarge) {
