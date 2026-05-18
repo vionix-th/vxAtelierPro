@@ -20,20 +20,9 @@ struct TTSControlView: View {
     @State private var activeTab: TTSTab = .player
 
     var body: some View {
-        VStack(spacing: 0) {
-            TabView(selection: $activeTab) {
-                playerTab
-                    .tabItem {
-                        Label("Player", systemImage: "play.circle")
-                    }
-                    .tag(TTSTab.player)
-
-                playlistsTab
-                    .tabItem {
-                        Label("Playlists", systemImage: "music.note.list")
-                    }
-                    .tag(TTSTab.playlists)
-            }
+        VStack(spacing: AppDefaults.paddingLarge) {
+            tabSelector
+            activeTabContent
 
             playlistActionsBar
         }
@@ -108,6 +97,43 @@ struct TTSControlView: View {
         .onChange(of: playlists.map(\.persistentModelID)) { _, _ in
             syncSelection()
         }
+        .padding(AppDefaults.paddingLarge)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var tabSelector: some View {
+        HStack(spacing: AppDefaults.paddingSmall) {
+            tabButton(title: "Player", systemImage: "play.circle", tab: .player)
+            tabButton(title: "Playlists", systemImage: "music.note.list", tab: .playlists)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func tabButton(title: String, systemImage: String, tab: TTSTab) -> some View {
+        Button {
+            activeTab = tab
+        } label: {
+            Label(title, systemImage: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, AppDefaults.paddingMedium)
+                .padding(.vertical, AppDefaults.paddingSmall)
+                .foregroundStyle(activeTab == tab ? Color.accentColor : Color.secondary)
+                .background(
+                    RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium, style: .continuous)
+                        .fill(activeTab == tab ? Color.accentColor.opacity(0.12) : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var activeTabContent: some View {
+        switch activeTab {
+        case .player:
+            playerTab
+        case .playlists:
+            playlistsTab
+        }
     }
 
     private var playerTab: some View {
@@ -145,23 +171,22 @@ struct TTSControlView: View {
     private var playlistActionsBar: some View {
         VStack(spacing: AppDefaults.paddingSmall) {
             Divider()
-        HStack(spacing: AppDefaults.paddingMedium) {
-            
-            if playlists.isEmpty {
-                Text("No playlists")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                Picker("", selection: playlistSelectionBinding) {
-                    ForEach(playlists) { playlist in
-                        Text(playlist.name)
-                            .tag(Optional(playlist.persistentModelID))
+            HStack(spacing: AppDefaults.paddingMedium) {
+                if playlists.isEmpty {
+                    Text("No playlists")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Picker("", selection: playlistSelectionBinding) {
+                        ForEach(playlists) { playlist in
+                            Text(playlist.name)
+                                .tag(Optional(playlist.persistentModelID))
+                        }
                     }
+                    .pickerStyle(.menu)
                 }
-                .pickerStyle(.menu)
-            }
-            
-            Button {
+
+                Button {
                     presentedPlaylistEditor = PlaylistEditor(
                         title: "New Playlist",
                         name: suggestedPlaylistName(),
@@ -187,9 +212,9 @@ struct TTSControlView: View {
                     .foregroundStyle(.secondary)
             }
             .padding(.horizontal, AppDefaults.paddingLarge)
-            .padding(.bottom, AppDefaults.paddingMedium)
+            .padding(.vertical, AppDefaults.paddingSmall)
         }
-        .background(.regularMaterial)
+        .padding(.top, AppDefaults.paddingSmall)
     }
 
     private var transportCard: some View {
