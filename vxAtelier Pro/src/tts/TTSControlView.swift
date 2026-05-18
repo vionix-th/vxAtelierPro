@@ -21,10 +21,7 @@ struct TTSControlView: View {
     @State private var isExportingPlaylistAudio = false
     @State private var exportingPlaylistAudioName: String?
     @State private var playlistAudioExportTask: Task<Void, Never>?
-    @State private var showPlaylistImportError = false
-    @State private var playlistImportErrorMessage = ""
-    @State private var showPlaylistExportError = false
-    @State private var playlistExportErrorMessage = ""
+    @State private var activeAlert: TTSControlAlert?
 
     var body: some View {
         ZStack {
@@ -88,10 +85,7 @@ struct TTSControlView: View {
             }
             .confirmationDialog(
                 "Delete Playlist",
-                isPresented: Binding(
-                    get: { pendingPlaylistDeletionID != nil },
-                    set: { if !$0 { pendingPlaylistDeletionID = nil } }
-                ),
+                isPresented: deletePlaylistConfirmationBinding,
                 titleVisibility: .visible
             ) {
                 Button("Delete", role: .destructive) {
@@ -115,24 +109,13 @@ struct TTSControlView: View {
             .fileImporter(
                 isPresented: $isImportingPlaylist,
                 allowedContentTypes: [.json]
-            ) { result in
-                switch result {
-                case .success(let url):
-                    Task { await importPlaylist(from: url) }
-                case .failure(let error):
-                    playlistImportErrorMessage = error.localizedDescription
-                    showPlaylistImportError = true
-                }
-            }
-            .alert("Playlist Import", isPresented: $showPlaylistImportError, presenting: playlistImportErrorMessage) { _ in
-                Button("OK") { }
-            } message: { message in
-                Text(message)
-            }
-            .alert("Playlist Export", isPresented: $showPlaylistExportError, presenting: playlistExportErrorMessage) { _ in
-                Button("OK") { }
-            } message: { message in
-                Text(message)
+            ) { result in handlePlaylistImportResult(result) }
+            .alert(item: $activeAlert) { alert in
+                Alert(
+                    title: Text(alert.title),
+                    message: Text(alert.message),
+                    dismissButton: .default(Text("OK"))
+                )
             }
             .onAppear {
                 syncSelection()
@@ -144,7 +127,7 @@ struct TTSControlView: View {
                 syncSelection()
             }
             .padding(AppDefaults.paddingLarge)
-            .background(Color(nsColor: .windowBackgroundColor))
+            .background(platformWindowBackgroundColor)
             .disabled(isExportingPlaylistAudio)
 
             if isExportingPlaylistAudio {
@@ -214,8 +197,8 @@ struct TTSControlView: View {
         .background(
             LinearGradient(
                 colors: [
-                    Color(nsColor: .windowBackgroundColor),
-                    Color(nsColor: .controlBackgroundColor)
+                    platformWindowBackgroundColor,
+                    platformControlBackgroundColor
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -286,7 +269,9 @@ struct TTSControlView: View {
                 startPlaylistAudioExport()
             },
             onExportJSON: {
-                Task { await exportSelectedPlaylistJSON() }
+                Task { @MainActor in
+                    await exportSelectedPlaylistJSON()
+                }
             }
         )
     }
@@ -375,6 +360,7 @@ struct TTSControlView: View {
         ttsQueue.playPlaylist(id: playlistID)
     }
 
+    @MainActor
     private func exportSelectedPlaylistJSON() async {
         guard let playlist = displayedPlaylist else { return }
         do {
@@ -383,23 +369,28 @@ struct TTSControlView: View {
         } catch is FileHelper.FileError {
             vxAtelierPro.log.debug("Playlist JSON export cancelled for '\(playlist.name)'.")
         } catch {
-            playlistExportErrorMessage = "Failed to export playlist JSON: \(error.localizedDescription)"
-            showPlaylistExportError = true
+            activeAlert = TTSControlAlert(
+                title: "Playlist Export",
+                message: "Failed to export playlist JSON: \(error.localizedDescription)"
+            )
             vxAtelierPro.log.error("Failed to export playlist '\(playlist.name)': \(error.localizedDescription)")
         }
     }
 
+    @MainActor
     private func exportSelectedPlaylistAudio() async {
-        guard let playlist = displayedPlaylist else { return }
+        guard let playlistID = selectedPlaylistID,
+              let playlist = playlists.first(where: { $0.persistentModelID == playlistID }) else { return }
+        let playlistName = playlist.name
         do {
             #if os(macOS)
             let destinationURL = try await FileHelper.shared.selectSaveURL(
-                filename: playlist.name,
+                filename: playlistName,
                 allowedContentTypes: [.mpeg4Audio]
             )
 
             isExportingPlaylistAudio = true
-            exportingPlaylistAudioName = playlist.name
+            exportingPlaylistAudioName = playlistName
 
             defer {
                 isExportingPlaylistAudio = false
@@ -407,10 +398,10 @@ struct TTSControlView: View {
                 exportingPlaylistAudioName = nil
             }
 
-            try await DataManager.shared.exportPlaylistAudio(playlist, into: modelContext, to: destinationURL)
+            try await exportPlaylistAudio(playlistID: playlistID, to: destinationURL)
             #else
             isExportingPlaylistAudio = true
-            exportingPlaylistAudioName = playlist.name
+            exportingPlaylistAudioName = playlistName
 
             defer {
                 isExportingPlaylistAudio = false
@@ -419,28 +410,44 @@ struct TTSControlView: View {
             }
 
             try await FileHelper.shared.save(
-                filename: playlist.name,
+                filename: playlistName,
                 allowedContentTypes: [.mpeg4Audio]
             ) { destinationURL in
-                try await DataManager.shared.exportPlaylistAudio(playlist, into: modelContext, to: destinationURL)
+                try await exportPlaylistAudio(playlistID: playlistID, to: destinationURL)
             }
             #endif
 
-            vxAtelierPro.log.info("Exported playlist audio for '\(playlist.name)'.")
+            vxAtelierPro.log.info("Exported playlist audio for '\(playlistName)'.")
         } catch is CancellationError {
-            vxAtelierPro.log.debug("Playlist audio export cancelled for '\(playlist.name)'.")
+            vxAtelierPro.log.debug("Playlist audio export cancelled for '\(playlistName)'.")
         } catch is FileHelper.FileError {
-            vxAtelierPro.log.debug("Playlist audio export cancelled for '\(playlist.name)'.")
+            vxAtelierPro.log.debug("Playlist audio export cancelled for '\(playlistName)'.")
         } catch {
-            playlistExportErrorMessage = "Failed to export playlist audio: \(error.localizedDescription)"
-            showPlaylistExportError = true
-            vxAtelierPro.log.error("Failed to export playlist audio for '\(playlist.name)': \(error.localizedDescription)")
+            activeAlert = TTSControlAlert(
+                title: "Playlist Export",
+                message: "Failed to export playlist audio: \(error.localizedDescription)"
+            )
+            vxAtelierPro.log.error("Failed to export playlist audio for '\(playlistName)': \(error.localizedDescription)")
         }
     }
 
+    @MainActor
+    private func exportPlaylistAudio(
+        playlistID: PersistentIdentifier,
+        to destinationURL: URL
+    ) async throws {
+        guard let playlist = playlists.first(where: { $0.persistentModelID == playlistID }) else {
+            throw LLMProviderError.invalidConfiguration("Playlist not found.")
+        }
+        try await DataManager.shared.exportPlaylistAudio(playlist, into: modelContext, to: destinationURL)
+    }
+
+    @MainActor
     private func startPlaylistAudioExport() {
         guard !isExportingPlaylistAudio else { return }
-        playlistAudioExportTask = Task { await exportSelectedPlaylistAudio() }
+        playlistAudioExportTask = Task { @MainActor in
+            await exportSelectedPlaylistAudio()
+        }
     }
 
     private func importPlaylist(from url: URL) async {
@@ -450,8 +457,10 @@ struct TTSControlView: View {
             ttsQueue.selectPlaylist(id: playlist.persistentModelID)
             vxAtelierPro.log.info("Imported playlist '\(playlist.name)'.")
         } catch {
-            playlistImportErrorMessage = error.localizedDescription
-            showPlaylistImportError = true
+            activeAlert = TTSControlAlert(
+                title: "Playlist Import",
+                message: error.localizedDescription
+            )
             vxAtelierPro.log.error("Failed to import playlist: \(error.localizedDescription)")
         }
     }
@@ -460,4 +469,51 @@ struct TTSControlView: View {
         selectedPlaylistID = playlistID
         ttsQueue.selectPlaylist(id: playlistID)
     }
+
+    private func handlePlaylistImportResult(_ result: Result<URL, Error>) {
+        switch result {
+        case .success(let url):
+            Task { @MainActor in
+                await importPlaylist(from: url)
+            }
+        case .failure(let error):
+            activeAlert = TTSControlAlert(
+                title: "Playlist Import",
+                message: error.localizedDescription
+            )
+        }
+    }
+
+    private var deletePlaylistConfirmationBinding: Binding<Bool> {
+        Binding(
+            get: { pendingPlaylistDeletionID != nil },
+            set: { presented in
+                if !presented {
+                    pendingPlaylistDeletionID = nil
+                }
+            }
+        )
+    }
+
+    private var platformWindowBackgroundColor: Color {
+        #if os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+        #else
+        Color(uiColor: .systemBackground)
+        #endif
+    }
+
+    private var platformControlBackgroundColor: Color {
+        #if os(macOS)
+        Color(nsColor: .controlBackgroundColor)
+        #else
+        Color(uiColor: .secondarySystemBackground)
+        #endif
+    }
+}
+
+private struct TTSControlAlert: Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
 }

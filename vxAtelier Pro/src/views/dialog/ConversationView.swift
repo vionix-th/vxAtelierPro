@@ -213,7 +213,7 @@ struct ConversationView: View {
         .disabled(selectedMessages.isEmpty)
 
         Button {
-            Task {
+            Task { @MainActor in
                 await exportSelectedMessages()
             }
         } label: {
@@ -495,6 +495,7 @@ struct ConversationView: View {
         exitSelectionMode()
     }
 
+    @MainActor
     private func exportSelectedMessages() async {
         guard let conversation else { return }
 

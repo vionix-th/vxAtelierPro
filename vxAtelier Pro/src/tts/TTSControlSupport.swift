@@ -155,7 +155,7 @@ struct TextEditorWithPlaceholder: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous)
-                .fill(Color(nsColor: .textBackgroundColor))
+                .fill(platformTextBackgroundColor)
 
             TextEditor(text: $text)
                 .scrollContentBackground(.hidden)
@@ -169,5 +169,13 @@ struct TextEditorWithPlaceholder: View {
                     .allowsHitTesting(false)
             }
         }
+    }
+
+    private var platformTextBackgroundColor: Color {
+        #if os(macOS)
+        Color(nsColor: .textBackgroundColor)
+        #else
+        Color(uiColor: .secondarySystemBackground)
+        #endif
     }
 }

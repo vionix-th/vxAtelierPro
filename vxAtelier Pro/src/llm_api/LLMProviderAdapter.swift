@@ -29,7 +29,7 @@ struct LLMStreamCompletionPolicy {
 /// - Emit `.runCompleted` exactly once for complete provider responses, or throw if the provider stream ends before a required completion event.
 /// - Emit tool-call deltas and completed calls using provider order indexes so `LLMToolCallAssembler` can merge fragments deterministically.
 /// - Return model candidates using provider metadata and bundled model defaults; throw for unsupported model listing instead of fabricating models.
-typealias LLMToolExecutionHandler = @Sendable (_ toolName: String, _ argumentsJSON: String) async throws -> String
+typealias LLMToolExecutionHandler = @MainActor @Sendable (_ toolName: String, _ argumentsJSON: String) async throws -> String
 
 protocol LLMProviderAdapter {
     var profile: LLMProviderProfile { get }
