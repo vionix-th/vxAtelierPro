@@ -350,9 +350,7 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
         guard !entries.isEmpty else {
             return nil
         }
-        if currentIndex >= entries.count {
-            currentIndex = entries.count - 1
-        }
+        guard currentIndex >= 0 && currentIndex < entries.count else { return nil }
         return entries[currentIndex]
     }
 

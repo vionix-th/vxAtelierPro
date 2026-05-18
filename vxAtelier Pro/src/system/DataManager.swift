@@ -285,6 +285,18 @@ class DataManager {
     }
 
     @MainActor
+    func exportPlaylistAudio(_ playlist: TTSPlaylist, into context: ModelContext, to destinationURL: URL) async throws {
+        let pauseBetweenEntriesMs = UserDefaults.standard.object(forKey: AppSettings.Keys.ttsEntryPauseMs) as? Int
+            ?? AppDefaults.ttsEntryPauseMs
+        let exportService = TTSPlaylistAudioExportService(modelContext: context)
+        try await exportService.export(
+            playlist: playlist,
+            pauseBetweenEntriesMs: pauseBetweenEntriesMs,
+            to: destinationURL
+        )
+    }
+
+    @MainActor
     func importPlaylist(from url: URL, into context: ModelContext) async throws -> TTSPlaylist {
         let didStartAccessing = url.startAccessingSecurityScopedResource()
         defer {

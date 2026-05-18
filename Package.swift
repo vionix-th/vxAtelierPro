@@ -142,8 +142,11 @@ let package = Package(
                 "system/QueryManager.swift",
                 "system/StatusBarLayoutStyle.swift",
                 // TTS
-                "tts/control/TTSControlView.swift",
-                "tts/control/TTSControlSupport.swift",
+                "tts/TTSControlView.swift",
+                "tts/TTSControlSupport.swift",
+                "tts/TTSPlaylistAudioExportRenderer.swift",
+                "tts/TTSPlaylistAudioExportService.swift",
+                "tts/TTSControlSubviews.swift",
                 "tts/TTSPlaylistModels.swift",
                 "tts/TTSSystem.swift",
                 // Logging

@@ -20,19 +20,26 @@ class FileHelper: NSObject {
     ///   - data: The data to save (e.g., JSON data)
     ///   - filename: Suggested filename for the save dialog
     func save(data: Data, filename: String) async throws {
+        try await save(data: data, filename: filename, allowedContentTypes: [.json])
+    }
+
+    func save(data: Data, filename: String, allowedContentTypes: [UTType]) async throws {
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = filename
-        panel.allowedContentTypes = [.json] // Restrict to JSON files
+        panel.nameFieldStringValue = normalizedFilename(filename, allowedContentTypes: allowedContentTypes)
+        panel.allowedContentTypes = allowedContentTypes
         
         // Show the save panel and wait for user response
         let response = await panel.begin()
         guard response == .OK, let url = panel.url else {
-            vxAtelierPro.log.warning("User cancelled save panel for file '", file: #file, function: #function, line: #line)
+            vxAtelierPro.log.warning("User cancelled save panel for file '\(filename)'", file: #file, function: #function, line: #line)
             throw FileError.cancelled
         }
         
         // Write the data to the selected file
         do {
+            if FileManager.default.fileExists(atPath: url.path) {
+                try FileManager.default.removeItem(at: url)
+            }
             try data.write(to: url)
             vxAtelierPro.log.info("Successfully saved file to \(url.path)", file: #file, function: #function, line: #line)
         } catch {
@@ -40,7 +47,48 @@ class FileHelper: NSObject {
             throw error
         }
     }
-    
+
+    func save(
+        filename: String,
+        allowedContentTypes: [UTType],
+        writing: @escaping @Sendable (URL) async throws -> Void
+    ) async throws {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = normalizedFilename(filename, allowedContentTypes: allowedContentTypes)
+        panel.allowedContentTypes = allowedContentTypes
+
+        let response = await panel.begin()
+        guard response == .OK, let url = panel.url else {
+            vxAtelierPro.log.warning("User cancelled save panel for file '\(filename)'", file: #file, function: #function, line: #line)
+            throw FileError.cancelled
+        }
+
+        do {
+            if FileManager.default.fileExists(atPath: url.path) {
+                try FileManager.default.removeItem(at: url)
+            }
+            try await writing(url)
+            vxAtelierPro.log.info("Successfully saved file to \(url.path)", file: #file, function: #function, line: #line)
+        } catch {
+            vxAtelierPro.log.error("Failed to save file to \(url.path): \(error.localizedDescription)", file: #file, function: #function, line: #line)
+            throw error
+        }
+    }
+
+    func selectSaveURL(filename: String, allowedContentTypes: [UTType]) async throws -> URL {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = normalizedFilename(filename, allowedContentTypes: allowedContentTypes)
+        panel.allowedContentTypes = allowedContentTypes
+
+        let response = await panel.begin()
+        guard response == .OK, let url = panel.url else {
+            vxAtelierPro.log.warning("User cancelled save panel for file '\(filename)'", file: #file, function: #function, line: #line)
+            throw FileError.cancelled
+        }
+
+        return url
+    }
+
     /// Loads data from a file on macOS using NSOpenPanel
     /// - Returns: The data from the selected file
     func load() async throws -> Data {
@@ -77,8 +125,14 @@ class FileHelper: NSObject {
     ///   - data: The data to save (e.g., JSON data)
     ///   - filename: Suggested filename for the save operation
     func save(data: Data, filename: String) async throws {
+        try await save(data: data, filename: filename, allowedContentTypes: [.json])
+    }
+
+    func save(data: Data, filename: String, allowedContentTypes: [UTType]) async throws {
         // Create a temporary file to hold the data
-        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+            normalizedFilename(filename, allowedContentTypes: allowedContentTypes)
+        )
         do {
             try data.write(to: tempURL)
         } catch {
@@ -112,6 +166,50 @@ class FileHelper: NSObject {
         }
         
         // Clean up the temporary file
+        try? FileManager.default.removeItem(at: tempURL)
+    }
+
+    func save(
+        filename: String,
+        allowedContentTypes: [UTType],
+        writing: @escaping @Sendable (URL) async throws -> Void
+    ) async throws {
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+            normalizedFilename(filename, allowedContentTypes: allowedContentTypes)
+        )
+
+        do {
+            if FileManager.default.fileExists(atPath: tempURL.path) {
+                try FileManager.default.removeItem(at: tempURL)
+            }
+            try await writing(tempURL)
+        } catch {
+            try? FileManager.default.removeItem(at: tempURL)
+            throw error
+        }
+
+        let picker = UIDocumentPickerViewController(forExporting: [tempURL])
+        picker.delegate = self
+
+        guard let rootVC = rootViewController() else {
+            vxAtelierPro.log.warning("No root view controller found for saving file", file: #file, function: #function, line: #line)
+            throw FileError.noViewController
+        }
+        rootVC.present(picker, animated: true)
+
+        do {
+            try await withCheckedThrowingContinuation { continuation in
+                self.saveContinuation = continuation
+            }
+            vxAtelierPro.log.info("Successfully saved file via document picker", file: #file, function: #function, line: #line)
+        } catch FileError.cancelled {
+            vxAtelierPro.log.warning("User cancelled document picker for saving file", file: #file, function: #function, line: #line)
+            throw FileError.cancelled
+        } catch {
+            vxAtelierPro.log.error("Failed to save file via document picker: \(error.localizedDescription)", file: #file, function: #function, line: #line)
+            throw error
+        }
+
         try? FileManager.default.removeItem(at: tempURL)
     }
     
@@ -175,6 +273,24 @@ class FileHelper: NSObject {
         return nil
     }
 #endif
+
+    private func normalizedFilename(_ filename: String, allowedContentTypes: [UTType]) -> String {
+        let trimmed = filename.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return "export"
+        }
+
+        let url = URL(fileURLWithPath: trimmed)
+        guard url.pathExtension.isEmpty else {
+            return trimmed
+        }
+
+        guard let extensionName = allowedContentTypes.first?.preferredFilenameExtension else {
+            return trimmed
+        }
+
+        return "\(trimmed).\(extensionName)"
+    }
     
     // MARK: - Error Types
     /// Errors that can occur during file operations
