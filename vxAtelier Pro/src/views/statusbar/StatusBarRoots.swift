@@ -24,10 +24,9 @@ struct StatusBarInline: View {
                 onClearFilters: onClearFilters,
                 onRequestLogHistory: onRequestLogHistory
             )
+            .padding(.leading, AppDefaults.paddingSmall)
 
-            if let conversationID {
-                Spacer(minLength: 0)
-            }
+            Spacer(minLength: 0)
 
             StatusBarInfoStrip(
                 conversationID: conversationID,
@@ -38,6 +37,7 @@ struct StatusBarInline: View {
                 onToggleStreaming: conversationID.map { conversationID in { enabled in onToggleStreaming(conversationID, enabled) } },
                 onRequestTTS: onRequestTTS
             )
+            .padding(.trailing, AppDefaults.paddingMedium)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.secondary.opacity(0.1))
@@ -127,7 +127,6 @@ private struct StatusBarInfoStrip: View {
         }
         .padding(.horizontal, AppDefaults.paddingMedium)
         .padding(.vertical, AppDefaults.paddingSmall)
-        .background(Color.secondary.opacity(AppDefaults.sectionBackgroundOpacity / 2))
         }
     }
 
@@ -146,29 +145,17 @@ private struct StatusBarTTSStrip: View {
     let onRequestTTS: () -> Void
     let dense: Bool
 
-    private var statusColor: Color {
-        isPlaying ? .green : .secondary
-    }
-
     private var statusLabel: String {
         isPlaying ? "TTS Playing" : "TTS Ready"
     }
 
     var body: some View {
         HStack(spacing: AppDefaults.paddingSmall) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: dense ? 5 : 6, height: dense ? 5 : 6)
-                .help(statusLabel)
-
-            Text("TTS")
-                .font(dense ? .caption : .subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
-
             Button(action: onTogglePlayback) {
                 Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                     .font(.caption.weight(.semibold))
                     .frame(width: dense ? 20 : 22, height: dense ? 20 : 22)
+                    .foregroundStyle(isPlaying ? .green : .primary)
             }
             .buttonStyle(.plain)
             .help(isPlaying ? "Pause TTS playback" : "Resume TTS playback")
@@ -183,7 +170,6 @@ private struct StatusBarTTSStrip: View {
         }
         .padding(.horizontal, AppDefaults.paddingSmall)
         .padding(.vertical, AppDefaults.paddingSmall / 2)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusSmall, style: .continuous))
     }
 }
 
@@ -226,4 +212,10 @@ struct StatusBarLogStrip: View {
         }
         .padding(.leading, AppDefaults.paddingMedium)
     }
+}
+
+#Preview{
+    AppShellView()
+        .bootstrapped(with: .preview())
+        .frame(width: 800, height:640)
 }

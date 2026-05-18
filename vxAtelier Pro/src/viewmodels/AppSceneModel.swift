@@ -122,13 +122,6 @@ final class AppSceneModel {
         utilityPanelRequestID = UUID()
     }
 
-    func handleTTSPlayback(isPlaying: Bool) {
-        if isPlaying {
-            vxAtelierPro.log.info("TTS playback started")
-            requestTTS()
-        }
-    }
-
     private func presentSheet(_ sheet: PresentedSheet) {
         pendingSheetTask?.cancel()
         pendingSheetTask = Task { @MainActor in

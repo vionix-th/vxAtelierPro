@@ -4,7 +4,6 @@ import SwiftUI
 
 struct AppShellView: View {
     @Environment(QueryManager.self) private var queryManager
-    @Environment(TTSQueue.self) private var ttsQueue
     @Environment(AppSceneModel.self) private var sceneModel
 #if os(macOS)
     @Environment(\.openWindow) private var openWindow
@@ -29,9 +28,6 @@ struct AppShellView: View {
             if statusBarVisible {
                 StatusBar()
             }
-        }
-        .onChange(of: ttsQueue.isPlaying) { _, _ in
-            sceneModel.handleTTSPlayback(isPlaying: ttsQueue.isPlaying)
         }
         .task(id: scene.exportTaskID) { await scene.exportTask() }
         .task(id: scene.importRequestFlag) { await scene.importTask() }
