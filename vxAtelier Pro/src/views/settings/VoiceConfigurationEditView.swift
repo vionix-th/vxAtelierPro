@@ -86,9 +86,22 @@ struct VoiceConfigurationEditView: View {
                     }
                 }
 
-                SettingsPickerRow("Speech Rate", selection: $speechRate) {
-                    ForEach(speechRatePresets, id: \.value) { preset in
-                        Text(preset.label).tag(preset.value)
+                LabeledContent("Speech Rate") {
+                    ViewThatFits(in: .horizontal) {
+                        Picker("", selection: $speechRate) {
+                            ForEach(speechRatePresets, id: \.value) { preset in
+                                Text(preset.label).tag(preset.value)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+
+                        Picker("Speech Rate", selection: $speechRate) {
+                            ForEach(speechRatePresets, id: \.value) { preset in
+                                Text(preset.label).tag(preset.value)
+                            }
+                        }
+                        .pickerStyle(.menu)
                     }
                 }
 

@@ -38,31 +38,33 @@ struct PlaylistEditorSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AppDefaults.paddingLarge) {
-            Text(title)
-                .font(.title3.weight(.semibold))
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppDefaults.paddingLarge) {
+                Text(title)
+                    .font(.title3.weight(.semibold))
 
-            TextField("Playlist name", text: $draftName)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit(save)
+                TextField("Playlist name", text: $draftName)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit(save)
 
-            HStack(spacing: AppDefaults.paddingSmall) {
-                Spacer(minLength: 0)
+                HStack(spacing: AppDefaults.paddingSmall) {
+                    Spacer(minLength: 0)
 
-                Button("Cancel") {
-                    onCancel()
-                    dismiss()
+                    Button("Cancel") {
+                        onCancel()
+                        dismiss()
+                    }
+
+                    Button("Save") {
+                        save()
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!canSave)
                 }
-
-                Button("Save") {
-                    save()
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(!canSave)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(AppDefaults.paddingLarge)
-        .frame(minWidth: 360, minHeight: 180)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous))
     }
 
@@ -99,41 +101,52 @@ struct PlaylistEntryEditorSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AppDefaults.paddingLarge) {
-            Text(title)
-                .font(.title3.weight(.semibold))
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppDefaults.paddingLarge) {
+                Text(title)
+                    .font(.title3.weight(.semibold))
 
-            TextEditorWithPlaceholder(
-                text: $draftText,
-                placeholder: "Enter the entry text"
-            )
-            .frame(minHeight: 180)
+                TextEditorWithPlaceholder(
+                    text: $draftText,
+                    placeholder: "Enter the entry text"
+                )
+                .frame(minHeight: 180)
 
-            Picker("", selection: $draftRole) {
-                ForEach(TTSPlaylistRole.allCases) { role in
-                    Text(role.displayName).tag(role)
+                ViewThatFits(in: .horizontal) {
+                    Picker("", selection: $draftRole) {
+                        ForEach(TTSPlaylistRole.allCases) { role in
+                            Text(role.displayName).tag(role)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+
+                    Picker("Role", selection: $draftRole) {
+                        ForEach(TTSPlaylistRole.allCases) { role in
+                            Text(role.displayName).tag(role)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+
+                HStack(spacing: AppDefaults.paddingSmall) {
+                    Spacer(minLength: 0)
+
+                    Button("Cancel") {
+                        onCancel()
+                        dismiss()
+                    }
+
+                    Button("Save") {
+                        save()
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!canSave)
                 }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-
-            HStack(spacing: AppDefaults.paddingSmall) {
-                Spacer(minLength: 0)
-
-                Button("Cancel") {
-                    onCancel()
-                    dismiss()
-                }
-
-                Button("Save") {
-                    save()
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(!canSave)
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(AppDefaults.paddingLarge)
-        .frame(minWidth: 460, minHeight: 340)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous))
     }
 

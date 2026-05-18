@@ -44,21 +44,60 @@ struct TTSControlPlaylistActionsBar: View {
     var body: some View {
         VStack(spacing: AppDefaults.paddingSmall) {
             Divider()
-            HStack(spacing: AppDefaults.paddingMedium) {
-                if playlists.isEmpty {
-                    Text("No playlists")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Picker("", selection: selectedPlaylistID) {
-                        ForEach(playlists) { playlist in
-                            Text(playlist.name)
-                                .tag(Optional(playlist.persistentModelID))
-                        }
-                    }
-                    .pickerStyle(.menu)
+            ViewThatFits(in: .horizontal) {
+                fullWidthActionsRow
+                compactActionsRow
+            }
+            .padding(.horizontal, AppDefaults.paddingLarge)
+            .padding(.vertical, AppDefaults.paddingSmall)
+        }
+        .padding(.top, AppDefaults.paddingSmall)
+    }
+
+    private var fullWidthActionsRow: some View {
+        HStack(spacing: AppDefaults.paddingMedium) {
+            playlistPicker
+
+            Button(action: onNewPlaylist) {
+                Label("New Playlist", systemImage: "plus")
+            }
+
+            Button(action: onAddEntry) {
+                Label("Add Entry", systemImage: "text.badge.plus")
+            }
+
+            if isPlaylistTabActive {
+                Button(action: onImportPlaylist) {
+                    Label("Import Playlist", systemImage: "square.and.arrow.down")
                 }
 
+                Menu {
+                    Button(action: onExportAudio) {
+                        Label("Export Audio", systemImage: "waveform")
+                    }
+
+                    Button(action: onExportJSON) {
+                        Label("Export JSON", systemImage: "doc")
+                    }
+                } label: {
+                    Label("Export Playlist", systemImage: "square.and.arrow.up")
+                }
+                .disabled(playlists.isEmpty || isExportingPlaylistAudio)
+            }
+
+            Spacer(minLength: 0)
+
+            Text("\(playlists.count) total")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var compactActionsRow: some View {
+        HStack(spacing: AppDefaults.paddingMedium) {
+            playlistPicker
+
+            Menu {
                 Button(action: onNewPlaylist) {
                     Label("New Playlist", systemImage: "plus")
                 }
@@ -72,30 +111,70 @@ struct TTSControlPlaylistActionsBar: View {
                         Label("Import Playlist", systemImage: "square.and.arrow.down")
                     }
 
-                    Menu {
-                        Button(action: onExportAudio) {
-                            Label("Export Audio", systemImage: "waveform")
-                        }
-
-                        Button(action: onExportJSON) {
-                            Label("Export JSON", systemImage: "doc")
-                        }
-                    } label: {
-                        Label("Export Playlist", systemImage: "square.and.arrow.up")
+                    Button(action: onExportAudio) {
+                        Label("Export Audio", systemImage: "waveform")
                     }
                     .disabled(playlists.isEmpty || isExportingPlaylistAudio)
+
+                    Button(action: onExportJSON) {
+                        Label("Export JSON", systemImage: "doc")
+                    }
+                    .disabled(playlists.isEmpty)
                 }
-
-                Spacer(minLength: 0)
-
-                Text("\(playlists.count) total")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .frame(width: 44, height: 44)
             }
-            .padding(.horizontal, AppDefaults.paddingLarge)
-            .padding(.vertical, AppDefaults.paddingSmall)
+            .buttonStyle(.bordered)
+
+            Spacer(minLength: 0)
+
+            Text("\(playlists.count) total")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
-        .padding(.top, AppDefaults.paddingSmall)
+    }
+
+    @ViewBuilder
+    private var playlistPicker: some View {
+        if playlists.isEmpty {
+            Text("No playlists")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else {
+            ViewThatFits(in: .horizontal) {
+                Picker("", selection: selectedPlaylistID) {
+                    ForEach(playlists) { playlist in
+                        Text(playlist.name)
+                            .tag(Optional(playlist.persistentModelID))
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Menu {
+                    ForEach(playlists) { playlist in
+                        Button {
+                            selectedPlaylistID.wrappedValue = Optional(playlist.persistentModelID)
+                        } label: {
+                            Text(playlist.name)
+                        }
+                    }
+                } label: {
+                    Label(selectedPlaylistDisplayName, systemImage: "music.note.list")
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: 160, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    private var selectedPlaylistDisplayName: String {
+        guard let selectedPlaylistID = selectedPlaylistID.wrappedValue,
+              let playlist = playlists.first(where: { $0.persistentModelID == selectedPlaylistID }) else {
+            return "Select Playlist"
+        }
+        return playlist.name
     }
 }
 
@@ -122,53 +201,90 @@ struct TTSControlPlayerCard: View {
 
             progressBar
 
-            HStack(spacing: AppDefaults.paddingMedium) {
-                Button(action: onPrevious) {
-                    Image(systemName: "backward.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .frame(width: 32, height: 32)
-                }
+            ViewThatFits(in: .horizontal) {
+                horizontalControls
+                compactControls
+            }
+        }
+        .padding(AppDefaults.paddingLarge)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous))
+    }
+
+    private var horizontalControls: some View {
+        HStack(spacing: AppDefaults.paddingMedium) {
+            controlButton(systemImage: "backward.fill", size: 13, action: onPrevious)
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
                 .tint(.secondary)
                 .disabled(previousDisabled)
 
-                Button(action: onPlayPause) {
-                    Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                        .frame(width: 40, height: 40)
-                }
+            controlButton(systemImage: isPlaying ? "pause.fill" : "play.fill", size: 16, action: onPlayPause)
                 .buttonStyle(.borderedProminent)
                 .controlSize(.regular)
                 .disabled(!canPlay)
 
-                Button(action: onNext) {
-                    Image(systemName: "forward.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .frame(width: 32, height: 32)
-                }
+            controlButton(systemImage: "forward.fill", size: 13, action: onNext)
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
                 .tint(.secondary)
                 .disabled(nextDisabled)
 
-                Spacer(minLength: 0)
+            Spacer(minLength: 0)
 
-                Menu {
-                    Button("Repeat Off") { repeatMode = "none" }
-                    Button("Repeat One") { repeatMode = "one" }
-                    Button("Repeat All") { repeatMode = "all" }
-                } label: {
-                    Image(systemName: repeatModeIcon)
-                        .font(.system(size: 13, weight: .semibold))
-                        .frame(width: 28, height: 28)
-                }
-                .buttonStyle(.bordered)
-                .help(repeatModeTitle)
+            repeatModeMenu
+        }
+    }
+
+    private var compactControls: some View {
+        VStack(spacing: AppDefaults.paddingSmall) {
+            HStack(spacing: AppDefaults.paddingSmall) {
+                controlButton(systemImage: "backward.fill", size: 13, action: onPrevious)
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                    .tint(.secondary)
+                    .disabled(previousDisabled)
+
+                controlButton(systemImage: isPlaying ? "pause.fill" : "play.fill", size: 16, action: onPlayPause)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.regular)
+                    .disabled(!canPlay)
+
+                controlButton(systemImage: "forward.fill", size: 13, action: onNext)
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                    .tint(.secondary)
+                    .disabled(nextDisabled)
+
+                Spacer(minLength: 0)
+            }
+
+            HStack {
+                Spacer(minLength: 0)
+                repeatModeMenu
             }
         }
-        .padding(AppDefaults.paddingLarge)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous))
+    }
+
+    private func controlButton(systemImage: String, size: CGFloat, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: size, weight: .semibold))
+                .frame(width: 44, height: 44)
+        }
+    }
+
+    private var repeatModeMenu: some View {
+        Menu {
+            Button("Repeat Off") { repeatMode = "none" }
+            Button("Repeat One") { repeatMode = "one" }
+            Button("Repeat All") { repeatMode = "all" }
+        } label: {
+            Image(systemName: repeatModeIcon)
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 44, height: 44)
+        }
+        .buttonStyle(.bordered)
+        .help(repeatModeTitle)
     }
 
     private var progressBar: some View {
@@ -273,7 +389,7 @@ struct TTSControlPlaylistRow: View {
             ZStack {
                 RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium, style: .continuous)
                     .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.12))
-                    .frame(width: 34, height: 34)
+                    .frame(width: 44, height: 44)
 
                 Image(systemName: isSelected ? "play.fill" : "music.note.list")
                     .font(.system(size: 13, weight: .semibold))
@@ -293,6 +409,7 @@ struct TTSControlPlaylistRow: View {
             Button(action: onPlay) {
                 Image(systemName: "play.circle.fill")
                     .symbolRenderingMode(.hierarchical)
+                    .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
             .help("Play playlist")
@@ -335,49 +452,9 @@ struct TTSControlPlaylistEntryRow: View {
     let onDelete: () -> Void
 
     var body: some View {
-        HStack(spacing: AppDefaults.paddingMedium) {
-            VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
-                HStack(spacing: AppDefaults.paddingSmall) {
-                    if let index {
-                        TTSControlEntryIndexBadge(number: index + 1)
-                    }
-
-                    if isCurrent {
-                        Label("Now playing", systemImage: "speaker.wave.2.fill")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(Color.accentColor)
-                    } else {
-                        Text(item.role.capitalized)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Text(item.displayText)
-                    .font(.body)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            Spacer(minLength: AppDefaults.paddingMedium)
-
-            HStack(spacing: AppDefaults.paddingSmall) {
-                Button(action: onMoveUp) {
-                    Image(systemName: "chevron.up")
-                        .frame(width: 28, height: 28)
-                }
-                .buttonStyle(.borderless)
-                .disabled(!canMoveUp)
-                .help("Move up")
-
-                Button(action: onMoveDown) {
-                    Image(systemName: "chevron.down")
-                        .frame(width: 28, height: 28)
-                }
-                .buttonStyle(.borderless)
-                .disabled(!canMoveDown)
-                .help("Move down")
-            }
+        ViewThatFits(in: .horizontal) {
+            horizontalLayout
+            compactLayout
         }
         .padding(AppDefaults.paddingMedium)
         .background(
@@ -422,6 +499,88 @@ struct TTSControlPlaylistEntryRow: View {
             }
         }
     }
+
+    private var rowHeader: some View {
+        HStack(spacing: AppDefaults.paddingSmall) {
+            if let index {
+                TTSControlEntryIndexBadge(number: index + 1)
+            }
+
+            if isCurrent {
+                Label("Now playing", systemImage: "speaker.wave.2.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
+            } else {
+                Text(item.role.capitalized)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var horizontalLayout: some View {
+        HStack(spacing: AppDefaults.paddingMedium) {
+            VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
+                rowHeader
+
+                Text(item.displayText)
+                    .font(.body)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Spacer(minLength: AppDefaults.paddingMedium)
+
+            HStack(spacing: AppDefaults.paddingSmall) {
+                Button(action: onMoveUp) {
+                    Image(systemName: "chevron.up")
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.borderless)
+                .disabled(!canMoveUp)
+                .help("Move up")
+
+                Button(action: onMoveDown) {
+                    Image(systemName: "chevron.down")
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.borderless)
+                .disabled(!canMoveDown)
+                .help("Move down")
+            }
+        }
+    }
+
+    private var compactLayout: some View {
+        VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
+            rowHeader
+
+            Text(item.displayText)
+                .font(.body)
+                .lineLimit(3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack(spacing: AppDefaults.paddingSmall) {
+                Spacer(minLength: 0)
+
+                Button(action: onMoveUp) {
+                    Image(systemName: "chevron.up")
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.borderless)
+                .disabled(!canMoveUp)
+                .help("Move up")
+
+                Button(action: onMoveDown) {
+                    Image(systemName: "chevron.down")
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.borderless)
+                .disabled(!canMoveDown)
+                .help("Move down")
+            }
+        }
+    }
 }
 
 struct TTSControlEntryIndexBadge: View {
@@ -431,7 +590,7 @@ struct TTSControlEntryIndexBadge: View {
         Text(String(number))
             .font(.caption.weight(.semibold))
             .foregroundStyle(.secondary)
-            .frame(width: 24, height: 24)
+            .frame(width: 28, height: 28)
             .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium, style: .continuous))
     }
 }
@@ -452,7 +611,7 @@ struct TTSControlEmptyDetailState: View {
             Text("Create a playlist or select one from the Playlists page.")
                 .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, minHeight: 220, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(AppDefaults.paddingLarge)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous))
     }

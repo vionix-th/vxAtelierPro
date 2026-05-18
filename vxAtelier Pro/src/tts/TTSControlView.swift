@@ -101,10 +101,7 @@ struct TTSControlView: View {
             } message: {
                 Text("Delete selected playlist and its items.")
             }
-            .frame(
-                minWidth: 760, idealWidth: 1000, maxWidth: .infinity,
-                minHeight: 560, idealHeight: 760, maxHeight: .infinity
-            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .presentationDetents([.large])
             .fileImporter(
                 isPresented: $isImportingPlaylist,
