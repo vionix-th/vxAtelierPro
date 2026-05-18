@@ -51,6 +51,8 @@
 		74516F662D33EA1500731EDB /* vxAtelier ProTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "vxAtelier ProTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		74516F702D33EA1500731EDB /* vxAtelier ProUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "vxAtelier ProUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		745A79502D5DDBEE00E0921D /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
+		746788132FBAD73F0024CD5D /* AGENTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = AGENTS.md; sourceTree = "<group>"; };
+		746788142FBAD73F0024CD5D /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -135,6 +137,8 @@
 		74516F4A2D33EA1300731EDB = {
 			isa = PBXGroup;
 			children = (
+				746788132FBAD73F0024CD5D /* AGENTS.md */,
+				746788142FBAD73F0024CD5D /* README.md */,
 				742675CA2E3995090084FBF2 /* vxAtelier Pro Unit.xctestplan */,
 				742675CB2E3995090084FBF2 /* vxAtelier Pro Integration.xctestplan */,
 				742675CC2E3995090084FBF2 /* vxAtelier Pro LiveProviders.xctestplan */,

@@ -97,7 +97,7 @@ private struct StatusBarInfoStrip: View {
     let onToggleStreaming: ((Bool) -> Void)?
 
     var body: some View {
-        StatusBarInfoRow(
+        StatusBarConversationInfoRow(
             conversationID: conversationID,
             allowsStreamingToggle: allowsStreamingToggle,
             dense: dense,

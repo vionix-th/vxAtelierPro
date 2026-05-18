@@ -200,7 +200,7 @@ struct StatusBarModelPill: View {
     }
 }
 
-struct StatusBarInfoRow: View {
+struct StatusBarConversationInfoRow: View {
     @Environment(QueryManager.self) private var queryManager
 
     let conversationID: PersistentIdentifier
