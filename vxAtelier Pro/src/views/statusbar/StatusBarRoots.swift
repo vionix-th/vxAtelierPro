@@ -108,6 +108,7 @@ private struct StatusBarInfoStrip: View {
             if showStatusBarTTSStrip {
                 StatusBarTTSStrip(
                     isPlaying: ttsQueue.isPlaying,
+                    canTogglePlayback: ttsQueue.currentPlaylistHasEntries(),
                     onTogglePlayback: togglePlayback,
                     onRequestTTS: onRequestTTS,
                     dense: dense
@@ -131,6 +132,7 @@ private struct StatusBarInfoStrip: View {
     }
 
     private func togglePlayback() {
+        guard ttsQueue.currentPlaylistHasEntries() else { return }
         if ttsQueue.isPlaying {
             ttsQueue.pause()
         } else {
@@ -141,6 +143,7 @@ private struct StatusBarInfoStrip: View {
 
 private struct StatusBarTTSStrip: View {
     let isPlaying: Bool
+    let canTogglePlayback: Bool
     let onTogglePlayback: () -> Void
     let onRequestTTS: () -> Void
     let dense: Bool
@@ -159,6 +162,7 @@ private struct StatusBarTTSStrip: View {
             }
             .buttonStyle(.plain)
             .help(isPlaying ? "Pause TTS playback" : "Resume TTS playback")
+            .disabled(!canTogglePlayback)
 
             Button(action: onRequestTTS) {
                 Image(systemName: "slider.horizontal.3")

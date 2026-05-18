@@ -114,13 +114,6 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
             return playlist
         }
 
-        if let first = orderedPlaylists().first {
-            activePlaylistID = first.persistentModelID
-            persistActivePlaylistID(first.persistentModelID)
-            currentIndex = 0
-            return first
-        }
-
         guard createIfNeeded else { return nil }
         let playlistName = preferredName ?? defaultPlaylistName
         return createPlaylist(named: playlistName)
@@ -387,7 +380,7 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
         modelContext.delete(playlist)
         saveContext()
         if wasActive {
-            selectPlaylist(id: orderedPlaylists().first?.persistentModelID)
+            selectPlaylist(nil)
         }
     }
 
@@ -409,9 +402,7 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
     func selectFirstPlaylistIfNeeded() {
         restorePersistedActivePlaylistIfNeeded()
         guard activePlaylistID == nil else { return }
-        if let first = orderedPlaylists().first {
-            selectPlaylist(id: first.persistentModelID)
-        }
+        selectPlaylist(nil)
     }
 
     func add(_ message: MessageItem, conversationID: PersistentIdentifier, createPlaylistNamed playlistName: String? = nil) {
@@ -748,7 +739,7 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
     func reloadSelectionIfNeeded() {
         restorePersistedActivePlaylistIfNeeded()
         if let activePlaylistID, fetchPlaylist(with: activePlaylistID) == nil {
-            selectPlaylist(orderedPlaylists().first)
+            selectPlaylist(nil)
         }
     }
 

@@ -201,6 +201,17 @@ struct TTSControlView: View {
             }
         }
         .listStyle(.inset)
+        .contextMenu {
+            Button {
+                presentedPlaylistEditor = PlaylistEditor(
+                    title: "New Playlist",
+                    name: suggestedPlaylistName(),
+                    playlistID: nil
+                )
+            } label: {
+                Label("New Playlist", systemImage: "plus")
+            }
+        }
     }
 
     private var playlistActionsBar: some View {
@@ -221,23 +232,6 @@ struct TTSControlView: View {
                     .pickerStyle(.menu)
                 }
 
-                Menu {
-                    Button {
-                        isImportingPlaylist = true
-                    } label: {
-                        Label("Import Playlist", systemImage: "square.and.arrow.down")
-                    }
-
-                    Button {
-                        Task { await exportSelectedPlaylist() }
-                    } label: {
-                        Label("Export Playlist", systemImage: "square.and.arrow.up")
-                    }
-                    .disabled(displayedPlaylist == nil)
-                } label: {
-                    Label("Import / Export", systemImage: "square.and.arrow.up.on.square")
-                }
-
                 Button {
                     presentedPlaylistEditor = PlaylistEditor(
                         title: "New Playlist",
@@ -250,11 +244,26 @@ struct TTSControlView: View {
 
                 Button {
                     presentPlaylistEntryEditor(
-                        targetPlaylistID: selectedPlaylistID ?? ttsQueue.currentPlaylistID(),
+                        targetPlaylistID: selectedPlaylistID,
                         playlistName: displayedPlaylist?.name
                     )
                 } label: {
                     Label("Add Entry", systemImage: "text.badge.plus")
+                }
+                
+                if activeTab == .playlists {
+                    Button {
+                        isImportingPlaylist = true
+                    } label: {
+                        Label("Import Playlist", systemImage: "square.and.arrow.down")
+                    }
+                    
+                    Button {
+                        Task { await exportSelectedPlaylist() }
+                    } label: {
+                        Label("Export Playlist", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(displayedPlaylist == nil)
                 }
 
                 Spacer()
@@ -583,7 +592,7 @@ struct TTSControlView: View {
             title: "Edit Entry",
             text: item.displayText,
             role: TTSPlaylistRole(rawValue: item.role) ?? .user,
-            playlistID: displayedPlaylist?.persistentModelID ?? selectedPlaylistID ?? ttsQueue.currentPlaylistID(),
+            playlistID: displayedPlaylist?.persistentModelID ?? selectedPlaylistID,
             entryID: item.persistentModelID
         )
     }
@@ -593,8 +602,7 @@ struct TTSControlView: View {
            playlists.contains(where: { $0.persistentModelID == currentID }) {
             selectedPlaylistID = currentID
         } else {
-            let firstPlaylistID = playlists.first?.persistentModelID
-            selectedPlaylistID = firstPlaylistID
+            selectedPlaylistID = nil
         }
     }
 
@@ -602,8 +610,7 @@ struct TTSControlView: View {
         Binding(
             get: { selectedPlaylistID },
             set: { newValue in
-                selectedPlaylistID = newValue
-                ttsQueue.selectPlaylist(id: newValue)
+                selectPlaylist(newValue)
             }
         )
     }
@@ -613,7 +620,7 @@ struct TTSControlView: View {
            let playlist = playlists.first(where: { $0.persistentModelID == selectedPlaylistID }) {
             return playlist
         }
-        return ttsQueue.playlist(with: ttsQueue.currentPlaylistID())
+        return nil
     }
 
     private var displayedPlaylistEntries: [TTSPlaylistEntry] {
@@ -711,11 +718,6 @@ struct TTSControlView: View {
         "Playlist \(playlists.count + 1)"
     }
 
-    private func selectPlaylist(_ playlistID: PersistentIdentifier?) {
-        selectedPlaylistID = playlistID
-        ttsQueue.selectPlaylist(id: playlistID)
-    }
-
     private func playPlaylist(_ playlistID: PersistentIdentifier) {
         selectedPlaylistID = playlistID
         ttsQueue.playPlaylist(id: playlistID)
@@ -742,5 +744,10 @@ struct TTSControlView: View {
             showPlaylistImportError = true
             vxAtelierPro.log.error("Failed to import playlist: \(error.localizedDescription)")
         }
+    }
+
+    private func selectPlaylist(_ playlistID: PersistentIdentifier?) {
+        selectedPlaylistID = playlistID
+        ttsQueue.selectPlaylist(id: playlistID)
     }
 }
