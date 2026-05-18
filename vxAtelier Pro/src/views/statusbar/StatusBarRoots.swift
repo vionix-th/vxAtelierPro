@@ -12,6 +12,7 @@ struct StatusBarInline: View {
     let onRequestOptions: (PersistentIdentifier) -> Void
     let onRequestModelSelection: (PersistentIdentifier) -> Void
     let onToggleStreaming: (PersistentIdentifier, Bool) -> Void
+    let onRequestTTS: () -> Void
 
     var body: some View {
         HStack(spacing: AppDefaults.paddingSmall) {
@@ -26,16 +27,17 @@ struct StatusBarInline: View {
 
             if let conversationID {
                 Spacer(minLength: 0)
-
-                StatusBarInfoStrip(
-                    conversationID: conversationID,
-                    allowsStreamingToggle: true,
-                    dense: false,
-                    onRequestOptions: { onRequestOptions(conversationID) },
-                    onRequestModelSelection: { onRequestModelSelection(conversationID) },
-                    onToggleStreaming: { onToggleStreaming(conversationID, $0) }
-                )
             }
+
+            StatusBarInfoStrip(
+                conversationID: conversationID,
+                allowsStreamingToggle: true,
+                dense: false,
+                onRequestOptions: conversationID.map { conversationID in { onRequestOptions(conversationID) } },
+                onRequestModelSelection: conversationID.map { conversationID in { onRequestModelSelection(conversationID) } },
+                onToggleStreaming: conversationID.map { conversationID in { enabled in onToggleStreaming(conversationID, enabled) } },
+                onRequestTTS: onRequestTTS
+            )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.secondary.opacity(0.1))
@@ -53,25 +55,25 @@ struct StatusBarStacked: View {
     let onRequestOptions: (PersistentIdentifier) -> Void
     let onRequestModelSelection: (PersistentIdentifier) -> Void
     let onToggleStreaming: (PersistentIdentifier, Bool) -> Void
+    let onRequestTTS: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            if let conversationID {
-                HStack {
-                    Spacer()
-                    
-                    StatusBarInfoStrip(
-                        conversationID: conversationID,
-                        allowsStreamingToggle: false,
-                        dense: true,
-                        onRequestOptions: { onRequestOptions(conversationID) },
-                        onRequestModelSelection: { onRequestModelSelection(conversationID) },
-                        onToggleStreaming: { onToggleStreaming(conversationID, $0) }
-                    )
-                }
+            HStack {
+                Spacer()
+
+                StatusBarInfoStrip(
+                    conversationID: conversationID,
+                    allowsStreamingToggle: false,
+                    dense: true,
+                    onRequestOptions: conversationID.map { conversationID in { onRequestOptions(conversationID) } },
+                    onRequestModelSelection: conversationID.map { conversationID in { onRequestModelSelection(conversationID) } },
+                    onToggleStreaming: conversationID.map { conversationID in { enabled in onToggleStreaming(conversationID, enabled) } },
+                    onRequestTTS: onRequestTTS
+                )
             }
 
-            HStack{
+            HStack {
                 StatusBarLogStrip(
                     message: logMessage,
                     logType: logType,
@@ -89,25 +91,99 @@ struct StatusBarStacked: View {
 }
 
 private struct StatusBarInfoStrip: View {
-    let conversationID: PersistentIdentifier
+    @Environment(TTSQueue.self) private var ttsQueue
+    @AppStorage(AppSettings.Keys.showStatusBarTTSStrip) private var showStatusBarTTSStrip: Bool = AppDefaults.showStatusBarTTSStrip
+
+    let conversationID: PersistentIdentifier?
     let allowsStreamingToggle: Bool
     let dense: Bool
-    let onRequestOptions: () -> Void
+    let onRequestOptions: (() -> Void)?
     let onRequestModelSelection: (() -> Void)?
     let onToggleStreaming: ((Bool) -> Void)?
+    let onRequestTTS: () -> Void
 
     var body: some View {
-        StatusBarConversationInfoRow(
-            conversationID: conversationID,
-            allowsStreamingToggle: allowsStreamingToggle,
-            dense: dense,
-            onRequestOptions: onRequestOptions,
-            onRequestModelSelection: onRequestModelSelection,
-            onToggleStreaming: onToggleStreaming
-        )
+        if showStatusBarTTSStrip || conversationID != nil {
+        HStack(spacing: AppDefaults.paddingSmall) {
+            if showStatusBarTTSStrip {
+                StatusBarTTSStrip(
+                    isPlaying: ttsQueue.isPlaying,
+                    onTogglePlayback: togglePlayback,
+                    onRequestTTS: onRequestTTS,
+                    dense: dense
+                )
+            }
+
+            if let conversationID {
+                StatusBarConversationInfoRow(
+                    conversationID: conversationID,
+                    allowsStreamingToggle: allowsStreamingToggle,
+                    dense: dense,
+                    onRequestOptions: onRequestOptions ?? {},
+                    onRequestModelSelection: onRequestModelSelection,
+                    onToggleStreaming: onToggleStreaming
+                )
+            }
+        }
         .padding(.horizontal, AppDefaults.paddingMedium)
         .padding(.vertical, AppDefaults.paddingSmall)
         .background(Color.secondary.opacity(AppDefaults.sectionBackgroundOpacity / 2))
+        }
+    }
+
+    private func togglePlayback() {
+        if ttsQueue.isPlaying {
+            ttsQueue.pause()
+        } else {
+            ttsQueue.resume()
+        }
+    }
+}
+
+private struct StatusBarTTSStrip: View {
+    let isPlaying: Bool
+    let onTogglePlayback: () -> Void
+    let onRequestTTS: () -> Void
+    let dense: Bool
+
+    private var statusColor: Color {
+        isPlaying ? .green : .secondary
+    }
+
+    private var statusLabel: String {
+        isPlaying ? "TTS Playing" : "TTS Ready"
+    }
+
+    var body: some View {
+        HStack(spacing: AppDefaults.paddingSmall) {
+            Circle()
+                .fill(statusColor)
+                .frame(width: dense ? 5 : 6, height: dense ? 5 : 6)
+                .help(statusLabel)
+
+            Text("TTS")
+                .font(dense ? .caption : .subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+
+            Button(action: onTogglePlayback) {
+                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                    .font(.caption.weight(.semibold))
+                    .frame(width: dense ? 20 : 22, height: dense ? 20 : 22)
+            }
+            .buttonStyle(.plain)
+            .help(isPlaying ? "Pause TTS playback" : "Resume TTS playback")
+
+            Button(action: onRequestTTS) {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.caption.weight(.semibold))
+                    .frame(width: dense ? 20 : 22, height: dense ? 20 : 22)
+            }
+            .buttonStyle(.plain)
+            .help("Open TTS controls")
+        }
+        .padding(.horizontal, AppDefaults.paddingSmall)
+        .padding(.vertical, AppDefaults.paddingSmall / 2)
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusSmall, style: .continuous))
     }
 }
 

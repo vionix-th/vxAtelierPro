@@ -7,6 +7,7 @@ struct GeneralSettingsView: View {
     @AppStorage(AppSettings.Keys.autoNameConversations) private var autoNameConversations: Bool = AppDefaults.autoNameConversations
     @AppStorage(AppSettings.Keys.statusBarVisible) private var statusBarVisible: Bool = AppDefaults.statusBarVisible
     @AppStorage(AppSettings.Keys.statusBarLayoutStyle) private var statusBarLayoutStyleRaw: String = AppDefaults.statusBarLayoutStyle
+    @AppStorage(AppSettings.Keys.showStatusBarTTSStrip) private var showStatusBarTTSStrip: Bool = AppDefaults.showStatusBarTTSStrip
     @AppStorage(AppSettings.Keys.showConversationLastMessageLabel) private var showConversationLastMessageLabel: Bool = AppDefaults.showConversationLastMessageLabel
     @AppStorage(AppSettings.Keys.showConversationCreatedLabel) private var showConversationCreatedLabel: Bool = AppDefaults.showConversationCreatedLabel
     @AppStorage(AppSettings.Keys.shouldTerminateAfterLastWindowClosed) private var shouldTerminateAfterLastWindowClosed: Bool = AppDefaults.shouldTerminateAfterLastWindowClosed
@@ -33,6 +34,7 @@ struct GeneralSettingsView: View {
                         Text(style.rawValue).tag(style.rawValue)
                     }
                 }
+                SettingsToggleRow("Show TTS Status Strip", isOn: $showStatusBarTTSStrip)
                 SettingsToggleRow("Last Message Timestamp", isOn: $showConversationLastMessageLabel)
                 SettingsToggleRow("Creation Timestamp", isOn: $showConversationCreatedLabel)
 #if os(macOS)

@@ -89,6 +89,7 @@ enum AppSettings {
         static let ttsEntryPauseMs = "TTSEntryPauseMs"
         static let ttsRepeatMode = "TTSRepeatMode"
         static let ttsActivePlaylistID = "TTSActivePlaylistID"
+        static let showStatusBarTTSStrip = "showStatusBarTTSStrip"
 
         // Lifecycle
         static let shouldTerminateAfterLastWindowClosed = "shouldTerminateAfterLastWindowClosed"
@@ -139,6 +140,7 @@ enum AppSettings {
         Keys.autoSendConversationTemplates: .init(key: Keys.autoSendConversationTemplates, type: Bool.self),
         Keys.ttsEntryPauseMs: .init(key: Keys.ttsEntryPauseMs, type: Int.self, intRange: 0...5000),
         Keys.ttsRepeatMode: .init(key: Keys.ttsRepeatMode, type: String.self, allowedValues: ["none", "one", "all"]),
+        Keys.showStatusBarTTSStrip: .init(key: Keys.showStatusBarTTSStrip, type: Bool.self),
         Keys.allowSelfSignedCertificates: .init(key: Keys.allowSelfSignedCertificates, type: Bool.self),
         Keys.selfSignedCertWhitelist: .init(key: Keys.selfSignedCertWhitelist, type: String.self)
     ]

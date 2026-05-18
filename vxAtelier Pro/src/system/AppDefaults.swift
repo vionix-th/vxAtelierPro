@@ -76,6 +76,7 @@ struct AppDefaults {
     // TTS Settings
     static let ttsEntryPauseMs = 1000
     static let ttsRepeatMode = "none"  // "none", "one", or "all"
+    static let showStatusBarTTSStrip = true
     
     // NOTE: Speech rate and pitch settings are managed through voice configurations.
     // These values apply when no voice configuration is available.
@@ -208,6 +209,7 @@ extension AppDefaults {
         // TTS
         defaults.set(AppDefaults.ttsEntryPauseMs, forKey: AppSettings.Keys.ttsEntryPauseMs)
         defaults.set(AppDefaults.ttsRepeatMode, forKey: AppSettings.Keys.ttsRepeatMode)
+        defaults.set(AppDefaults.showStatusBarTTSStrip, forKey: AppSettings.Keys.showStatusBarTTSStrip)
         defaults.removeObject(forKey: AppSettings.Keys.ttsActivePlaylistID)
         // Sidebar sort
         defaults.set(

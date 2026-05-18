@@ -138,7 +138,8 @@ struct StatusBar: View {
                     onRequestLogHistory: requestLogHistory,
                     onRequestOptions: requestOptions(for:),
                     onRequestModelSelection: requestModelSelection(for:),
-                    onToggleStreaming: toggleStreaming(for:enabled:)
+                    onToggleStreaming: toggleStreaming(for:enabled:),
+                    onRequestTTS: sceneModel.requestTTS
                 )
             } else {
                 StatusBarInline(
@@ -151,7 +152,8 @@ struct StatusBar: View {
                     onRequestLogHistory: requestLogHistory,
                     onRequestOptions: requestOptions(for:),
                     onRequestModelSelection: requestModelSelection(for:),
-                    onToggleStreaming: toggleStreaming(for:enabled:)
+                    onToggleStreaming: toggleStreaming(for:enabled:),
+                    onRequestTTS: sceneModel.requestTTS
                 )
             }
         }
