@@ -93,10 +93,8 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
     }
 
     private func fetchPlaylist(with id: PersistentIdentifier) -> TTSPlaylist? {
-        var descriptor = FetchDescriptor<TTSPlaylist>(sortBy: [])
-        descriptor.fetchLimit = 1
-        descriptor.predicate = #Predicate { $0.id == id }
-        return try? modelContext.fetch(descriptor).first
+        let descriptor = FetchDescriptor<TTSPlaylist>(sortBy: [])
+        return try? modelContext.fetch(descriptor).first(where: { $0.persistentModelID == id })
     }
 
     private func orderedPlaylists() -> [TTSPlaylist] {
@@ -117,8 +115,8 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
         }
 
         if let first = orderedPlaylists().first {
-            activePlaylistID = first.id
-            persistActivePlaylistID(first.id)
+            activePlaylistID = first.persistentModelID
+            persistActivePlaylistID(first.persistentModelID)
             currentIndex = 0
             return first
         }
@@ -157,7 +155,7 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
         let baseName = trimmedName.isEmpty ? defaultPlaylistName : trimmedName
         let existing = Set(
             orderedPlaylists()
-                .filter { $0.id != playlistID }
+                .filter { $0.persistentModelID != playlistID }
                 .map(\.name)
         )
 
@@ -180,8 +178,8 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
     private func selectPlaylist(_ playlist: TTSPlaylist?) {
         cancelPendingAdvance()
         if let playlist {
-            activePlaylistID = playlist.id
-            persistActivePlaylistID(playlist.id)
+            activePlaylistID = playlist.persistentModelID
+            persistActivePlaylistID(playlist.persistentModelID)
             currentIndex = min(currentIndex, max(0, playlist.orderedEntries.count - 1))
         } else {
             activePlaylistID = nil
@@ -389,7 +387,7 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
         modelContext.delete(playlist)
         saveContext()
         if wasActive {
-            selectPlaylist(id: orderedPlaylists().first?.id)
+            selectPlaylist(id: orderedPlaylists().first?.persistentModelID)
         }
     }
 
@@ -412,7 +410,7 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
         restorePersistedActivePlaylistIfNeeded()
         guard activePlaylistID == nil else { return }
         if let first = orderedPlaylists().first {
-            selectPlaylist(id: first.id)
+            selectPlaylist(id: first.persistentModelID)
         }
     }
 

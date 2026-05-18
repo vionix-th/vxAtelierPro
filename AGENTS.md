@@ -5,6 +5,8 @@
 - Prefer @Observable over ObservableObject
 - Prefer @Environment over @EnvironmentObject
 - Apply SwiftUI and SwiftData best practices.
+- Keep UI state, selection state, and persisted controller state separate unless there is a deliberate reason to couple them.
+- Use `persistentModelID` explicitly for SwiftData identity comparisons, picker tags, and lookup keys; do not depend on synthesized model identity access in views or predicates.
 - Do not keep deleteable `PersistentModel` instances as durable view state; use `PersistentIdentifier` or immutable value snapshots in views and resolve fresh models at the point of use.
 - When a view can outlive a delete mutation, assume any captured SwiftData object may be detached on the next render pass.
 - Fully implement requested functionality: no new TODOs, placeholders, or missing pieces.
@@ -33,6 +35,20 @@
 - Settings use separate platform shells: `MacOSApplicationSettingsSceneView` for the native macOS `Settings` scene and `IOSApplicationSettingsSheetView` for the iOS sheet. Shared settings pages live below those shells and should not own platform scene policy.
 - macOS Settings must keep the native Settings toolbar for section tabs. Root settings page actions belong in inline page action regions on macOS and navigation toolbar actions on iOS.
 - When adding a settings page, update `SettingsDestination`, `MacOSSettingsSection`, `AppDefaults` / `AppSettings` if persistence is needed, and `Package.swift` if files are added.
+
+## Preview Purity
+- Views used in previews must not mutate SwiftData, `UserDefaults`, or controller state during `body` evaluation.
+- Computed properties, bindings, and default arguments used by previews must be read-only.
+- If a preview crashes, prefer fixing view purity and identity handling before adding preview-specific workarounds.
+
+## Command Boundaries
+- Views emit intents; controllers own persistence, fetching, and mutation.
+- Do not perform SwiftData writes from computed properties, binding getters, or selection synchronization helpers.
+- Keep controller APIs explicit and narrow: `select...`, `create...`, `delete...`, `move...`, `rename...`.
+
+## Reusable Components
+- Extract repeated UI into small reusable subviews once it repeats or obscures the parent view's responsibility.
+- Prefer composition over long monolithic sheets or cards when multiple concerns are present.
 
 ## Logging
 - Logging must use the shared logger exposed by `vxAtelierPro.log` and the appropriate level (`debug`, `info`, `warning`, `error`, etc.).

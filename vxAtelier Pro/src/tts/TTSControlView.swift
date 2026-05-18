@@ -16,6 +16,7 @@ struct TTSControlView: View {
     @State private var presentedCustomEntryEditor: CustomPlaylistEntryEditor?
     @State private var pendingPlaylistDeletionID: PersistentIdentifier?
     @State private var focusedPlaylistID: PersistentIdentifier?
+    @State private var selectedPlaylistID: PersistentIdentifier?
     @State private var activeTab: TTSTab = .player
 
     var body: some View {
@@ -33,6 +34,8 @@ struct TTSControlView: View {
                     }
                     .tag(TTSTab.playlists)
             }
+
+            playlistActionsBar
         }
         .navigationTitle("Text to Speech")
         .sheet(item: $presentedPlaylistEditor) { editor in
@@ -102,7 +105,7 @@ struct TTSControlView: View {
         .onChange(of: ttsQueue.currentPlaylistID()) { _, _ in
             syncSelection()
         }
-        .onChange(of: playlists.map(\.id)) { _, _ in
+        .onChange(of: playlists.map(\.persistentModelID)) { _, _ in
             syncSelection()
         }
     }
@@ -131,46 +134,62 @@ struct TTSControlView: View {
                 } else {
                     ForEach(playlists) { playlist in
                         playlistRow(for: playlist)
-                            .tag(Optional(playlist.id))
+                            .tag(Optional(playlist.persistentModelID))
                     }
                 }
             }
         }
         .listStyle(.inset)
-        .safeAreaInset(edge: .bottom) {
-            VStack(spacing: AppDefaults.paddingSmall) {
-                Divider()
-                HStack {
-                    Button {
-                        presentedPlaylistEditor = PlaylistEditor(
-                            title: "New Playlist",
-                            name: suggestedPlaylistName(),
-                            playlistID: nil
-                        )
-                    } label: {
-                        Label("New Playlist", systemImage: "plus")
+    }
+
+    private var playlistActionsBar: some View {
+        VStack(spacing: AppDefaults.paddingSmall) {
+            Divider()
+        HStack(spacing: AppDefaults.paddingMedium) {
+            
+            if playlists.isEmpty {
+                Text("No playlists")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Picker("", selection: playlistSelectionBinding) {
+                    ForEach(playlists) { playlist in
+                        Text(playlist.name)
+                            .tag(Optional(playlist.persistentModelID))
                     }
-
-                    Button {
-                        presentCustomEntryEditor(
-                            targetPlaylistID: focusedPlaylistID ?? ttsQueue.currentPlaylistID(),
-                            playlistName: displayedPlaylist?.name
-                        )
-                    } label: {
-                        Label("Add Entry", systemImage: "text.badge.plus")
-                    }
-
-                    Spacer()
-
-                    Text("\(playlists.count) total")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, AppDefaults.paddingLarge)
-                .padding(.bottom, AppDefaults.paddingMedium)
+                .pickerStyle(.menu)
             }
-            .background(.regularMaterial)
+            
+            Button {
+                    presentedPlaylistEditor = PlaylistEditor(
+                        title: "New Playlist",
+                        name: suggestedPlaylistName(),
+                        playlistID: nil
+                    )
+                } label: {
+                    Label("New Playlist", systemImage: "plus")
+                }
+
+                Button {
+                    presentCustomEntryEditor(
+                        targetPlaylistID: focusedPlaylistID ?? ttsQueue.currentPlaylistID(),
+                        playlistName: displayedPlaylist?.name
+                    )
+                } label: {
+                    Label("Add Custom Entry", systemImage: "text.badge.plus")
+                }
+
+                Spacer()
+
+                Text("\(playlists.count) total")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, AppDefaults.paddingLarge)
+            .padding(.bottom, AppDefaults.paddingMedium)
         }
+        .background(.regularMaterial)
     }
 
     private var transportCard: some View {
@@ -262,7 +281,7 @@ struct TTSControlView: View {
     }
 
     private func playlistRow(for playlist: TTSPlaylist) -> some View {
-        let isSelected = playlist.id == focusedPlaylistID
+        let isSelected = playlist.persistentModelID == focusedPlaylistID
 
         return HStack(spacing: AppDefaults.paddingMedium) {
             ZStack {
@@ -286,8 +305,8 @@ struct TTSControlView: View {
             Spacer(minLength: 0)
 
             Button {
-                ttsQueue.playPlaylist(id: playlist.id)
-                focusedPlaylistID = playlist.id
+                ttsQueue.playPlaylist(id: playlist.persistentModelID)
+                focusedPlaylistID = playlist.persistentModelID
             } label: {
                 Image(systemName: "play.circle.fill")
                     .symbolRenderingMode(.hierarchical)
@@ -299,13 +318,13 @@ struct TTSControlView: View {
         .contentShape(Rectangle())
         .listRowBackground(isSelected ? Color.accentColor.opacity(0.10) : Color.clear)
         .onTapGesture {
-            focusedPlaylistID = playlist.id
-            ttsQueue.selectPlaylist(id: playlist.id)
+            focusedPlaylistID = playlist.persistentModelID
+            ttsQueue.selectPlaylist(id: playlist.persistentModelID)
         }
         .contextMenu {
             Button {
-                ttsQueue.playPlaylist(id: playlist.id)
-                focusedPlaylistID = playlist.id
+                ttsQueue.playPlaylist(id: playlist.persistentModelID)
+                focusedPlaylistID = playlist.persistentModelID
             } label: {
                 Label("Play", systemImage: "play.circle")
             }
@@ -314,14 +333,14 @@ struct TTSControlView: View {
                 presentedPlaylistEditor = PlaylistEditor(
                     title: "Rename Playlist",
                     name: playlist.name,
-                    playlistID: playlist.id
+                    playlistID: playlist.persistentModelID
                 )
             } label: {
                 Label("Rename", systemImage: "pencil")
             }
 
             Button(role: .destructive) {
-                pendingPlaylistDeletionID = playlist.id
+                pendingPlaylistDeletionID = playlist.persistentModelID
             } label: {
                 Label("Delete", systemImage: "trash")
             }
@@ -330,7 +349,7 @@ struct TTSControlView: View {
 
             Button {
                 presentCustomEntryEditor(
-                    targetPlaylistID: playlist.id,
+                    targetPlaylistID: playlist.persistentModelID,
                     playlistName: playlist.name
                 )
             } label: {
@@ -340,7 +359,7 @@ struct TTSControlView: View {
     }
 
     private func playlistEntryRow(item: TTSPlaylistEntry) -> some View {
-        let isCurrent = item.id == ttsQueue.currentItem?.id
+        let isCurrent = item.persistentModelID == ttsQueue.currentItem?.persistentModelID
 
         return HStack(spacing: AppDefaults.paddingMedium) {
             VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
@@ -423,7 +442,7 @@ struct TTSControlView: View {
     }
 
     private func displayedPlaylistEntryIndex(for item: TTSPlaylistEntry) -> Int? {
-        displayedPlaylistEntries.firstIndex(where: { $0.id == item.id })
+        displayedPlaylistEntries.firstIndex(where: { $0.persistentModelID == item.persistentModelID })
     }
 
     private func entryIndexBadge(number: Int) -> some View {
@@ -455,21 +474,35 @@ struct TTSControlView: View {
     }
 
     private func syncSelection() {
-        if let focusedPlaylistID, playlists.contains(where: { $0.id == focusedPlaylistID }) {
-            return
-        }
-
         if let currentID = ttsQueue.currentPlaylistID(),
-           playlists.contains(where: { $0.id == currentID }) {
+           playlists.contains(where: { $0.persistentModelID == currentID }) {
             focusedPlaylistID = currentID
+            selectedPlaylistID = currentID
         } else {
-            focusedPlaylistID = playlists.first?.id
+            let firstPlaylistID = playlists.first?.persistentModelID
+            focusedPlaylistID = firstPlaylistID
+            selectedPlaylistID = firstPlaylistID
         }
     }
 
+    private var playlistSelectionBinding: Binding<PersistentIdentifier?> {
+        Binding(
+            get: { selectedPlaylistID },
+            set: { newValue in
+                selectedPlaylistID = newValue
+                ttsQueue.selectPlaylist(id: newValue)
+            }
+        )
+    }
+
     private var displayedPlaylist: TTSPlaylist? {
+        if let selectedPlaylistID,
+           let playlist = playlists.first(where: { $0.persistentModelID == selectedPlaylistID }) {
+            return playlist
+        }
+
         if let focusedPlaylistID,
-           let playlist = playlists.first(where: { $0.id == focusedPlaylistID }) {
+           let playlist = playlists.first(where: { $0.persistentModelID == focusedPlaylistID }) {
             return playlist
         }
         return ttsQueue.playlist(with: ttsQueue.currentPlaylistID())
