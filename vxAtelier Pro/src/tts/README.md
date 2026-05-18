@@ -47,8 +47,10 @@ TTS layer has two parts:
 
 ### `TTSControlView`
 
+- Lives in `src/tts/control/TTSControlView.swift`
 - Lists playlists
 - Creates, renames, deletes playlists
+- Imports and exports single playlists
 - Shows current playlist entries
 - Provides transport controls and repeat controls
 
@@ -60,7 +62,7 @@ TTS layer has two parts:
 ## Import / Export
 
 - Full backup includes playlists and entries
-- Single playlist JSON export/import is supported through `JsonSerializer`
+- Single playlist JSON export/import is supported through `DataManager` and `JsonSerializer`
 
 ## Notes
 

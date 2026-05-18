@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct TTSControlView: View {
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @Environment(TTSQueue.self) private var ttsQueue
 
     @Query(sort: [
@@ -15,9 +15,11 @@ struct TTSControlView: View {
     @State private var presentedPlaylistEditor: PlaylistEditor?
     @State private var presentedPlaylistEntryEditor: PlaylistEntryEditor?
     @State private var pendingPlaylistDeletionID: PersistentIdentifier?
-    @State private var focusedPlaylistID: PersistentIdentifier?
     @State private var selectedPlaylistID: PersistentIdentifier?
     @State private var activeTab: TTSTab = .player
+    @State private var isImportingPlaylist = false
+    @State private var showPlaylistImportError = false
+    @State private var playlistImportErrorMessage = ""
 
     var body: some View {
         VStack(spacing: AppDefaults.paddingLarge) {
@@ -38,7 +40,9 @@ struct TTSControlView: View {
                     if let playlistID = editor.playlistID {
                         ttsQueue.renamePlaylist(id: playlistID, to: name)
                     } else {
-                        _ = ttsQueue.createPlaylist(named: name)
+                        if let playlist = ttsQueue.createPlaylist(named: name) {
+                            selectedPlaylistID = playlist.persistentModelID
+                        }
                     }
                     presentedPlaylistEditor = nil
                 }
@@ -102,6 +106,23 @@ struct TTSControlView: View {
             minHeight: 560, idealHeight: 760, maxHeight: .infinity
         )
         .presentationDetents([.large])
+        .fileImporter(
+            isPresented: $isImportingPlaylist,
+            allowedContentTypes: [.json]
+        ) { result in
+            switch result {
+            case .success(let url):
+                Task { await importPlaylist(from: url) }
+            case .failure(let error):
+                playlistImportErrorMessage = error.localizedDescription
+                showPlaylistImportError = true
+            }
+        }
+        .alert("Playlist Import", isPresented: $showPlaylistImportError, presenting: playlistImportErrorMessage) { _ in
+            Button("OK") { }
+        } message: { message in
+            Text(message)
+        }
         .onAppear {
             syncSelection()
         }
@@ -167,7 +188,7 @@ struct TTSControlView: View {
     }
 
     private var playlistsTab: some View {
-        List(selection: $focusedPlaylistID) {
+        List(selection: playlistSelectionBinding) {
             Section("Playlists") {
                 if playlists.isEmpty {
                     emptySidebarState
@@ -200,6 +221,23 @@ struct TTSControlView: View {
                     .pickerStyle(.menu)
                 }
 
+                Menu {
+                    Button {
+                        isImportingPlaylist = true
+                    } label: {
+                        Label("Import Playlist", systemImage: "square.and.arrow.down")
+                    }
+
+                    Button {
+                        Task { await exportSelectedPlaylist() }
+                    } label: {
+                        Label("Export Playlist", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(displayedPlaylist == nil)
+                } label: {
+                    Label("Import / Export", systemImage: "square.and.arrow.up.on.square")
+                }
+
                 Button {
                     presentedPlaylistEditor = PlaylistEditor(
                         title: "New Playlist",
@@ -212,7 +250,7 @@ struct TTSControlView: View {
 
                 Button {
                     presentPlaylistEntryEditor(
-                        targetPlaylistID: focusedPlaylistID ?? ttsQueue.currentPlaylistID(),
+                        targetPlaylistID: selectedPlaylistID ?? ttsQueue.currentPlaylistID(),
                         playlistName: displayedPlaylist?.name
                     )
                 } label: {
@@ -320,7 +358,7 @@ struct TTSControlView: View {
     }
 
     private func playlistRow(for playlist: TTSPlaylist) -> some View {
-        let isSelected = playlist.persistentModelID == focusedPlaylistID
+        let isSelected = playlist.persistentModelID == selectedPlaylistID
 
         return HStack(spacing: AppDefaults.paddingMedium) {
             ZStack {
@@ -344,8 +382,7 @@ struct TTSControlView: View {
             Spacer(minLength: 0)
 
             Button {
-                ttsQueue.playPlaylist(id: playlist.persistentModelID)
-                focusedPlaylistID = playlist.persistentModelID
+                playPlaylist(playlist.persistentModelID)
             } label: {
                 Image(systemName: "play.circle.fill")
                     .symbolRenderingMode(.hierarchical)
@@ -356,13 +393,11 @@ struct TTSControlView: View {
         .padding(.vertical, AppDefaults.paddingSmall)
         .contentShape(Rectangle())
         .onTapGesture {
-            focusedPlaylistID = playlist.persistentModelID
-            ttsQueue.selectPlaylist(id: playlist.persistentModelID)
+            selectPlaylist(playlist.persistentModelID)
         }
         .contextMenu {
             Button {
-                ttsQueue.playPlaylist(id: playlist.persistentModelID)
-                focusedPlaylistID = playlist.persistentModelID
+                playPlaylist(playlist.persistentModelID)
             } label: {
                 Label("Play", systemImage: "play.circle")
             }
@@ -392,9 +427,9 @@ struct TTSControlView: View {
                 )
             } label: {
                 Label("Add Entry", systemImage: "text.badge.plus")
-                }
             }
         }
+    }
 
     private func playlistEntryRow(item: TTSPlaylistEntry) -> some View {
         let isCurrent = item.persistentModelID == ttsQueue.currentItem?.persistentModelID
@@ -548,7 +583,7 @@ struct TTSControlView: View {
             title: "Edit Entry",
             text: item.displayText,
             role: TTSPlaylistRole(rawValue: item.role) ?? .user,
-            playlistID: displayedPlaylist?.persistentModelID ?? focusedPlaylistID ?? ttsQueue.currentPlaylistID(),
+            playlistID: displayedPlaylist?.persistentModelID ?? selectedPlaylistID ?? ttsQueue.currentPlaylistID(),
             entryID: item.persistentModelID
         )
     }
@@ -556,11 +591,9 @@ struct TTSControlView: View {
     private func syncSelection() {
         if let currentID = ttsQueue.currentPlaylistID(),
            playlists.contains(where: { $0.persistentModelID == currentID }) {
-            focusedPlaylistID = currentID
             selectedPlaylistID = currentID
         } else {
             let firstPlaylistID = playlists.first?.persistentModelID
-            focusedPlaylistID = firstPlaylistID
             selectedPlaylistID = firstPlaylistID
         }
     }
@@ -578,11 +611,6 @@ struct TTSControlView: View {
     private var displayedPlaylist: TTSPlaylist? {
         if let selectedPlaylistID,
            let playlist = playlists.first(where: { $0.persistentModelID == selectedPlaylistID }) {
-            return playlist
-        }
-
-        if let focusedPlaylistID,
-           let playlist = playlists.first(where: { $0.persistentModelID == focusedPlaylistID }) {
             return playlist
         }
         return ttsQueue.playlist(with: ttsQueue.currentPlaylistID())
@@ -682,180 +710,37 @@ struct TTSControlView: View {
     private func suggestedPlaylistName() -> String {
         "Playlist \(playlists.count + 1)"
     }
-}
 
-private enum TTSTab: Hashable {
-    case player
-    case playlists
-}
-
-private struct PlaylistEditor: Identifiable {
-    let id = UUID()
-    let title: String
-    let name: String
-    let playlistID: PersistentIdentifier?
-}
-
-private struct PlaylistEntryEditor: Identifiable {
-    let id = UUID()
-    let title: String
-    let text: String
-    let role: TTSPlaylistRole
-    let playlistID: PersistentIdentifier?
-    let entryID: PersistentIdentifier?
-}
-
-private struct PlaylistEditorSheet: View {
-    let title: String
-    let onCancel: () -> Void
-    let onSave: (String) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var draftName: String
-
-    init(title: String, name: String, onCancel: @escaping () -> Void, onSave: @escaping (String) -> Void) {
-        self.title = title
-        self.onCancel = onCancel
-        self.onSave = onSave
-        _draftName = State(initialValue: name)
+    private func selectPlaylist(_ playlistID: PersistentIdentifier?) {
+        selectedPlaylistID = playlistID
+        ttsQueue.selectPlaylist(id: playlistID)
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: AppDefaults.paddingLarge) {
-            Text(title)
-                .font(.title3.weight(.semibold))
-
-            TextField("Playlist name", text: $draftName)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit(save)
-
-            HStack(spacing: AppDefaults.paddingSmall) {
-                Spacer(minLength: 0)
-
-                Button("Cancel") {
-                    onCancel()
-                    dismiss()
-                }
-
-                Button("Save") {
-                    save()
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(!canSave)
-            }
-        }
-        .padding(AppDefaults.paddingLarge)
-        .frame(minWidth: 360, minHeight: 180)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous))
+    private func playPlaylist(_ playlistID: PersistentIdentifier) {
+        selectedPlaylistID = playlistID
+        ttsQueue.playPlaylist(id: playlistID)
     }
 
-    private var canSave: Bool {
-        !draftName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private func save() {
-        guard canSave else { return }
-        onSave(draftName)
-        dismiss()
-    }
-}
-
-private struct PlaylistEntryEditorSheet: View {
-    let title: String
-    let text: String
-    let role: TTSPlaylistRole
-    let onCancel: () -> Void
-    let onSave: (String, TTSPlaylistRole) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var draftText: String
-    @State private var draftRole: TTSPlaylistRole
-
-    init(title: String, text: String, role: TTSPlaylistRole, onCancel: @escaping () -> Void, onSave: @escaping (String, TTSPlaylistRole) -> Void) {
-        self.title = title
-        self.text = text
-        self.role = role
-        self.onCancel = onCancel
-        self.onSave = onSave
-        _draftText = State(initialValue: text)
-        _draftRole = State(initialValue: role)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: AppDefaults.paddingLarge) {
-            Text(title)
-                .font(.title3.weight(.semibold))
-
-            TextEditorWithPlaceholder(
-                text: $draftText,
-                placeholder: "Enter the entry text"
-            )
-            .frame(minHeight: 180)
-
-            Picker("", selection: $draftRole) {
-                ForEach(TTSPlaylistRole.allCases) { role in
-                    Text(role.displayName).tag(role)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-
-            HStack(spacing: AppDefaults.paddingSmall) {
-                Spacer(minLength: 0)
-
-                Button("Cancel") {
-                    onCancel()
-                    dismiss()
-                }
-
-                Button("Save") {
-                    save()
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(!canSave)
-            }
-        }
-        .padding(AppDefaults.paddingLarge)
-        .frame(minWidth: 460, minHeight: 340)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous))
-    }
-
-    private var canSave: Bool {
-        !draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private func save() {
-        guard canSave else { return }
-        onSave(draftText, draftRole)
-        dismiss()
-    }
-}
-
-private struct TextEditorWithPlaceholder: View {
-    @Binding var text: String
-    let placeholder: String
-
-    var body: some View {
-        ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous)
-                .fill(Color(nsColor: .textBackgroundColor))
-
-            TextEditor(text: $text)
-                .scrollContentBackground(.hidden)
-                .padding(4)
-
-            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Text(placeholder)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 11)
-                    .allowsHitTesting(false)
-            }
+    private func exportSelectedPlaylist() async {
+        guard let playlist = displayedPlaylist else { return }
+        do {
+            try await DataManager.shared.exportPlaylist(playlist)
+            vxAtelierPro.log.info("Exported playlist '\(playlist.name)'.")
+        } catch {
+            vxAtelierPro.log.error("Failed to export playlist '\(playlist.name)': \(error.localizedDescription)")
         }
     }
-}
 
-#Preview{
-    TTSControlView()
-        .bootstrapped(with: .preview())
+    private func importPlaylist(from url: URL) async {
+        do {
+            let playlist = try await DataManager.shared.importPlaylist(from: url, into: modelContext)
+            selectedPlaylistID = playlist.persistentModelID
+            ttsQueue.selectPlaylist(id: playlist.persistentModelID)
+            vxAtelierPro.log.info("Imported playlist '\(playlist.name)'.")
+        } catch {
+            playlistImportErrorMessage = error.localizedDescription
+            showPlaylistImportError = true
+            vxAtelierPro.log.error("Failed to import playlist: \(error.localizedDescription)")
+        }
+    }
 }

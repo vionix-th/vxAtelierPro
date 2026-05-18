@@ -283,6 +283,49 @@ class DataManager {
         let data = try JsonSerializer.exportPlaylist(playlist)
         try await FileHelper.shared.save(data: data, filename: "\(playlist.name).json")
     }
+
+    @MainActor
+    func importPlaylist(from url: URL, into context: ModelContext) async throws -> TTSPlaylist {
+        let didStartAccessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if didStartAccessing {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        do {
+            let data = try Data(contentsOf: url)
+            return try await importPlaylist(from: data, into: context)
+        } catch let error as DataManagerError {
+            throw error
+        } catch {
+            throw DataManagerError.importFailed(
+                reason: "Could not read playlist file",
+                underlyingErrors: [error]
+            )
+        }
+    }
+
+    @MainActor
+    func importPlaylist(from data: Data, into context: ModelContext) async throws -> TTSPlaylist {
+        do {
+            let playlist = try JsonSerializer.importPlaylist(from: data)
+            context.insert(playlist)
+            let queryManager = QueryManager(modelContext: context)
+            try queryManager.saveContext()
+            return playlist
+        } catch let error as DecodingError {
+            throw DataManagerError.importFailed(
+                reason: "File is not a valid playlist export",
+                underlyingErrors: [error]
+            )
+        } catch {
+            throw DataManagerError.importFailed(
+                reason: "Could not save imported playlist",
+                underlyingErrors: [error]
+            )
+        }
+    }
     
     @MainActor
     func exportProject(_ project: ProjectItem) async throws {
