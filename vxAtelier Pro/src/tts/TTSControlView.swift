@@ -31,6 +31,7 @@ struct TTSControlView: View {
 
                 playlistActionsBar
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .navigationTitle("Text to Speech")
             .sheet(item: $presentedPlaylistEditor) { editor in
                 PlaylistEditorSheet(
@@ -204,40 +205,50 @@ struct TTSControlView: View {
     }
 
     private var playlistsTab: some View {
-        List(selection: playlistSelectionBinding) {
-            Section("Playlists") {
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
+                Text("Playlists")
+                    .font(.headline)
+
                 if playlists.isEmpty {
                     TTSControlEmptySidebarState()
                 } else {
-                    ForEach(playlists) { playlist in
-                        TTSControlPlaylistRow(
-                            playlist: playlist,
-                            isSelected: playlist.persistentModelID == selectedPlaylistID,
-                            onSelect: { selectPlaylist(playlist.persistentModelID) },
-                            onPlay: { playPlaylist(playlist.persistentModelID) },
-                            onRename: {
-                                presentedPlaylistEditor = PlaylistEditor(
-                                    title: "Rename Playlist",
-                                    name: playlist.name,
-                                    playlistID: playlist.persistentModelID
-                                )
-                            },
-                            onDelete: {
-                                pendingPlaylistDeletionID = playlist.persistentModelID
-                            },
-                            onAddEntry: {
-                                presentPlaylistEntryEditor(
-                                    targetPlaylistID: playlist.persistentModelID,
-                                    playlistName: playlist.name
-                                )
-                            }
-                        )
-                            .tag(Optional(playlist.persistentModelID))
+                    LazyVStack(spacing: AppDefaults.paddingSmall) {
+                        ForEach(playlists) { playlist in
+                            TTSControlPlaylistRow(
+                                playlist: playlist,
+                                isSelected: playlist.persistentModelID == selectedPlaylistID,
+                                onSelect: { selectPlaylist(playlist.persistentModelID) },
+                                onPlay: { playPlaylist(playlist.persistentModelID) },
+                                onRename: {
+                                    presentedPlaylistEditor = PlaylistEditor(
+                                        title: "Rename Playlist",
+                                        name: playlist.name,
+                                        playlistID: playlist.persistentModelID
+                                    )
+                                },
+                                onDelete: {
+                                    pendingPlaylistDeletionID = playlist.persistentModelID
+                                },
+                                onAddEntry: {
+                                    presentPlaylistEntryEditor(
+                                        targetPlaylistID: playlist.persistentModelID,
+                                        playlistName: playlist.name
+                                    )
+                                }
+                            )
+                            .background(
+                                RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous)
+                                    .fill(playlist.persistentModelID == selectedPlaylistID ? Color.accentColor.opacity(0.08) : Color.clear)
+                            )
+                        }
                     }
                 }
             }
+            .padding(AppDefaults.paddingLarge)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .listStyle(.inset)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var playlistActionsBar: some View {
