@@ -12,6 +12,12 @@
 - Fully implement requested functionality: no new TODOs, placeholders, or missing pieces.
 - Do not make assumptions about existing types/properties/functions; verify in the codebase first.
 
+## SwiftUI sizing
+
+- Prefer adaptive SwiftUI layout: padding, alignment, min/max frames, layout priority, line limits, `ViewThatFits`, and custom `Layout` over exact dimensions.
+- Do not use `.frame(width:)`, `.frame(height:)`, screen bounds, or `GeometryReader` for ordinary sizing; exact sizes require a semantic reason such as icon/avatar slots, separators, hit targets, design tokens, or fixed-shape controls.
+- Use `.fixedSize()` only deliberately, preferably axis-specific, and never as a default substitute for proper layout negotiation.
+
 ## Backward Compatibility / Data Migration
 - This app has no stable release yet; persisted local data is disposable during development.
 - Do **not** add backward-compatibility layers, schema-history tracking, compatibility shims, or SwiftData migration stages for unreleased schema changes unless explicitly requested for a specific task.
