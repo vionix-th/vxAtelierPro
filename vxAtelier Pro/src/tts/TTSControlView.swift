@@ -296,8 +296,8 @@ struct TTSControlView: View {
 
     private func moveEntry(_ item: TTSPlaylistEntry, by offset: Int) {
         guard let index = displayedPlaylistEntryIndex(for: item) else { return }
-        let destination = index + offset
-        guard destination >= 0, destination < displayedPlaylistEntries.count else { return }
+        let destination = index + offset + (offset > 0 ? 1 : 0)
+        guard destination >= 0, destination <= displayedPlaylistEntries.count else { return }
         ttsQueue.moveEntries(from: IndexSet(integer: index), to: destination)
     }
 
