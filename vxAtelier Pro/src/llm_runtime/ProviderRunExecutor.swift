@@ -131,7 +131,7 @@ struct ProviderRunExecutor {
             return true
         case .provider(let statusCode, _, _):
             return statusCode == 408 || statusCode == 409 || statusCode == 425 || statusCode == 429 || (500...599).contains(statusCode)
-        case .invalidConfiguration, .invalidURL, .authUnavailable, .unsupportedCapability, .unsupportedParameter, .decoding, .cancelled:
+        case .invalidConfiguration, .invalidURL, .authUnavailable, .localModelUnavailable, .unsupportedCapability, .unsupportedParameter, .decoding, .cancelled:
             return false
         }
     }

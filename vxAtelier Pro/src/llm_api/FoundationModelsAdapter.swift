@@ -36,6 +36,17 @@ struct FoundationModelsAdapter: LLMProviderAdapter {
 @available(macOS 26.0, iOS 26.0, *)
 struct FoundationModelsBackend: LLMLocalModelBackend {
     let profile: LLMProviderProfile = LLMProviderRegistry.shared.profile(for: .appleIntelligence)
+    private let makeSession: FoundationModelsSessionFactory
+
+    init(
+        makeSession: @escaping FoundationModelsSessionFactory = { tools, transcript in
+            FoundationModelsLiveSession(
+                session: LanguageModelSession(model: .default, tools: tools, transcript: transcript)
+            )
+        }
+    ) {
+        self.makeSession = makeSession
+    }
 
     func availability() -> LLMLocalModelAvailability {
         #if canImport(FoundationModels)
@@ -131,84 +142,73 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
     ) async throws {
         let availability = availability()
         guard availability.isAvailable else {
-            throw LLMProviderError.authUnavailable(availability.statusText)
+            throw LLMProviderError.localModelUnavailable(availability.statusText)
         }
 
         continuation.yield(.runStarted(requestID: nil))
 
         #if canImport(FoundationModels)
-        let transcript = buildTranscript(from: request)
+        let transcript = try buildTranscript(from: request)
+        let transcriptEntryCount = transcript.count
         let promptText = currentPromptText(for: request)
         let options = generationOptions(from: request.options)
-        let toolRecorder = NativeToolExecutionRecorder()
         let bridgedTools = try buildTools(
             from: request.tools,
-            toolExecutor: toolExecutor,
-            recorder: toolRecorder
+            toolExecutor: toolExecutor
         )
-        let session = LanguageModelSession(model: .default, tools: bridgedTools, transcript: transcript)
-        let stream = session.streamResponse(options: options) {
-            Prompt(promptText)
+        let session = makeSession(bridgedTools, transcript)
+        if request.options.streamMode == .enabled {
+            let stream = session.streamResponse(options: options, prompt: Prompt(promptText))
+
+            var emittedText = ""
+            for try await currentText in stream {
+                let delta: String
+                if currentText.hasPrefix(emittedText) {
+                    delta = String(currentText.dropFirst(emittedText.count))
+                } else {
+                    delta = currentText
+                }
+                emittedText = currentText
+                if !delta.isEmpty {
+                    continuation.yield(.textDelta(delta))
+                }
+            }
+        } else {
+            let response = try await session.respond(options: options, prompt: Prompt(promptText))
+            let finalText = response
+            if !finalText.isEmpty {
+                continuation.yield(.textDelta(finalText))
+            }
         }
 
-        var emittedText = ""
-        for try await snapshot in stream {
-            let currentText = snapshot.content
-            let delta: String
-            if currentText.hasPrefix(emittedText) {
-                delta = String(currentText.dropFirst(emittedText.count))
-            } else {
-                delta = currentText
-            }
-            emittedText = currentText
-            if !delta.isEmpty {
-                continuation.yield(.textDelta(delta))
-            }
-        }
-
-        let records = await toolRecorder.snapshot()
-        for record in records.sorted(by: { $0.index < $1.index }) {
-            let call = LLMToolCall(
-                id: record.id,
-                callID: record.id,
-                index: record.index,
-                name: record.toolName,
-                argumentsJSON: record.argumentsJSON
-            )
-            continuation.yield(.toolCallCompleted(call))
-            continuation.yield(
-                .toolOutputCompleted(
-                    LLMToolOutput(
-                        id: record.id,
-                        callID: record.id,
-                        index: record.index,
-                        name: record.toolName,
-                        output: record.output
-                    )
-                )
-            )
+        for event in Self.nativeToolEvents(
+            from: session.transcript.dropFirst(transcriptEntryCount)
+        ) {
+            continuation.yield(event)
         }
 
         continuation.yield(.runCompleted(responseID: nil, modelID: request.modelID))
         #else
-        throw LLMProviderError.authUnavailable("Foundation Models framework unavailable in this build.")
+        throw LLMProviderError.localModelUnavailable("Foundation Models framework unavailable in this build.")
         #endif
     }
 
     #if canImport(FoundationModels)
-    private func buildTranscript(from request: LLMRequest) -> Transcript {
+    private func buildTranscript(from request: LLMRequest) throws -> Transcript {
         var entries: [Transcript.Entry] = []
         var toolNamesByID: [String: String] = [:]
+        let toolDefinitions = try transcriptToolDefinitions(from: request.tools)
 
-        if !request.options.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        let systemPrompt = request.options.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !systemPrompt.isEmpty || !toolDefinitions.isEmpty {
             entries.append(
                 .instructions(
                     Transcript.Instructions(
                         id: "system",
-                        segments: [
-                            .text(Transcript.TextSegment(content: request.options.systemPrompt))
-                        ],
-                        toolDefinitions: []
+                        segments: systemPrompt.isEmpty
+                            ? []
+                            : [.text(Transcript.TextSegment(content: request.options.systemPrompt))],
+                        toolDefinitions: toolDefinitions
                     )
                 )
             )
@@ -254,13 +254,13 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
 
                 let calls = message.toolCalls.sorted { $0.index < $1.index }
                 if !calls.isEmpty {
-                    let transcriptCalls = calls.map { call -> Transcript.ToolCall in
+                    let transcriptCalls = try calls.map { call -> Transcript.ToolCall in
                         let callID = call.callID ?? call.id
                         toolNamesByID[callID] = call.name
                         return Transcript.ToolCall(
                             id: callID,
                             toolName: call.name,
-                            arguments: Self.generatedContent(from: call.argumentsJSON)
+                            arguments: try Self.generatedContent(from: call.argumentsJSON)
                         )
                     }
                     entries.append(.toolCalls(Transcript.ToolCalls(transcriptCalls)))
@@ -287,10 +287,23 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
         return Transcript(entries: entries)
     }
 
+    private func transcriptToolDefinitions(from definitions: [LLMToolDefinition]) throws -> [Transcript.ToolDefinition] {
+        try definitions.map { definition in
+            Transcript.ToolDefinition(
+                name: definition.name,
+                description: definition.description,
+                parameters: try Self.generationSchema(
+                    from: definition.parameters,
+                    name: definition.name,
+                    description: definition.description
+                )
+            )
+        }
+    }
+
     private func buildTools(
         from definitions: [LLMToolDefinition],
-        toolExecutor: LLMToolExecutionHandler?,
-        recorder: NativeToolExecutionRecorder
+        toolExecutor: LLMToolExecutionHandler?
     ) throws -> [any Tool] {
         guard !definitions.isEmpty else {
             return []
@@ -301,8 +314,7 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
         return try definitions.map { definition in
             try FoundationModelsToolBridge(
                 definition: definition,
-                toolExecutor: toolExecutor,
-                recorder: recorder
+                toolExecutor: toolExecutor
             )
         }
     }
@@ -330,8 +342,12 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
         )
     }
 
-    private static func generatedContent(from jsonString: String) -> GeneratedContent {
-        (try? GeneratedContent(json: jsonString)) ?? GeneratedContent(kind: .structure(properties: [:], orderedKeys: []))
+    static func generatedContent(from jsonString: String) throws -> GeneratedContent {
+        do {
+            return try GeneratedContent(json: jsonString)
+        } catch {
+            throw LLMProviderError.decoding("Invalid persisted tool-call arguments for Foundation Models: \(error.localizedDescription)")
+        }
     }
 
     private static func modelMetadataJSON(availability: LLMLocalModelAvailability, contextSize: Int) -> String? {
@@ -345,82 +361,68 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
         }
         return string
     }
-    #endif
-}
 
-#if canImport(FoundationModels)
-@available(macOS 26.0, iOS 26.0, *)
-private actor NativeToolExecutionRecorder {
-    struct Record: Sendable {
-        var index: Int
-        var id: String
-        var toolName: String
-        var argumentsJSON: String
-        var output: String
-    }
+    private static func nativeToolEvents(from transcriptEntries: some Sequence<Transcript.Entry>) -> [LLMStreamEvent] {
+        var events: [LLMStreamEvent] = []
+        var nextIndex = 0
+        var indexByCallID: [String: Int] = [:]
 
-    private var records: [Record] = []
-
-    func begin(toolName: String, argumentsJSON: String) -> Record {
-        let record = Record(
-            index: records.count,
-            id: UUID().uuidString,
-            toolName: toolName,
-            argumentsJSON: argumentsJSON,
-            output: ""
-        )
-        records.append(record)
-        return record
-    }
-
-    func finish(id: String, output: String) {
-        guard let index = records.firstIndex(where: { $0.id == id }) else { return }
-        records[index].output = output
-    }
-
-    func snapshot() -> [Record] {
-        records
-    }
-}
-
-@available(macOS 26.0, iOS 26.0, *)
-private struct FoundationModelsToolBridge: Tool {
-    typealias Arguments = GeneratedContent
-    typealias Output = String
-
-    let name: String
-    let description: String
-    let parameters: GenerationSchema
-    let includesSchemaInInstructions: Bool = true
-
-    private let toolExecutor: LLMToolExecutionHandler
-    private let recorder: NativeToolExecutionRecorder
-
-    init(
-        definition: LLMToolDefinition,
-        toolExecutor: @escaping LLMToolExecutionHandler,
-        recorder: NativeToolExecutionRecorder
-    ) throws {
-        self.name = definition.name
-        self.description = definition.description
-        self.toolExecutor = toolExecutor
-        self.recorder = recorder
-        self.parameters = try Self.generationSchema(from: definition.parameters, name: definition.name, description: definition.description)
-    }
-
-    func call(arguments: GeneratedContent) async throws -> String {
-        let argumentsJSON = arguments.jsonString
-        let record = await recorder.begin(toolName: name, argumentsJSON: argumentsJSON)
-        do {
-            let output = try await toolExecutor(name, argumentsJSON)
-            await recorder.finish(id: record.id, output: output)
-            return output
-        } catch {
-            throw error
+        for entry in transcriptEntries {
+            switch entry {
+            case .toolCalls(let calls):
+                for call in calls {
+                    let index = nextIndex
+                    nextIndex += 1
+                    indexByCallID[call.id] = index
+                    events.append(
+                        .toolCallCompleted(
+                            LLMToolCall(
+                                id: call.id,
+                                callID: call.id,
+                                index: index,
+                                name: call.toolName,
+                                argumentsJSON: call.arguments.jsonString
+                            )
+                        )
+                    )
+                }
+            case .toolOutput(let output):
+                let index = indexByCallID[output.id] ?? nextIndex
+                events.append(
+                    .toolOutputCompleted(
+                        LLMToolOutput(
+                            id: output.id,
+                            callID: output.id,
+                            index: index,
+                            name: output.toolName,
+                            output: Self.textContent(from: output.segments)
+                        )
+                    )
+                )
+            default:
+                continue
+            }
         }
+
+        return events
     }
 
-    private static func generationSchema(
+    private static func textContent(from segments: [Transcript.Segment]) -> String {
+        segments
+            .map { segment -> String in
+                switch segment {
+                case .text(let text):
+                    return text.content
+                case .structure(let structured):
+                    return structured.content.jsonString
+                @unknown default:
+                    return ""
+                }
+            }
+            .joined()
+    }
+
+    fileprivate static func generationSchema(
         from json: JSONValue,
         name: String,
         description: String
@@ -431,7 +433,7 @@ private struct FoundationModelsToolBridge: Tool {
         )
     }
 
-    private static func dynamicSchema(
+    fileprivate static func dynamicSchema(
         from json: JSONValue,
         name: String? = nil,
         description: String? = nil
@@ -499,5 +501,86 @@ private struct FoundationModelsToolBridge: Tool {
 
         return DynamicGenerationSchema(type: String.self)
     }
+    #endif
 }
+
+#if canImport(FoundationModels)
+@available(macOS 26.0, iOS 26.0, *)
+private struct FoundationModelsToolBridge: Tool {
+    typealias Arguments = GeneratedContent
+    typealias Output = String
+
+    let name: String
+    let description: String
+    let parameters: GenerationSchema
+    let includesSchemaInInstructions: Bool = false
+
+    private let toolExecutor: LLMToolExecutionHandler
+
+    init(
+        definition: LLMToolDefinition,
+        toolExecutor: @escaping LLMToolExecutionHandler
+    ) throws {
+        self.name = definition.name
+        self.description = definition.description
+        self.toolExecutor = toolExecutor
+        self.parameters = try FoundationModelsBackend.generationSchema(
+            from: definition.parameters,
+            name: definition.name,
+            description: definition.description
+        )
+    }
+
+    func call(arguments: GeneratedContent) async throws -> String {
+        let argumentsJSON = arguments.jsonString
+        return try await toolExecutor(name, argumentsJSON)
+    }
+}
+
+@available(macOS 26.0, iOS 26.0, *)
+protocol FoundationModelsSessioning: Sendable {
+    var transcript: Transcript { get }
+
+    func respond(options: GenerationOptions, prompt: Prompt) async throws -> String
+    func streamResponse(options: GenerationOptions, prompt: Prompt) -> AsyncThrowingStream<String, Error>
+}
+
+@available(macOS 26.0, iOS 26.0, *)
+typealias FoundationModelsSessionFactory = @Sendable (_ tools: [any Tool], _ transcript: Transcript) -> any FoundationModelsSessioning
+
+@available(macOS 26.0, iOS 26.0, *)
+private struct FoundationModelsLiveSession: FoundationModelsSessioning {
+    let session: LanguageModelSession
+
+    var transcript: Transcript {
+        session.transcript
+    }
+
+    func respond(options: GenerationOptions, prompt: Prompt) async throws -> String {
+        try await session.respond(to: prompt, options: options).content
+    }
+
+    func streamResponse(options: GenerationOptions, prompt: Prompt) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    let stream = session.streamResponse(to: prompt, options: options)
+                    for try await snapshot in stream {
+                        continuation.yield(snapshot.content)
+                    }
+                    continuation.finish()
+                } catch is CancellationError {
+                    continuation.finish(throwing: CancellationError())
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
+    }
+}
+
 #endif

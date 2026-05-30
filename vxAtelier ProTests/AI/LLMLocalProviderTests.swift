@@ -4,6 +4,9 @@ import XCTest
 #else
 @testable import vxAtelier_Pro
 #endif
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
 
 @MainActor
 final class LLMLocalProviderTests: XCTestCase {
@@ -94,7 +97,7 @@ final class LLMLocalProviderTests: XCTestCase {
             _ = try await collectEvents(adapter.stream(request, configuration: configuration))
             XCTFail("Expected adapter to fail when backend is unavailable.")
         } catch let error as LLMProviderError {
-            XCTAssertEqual(error, .authUnavailable("Apple Intelligence unavailable."))
+            XCTAssertEqual(error, .localModelUnavailable("Apple Intelligence unavailable."))
         }
     }
 
@@ -140,7 +143,8 @@ private final class MockLocalModelBackend: LLMLocalModelBackend {
 
     func stream(
         request: LLMRequest,
-        configuration: LLMProviderConfiguration
+        configuration: LLMProviderConfiguration,
+        toolExecutor: LLMToolExecutionHandler?
     ) -> AsyncThrowingStream<LLMStreamEvent, Error> {
         AsyncThrowingStream { continuation in
             streamFactory(continuation)
@@ -148,3 +152,243 @@ private final class MockLocalModelBackend: LLMLocalModelBackend {
     }
 }
 
+#if canImport(FoundationModels)
+@available(macOS 26.0, iOS 26.0, *)
+@MainActor
+final class FoundationModelsBackendTests: XCTestCase {
+    func testGeneratedContentThrowsOnInvalidJSON() {
+        XCTAssertThrowsError(try FoundationModelsBackend.generatedContent(from: "{invalid")) { error in
+            guard case .decoding(let message) = error as? LLMProviderError else {
+                return XCTFail("Expected decoding error, got \(error)")
+            }
+            XCTAssertTrue(message.contains("Invalid persisted tool-call arguments for Foundation Models"))
+        }
+    }
+
+    func testFoundationModelsBackendUsesRespondForNonStreamingRuns() async throws {
+        let session = MockFoundationModelsSession(
+            responseText: "Final answer",
+            streamText: ["Final answer"],
+            generatedEntries: [
+                .toolCalls(
+                    Transcript.ToolCalls([
+                        Transcript.ToolCall(
+                            id: "call-1",
+                            toolName: "lookup",
+                            arguments: try FoundationModelsBackend.generatedContent(from: "{\"q\":\"test\"}")
+                        )
+                    ])
+                ),
+                .toolOutput(
+                    Transcript.ToolOutput(
+                        id: "call-1",
+                        toolName: "lookup",
+                        segments: [
+                            .text(Transcript.TextSegment(content: "result"))
+                        ]
+                    )
+                )
+            ]
+        )
+        let backend = FoundationModelsBackend { _, transcript in
+            session.transcript = transcript
+            return session
+        }
+        let request = makeAppleRequest(streamMode: .disabled)
+
+        let events = try await collectEvents(backend.stream(
+            request: request,
+            configuration: .init(providerID: .appleIntelligence, baseURL: "", credential: .none),
+            toolExecutor: { _, _ in "result" }
+        ))
+
+        XCTAssertTrue(session.respondCalled)
+        XCTAssertFalse(session.streamCalled)
+        XCTAssertEqual(events, [
+            .runStarted(requestID: nil),
+            .textDelta("Final answer"),
+            .toolCallCompleted(LLMToolCall(
+                id: "call-1",
+                callID: "call-1",
+                index: 0,
+                name: "lookup",
+                argumentsJSON: "{\"q\":\"test\"}"
+            )),
+            .toolOutputCompleted(LLMToolOutput(
+                id: "call-1",
+                callID: "call-1",
+                index: 0,
+                name: "lookup",
+                output: "result"
+            )),
+            .runCompleted(responseID: nil, modelID: "apple-intelligence-default")
+        ])
+    }
+
+    func testFoundationModelsBackendUsesStreamForStreamingRuns() async throws {
+        let session = MockFoundationModelsSession(
+            responseText: "Final answer",
+            streamText: ["Fin", "Final answer"],
+            generatedEntries: [
+                .toolCalls(
+                    Transcript.ToolCalls([
+                        Transcript.ToolCall(
+                            id: "call-1",
+                            toolName: "lookup",
+                            arguments: try FoundationModelsBackend.generatedContent(from: "{\"q\":\"test\"}")
+                        )
+                    ])
+                ),
+                .toolOutput(
+                    Transcript.ToolOutput(
+                        id: "call-1",
+                        toolName: "lookup",
+                        segments: [
+                            .text(Transcript.TextSegment(content: "result"))
+                        ]
+                    )
+                )
+            ]
+        )
+        let backend = FoundationModelsBackend { _, transcript in
+            session.transcript = transcript
+            return session
+        }
+        let request = makeAppleRequest(streamMode: .enabled)
+
+        let events = try await collectEvents(backend.stream(
+            request: request,
+            configuration: .init(providerID: .appleIntelligence, baseURL: "", credential: .none),
+            toolExecutor: { _, _ in "result" }
+        ))
+
+        XCTAssertTrue(session.streamCalled)
+        XCTAssertFalse(session.respondCalled)
+        XCTAssertEqual(events, [
+            .runStarted(requestID: nil),
+            .textDelta("Fin"),
+            .textDelta("al answer"),
+            .toolCallCompleted(LLMToolCall(
+                id: "call-1",
+                callID: "call-1",
+                index: 0,
+                name: "lookup",
+                argumentsJSON: "{\"q\":\"test\"}"
+            )),
+            .toolOutputCompleted(LLMToolOutput(
+                id: "call-1",
+                callID: "call-1",
+                index: 0,
+                name: "lookup",
+                output: "result"
+            )),
+            .runCompleted(responseID: nil, modelID: "apple-intelligence-default")
+        ])
+    }
+
+    private func makeAppleRequest(streamMode: LLMGenerationOptions.StreamMode) -> LLMRequest {
+        let candidate = LLMModelDescriptor(
+            id: "apple-intelligence-default",
+            displayName: "Apple Intelligence",
+            providerID: .appleIntelligence,
+            contextSize: 4096,
+            capabilities: [.text, .tools, .streaming]
+        )
+
+        return LLMRequest(
+            providerID: .appleIntelligence,
+            adapterID: .foundationModels,
+            modelID: candidate.id,
+            modelCapabilities: candidate.capabilities,
+            messages: [
+                LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Hello")])
+            ],
+            tools: [
+                LLMToolDefinition(
+                    name: "lookup",
+                    description: "Lookup tool",
+                    parameters: .object([:])
+                )
+            ],
+            options: LLMGenerationOptions(streamMode: streamMode)
+        )
+    }
+
+    private func collectEvents(_ stream: AsyncThrowingStream<LLMStreamEvent, Error>) async throws -> [LLMStreamEvent] {
+        var events: [LLMStreamEvent] = []
+        for try await event in stream {
+            events.append(event)
+        }
+        return events
+    }
+}
+
+private final class MockFoundationModelsSession: @unchecked Sendable, FoundationModelsSessioning {
+    var transcript: Transcript
+    let responseText: String
+    let streamText: [String]
+    let generatedEntries: [Transcript.Entry]
+    private(set) var respondCalled = false
+    private(set) var streamCalled = false
+
+    init(
+        transcript: Transcript = Transcript(entries: [
+            .prompt(
+                Transcript.Prompt(
+                    segments: [
+                        .text(Transcript.TextSegment(content: "Hello"))
+                    ]
+                )
+            )
+        ]),
+        responseText: String,
+        streamText: [String],
+        generatedEntries: [Transcript.Entry]
+    ) {
+        self.transcript = transcript
+        self.responseText = responseText
+        self.streamText = streamText
+        self.generatedEntries = generatedEntries
+    }
+
+    func respond(options: GenerationOptions, prompt: Prompt) async throws -> String {
+        respondCalled = true
+        transcript = Transcript(entries: Array(transcript) + generatedEntries + [
+            .response(
+                Transcript.Response(
+                    assetIDs: [],
+                    segments: [
+                        .text(Transcript.TextSegment(content: responseText))
+                    ]
+                )
+            )
+        ])
+        return responseText
+    }
+
+    func streamResponse(options: GenerationOptions, prompt: Prompt) -> AsyncThrowingStream<String, Error> {
+        streamCalled = true
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                for text in streamText {
+                    continuation.yield(text)
+                }
+                transcript = Transcript(entries: Array(transcript) + generatedEntries + [
+                    .response(
+                        Transcript.Response(
+                            assetIDs: [],
+                            segments: [
+                                .text(Transcript.TextSegment(content: responseText))
+                            ]
+                        )
+                    )
+                ])
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
+    }
+}
+#endif

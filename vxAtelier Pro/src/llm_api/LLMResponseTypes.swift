@@ -15,6 +15,7 @@ enum LLMProviderError: Error, LocalizedError, Equatable {
     case invalidConfiguration(String)
     case invalidURL(String)
     case authUnavailable(String)
+    case localModelUnavailable(String)
     case unsupportedCapability(String)
     case unsupportedParameter(String)
     case network(String)
@@ -28,6 +29,7 @@ enum LLMProviderError: Error, LocalizedError, Equatable {
         case .invalidConfiguration(let message): return message
         case .invalidURL(let message): return message
         case .authUnavailable(let message): return message
+        case .localModelUnavailable(let message): return message
         case .unsupportedCapability(let message): return message
         case .unsupportedParameter(let message): return message
         case .network(let message): return message
