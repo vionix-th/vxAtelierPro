@@ -15,20 +15,20 @@ struct FoundationModelsAdapter: LLMProviderAdapter {
         self.backend = backend
     }
 
-    func stream(
-        _ request: LLMRequest,
+    func generateEvents(
+        _ request: LLMGenerationRequest,
         configuration: LLMProviderConfiguration,
         toolExecutor: LLMToolExecutionHandler?
-    ) -> AsyncThrowingStream<LLMStreamEvent, Error> {
-        backend.stream(
+    ) -> AsyncThrowingStream<LLMGenerationEvent, Error> {
+        backend.generateEvents(
             request: request,
             configuration: configuration,
             toolExecutor: toolExecutor
         )
     }
 
-    func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
-        backend.modelCandidates(configuration: configuration)
+    func fetchModelMetadata(configuration: LLMProviderConfiguration) async throws -> [LLMModelMetadata] {
+        backend.modelMetadata(configuration: configuration)
     }
 }
 
@@ -70,13 +70,13 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
         #endif
     }
 
-    func modelCandidates(configuration: LLMProviderConfiguration) -> [LLMModelDescriptor] {
+    func modelMetadata(configuration: LLMProviderConfiguration) -> [LLMModelMetadata] {
         #if canImport(FoundationModels)
         let model = SystemLanguageModel.default
         let availability = availability()
         let contextSize = model.contextSize
         return [
-            LLMModelDescriptor(
+            LLMModelMetadata(
                 id: "apple-intelligence-default",
                 displayName: "Apple Intelligence",
                 providerID: .appleIntelligence,
@@ -90,7 +90,7 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
         ]
         #else
         return [
-            LLMModelDescriptor(
+            LLMModelMetadata(
                 id: "apple-intelligence-default",
                 displayName: "Apple Intelligence",
                 providerID: .appleIntelligence,
@@ -105,11 +105,11 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
         #endif
     }
 
-    func stream(
-        request: LLMRequest,
+    func generateEvents(
+        request: LLMGenerationRequest,
         configuration: LLMProviderConfiguration,
         toolExecutor: LLMToolExecutionHandler?
-    ) -> AsyncThrowingStream<LLMStreamEvent, Error> {
+    ) -> AsyncThrowingStream<LLMGenerationEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
@@ -135,17 +135,17 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
     }
 
     private func run(
-        request: LLMRequest,
+        request: LLMGenerationRequest,
         configuration: LLMProviderConfiguration,
         toolExecutor: LLMToolExecutionHandler?,
-        continuation: AsyncThrowingStream<LLMStreamEvent, Error>.Continuation
+        continuation: AsyncThrowingStream<LLMGenerationEvent, Error>.Continuation
     ) async throws {
         let availability = availability()
         guard availability.isAvailable else {
             throw LLMProviderError.localModelUnavailable(availability.statusText)
         }
 
-        continuation.yield(.runStarted(requestID: nil))
+        continuation.yield(.generationStarted(requestID: nil))
 
         #if canImport(FoundationModels)
         let transcript = try buildTranscript(from: request)
@@ -187,14 +187,14 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
             continuation.yield(event)
         }
 
-        continuation.yield(.runCompleted(responseID: nil, modelID: request.modelID))
+        continuation.yield(.generationCompleted(responseID: nil, modelID: request.modelID))
         #else
         throw LLMProviderError.localModelUnavailable("Foundation Models framework unavailable in this build.")
         #endif
     }
 
     #if canImport(FoundationModels)
-    private func buildTranscript(from request: LLMRequest) throws -> Transcript {
+    private func buildTranscript(from request: LLMGenerationRequest) throws -> Transcript {
         var entries: [Transcript.Entry] = []
         var toolNamesByID: [String: String] = [:]
         let toolDefinitions = try transcriptToolDefinitions(from: request.tools)
@@ -233,19 +233,19 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
                     .prompt(
                         Transcript.Prompt(
                             segments: [
-                                .text(Transcript.TextSegment(content: message.displayText))
+                                .text(Transcript.TextSegment(content: message.textContent))
                             ]
                         )
                     )
                 )
             case "assistant":
-                if !message.displayText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if !message.textContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     entries.append(
                         .response(
                             Transcript.Response(
                                 assetIDs: [],
                                 segments: [
-                                    .text(Transcript.TextSegment(content: message.displayText))
+                                    .text(Transcript.TextSegment(content: message.textContent))
                                 ]
                             )
                         )
@@ -267,14 +267,14 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
                 }
             case "tool":
                 guard let toolCallID = message.toolCallID else { continue }
-                let toolName = toolNamesByID[toolCallID] ?? (message.displayText.isEmpty ? "tool" : message.displayText)
+                let toolName = toolNamesByID[toolCallID] ?? (message.textContent.isEmpty ? "tool" : message.textContent)
                 entries.append(
                     .toolOutput(
                         Transcript.ToolOutput(
                             id: toolCallID,
                             toolName: toolName,
                             segments: [
-                                .text(Transcript.TextSegment(content: message.displayText))
+                                .text(Transcript.TextSegment(content: message.textContent))
                             ]
                         )
                     )
@@ -319,7 +319,7 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
         }
     }
 
-    private func currentPromptText(for request: LLMRequest) -> String {
+    private func currentPromptText(for request: LLMGenerationRequest) -> String {
         guard let lastMessage = request.messages.last else {
             return "Continue."
         }
@@ -327,9 +327,9 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
         case "tool":
             return "Continue using the tool outputs above."
         case "assistant":
-            return lastMessage.displayText.isEmpty ? "Continue." : lastMessage.displayText
+            return lastMessage.textContent.isEmpty ? "Continue." : lastMessage.textContent
         default:
-            return lastMessage.displayText.isEmpty ? "Continue." : lastMessage.displayText
+            return lastMessage.textContent.isEmpty ? "Continue." : lastMessage.textContent
         }
     }
 
@@ -362,8 +362,8 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
         return string
     }
 
-    private static func nativeToolEvents(from transcriptEntries: some Sequence<Transcript.Entry>) -> [LLMStreamEvent] {
-        var events: [LLMStreamEvent] = []
+    private static func nativeToolEvents(from transcriptEntries: some Sequence<Transcript.Entry>) -> [LLMGenerationEvent] {
+        var events: [LLMGenerationEvent] = []
         var nextIndex = 0
         var indexByCallID: [String: Int] = [:]
 

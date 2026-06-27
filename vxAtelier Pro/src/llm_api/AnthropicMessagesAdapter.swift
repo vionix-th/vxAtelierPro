@@ -9,12 +9,12 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
     private let httpClient = LLMHTTPClient()
 
     /// Executes a Messages request through the shared adapter run loop.
-    func stream(
-        _ request: LLMRequest,
+    func generateEvents(
+        _ request: LLMGenerationRequest,
         configuration: LLMProviderConfiguration,
         toolExecutor: LLMToolExecutionHandler?
-    ) -> AsyncThrowingStream<LLMStreamEvent, Error> {
-        return LLMAdapterRunLoop.stream(
+    ) -> AsyncThrowingStream<LLMGenerationEvent, Error> {
+        return LLMHTTPGenerationPipeline.generateEvents(
             request: request,
             configuration: configuration,
             profile: profile,
@@ -36,7 +36,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
     }
 
     /// Fetches Anthropic model metadata and maps it into candidates.
-    func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
+    func fetchModelMetadata(configuration: LLMProviderConfiguration) async throws -> [LLMModelMetadata] {
         let response: JSONValue = try await httpClient.getJSON(
             path: Self.modelsPath,
             configuration: httpClient.makeConfiguration(for: configuration),
@@ -47,7 +47,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
     }
 
     /// Encodes a provider-neutral request into an Anthropic Messages JSON body.
-    func makeBody(for request: LLMRequest, stream: Bool) throws -> [String: JSONValue] {
+    func makeBody(for request: LLMGenerationRequest, stream: Bool) throws -> [String: JSONValue] {
         var body: [String: JSONValue] = [
             "model": .string(request.modelID),
             "messages": .array(try anthropicMessages(from: request)),
@@ -56,11 +56,11 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
         if !request.options.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             body["system"] = .string(request.options.systemPrompt)
         }
-        let mappings = LLMParameterMappingResolver.resolve(
+        let mappings = LLMParameterMappingIndex.resolve(
             adapterID: request.adapterID,
             mappings: request.parameterMappings
         )
-        try LLMParameterRequestEncoder.applyScalarOptions(
+        try LLMParameterWireEncoder.applyScalarOptions(
             request.options, to: &body, mappings: mappings)
         if let budgetTokens = request.options.reasoningBudgetTokens {
             body["thinking"] = .object([
@@ -83,7 +83,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
     }
 
     /// Converts conversation history into Anthropic message objects and tool-result groups.
-    func anthropicMessages(from request: LLMRequest) throws -> [JSONValue] {
+    func anthropicMessages(from request: LLMGenerationRequest) throws -> [JSONValue] {
         var messages: [JSONValue] = []
         var index = request.messages.startIndex
         while index < request.messages.endIndex {
@@ -106,7 +106,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
                         .object([
                             "type": .string("tool_result"),
                             "tool_use_id": .string(toolCallID),
-                            "content": .string(toolMessage.displayText),
+                            "content": .string(toolMessage.textContent),
                         ]))
                     index = request.messages.index(after: index)
                 }
@@ -198,11 +198,11 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
     private func handleStreamEvent(
         _ event: [String: JSONValue],
         assembler: inout LLMToolCallAssembler,
-        continuation: AsyncThrowingStream<LLMStreamEvent, Error>.Continuation
+        continuation: AsyncThrowingStream<LLMGenerationEvent, Error>.Continuation
     ) {
         switch event.string("type") {
         case "message_start":
-            continuation.yield(.runStarted(requestID: event.object("message")?.string("id")))
+            continuation.yield(.generationStarted(requestID: event.object("message")?.string("id")))
         case "content_block_delta":
             guard let delta = event.object("delta") else { return }
             if let text = delta.string("text") {
@@ -237,7 +237,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
                             outputTokens: usage.int("output_tokens"), totalTokens: nil)))
             }
         case "message_stop":
-            continuation.yield(.runCompleted(responseID: nil, modelID: nil))
+            continuation.yield(.generationCompleted(responseID: nil, modelID: nil))
         default:
             break
         }
@@ -246,7 +246,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
     /// Emits normalized events from a complete Anthropic Messages JSON response.
     private func emitResponse(
         _ response: JSONValue,
-        continuation: AsyncThrowingStream<LLMStreamEvent, Error>.Continuation
+        continuation: AsyncThrowingStream<LLMGenerationEvent, Error>.Continuation
     ) {
         guard let object = response.objectValue else { return }
         if let content = object.array("content") {
@@ -277,7 +277,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
                         outputTokens: usage.int("output_tokens"))))
         }
         continuation.yield(
-            .runCompleted(responseID: object.string("id"), modelID: object.string("model")))
+            .generationCompleted(responseID: object.string("id"), modelID: object.string("model")))
     }
 
     /// Parses assistant tool-call arguments into the JSON object required by Anthropic.

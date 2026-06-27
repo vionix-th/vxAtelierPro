@@ -1,24 +1,24 @@
 import Foundation
 
 /// Shared adapter loop that validates requests and normalizes streaming/non-streaming HTTP execution.
-enum LLMAdapterRunLoop {
-    typealias Continuation = AsyncThrowingStream<LLMStreamEvent, Error>.Continuation
+enum LLMHTTPGenerationPipeline {
+    typealias Continuation = AsyncThrowingStream<LLMGenerationEvent, Error>.Continuation
     typealias BodyBuilder = (Bool) throws -> [String: JSONValue]
     typealias NonStreamingEmitter = (JSONValue, Continuation) -> Void
     typealias StreamingEventHandler = ([String: JSONValue], inout LLMToolCallAssembler, Continuation) -> Void
 
     /// Executes one provider request and delegates provider-specific encoding and event interpretation to closures.
-    static func stream(
-        request: LLMRequest,
+    static func generateEvents(
+        request: LLMGenerationRequest,
         configuration: LLMProviderConfiguration,
         profile: LLMProviderProfile,
         httpClient: LLMHTTPClient,
         endpoint: String,
-        completionPolicy: LLMStreamCompletionPolicy,
+        completionPolicy: LLMSSECompletionPolicy,
         makeBody: @escaping BodyBuilder,
         emitNonStreaming: @escaping NonStreamingEmitter,
         handleStreamingEvent: @escaping StreamingEventHandler
-    ) -> AsyncThrowingStream<LLMStreamEvent, Error> {
+    ) -> AsyncThrowingStream<LLMGenerationEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
@@ -26,7 +26,7 @@ enum LLMAdapterRunLoop {
                     let streamEnabled = LLMCapabilityValidator.streamEnabled(for: request)
                     let body = try makeBody(streamEnabled)
                     let httpConfig = httpClient.makeConfiguration(for: configuration)
-                    continuation.yield(.runStarted(requestID: nil))
+                    continuation.yield(.generationStarted(requestID: nil))
 
                     if streamEnabled {
                         try await collectStream(
@@ -63,7 +63,7 @@ enum LLMAdapterRunLoop {
         httpConfig: LLMHTTPClient.Configuration,
         body: [String: JSONValue],
         httpClient: LLMHTTPClient,
-        completionPolicy: LLMStreamCompletionPolicy,
+        completionPolicy: LLMSSECompletionPolicy,
         continuation: Continuation,
         handleStreamingEvent: StreamingEventHandler
     ) async throws {
@@ -88,7 +88,7 @@ enum LLMAdapterRunLoop {
             continuation.yield(.toolCallCompleted(call))
         }
         if !completionPolicy.requiresExplicitCompletionEvent {
-            continuation.yield(.runCompleted(responseID: nil, modelID: nil))
+            continuation.yield(.generationCompleted(responseID: nil, modelID: nil))
         } else if !sawRunCompleted {
             throw LLMProviderError.decoding("Provider stream ended before completion event.")
         }

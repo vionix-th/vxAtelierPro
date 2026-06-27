@@ -70,7 +70,7 @@ final class TTSPlaylistEntry {
         self.playlist = playlist
     }
 
-    var displayText: String {
+    var textContent: String {
         text
     }
 }

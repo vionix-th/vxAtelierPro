@@ -175,11 +175,11 @@ struct LLMProviderRegistry {
     }
 
     /// Returns the synthetic model candidates exposed by a local-model backend.
-    func localModelCandidates(
+    func localModelMetadata(
         for providerID: LLMProviderID,
         configuration: LLMProviderConfiguration
-    ) -> [LLMModelDescriptor] {
-        localBackend(for: providerID)?.modelCandidates(configuration: configuration) ?? []
+    ) -> [LLMModelMetadata] {
+        localBackend(for: providerID)?.modelMetadata(configuration: configuration) ?? []
     }
 
     /// Returns the local backend associated with one provider profile.

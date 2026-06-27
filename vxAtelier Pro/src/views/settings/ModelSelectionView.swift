@@ -9,7 +9,7 @@ struct ModelSelectionView: View {
     let selectedModel: String
     let onModelSelected: (String) -> Void
     let apiConfiguration: APIConfigurationItem?
-    var draftModelCandidates: [LLMModelDescriptor]? = nil
+    var draftModelCandidates: [LLMModelMetadata]? = nil
 
     @State private var showAllModels = false
     @State private var searchText = ""
@@ -22,8 +22,8 @@ struct ModelSelectionView: View {
     private var filteredModels: [ModelSelectionOption] {
         var models: [ModelSelectionOption]
         if let draftModelCandidates {
-            models = draftModelCandidates.map {
-                ModelSelectionOption(descriptor: $0, groupName: apiConfiguration?.name ?? $0.providerID.displayName)
+            models = draftModelCandidates.map { metadata in
+                ModelSelectionOption(metadata: metadata, groupName: apiConfiguration?.name ?? metadata.providerID.displayName)
             }
         } else if let apiConfiguration, !showAllModels {
             models = allModels
@@ -219,13 +219,13 @@ private struct ModelSelectionOption: Identifiable {
         self.apiConfigurationID = model.apiConfiguration?.id
     }
 
-    init(descriptor: LLMModelDescriptor, groupName: String) {
-        self.id = "descriptor-\(descriptor.providerID.rawValue)-\(descriptor.id)"
-        self.name = descriptor.id
-        self.provider = descriptor.providerID.displayName
-        self.contextSize = descriptor.contextSize ?? 0
-        self.capabilities = descriptor.capabilities
-        self.metadataSearchTerms = descriptor.capabilities.map(\.displayName)
+    init(metadata: LLMModelMetadata, groupName: String) {
+        self.id = "metadata-\(metadata.providerID.rawValue)-\(metadata.id)"
+        self.name = metadata.id
+        self.provider = metadata.providerID.displayName
+        self.contextSize = metadata.contextSize ?? 0
+        self.capabilities = metadata.capabilities
+        self.metadataSearchTerms = metadata.capabilities.map(\.displayName)
         self.groupName = groupName
         self.apiConfigurationID = nil
     }

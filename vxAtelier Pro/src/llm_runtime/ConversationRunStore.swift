@@ -44,7 +44,7 @@ struct ConversationRunStore {
     /// Creates a persisted provider run and transitions it into streaming state.
     @MainActor
     func createResponseRun(
-        for request: LLMRequest,
+        for request: LLMGenerationRequest,
         turn: ConversationTurn,
         conversation: ConversationItem
     ) throws -> ResponseRunItem {
@@ -56,7 +56,7 @@ struct ConversationRunStore {
             turn: turn
         )
         turn.responseRuns.append(run)
-        try run.transition(to: .streaming)
+        try run.transition(to: .running)
         try save(conversation)
         return run
     }

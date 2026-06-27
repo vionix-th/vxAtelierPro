@@ -15,30 +15,30 @@ enum OpenAICompatibleEncoding {
     static func applyMappedOptions(
         _ options: LLMGenerationOptions,
         to body: inout [String: JSONValue],
-        mappings: [LLMParameterID: LLMParameterMappingDescriptor],
+        mappings: [LLMParameterID: LLMParameterMapping],
         reservedProviderExtraKeys: Set<String> = []
     ) throws {
-        var providerExtras = options.providerExtras
+        var providerSpecificOptions = options.providerSpecificOptions
         for mapping in mappings.values {
-            guard let value = options.jsonValue(for: mapping.semanticParameterID) else { continue }
-            providerExtras.removeValue(forKey: mapping.semanticParameterID.rawValue)
+            guard let value = options.jsonValue(for: mapping.parameterID) else { continue }
+            providerSpecificOptions.removeValue(forKey: mapping.parameterID.rawValue)
 
             switch mapping.encodingKind {
             case .scalarKey:
                 guard !mapping.wireKey.isEmpty else {
-                    throw LLMProviderError.unsupportedParameter("\(mapping.semanticParameterID.rawValue) has no wire key.")
+                    throw LLMProviderError.unsupportedParameter("\(mapping.parameterID.rawValue) has no wire key.")
                 }
                 body[mapping.wireKey] = value
             case .structuredPreset:
-                try applyStructuredPreset(mapping.structuredPreset, value: value, providerExtras: &providerExtras, to: &body)
+                try applyStructuredPreset(mapping.structuredPreset, value: value, providerSpecificOptions: &providerSpecificOptions, to: &body)
             case .disabled:
                 continue
             }
         }
 
-        for (key, value) in providerExtras {
+        for (key, value) in providerSpecificOptions {
             guard !reservedProviderExtraKeys.contains(key), body[key] == nil else {
-                throw LLMProviderError.unsupportedParameter("providerExtras.\(key) cannot override a reserved request field.")
+                throw LLMProviderError.unsupportedParameter("providerSpecificOptions.\(key) cannot override a reserved request field.")
             }
             body[key] = value
         }
@@ -48,7 +48,7 @@ enum OpenAICompatibleEncoding {
     private static func applyStructuredPreset(
         _ preset: LLMParameterStructuredPreset?,
         value: JSONValue,
-        providerExtras: inout [String: JSONValue],
+        providerSpecificOptions: inout [String: JSONValue],
         to body: inout [String: JSONValue]
     ) throws {
         guard let preset else { return }
@@ -60,7 +60,7 @@ enum OpenAICompatibleEncoding {
             case "json_schema", "jsonSchema":
                 body["response_format"] = .object([
                     "type": .string("json_schema"),
-                    "json_schema": .object(try jsonSchemaPayload(from: &providerExtras))
+                    "json_schema": .object(try jsonSchemaPayload(from: &providerSpecificOptions))
                 ])
             default:
                 break
@@ -70,7 +70,7 @@ enum OpenAICompatibleEncoding {
             case "json_object", "jsonObject":
                 body["text"] = .object(["format": .object(["type": .string("json_object")])])
             case "json_schema", "jsonSchema":
-                var format = try jsonSchemaPayload(from: &providerExtras)
+                var format = try jsonSchemaPayload(from: &providerSpecificOptions)
                 format["type"] = .string("json_schema")
                 body["text"] = .object(["format": .object(format)])
             default:
@@ -103,10 +103,10 @@ enum OpenAICompatibleEncoding {
     }
 
     /// Removes and returns the caller-supplied JSON schema payload required by structured output.
-    private static func jsonSchemaPayload(from providerExtras: inout [String: JSONValue]) throws -> [String: JSONValue] {
-        guard let value = providerExtras.removeValue(forKey: "json_schema"),
+    private static func jsonSchemaPayload(from providerSpecificOptions: inout [String: JSONValue]) throws -> [String: JSONValue] {
+        guard let value = providerSpecificOptions.removeValue(forKey: "json_schema"),
               let object = value.objectValue else {
-            throw LLMProviderError.unsupportedParameter("response_format json_schema requires providerExtras.json_schema object.")
+            throw LLMProviderError.unsupportedParameter("response_format json_schema requires providerSpecificOptions.json_schema object.")
         }
         return object
     }
@@ -129,7 +129,7 @@ enum OpenAICompatibleEncoding {
     static func chatContent(from message: LLMMessage) throws -> JSONValue {
         let parts = message.content
         if isPlainText(parts) {
-            return .string(message.displayText)
+            return .string(message.textContent)
         }
 
         return .array(try parts.map { part in
@@ -165,7 +165,7 @@ enum OpenAICompatibleEncoding {
     static func responsesContent(from message: LLMMessage) throws -> JSONValue {
         let parts = message.content
         if isPlainText(parts) {
-            return .string(message.displayText)
+            return .string(message.textContent)
         }
 
         return .array(try parts.map { part in

@@ -61,7 +61,7 @@ struct LLMMessage: Codable, Equatable, Identifiable {
     }
 
     /// Concatenates text-bearing content parts for display and tool-result transport.
-    var displayText: String {
+    var textContent: String {
         content.compactMap(\.text).joined()
     }
 }

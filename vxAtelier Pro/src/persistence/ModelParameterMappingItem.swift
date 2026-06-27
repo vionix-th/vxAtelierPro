@@ -4,7 +4,7 @@ import SwiftData
 @Model
 final class ModelParameterMappingItem {
     var adapterIDRaw: String
-    var semanticParameterID: String
+    var parameterID: String
     var encodingKindRaw: String
     var wireKey: String
     var structuredPresetRaw: String?
@@ -23,10 +23,10 @@ final class ModelParameterMappingItem {
         set { adapterIDRaw = newValue.rawValue }
     }
 
-    var semanticParameterIDEnum: LLMParameterID {
-        get { LLMParameterID(rawValue: semanticParameterID) ?? .maxOutputTokens }
+    var parameterIDEnum: LLMParameterID {
+        get { LLMParameterID(rawValue: parameterID) ?? .maxOutputTokens }
         set {
-            semanticParameterID = newValue.rawValue
+            parameterID = newValue.rawValue
             applyMetadata(from: newValue)
         }
     }
@@ -41,10 +41,10 @@ final class ModelParameterMappingItem {
         set { structuredPresetRaw = newValue?.rawValue }
     }
 
-    var descriptor: LLMParameterMappingDescriptor {
-        LLMParameterMappingDescriptor(
+    var mapping: LLMParameterMapping {
+        LLMParameterMapping(
             adapterID: adapterIDEnum,
-            semanticParameterID: semanticParameterIDEnum,
+            parameterID: parameterIDEnum,
             encodingKind: encodingKind,
             wireKey: wireKey,
             structuredPreset: structuredPreset
@@ -53,46 +53,46 @@ final class ModelParameterMappingItem {
 
     init(
         adapterID: LLMAdapterID,
-        semanticParameterID: LLMParameterID,
+        parameterID: LLMParameterID,
         encodingKind: LLMParameterEncodingKind = .scalarKey,
         wireKey: String = "",
         structuredPreset: LLMParameterStructuredPreset? = nil,
         isCustomized: Bool = false
     ) {
         self.adapterIDRaw = adapterID.rawValue
-        self.semanticParameterID = semanticParameterID.rawValue
+        self.parameterID = parameterID.rawValue
         self.encodingKindRaw = encodingKind.rawValue
         self.wireKey = wireKey
         self.structuredPresetRaw = structuredPreset?.rawValue
-        let presentation = AiParameterPresentationCatalog.presentation(for: semanticParameterID)
+        let presentation = AiParameterPresentationCatalog.presentation(for: parameterID)
         self.displayName = presentation.displayName
         self.paramDescription = presentation.description
-        self.valueType = semanticParameterID.valueType.rawValue
+        self.valueType = parameterID.valueType.rawValue
         self.controlType = presentation.controlType.rawValue
-        self.minValue = semanticParameterID.minValue
-        self.maxValue = semanticParameterID.maxValue
+        self.minValue = parameterID.minValue
+        self.maxValue = parameterID.maxValue
         self.step = presentation.step
-        self.options = semanticParameterID.options
+        self.options = parameterID.options
         self.isCustomized = isCustomized
     }
 
-    convenience init(descriptor: LLMParameterMappingDescriptor, isCustomized: Bool = false) {
+    convenience init(mapping: LLMParameterMapping, isCustomized: Bool = false) {
         self.init(
-            adapterID: descriptor.adapterID,
-            semanticParameterID: descriptor.semanticParameterID,
-            encodingKind: descriptor.encodingKind,
-            wireKey: descriptor.wireKey,
-            structuredPreset: descriptor.structuredPreset,
+            adapterID: mapping.adapterID,
+            parameterID: mapping.parameterID,
+            encodingKind: mapping.encodingKind,
+            wireKey: mapping.wireKey,
+            structuredPreset: mapping.structuredPreset,
             isCustomized: isCustomized
         )
     }
 
-    func apply(_ descriptor: LLMParameterMappingDescriptor, markCustomized: Bool) {
-        adapterIDEnum = descriptor.adapterID
-        semanticParameterIDEnum = descriptor.semanticParameterID
-        encodingKind = descriptor.encodingKind
-        wireKey = descriptor.wireKey
-        structuredPreset = descriptor.structuredPreset
+    func apply(_ mapping: LLMParameterMapping, markCustomized: Bool) {
+        adapterIDEnum = mapping.adapterID
+        parameterIDEnum = mapping.parameterID
+        encodingKind = mapping.encodingKind
+        wireKey = mapping.wireKey
+        structuredPreset = mapping.structuredPreset
         isCustomized = markCustomized
     }
 

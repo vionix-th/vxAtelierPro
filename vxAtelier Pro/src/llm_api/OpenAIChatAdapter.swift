@@ -16,14 +16,14 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
     }
 
     /// Executes a Chat Completions request through the shared adapter run loop.
-    func stream(
-        _ request: LLMRequest,
+    func generateEvents(
+        _ request: LLMGenerationRequest,
         configuration: LLMProviderConfiguration,
         toolExecutor: LLMToolExecutionHandler?
-    ) -> AsyncThrowingStream<LLMStreamEvent, Error> {
+    ) -> AsyncThrowingStream<LLMGenerationEvent, Error> {
         do {
             try validateAdapterID(request.adapterID)
-            return LLMAdapterRunLoop.stream(
+            return LLMHTTPGenerationPipeline.generateEvents(
                 request: request,
                 configuration: configuration,
                 profile: profile,
@@ -50,7 +50,7 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
     }
 
     /// Fetches OpenAI-compatible model metadata and maps it into candidates.
-    func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
+    func fetchModelMetadata(configuration: LLMProviderConfiguration) async throws -> [LLMModelMetadata] {
         let httpConfig = httpClient.makeConfiguration(for: configuration)
         let response: JSONValue = try await httpClient.getJSON(path: Self.modelsPath, configuration: httpConfig, responseType: JSONValue.self)
         guard let data = response.objectValue?.array("data") else { return [] }
@@ -68,13 +68,13 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
     }
 
     /// Encodes a provider-neutral request into a Chat Completions JSON body.
-    func makeBody(for request: LLMRequest, stream: Bool) throws -> [String: JSONValue] {
+    func makeBody(for request: LLMGenerationRequest, stream: Bool) throws -> [String: JSONValue] {
         var body: [String: JSONValue] = [
             "model": .string(request.modelID),
             "messages": .array(try openAIMessages(from: request)),
             "stream": .boolean(stream)
         ]
-        let mappings = LLMParameterMappingResolver.resolve(
+        let mappings = LLMParameterMappingIndex.resolve(
             adapterID: request.adapterID,
             mappings: request.parameterMappings
         )
@@ -92,7 +92,7 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
     }
 
     /// Converts provider-neutral messages into Chat Completions message objects.
-    private func openAIMessages(from request: LLMRequest) throws -> [JSONValue] {
+    private func openAIMessages(from request: LLMGenerationRequest) throws -> [JSONValue] {
         var messages: [JSONValue] = []
         if !request.options.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             messages.append(.object(["role": .string("system"), "content": .string(request.options.systemPrompt)]))
@@ -123,7 +123,7 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
     }
 
     /// Converts one Chat Completions SSE payload into normalized stream events.
-    private func handleStreamEvent(_ event: [String: JSONValue], assembler: inout LLMToolCallAssembler) -> [LLMStreamEvent] {
+    private func handleStreamEvent(_ event: [String: JSONValue], assembler: inout LLMToolCallAssembler) -> [LLMGenerationEvent] {
         guard let choices = event.array("choices"),
               let choice = choices.first?.objectValue,
               let delta = choice.object("delta") else {
@@ -132,7 +132,7 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
             }
             return []
         }
-        var events: [LLMStreamEvent] = []
+        var events: [LLMGenerationEvent] = []
         if let content = delta.string("content"), !content.isEmpty {
             events.append(.textDelta(content))
         }
@@ -160,10 +160,10 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
     /// Emits normalized events from a complete Chat Completions JSON response.
     private func emitNonStreamingResponse(
         _ response: JSONValue,
-        continuation: AsyncThrowingStream<LLMStreamEvent, Error>.Continuation
+        continuation: AsyncThrowingStream<LLMGenerationEvent, Error>.Continuation
     ) {
         guard let object = response.objectValue else {
-            continuation.yield(.runCompleted(responseID: nil, modelID: nil))
+            continuation.yield(.generationCompleted(responseID: nil, modelID: nil))
             return
         }
         if let choices = object.array("choices"),
@@ -189,7 +189,7 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
         if let usage = object.object("usage") {
             continuation.yield(.usage(OpenAICompatibleEncoding.usage(from: usage, inputKey: "prompt_tokens", outputKey: "completion_tokens")))
         }
-        continuation.yield(.runCompleted(responseID: object.string("id"), modelID: object.string("model")))
+        continuation.yield(.generationCompleted(responseID: object.string("id"), modelID: object.string("model")))
     }
 }
 
@@ -208,16 +208,16 @@ struct OpenAICompatibleChatCompletionsAdapter: LLMProviderAdapter {
     }
 
     /// Executes a compatible Chat Completions request through the shared chat implementation.
-    func stream(
-        _ request: LLMRequest,
+    func generateEvents(
+        _ request: LLMGenerationRequest,
         configuration: LLMProviderConfiguration,
         toolExecutor: LLMToolExecutionHandler?
-    ) -> AsyncThrowingStream<LLMStreamEvent, Error> {
-        chatAdapter.stream(request, configuration: configuration, toolExecutor: toolExecutor)
+    ) -> AsyncThrowingStream<LLMGenerationEvent, Error> {
+        chatAdapter.generateEvents(request, configuration: configuration, toolExecutor: toolExecutor)
     }
 
     /// Fetches OpenAI-compatible model metadata and maps it into candidates.
-    func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
-        try await chatAdapter.fetchModels(configuration: configuration)
+    func fetchModelMetadata(configuration: LLMProviderConfiguration) async throws -> [LLMModelMetadata] {
+        try await chatAdapter.fetchModelMetadata(configuration: configuration)
     }
 }

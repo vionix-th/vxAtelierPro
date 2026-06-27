@@ -23,7 +23,7 @@ struct ConversationOptionsExportData: Codable {
     let serviceTier: String?
     let streamModeRaw: String?
     let retryPolicyRaw: String?
-    let providerExtrasJSON: String?
+    let providerSpecificOptionsJSON: String?
     
     init(_ options: ConversationOptions) {
         self.avatarImageData = options.avatarImageData
@@ -44,7 +44,7 @@ struct ConversationOptionsExportData: Codable {
         self.serviceTier = options.serviceTier
         self.streamModeRaw = options.streamModeRaw
         self.retryPolicyRaw = options.retryPolicyRaw
-        self.providerExtrasJSON = options.providerExtrasJSON
+        self.providerSpecificOptionsJSON = options.providerSpecificOptionsJSON
     }
     
     func toDataItem(context: ModelContext) -> ConversationOptions {
@@ -69,7 +69,7 @@ struct ConversationOptionsExportData: Codable {
             options.reasoningEffort = reasoningEffort
             options.serviceTier = serviceTier
             options.streamModeRaw = streamModeRaw ?? LLMGenerationOptions.StreamMode.disabled.rawValue
-            options.providerExtrasJSON = providerExtrasJSON ?? "{}"
+            options.providerSpecificOptionsJSON = providerSpecificOptionsJSON ?? "{}"
         }
         options.retryPolicyRaw = retryPolicyRaw ?? LLMGenerationOptions.RetryPolicy.disabled.rawValue
         options.normalizeKnownParameters()

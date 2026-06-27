@@ -26,12 +26,12 @@ protocol LLMLocalModelBackend {
 
     func availability() -> LLMLocalModelAvailability
     func statusText() -> String
-    func modelCandidates(configuration: LLMProviderConfiguration) -> [LLMModelDescriptor]
-    func stream(
-        request: LLMRequest,
+    func modelMetadata(configuration: LLMProviderConfiguration) -> [LLMModelMetadata]
+    func generateEvents(
+        request: LLMGenerationRequest,
         configuration: LLMProviderConfiguration,
         toolExecutor: LLMToolExecutionHandler?
-    ) -> AsyncThrowingStream<LLMStreamEvent, Error>
+    ) -> AsyncThrowingStream<LLMGenerationEvent, Error>
 }
 
 extension LLMLocalModelBackend {

@@ -6,7 +6,7 @@ struct ConversationDraft: Equatable {
     var text: String = ""
     var isActive: Bool = false
     var toolCalls: [LLMToolCall] = []
-    var runStatus: LLMRunStatus = .pending
+    var runStatus: ProviderRunStatus = .pending
     var errorMessage: String?
 }
 
@@ -59,14 +59,14 @@ final class ConversationDraftStore {
 
     func start(conversationID: PersistentIdentifier) {
         activeConversationID = conversationID
-        drafts[conversationID] = ConversationDraft(isActive: true, runStatus: .streaming)
+        drafts[conversationID] = ConversationDraft(isActive: true, runStatus: .running)
     }
 
     func appendContent(_ content: String, conversationID: PersistentIdentifier? = nil) {
         mutate(conversationID: conversationID) { draft in
             draft.text += content
             draft.isActive = true
-            draft.runStatus = .streaming
+            draft.runStatus = .running
         }
     }
 

@@ -36,17 +36,17 @@ struct ConversationRunContextResolver {
         guard let model = apiConfig.models.first(where: { $0.modelID == modelID }) else {
             throw LLMProviderError.invalidConfiguration("Model \(modelID) is not available for \(apiConfig.name).")
         }
-        let mappings = LLMParameterMappingResolver.resolve(
+        let mappings = LLMParameterMappingIndex.resolve(
             adapterID: adapterID,
-            mappings: model.parameterMappings.map(\.descriptor)
+            mappings: model.parameterMappings.map(\.mapping)
         )
-        let availability = LLMParameterAvailabilityMappingResolver.resolve(
+        let availability = LLMParameterAvailabilityIndex.resolve(
             adapterID: adapterID,
-            availability: model.parameterAvailability.map(\.descriptor)
+            availability: model.parameterAvailability.map(\.availability)
         )
         conversation.options.reconcileParameters(apiConfiguration: apiConfig, modelID: modelID)
         let rawOptions = conversation.options.generationOptions(resolvedModelID: modelID)
-        let sendableAvailability = LLMParameterAvailabilityResolver.sendableModelAvailability(
+        let sendableAvailability = LLMGenerationOptionsResolver.sendableModelAvailability(
             for: rawOptions,
             conversationPreferences: conversation.options.parameterInclusionPreferences,
             modelAvailability: availability
@@ -87,11 +87,11 @@ struct ConversationRunContextResolver {
 
 }
 
-/// Builds and validates provider-neutral `LLMRequest` values from resolved run context.
-struct LLMRequestFactory {
+/// Builds and validates provider-neutral `LLMGenerationRequest` values from resolved run context.
+struct LLMGenerationRequestFactory {
     /// Creates a request with concrete streaming mode resolved before final validation.
-    func makeRequest(from context: ConversationRunContext) throws -> LLMRequest {
-        let request = LLMRequest(
+    func makeRequest(from context: ConversationRunContext) throws -> LLMGenerationRequest {
+        let request = LLMGenerationRequest(
             providerID: context.providerID,
             adapterID: context.adapterID,
             modelID: context.modelID,

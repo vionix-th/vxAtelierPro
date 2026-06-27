@@ -42,7 +42,7 @@ struct ModelExportData: Codable {
             apiConfiguration: apiConfiguration
         )
         model.displayName = displayName ?? name
-        let defaultCandidate = LLMModelDescriptorResolver().catalogDescriptor(
+        let defaultCandidate = LLMModelMetadataResolver().catalogMetadata(
             for: model.modelID,
             providerID: apiConfiguration?.providerIDEnum ?? .customOpenAICompatible
         )
@@ -59,7 +59,7 @@ struct ModelExportData: Codable {
 
 struct ModelParameterMappingExportData: Codable {
     let adapterIDRaw: String
-    let semanticParameterID: String
+    let parameterID: String
     let encodingKindRaw: String
     let wireKey: String
     let structuredPresetRaw: String?
@@ -75,7 +75,7 @@ struct ModelParameterMappingExportData: Codable {
 
     init(_ mapping: ModelParameterMappingItem) {
         adapterIDRaw = mapping.adapterIDRaw
-        semanticParameterID = mapping.semanticParameterID
+        parameterID = mapping.parameterID
         encodingKindRaw = mapping.encodingKindRaw
         wireKey = mapping.wireKey
         structuredPresetRaw = mapping.structuredPresetRaw
@@ -93,7 +93,7 @@ struct ModelParameterMappingExportData: Codable {
     func toDataItem() -> ModelParameterMappingItem {
         let mapping = ModelParameterMappingItem(
             adapterID: LLMAdapterID(rawValue: adapterIDRaw) ?? .openAIChatCompletions,
-            semanticParameterID: LLMParameterID(rawValue: semanticParameterID) ?? .maxOutputTokens,
+            parameterID: LLMParameterID(rawValue: parameterID) ?? .maxOutputTokens,
             encodingKind: LLMParameterEncodingKind(rawValue: encodingKindRaw) ?? .scalarKey,
             wireKey: wireKey,
             structuredPreset: structuredPresetRaw.flatMap(LLMParameterStructuredPreset.init(rawValue:)),
@@ -113,7 +113,7 @@ struct ModelParameterMappingExportData: Codable {
 
 struct ModelParameterAvailabilityExportData: Codable {
     let adapterIDRaw: String
-    let semanticParameterID: String
+    let parameterID: String
     let isAvailable: Bool
     let isRequired: Bool
     let isEnabled: Bool
@@ -130,7 +130,7 @@ struct ModelParameterAvailabilityExportData: Codable {
 
     init(_ availability: ModelParameterAvailabilityItem) {
         adapterIDRaw = availability.adapterIDRaw
-        semanticParameterID = availability.semanticParameterID
+        parameterID = availability.parameterID
         isAvailable = availability.isAvailable
         isRequired = availability.isRequired
         isEnabled = availability.isEnabled
@@ -149,7 +149,7 @@ struct ModelParameterAvailabilityExportData: Codable {
     func toDataItem() -> ModelParameterAvailabilityItem {
         let availability = ModelParameterAvailabilityItem(
             adapterID: LLMAdapterID(rawValue: adapterIDRaw) ?? .openAIChatCompletions,
-            semanticParameterID: LLMParameterID(rawValue: semanticParameterID) ?? .maxOutputTokens,
+            parameterID: LLMParameterID(rawValue: parameterID) ?? .maxOutputTokens,
             isAvailable: isAvailable,
             isRequired: isRequired,
             isEnabled: isEnabled,

@@ -314,7 +314,7 @@ struct TTSControlView: View {
     private func presentEntryEditor(item: TTSPlaylistEntry) {
         presentedPlaylistEntryEditor = PlaylistEntryEditor(
             title: "Edit Entry",
-            text: item.displayText,
+            text: item.textContent,
             role: TTSPlaylistRole(rawValue: item.role) ?? .user,
             playlistID: displayedPlaylist?.persistentModelID ?? selectedPlaylistID,
             entryID: item.persistentModelID

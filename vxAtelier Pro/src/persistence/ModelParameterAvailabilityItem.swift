@@ -4,7 +4,7 @@ import SwiftData
 @Model
 final class ModelParameterAvailabilityItem {
     var adapterIDRaw: String
-    var semanticParameterID: String
+    var parameterID: String
     var isAvailable: Bool
     var isRequired: Bool
     var isEnabled: Bool
@@ -24,10 +24,10 @@ final class ModelParameterAvailabilityItem {
         set { adapterIDRaw = newValue.rawValue }
     }
 
-    var semanticParameterIDEnum: LLMParameterID {
-        get { LLMParameterID(rawValue: semanticParameterID) ?? .maxOutputTokens }
+    var parameterIDEnum: LLMParameterID {
+        get { LLMParameterID(rawValue: parameterID) ?? .maxOutputTokens }
         set {
-            semanticParameterID = newValue.rawValue
+            parameterID = newValue.rawValue
             applyMetadata(from: newValue)
         }
     }
@@ -46,10 +46,10 @@ final class ModelParameterAvailabilityItem {
         }
     }
 
-    var descriptor: LLMParameterAvailabilityDescriptor {
-        LLMParameterAvailabilityDescriptor(
+    var availability: LLMParameterAvailability {
+        LLMParameterAvailability(
             adapterID: adapterIDEnum,
-            semanticParameterID: semanticParameterIDEnum,
+            parameterID: parameterIDEnum,
             isAvailable: isAvailable,
             isRequired: isRequired,
             isEnabled: isEnabled,
@@ -60,7 +60,7 @@ final class ModelParameterAvailabilityItem {
 
     init(
         adapterID: LLMAdapterID,
-        semanticParameterID: LLMParameterID,
+        parameterID: LLMParameterID,
         isAvailable: Bool = true,
         isRequired: Bool = false,
         isEnabled: Bool = false,
@@ -68,19 +68,19 @@ final class ModelParameterAvailabilityItem {
         isCustomized: Bool = false
     ) {
         self.adapterIDRaw = adapterID.rawValue
-        self.semanticParameterID = semanticParameterID.rawValue
+        self.parameterID = parameterID.rawValue
         self.isAvailable = isAvailable
         self.isRequired = isRequired
         self.isEnabled = isEnabled
-        let presentation = AiParameterPresentationCatalog.presentation(for: semanticParameterID)
+        let presentation = AiParameterPresentationCatalog.presentation(for: parameterID)
         self.displayName = presentation.displayName
         self.paramDescription = presentation.description
-        self.valueType = semanticParameterID.valueType.rawValue
+        self.valueType = parameterID.valueType.rawValue
         self.controlType = presentation.controlType.rawValue
-        self.minValue = semanticParameterID.minValue
-        self.maxValue = semanticParameterID.maxValue
+        self.minValue = parameterID.minValue
+        self.maxValue = parameterID.maxValue
         self.step = presentation.step
-        self.options = semanticParameterID.options
+        self.options = parameterID.options
         if let defaultValue {
             self.defaultValueData = try? JSONEncoder().encode(defaultValue)
         } else {
@@ -89,27 +89,27 @@ final class ModelParameterAvailabilityItem {
         self.isCustomized = isCustomized
     }
 
-    convenience init(descriptor: LLMParameterAvailabilityDescriptor, isCustomized: Bool = false) {
+    convenience init(availability: LLMParameterAvailability, isCustomized: Bool = false) {
         self.init(
-            adapterID: descriptor.adapterID,
-            semanticParameterID: descriptor.semanticParameterID,
-            isAvailable: descriptor.isAvailable,
-            isRequired: descriptor.isRequired,
-            isEnabled: descriptor.isEnabled,
-            defaultValue: descriptor.defaultValue,
+            adapterID: availability.adapterID,
+            parameterID: availability.parameterID,
+            isAvailable: availability.isAvailable,
+            isRequired: availability.isRequired,
+            isEnabled: availability.isEnabled,
+            defaultValue: availability.defaultValue,
             isCustomized: isCustomized
         )
-        options = descriptor.options ?? semanticParameterIDEnum.options
+        options = availability.options ?? parameterIDEnum.options
     }
 
-    func apply(_ descriptor: LLMParameterAvailabilityDescriptor, markCustomized: Bool) {
-        adapterIDEnum = descriptor.adapterID
-        semanticParameterIDEnum = descriptor.semanticParameterID
-        isAvailable = descriptor.isAvailable
-        isRequired = descriptor.isRequired
-        isEnabled = descriptor.isEnabled
-        defaultJSONValue = descriptor.defaultValue
-        options = descriptor.options ?? semanticParameterIDEnum.options
+    func apply(_ availability: LLMParameterAvailability, markCustomized: Bool) {
+        adapterIDEnum = availability.adapterID
+        parameterIDEnum = availability.parameterID
+        isAvailable = availability.isAvailable
+        isRequired = availability.isRequired
+        isEnabled = availability.isEnabled
+        defaultJSONValue = availability.defaultValue
+        options = availability.options ?? parameterIDEnum.options
         isCustomized = markCustomized
     }
 

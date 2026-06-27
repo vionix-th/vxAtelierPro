@@ -94,7 +94,7 @@ final class ConversationOptions: Equatable {
         set { streamMode = LLMGenerationOptions.StreamMode(rawValue: newValue) ?? .disabled }
     }
 
-    var providerExtrasJSON: String {
+    var providerSpecificOptionsJSON: String {
         get {
             let extras = decodedParameterValues.filter { key, _ in
                 guard let parameterID = LLMParameterID(rawValue: key) else { return true }
@@ -192,9 +192,9 @@ final class ConversationOptions: Equatable {
         }
 
         let adapterID = configuration.defaultAdapterIDEnum
-        let availability = LLMParameterAvailabilityMappingResolver.resolve(
+        let availability = LLMParameterAvailabilityIndex.resolve(
             adapterID: adapterID,
-            availability: model.parameterAvailability.map(\.descriptor)
+            availability: model.parameterAvailability.map(\.availability)
         )
         var enabledStates = parameterEnabledStates
 
@@ -311,7 +311,7 @@ final class ConversationOptions: Equatable {
             textVerbosity: enabledValue(.textVerbosity)?.stringValue.flatMap { $0.isEmpty ? nil : $0 },
             streamMode: enabledValue(.stream)?.boolValue == true ? .enabled : .disabled,
             retryPolicy: retryPolicy,
-            providerExtras: extras
+            providerSpecificOptions: extras
         )
     }
 

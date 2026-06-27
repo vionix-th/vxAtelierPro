@@ -1,11 +1,11 @@
 import Foundation
 
 /// Model-level availability and enabled state for one semantic parameter.
-struct LLMParameterAvailabilityDescriptor: Codable, Equatable, Identifiable {
+struct LLMParameterAvailability: Codable, Equatable, Identifiable {
     /// Combines adapter and semantic parameter so one model can store per-adapter availability.
-    var id: String { "\(adapterID.rawValue):\(semanticParameterID.rawValue)" }
+    var id: String { "\(adapterID.rawValue):\(parameterID.rawValue)" }
     var adapterID: LLMAdapterID
-    var semanticParameterID: LLMParameterID
+    var parameterID: LLMParameterID
     var isAvailable: Bool
     var isRequired: Bool
     var isEnabled: Bool
@@ -15,7 +15,7 @@ struct LLMParameterAvailabilityDescriptor: Codable, Equatable, Identifiable {
     /// Creates model-level sendability metadata for a semantic parameter at one adapter.
     init(
         adapterID: LLMAdapterID,
-        semanticParameterID: LLMParameterID,
+        parameterID: LLMParameterID,
         isAvailable: Bool = true,
         isRequired: Bool = false,
         isEnabled: Bool = false,
@@ -23,7 +23,7 @@ struct LLMParameterAvailabilityDescriptor: Codable, Equatable, Identifiable {
         options: [String]? = nil
     ) {
         self.adapterID = adapterID
-        self.semanticParameterID = semanticParameterID
+        self.parameterID = parameterID
         self.isAvailable = isAvailable
         self.isRequired = isRequired
         self.isEnabled = isEnabled
@@ -39,7 +39,7 @@ enum LLMParameterAvailabilityCatalog {
         providerID: LLMProviderID,
         adapterID: LLMAdapterID,
         modelID: String
-    ) -> [LLMParameterAvailabilityDescriptor] {
+    ) -> [LLMParameterAvailability] {
         LLMDefaultsCatalog.bundled.parameterAvailability(
             providerID: providerID,
             adapterID: adapterID,
@@ -49,26 +49,26 @@ enum LLMParameterAvailabilityCatalog {
 }
 
 /// Resolves persisted model-specific parameter availability.
-struct LLMParameterAvailabilityMappingResolver {
+struct LLMParameterAvailabilityIndex {
     /// Returns availability keyed by semantic parameter for one adapter.
     static func resolve(
         adapterID: LLMAdapterID,
-        availability: [LLMParameterAvailabilityDescriptor]
-    ) -> [LLMParameterID: LLMParameterAvailabilityDescriptor] {
+        availability: [LLMParameterAvailability]
+    ) -> [LLMParameterID: LLMParameterAvailability] {
         Dictionary(uniqueKeysWithValues: availability
             .filter { $0.adapterID == adapterID }
-            .map { ($0.semanticParameterID, $0) })
+            .map { ($0.parameterID, $0) })
     }
 }
 
 /// Resolves model-specific semantic parameter availability before provider wire encoding.
-enum LLMParameterAvailabilityResolver {
+enum LLMGenerationOptionsResolver {
     /// Returns true when a semantic parameter should remain in the provider-neutral request.
     static func isParameterSendable(
         _ parameterID: LLMParameterID,
         value: JSONValue?,
         conversationPreference: Bool?,
-        modelAvailability: LLMParameterAvailabilityDescriptor?
+        modelAvailability: LLMParameterAvailability?
     ) -> Bool {
         guard parameterID.isProviderMappable else { return true }
         guard let availability = modelAvailability else { return false }
@@ -82,7 +82,7 @@ enum LLMParameterAvailabilityResolver {
     static func resolvedOptions(
         from options: LLMGenerationOptions,
         conversationPreferences: [String: Bool],
-        modelAvailability: [LLMParameterID: LLMParameterAvailabilityDescriptor]
+        modelAvailability: [LLMParameterID: LLMParameterAvailability]
     ) -> LLMGenerationOptions {
         var resolved = options
         let sendableAvailability = sendableModelAvailability(
@@ -106,8 +106,8 @@ enum LLMParameterAvailabilityResolver {
     static func sendableModelAvailability(
         for options: LLMGenerationOptions,
         conversationPreferences: [String: Bool],
-        modelAvailability: [LLMParameterID: LLMParameterAvailabilityDescriptor]
-    ) -> [LLMParameterID: LLMParameterAvailabilityDescriptor] {
+        modelAvailability: [LLMParameterID: LLMParameterAvailability]
+    ) -> [LLMParameterID: LLMParameterAvailability] {
         modelAvailability.filter { entry in
             isParameterSendable(
                 entry.key,
@@ -161,7 +161,7 @@ private extension LLMGenerationOptions {
              .seed,
              .user,
              .safetyIdentifier:
-            providerExtras.removeValue(forKey: parameterID.rawValue)
+            providerSpecificOptions.removeValue(forKey: parameterID.rawValue)
         }
     }
 
@@ -216,7 +216,7 @@ private extension LLMGenerationOptions {
              .seed,
              .user,
              .safetyIdentifier:
-            providerExtras[parameterID.rawValue] = value
+            providerSpecificOptions[parameterID.rawValue] = value
         }
     }
 }

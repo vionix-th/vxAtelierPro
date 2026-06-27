@@ -158,7 +158,7 @@ struct ResponseRunExportData: Codable {
             requestedModelID: requestedModelID,
             actualModelID: actualModelID,
             requestID: requestID,
-            status: LLMRunStatus(rawValue: statusRaw) ?? .completed,
+            status: ProviderRunStatus(rawValue: statusRaw) ?? .completed,
             usage: LLMUsage(inputTokens: inputTokens, outputTokens: outputTokens, totalTokens: totalTokens),
             errorMessage: errorMessage,
             turn: turn

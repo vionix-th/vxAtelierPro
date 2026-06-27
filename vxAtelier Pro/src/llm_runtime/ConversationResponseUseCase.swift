@@ -2,11 +2,11 @@ import Foundation
 
 /// Coordinates a full conversation completion, including provider/tool loops and persistence.
 @MainActor
-final class ConversationCompletionUseCase {
-    static let shared = ConversationCompletionUseCase()
+final class ConversationResponseUseCase {
+    static let shared = ConversationResponseUseCase()
 
     private let contextResolver: ConversationRunContextResolver
-    private let requestFactory: LLMRequestFactory
+    private let requestFactory: LLMGenerationRequestFactory
     private let providerRunExecutor: ProviderRunExecutor
     private let toolBatchExecutor: ToolBatchExecutor
     private let runStore: ConversationRunStore
@@ -15,7 +15,7 @@ final class ConversationCompletionUseCase {
     /// Creates the completion coordinator with injectable collaborators for orchestration tests.
     init(
         contextResolver: ConversationRunContextResolver? = nil,
-        requestFactory: LLMRequestFactory = LLMRequestFactory(),
+        requestFactory: LLMGenerationRequestFactory = LLMGenerationRequestFactory(),
         providerRunExecutor: ProviderRunExecutor = ProviderRunExecutor(),
         toolBatchExecutor: ToolBatchExecutor? = nil,
         runStore: ConversationRunStore = ConversationRunStore(),
@@ -35,9 +35,9 @@ final class ConversationCompletionUseCase {
     }
 
     /// Appends a user message and runs the conversation until no tool calls remain.
-    func complete(
-        conversation: ConversationItem,
-        message: String,
+    func sendMessage(
+        _ message: String,
+        in conversation: ConversationItem,
         draftStore: ConversationDraftStore
     ) async throws {
         guard let apiConfig = conversation.options.apiConfiguration else {

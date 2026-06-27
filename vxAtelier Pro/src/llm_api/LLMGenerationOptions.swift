@@ -36,7 +36,7 @@ struct LLMGenerationOptions: Codable, Equatable {
     var textVerbosity: String?
     var streamMode: StreamMode
     var retryPolicy: RetryPolicy
-    var providerExtras: [String: JSONValue]
+    var providerSpecificOptions: [String: JSONValue]
 
     /// Creates provider-neutral generation options with conservative defaults.
     init(
@@ -55,7 +55,7 @@ struct LLMGenerationOptions: Codable, Equatable {
         textVerbosity: String? = nil,
         streamMode: StreamMode = .disabled,
         retryPolicy: RetryPolicy = .disabled,
-        providerExtras: [String: JSONValue] = [:]
+        providerSpecificOptions: [String: JSONValue] = [:]
     ) {
         self.systemPrompt = systemPrompt
         self.modelID = modelID
@@ -72,6 +72,6 @@ struct LLMGenerationOptions: Codable, Equatable {
         self.textVerbosity = textVerbosity
         self.streamMode = streamMode
         self.retryPolicy = retryPolicy
-        self.providerExtras = providerExtras
+        self.providerSpecificOptions = providerSpecificOptions
     }
 }

@@ -47,11 +47,11 @@ enum LLMParameterStructuredPreset: String, Codable, CaseIterable, Identifiable {
 }
 
 /// Mapping from one semantic parameter to one adapter-specific wire encoding.
-struct LLMParameterMappingDescriptor: Codable, Equatable, Identifiable {
+struct LLMParameterMapping: Codable, Equatable, Identifiable {
     /// Combines adapter and semantic parameter so one model can store per-adapter mappings.
-    var id: String { "\(adapterID.rawValue):\(semanticParameterID.rawValue)" }
+    var id: String { "\(adapterID.rawValue):\(parameterID.rawValue)" }
     var adapterID: LLMAdapterID
-    var semanticParameterID: LLMParameterID
+    var parameterID: LLMParameterID
     var encodingKind: LLMParameterEncodingKind
     var wireKey: String
     var structuredPreset: LLMParameterStructuredPreset?
@@ -59,13 +59,13 @@ struct LLMParameterMappingDescriptor: Codable, Equatable, Identifiable {
     /// Creates a provider mapping for a semantic parameter at one adapter.
     init(
         adapterID: LLMAdapterID,
-        semanticParameterID: LLMParameterID,
+        parameterID: LLMParameterID,
         encodingKind: LLMParameterEncodingKind = .scalarKey,
         wireKey: String = "",
         structuredPreset: LLMParameterStructuredPreset? = nil
     ) {
         self.adapterID = adapterID
-        self.semanticParameterID = semanticParameterID
+        self.parameterID = parameterID
         self.encodingKind = encodingKind
         self.wireKey = wireKey
         self.structuredPreset = structuredPreset
@@ -79,7 +79,7 @@ enum LLMParameterMappingCatalog {
         providerID: LLMProviderID,
         adapterID: LLMAdapterID,
         modelID: String
-    ) -> [LLMParameterMappingDescriptor] {
+    ) -> [LLMParameterMapping] {
         LLMDefaultsCatalog.bundled.parameterMappings(
             providerID: providerID,
             adapterID: adapterID,
@@ -89,31 +89,31 @@ enum LLMParameterMappingCatalog {
 }
 
 /// Resolves persisted model-specific mappings.
-struct LLMParameterMappingResolver {
+struct LLMParameterMappingIndex {
     /// Returns active mappings keyed by semantic parameter.
     static func resolve(
         adapterID: LLMAdapterID,
-        mappings: [LLMParameterMappingDescriptor]
-    ) -> [LLMParameterID: LLMParameterMappingDescriptor] {
+        mappings: [LLMParameterMapping]
+    ) -> [LLMParameterID: LLMParameterMapping] {
         Dictionary(uniqueKeysWithValues: mappings
             .filter { $0.adapterID == adapterID }
-            .map { ($0.semanticParameterID, $0) })
+            .map { ($0.parameterID, $0) })
     }
 }
 
 /// Encodes scalar semantic parameters into a provider request body.
-enum LLMParameterRequestEncoder {
+enum LLMParameterWireEncoder {
     /// Applies only scalar-key mappings; structured presets are adapter-specific.
     static func applyScalarOptions(
         _ options: LLMGenerationOptions,
         to body: inout [String: JSONValue],
-        mappings: [LLMParameterID: LLMParameterMappingDescriptor]
+        mappings: [LLMParameterID: LLMParameterMapping]
     ) throws {
         for mapping in mappings.values {
             guard mapping.encodingKind == .scalarKey else { continue }
-            guard let value = options.jsonValue(for: mapping.semanticParameterID) else { continue }
+            guard let value = options.jsonValue(for: mapping.parameterID) else { continue }
             guard !mapping.wireKey.isEmpty else {
-                throw LLMProviderError.unsupportedParameter("\(mapping.semanticParameterID.rawValue) has no wire key.")
+                throw LLMProviderError.unsupportedParameter("\(mapping.parameterID.rawValue) has no wire key.")
             }
             body[mapping.wireKey] = value
         }
@@ -170,7 +170,7 @@ extension LLMGenerationOptions {
              .seed,
              .user,
              .safetyIdentifier:
-            return providerExtras[parameterID.rawValue]
+            return providerSpecificOptions[parameterID.rawValue]
         }
     }
 }

@@ -406,7 +406,7 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
     func add(_ message: MessageItem, conversationID: PersistentIdentifier, createPlaylistNamed playlistName: String? = nil) {
         addEntry(
             role: message.role,
-            text: message.displayText,
+            text: message.textContent,
             sourceConversationIDString: String(describing: conversationID),
             sourceMessageIDString: String(describing: message.id),
             createPlaylistNamed: playlistName
@@ -422,7 +422,7 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
             let entry = TTSPlaylistEntry(
                 orderIndex: playlist.nextOrderIndex(),
                 role: message.role,
-                text: message.displayText,
+                text: message.textContent,
                 sourceConversationIDString: String(describing: conversationID),
                 sourceMessageIDString: String(describing: message.id),
                 playlist: playlist
@@ -491,7 +491,7 @@ final class TTSQueue: NSObject, AVSpeechSynthesizerDelegate, @unchecked Sendable
     func read(_ message: MessageItem) {
         stop()
         isManualSelection = true
-        startSpeaking(text: message.displayText, role: message.role)
+        startSpeaking(text: message.textContent, role: message.role)
     }
 
     func play() {

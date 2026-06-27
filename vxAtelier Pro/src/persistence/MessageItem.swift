@@ -13,7 +13,7 @@ final class MessageItem {
 
     var toolCallId: String?
 
-    var displayText: String {
+    var textContent: String {
         orderedContentParts.compactMap(\.text).joined()
     }
 

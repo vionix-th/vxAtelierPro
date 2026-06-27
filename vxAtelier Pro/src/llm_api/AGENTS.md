@@ -2,9 +2,9 @@
 
 ## Boundary
 - Treat `llm_api/*` as the reusable LLM provider and tool API surface.
-- `LLMRequest`, `LLMContentTypes`, `LLMResponseTypes`, and related files own provider-neutral LLM request, response, event, model, generation, parameter, capability, and tool-call value types.
+- `LLMGenerationRequest`, `LLMContentTypes`, `LLMResponseTypes`, and related files own provider-neutral LLM request, response, event, model, generation, parameter, capability, and tool-call value types.
 - `LLMProvider*` files own provider identities, profiles, configuration value types, adapter selection, and model metadata decoding.
-- `OpenAI*`, `Anthropic*`, and `LLMAdapterRunLoop` own provider wire-protocol mapping into provider-neutral `LLMStreamEvent` values.
+- `OpenAI*`, `Anthropic*`, and `LLMHTTPGenerationPipeline` own provider wire-protocol mapping into provider-neutral `LLMGenerationEvent` values.
 - `LLMHTTPClient` and `LLMSecretRedactor` own reusable provider HTTP/SSE transport helpers, diagnostics redaction, and provider error normalization.
 - `LLMTool*` and `ConfigurableLLMTool` own reusable tool schema, configuration, catalog, and registry contracts.
 - Keep SwiftUI, SwiftData, view models, views, settings screens, persisted app models, concrete vxAtelier tools, and run orchestration out of `llm_api/*`.
@@ -25,7 +25,7 @@
 - Parameter mapping is selected-model semantic-to-wire translation: wire key or structured preset.
 - Conversation storage may contain semantic values and per-conversation enable/disable intent for optional parameters only.
 - Conversation storage must not decide model availability, mandatory behavior, defaults, or wire names.
-- Keep availability resolution in `LLMParameterAvailabilityResolver`; keep wire translation descriptors and encoding in `LLMParameterMapping` and provider encoders.
+- Keep availability resolution in `LLMGenerationOptionsResolver`; keep semantic-to-wire translation and encoding in `LLMParameterMapping` and provider encoders.
 
 ## Refactoring Rule
 - If a type is reusable across apps and does not require SwiftData, SwiftUI, persisted app models, or concrete app services, it belongs in `llm_api/*`.

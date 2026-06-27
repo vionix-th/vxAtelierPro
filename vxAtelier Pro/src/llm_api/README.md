@@ -2,10 +2,10 @@
 
 `llm_api` is the reusable LLM provider and tool API surface for vxAtelier Pro.
 
-- `LLMRequest`, `LLMContentTypes`, `LLMResponseTypes`, and related files define provider-neutral LLM values and stream events.
+- `LLMGenerationRequest`, `LLMContentTypes`, `LLMResponseTypes`, and related files define provider-neutral LLM values and generation events.
 - `LLMCapabilityValidator`, `LLMParameter*`, and `LLMRequestEncoding` define validation, parameter mapping, and request encoding.
 - `LLMProvider*`, `LLMDefaultsCatalog`, and `LLMModelMetadataDecoder` define provider identities, transport profiles, configuration values, adapter lookup, defaults, and model metadata decoding.
-- `OpenAI*`, `Anthropic*`, and `LLMAdapterRunLoop` map provider-specific wire protocols into provider-neutral events.
+- `OpenAI*`, `Anthropic*`, and `LLMHTTPGenerationPipeline` map provider-specific wire protocols into provider-neutral events.
 - `LLMHTTPClient` and `LLMSecretRedactor` contain provider HTTP/SSE helpers, response metadata handling, redaction, and normalized provider errors.
 - `LLMTool*` and `ConfigurableLLMTool` contain reusable tool schema, configuration, catalog, and registry contracts.
 
@@ -14,9 +14,9 @@ SwiftData run orchestration and concrete vxAtelier tools live in `llm_runtime`.
 ## Runtime Flow
 
 1. `llm_runtime` resolves persisted configuration and conversation state.
-2. `llm_runtime` builds an `LLMRequest` from `llm_api` values.
+2. `llm_runtime` builds an `LLMGenerationRequest` from `llm_api` values.
 3. `llm_api` supplies provider profiles and configuration values.
-4. `llm_api` executes provider requests through adapters/transport and emits `LLMStreamEvent` values.
+4. `llm_api` executes provider requests through adapters/transport and emits `LLMGenerationEvent` values.
 5. `llm_runtime` persists stable `MessageItem`, `ToolCallItem`, and `ResponseRunItem` records.
 6. `llm_runtime` executes concrete app tools through the reusable tool contracts.
 
@@ -50,7 +50,7 @@ Keep these concepts separate:
 - Parameter availability: selected-model support state, including available, unavailable, required, and defaulted.
 - Parameter mapping: selected-model semantic-to-wire translation, such as `max_output_tokens` to `max_tokens`, `max_completion_tokens`, or a structured preset.
 
-`LLMParameterDefinitions` owns semantic parameter identities and value metadata. `LLMParameterMapping` owns wire translation descriptors. `LLMParameterAvailabilityResolver` applies selected-model availability plus conversation inclusion preferences before encoding. Provider adapters then encode only the resulting sendable parameters.
+`LLMParameterDefinitions` owns semantic parameter identities and value metadata. `LLMParameterMapping` owns semantic-to-wire translation. `LLMGenerationOptionsResolver` applies selected-model availability plus conversation inclusion preferences before encoding. Provider adapters then encode only the resulting sendable parameters.
 
 Conversation storage may hold semantic values and user enable/disable intent for optional parameters. It must not own model availability, mandatory rules, or wire names.
 
@@ -64,7 +64,7 @@ Conversation storage may hold semantic values and user enable/disable intent for
 - Later matching rules override earlier rules for the same semantic parameter.
 - Broad provider and adapter rules should appear before narrower model-specific rules.
 - Unknown models inherit the broader provider or adapter baseline instead of failing.
-- Fetched model metadata may refine model descriptors such as context size and capabilities, but it does not create parameter mappings or availability rules.
+- Fetched model metadata may refine model facts such as context size and capabilities, but it does not create parameter mappings or availability rules.
 
 For baseline model creation and fetch normalization, the intended stack is:
 

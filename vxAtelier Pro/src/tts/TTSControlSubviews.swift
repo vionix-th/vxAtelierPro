@@ -523,7 +523,7 @@ struct TTSControlPlaylistEntryRow: View {
             VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
                 rowHeader
 
-                Text(item.displayText)
+                Text(item.textContent)
                     .font(.body)
                     .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -555,7 +555,7 @@ struct TTSControlPlaylistEntryRow: View {
         VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
             rowHeader
 
-            Text(item.displayText)
+            Text(item.textContent)
                 .font(.body)
                 .lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)

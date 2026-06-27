@@ -1,13 +1,13 @@
 import Foundation
 
 /// Fully resolved provider-neutral request ready for validation and adapter encoding.
-struct LLMRequest: Codable, Equatable {
+struct LLMGenerationRequest: Codable, Equatable {
     var providerID: LLMProviderID
     var adapterID: LLMAdapterID
     var modelID: String
     var modelCapabilities: [LLMModelCapability]
-    var parameterMappings: [LLMParameterMappingDescriptor]
-    var parameterAvailability: [LLMParameterAvailabilityDescriptor]
+    var parameterMappings: [LLMParameterMapping]
+    var parameterAvailability: [LLMParameterAvailability]
     var messages: [LLMMessage]
     var tools: [LLMToolDefinition]
     var options: LLMGenerationOptions
@@ -18,8 +18,8 @@ struct LLMRequest: Codable, Equatable {
         adapterID: LLMAdapterID,
         modelID: String,
         modelCapabilities: [LLMModelCapability] = [],
-        parameterMappings: [LLMParameterMappingDescriptor] = [],
-        parameterAvailability: [LLMParameterAvailabilityDescriptor] = [],
+        parameterMappings: [LLMParameterMapping] = [],
+        parameterAvailability: [LLMParameterAvailability] = [],
         messages: [LLMMessage],
         tools: [LLMToolDefinition] = [],
         options: LLMGenerationOptions = LLMGenerationOptions()
@@ -37,8 +37,8 @@ struct LLMRequest: Codable, Equatable {
 }
 
 /// Provider-neutral events emitted by adapters for streamed and complete responses.
-enum LLMStreamEvent: Equatable {
-    case runStarted(requestID: String?)
+enum LLMGenerationEvent: Equatable {
+    case generationStarted(requestID: String?)
     case responseMetadata(LLMResponseMetadata)
     case textDelta(String)
     case reasoningDelta(String)
@@ -46,5 +46,5 @@ enum LLMStreamEvent: Equatable {
     case toolCallCompleted(LLMToolCall)
     case toolOutputCompleted(LLMToolOutput)
     case usage(LLMUsage)
-    case runCompleted(responseID: String?, modelID: String?)
+    case generationCompleted(responseID: String?, modelID: String?)
 }

@@ -13,7 +13,7 @@ struct ProviderRunExecutor {
     /// Performs one provider run, retrying once for retryable failures when requested.
     @MainActor
     func performRun(
-        request: LLMRequest,
+        request: LLMGenerationRequest,
         providerConfiguration: LLMProviderConfiguration,
         draftSink: any ConversationDraftSink,
         conversationID: PersistentIdentifier,
@@ -54,7 +54,7 @@ struct ProviderRunExecutor {
     /// Collects adapter stream events into persisted-result data and transient draft updates.
     @MainActor
     private func collectRun(
-        request: LLMRequest,
+        request: LLMGenerationRequest,
         providerConfiguration: LLMProviderConfiguration,
         draftSink: any ConversationDraftSink,
         conversationID: PersistentIdentifier,
@@ -68,9 +68,9 @@ struct ProviderRunExecutor {
         let adapter = registry.adapter(for: request.adapterID, providerID: request.providerID)
         var result = ProviderRunResult()
 
-        for try await event in adapter.stream(request, configuration: providerConfiguration, toolExecutor: toolExecutor) {
+        for try await event in adapter.generateEvents(request, configuration: providerConfiguration, toolExecutor: toolExecutor) {
             switch event {
-            case .runStarted(let requestID):
+            case .generationStarted(let requestID):
                 result.requestID = result.requestID ?? requestID
             case .responseMetadata(let metadata):
                 result.metadata = metadata
@@ -90,7 +90,7 @@ struct ProviderRunExecutor {
                 upsert(output, into: &result.toolOutputs)
             case .usage(let usage):
                 result.usage = usage
-            case .runCompleted(let responseID, let modelID):
+            case .generationCompleted(let responseID, let modelID):
                 result.requestID = result.requestID ?? responseID
                 result.actualModelID = modelID
             }

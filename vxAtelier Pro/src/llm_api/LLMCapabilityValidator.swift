@@ -3,7 +3,7 @@ import Foundation
 /// Validates a resolved LLM request against provider and model capabilities.
 struct LLMCapabilityValidator {
     /// Performs preflight checks before a run is persisted or sent to a provider.
-    static func validate(_ request: LLMRequest, profile: LLMProviderProfile) throws {
+    static func validate(_ request: LLMGenerationRequest, profile: LLMProviderProfile) throws {
         guard profile.isEnabled else {
             throw LLMProviderError.authUnavailable("\(profile.name) is disabled.")
         }
@@ -15,7 +15,7 @@ struct LLMCapabilityValidator {
     }
 
     /// Rejects unsupported forced streaming.
-    static func validateStreaming(for request: LLMRequest, profile: LLMProviderProfile) throws {
+    static func validateStreaming(for request: LLMGenerationRequest, profile: LLMProviderProfile) throws {
         guard request.options.streamMode == .enabled else { return }
         guard supportsCapability(.streaming, request: request) else {
             throw LLMProviderError.unsupportedCapability("\(profile.name) does not support streaming for \(request.modelID).")
@@ -23,7 +23,7 @@ struct LLMCapabilityValidator {
     }
 
     /// Returns the explicit stream flag selected by conversation parameters.
-    static func streamEnabled(for request: LLMRequest) -> Bool {
+    static func streamEnabled(for request: LLMGenerationRequest) -> Bool {
         switch request.options.streamMode {
         case .disabled:
             return false
@@ -33,16 +33,16 @@ struct LLMCapabilityValidator {
     }
 
     /// Confirms that both provider profile and model metadata allow the selected adapter.
-    private static func validateEndpoint(_ request: LLMRequest, profile: LLMProviderProfile) throws {
+    private static func validateEndpoint(_ request: LLMGenerationRequest, profile: LLMProviderProfile) throws {
         guard profile.supportedAdapterIDs.contains(request.adapterID) else {
             throw LLMProviderError.unsupportedCapability("\(profile.name) does not support \(request.adapterID.rawValue).")
         }
     }
 
     /// Confirms requested generation options are mapped and supported by the provider/model pair.
-    private static func validateParameters(_ request: LLMRequest, profile: LLMProviderProfile) throws {
+    private static func validateParameters(_ request: LLMGenerationRequest, profile: LLMProviderProfile) throws {
         let options = request.options
-        let mappings = LLMParameterMappingResolver.resolve(
+        let mappings = LLMParameterMappingIndex.resolve(
             adapterID: request.adapterID,
             mappings: request.parameterMappings
         )
@@ -70,8 +70,8 @@ struct LLMCapabilityValidator {
             guard supportsCapability(.jsonSchema, request: request) else {
                 throw LLMProviderError.unsupportedParameter("\(profile.name) does not support JSON schema response format for \(request.modelID).")
             }
-            guard request.options.providerExtras["json_schema"]?.objectValue != nil else {
-                throw LLMProviderError.unsupportedParameter("response_format json_schema requires providerExtras.json_schema object.")
+            guard request.options.providerSpecificOptions["json_schema"]?.objectValue != nil else {
+                throw LLMProviderError.unsupportedParameter("response_format json_schema requires providerSpecificOptions.json_schema object.")
             }
         }
         if !request.tools.isEmpty {
@@ -79,23 +79,23 @@ struct LLMCapabilityValidator {
                 throw LLMProviderError.unsupportedCapability("\(profile.name) does not support tools for \(request.modelID).")
             }
         }
-        let availability = LLMParameterAvailabilityMappingResolver.resolve(
+        let availability = LLMParameterAvailabilityIndex.resolve(
             adapterID: request.adapterID,
             availability: request.parameterAvailability
         )
-        for descriptor in availability.values where descriptor.isAvailable && descriptor.semanticParameterID.isProviderMappable {
-            let value = request.options.jsonValue(for: descriptor.semanticParameterID)
-            if descriptor.isRequired && value == nil && descriptor.defaultValue == nil {
-                throw LLMProviderError.unsupportedParameter("\(descriptor.semanticParameterID.rawValue) is required for \(request.modelID).")
+        for parameterAvailability in availability.values where parameterAvailability.isAvailable && parameterAvailability.parameterID.isProviderMappable {
+            let value = request.options.jsonValue(for: parameterAvailability.parameterID)
+            if parameterAvailability.isRequired && value == nil && parameterAvailability.defaultValue == nil {
+                throw LLMProviderError.unsupportedParameter("\(parameterAvailability.parameterID.rawValue) is required for \(request.modelID).")
             }
-            if value != nil || descriptor.defaultValue != nil || descriptor.isRequired {
-                try requireMapping(descriptor.semanticParameterID, mappings: mappings, request: request, profile: profile)
+            if value != nil || parameterAvailability.defaultValue != nil || parameterAvailability.isRequired {
+                try requireMapping(parameterAvailability.parameterID, mappings: mappings, request: request, profile: profile)
             }
         }
     }
 
     /// Confirms message content modalities are supported by the provider/model pair.
-    private static func validateContent(_ request: LLMRequest, profile: LLMProviderProfile) throws {
+    private static func validateContent(_ request: LLMGenerationRequest, profile: LLMProviderProfile) throws {
         for message in request.messages {
             for part in message.content {
                 switch part.kind {
@@ -120,7 +120,7 @@ struct LLMCapabilityValidator {
     }
 
     /// Confirms assistant tool calls and tool results form a valid provider replay sequence.
-    private static func validateToolReplay(_ request: LLMRequest) throws {
+    private static func validateToolReplay(_ request: LLMGenerationRequest) throws {
         var knownToolIDs = Set<String>()
         var answeredToolIDs = Set<String>()
         var pendingToolIDs: [String] = []
@@ -169,7 +169,7 @@ struct LLMCapabilityValidator {
     }
 
     /// Returns the provider-specific error for an interrupted tool-result sequence.
-    private static func pendingToolResultError(for request: LLMRequest) -> LLMProviderError {
+    private static func pendingToolResultError(for request: LLMGenerationRequest) -> LLMProviderError {
         if request.adapterID == .anthropicMessages {
             return .unsupportedParameter("Anthropic tool_result must immediately follow its assistant tool_use.")
         }
@@ -179,8 +179,8 @@ struct LLMCapabilityValidator {
     /// Requires an active provider mapping before a semantic option is encoded.
     private static func requireMapping(
         _ parameterID: LLMParameterID,
-        mappings: [LLMParameterID: LLMParameterMappingDescriptor],
-        request: LLMRequest,
+        mappings: [LLMParameterID: LLMParameterMapping],
+        request: LLMGenerationRequest,
         profile: LLMProviderProfile
     ) throws {
         guard let mapping = mappings[parameterID], mapping.encodingKind != .disabled else {
@@ -189,7 +189,7 @@ struct LLMCapabilityValidator {
     }
 
     /// Resolves a capability against persisted model metadata.
-    private static func supportsCapability(_ capability: LLMModelCapability, request: LLMRequest) -> Bool {
+    private static func supportsCapability(_ capability: LLMModelCapability, request: LLMGenerationRequest) -> Bool {
         request.modelCapabilities.contains(capability)
     }
 }

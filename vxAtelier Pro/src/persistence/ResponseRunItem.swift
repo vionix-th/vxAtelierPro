@@ -27,7 +27,7 @@ final class ResponseRunItem {
         requestedModelID: String,
         actualModelID: String? = nil,
         requestID: String? = nil,
-        status: LLMRunStatus = .pending,
+        status: ProviderRunStatus = .pending,
         usage: LLMUsage? = nil,
         metadata: LLMResponseMetadata? = nil,
         errorMessage: String? = nil,
@@ -50,12 +50,12 @@ final class ResponseRunItem {
         self.turn = turn
     }
 
-    var status: LLMRunStatus {
-        get { LLMRunStatus(rawValue: statusRaw) ?? .pending }
+    var status: ProviderRunStatus {
+        get { ProviderRunStatus(rawValue: statusRaw) ?? .pending }
         set { statusRaw = newValue.rawValue }
     }
 
-    func transition(to newStatus: LLMRunStatus) throws {
+    func transition(to newStatus: ProviderRunStatus) throws {
         guard Self.canTransition(from: status, to: newStatus) else {
             throw LLMProviderError.invalidConfiguration("Invalid response run transition \(status.rawValue) -> \(newStatus.rawValue).")
         }
@@ -80,14 +80,14 @@ final class ResponseRunItem {
         return String(data: data, encoding: .utf8)
     }
 
-    private static func canTransition(from current: LLMRunStatus, to next: LLMRunStatus) -> Bool {
+    private static func canTransition(from current: ProviderRunStatus, to next: ProviderRunStatus) -> Bool {
         if current == next { return true }
         switch (current, next) {
-        case (.pending, .streaming),
-             (.streaming, .awaitingTools),
-             (.streaming, .completed),
-             (.streaming, .failed),
-             (.streaming, .cancelled),
+        case (.pending, .running),
+             (.running, .awaitingTools),
+             (.running, .completed),
+             (.running, .failed),
+             (.running, .cancelled),
              (.awaitingTools, .completed),
              (.awaitingTools, .failed),
              (.awaitingTools, .cancelled):

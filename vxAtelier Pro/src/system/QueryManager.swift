@@ -139,7 +139,7 @@ final class QueryManager {
         fetch(WebSearchConfigurationItem.self, sort: webSearchConfigurationSort)
     }
 
-    private func fetchModels() -> [ModelItem] {
+    private func fetchModelMetadata() -> [ModelItem] {
         fetch(ModelItem.self, sort: modelSort)
     }
 
@@ -167,7 +167,7 @@ final class QueryManager {
 
     func models(for apiConfiguration: APIConfigurationItem?) -> [ModelItem] {
         guard let apiConfiguration else { return [] }
-        return fetchModels().filter { $0.apiConfiguration?.id == apiConfiguration.id }
+        return fetchModelMetadata().filter { $0.apiConfiguration?.id == apiConfiguration.id }
     }
 
     func model(with modelID: String, for apiConfiguration: APIConfigurationItem) -> ModelItem? {
@@ -576,17 +576,17 @@ final class QueryManager {
         providerID: LLMProviderID,
         adapterID: LLMAdapterID,
         configuration: LLMProviderConfiguration
-    ) async throws -> [LLMModelDescriptor] {
+    ) async throws -> [LLMModelMetadata] {
         let adapter = LLMProviderRegistry.shared.adapter(
             for: adapterID,
             providerID: providerID
         )
-        return try await adapter.fetchModels(configuration: configuration)
+        return try await adapter.fetchModelMetadata(configuration: configuration)
     }
 
     @discardableResult
     func upsertModelCandidates(
-        _ candidates: [LLMModelDescriptor],
+        _ candidates: [LLMModelMetadata],
         for apiConfiguration: APIConfigurationItem
     ) throws -> ModelProviderFetchSummary {
         let existingModels = models(for: apiConfiguration)
@@ -595,11 +595,11 @@ final class QueryManager {
         for candidate in candidates {
             if let existing = existingModels.first(where: { $0.modelID == candidate.id }) {
                 existing.apiConfiguration = apiConfiguration
-                existing.descriptor = candidate
+                existing.metadata = candidate
                 summary.updated += 1
                 vxAtelierPro.log.debug("Overwrote model: \(candidate.id)")
             } else {
-                let modelItem = ModelItem(descriptor: candidate, apiConfiguration: apiConfiguration)
+                let modelItem = ModelItem(metadata: candidate, apiConfiguration: apiConfiguration)
                 modelContext.insert(modelItem)
                 summary.added += 1
                 vxAtelierPro.log.debug("Added new model: \(candidate.id)")

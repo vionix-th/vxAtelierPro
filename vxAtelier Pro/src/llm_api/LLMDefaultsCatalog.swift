@@ -65,14 +65,14 @@ struct LLMDefaultsCatalog {
     }
 
     /// Builds a model candidate from bundled defaults for draft fetch/create flows.
-    func modelDescriptor(
+    func modelMetadata(
         providerID: LLMProviderID,
         modelID: String,
         displayName: String? = nil,
         rawMetadataJSON: String? = nil
-    ) -> LLMModelDescriptor {
+    ) -> LLMModelMetadata {
         let defaults = modelDefaults(providerID: providerID, modelID: modelID)
-        return LLMModelDescriptor(
+        return LLMModelMetadata(
             id: modelID,
             displayName: displayName,
             providerID: providerID,
@@ -87,8 +87,8 @@ struct LLMDefaultsCatalog {
         providerID: LLMProviderID,
         adapterID: LLMAdapterID,
         modelID: String
-    ) -> [LLMParameterMappingDescriptor] {
-        var merged: [LLMParameterID: LLMParameterMappingDescriptor] = [:]
+    ) -> [LLMParameterMapping] {
+        var merged: [LLMParameterID: LLMParameterMapping] = [:]
         var order: [LLMParameterID] = []
 
         for rule in rules {
@@ -97,12 +97,12 @@ struct LLMDefaultsCatalog {
                 continue
             }
 
-            for mapping in parameterMappings {
-                let descriptor = mapping.descriptor(adapterID: adapterID)
-                if merged[descriptor.semanticParameterID] == nil {
-                    order.append(descriptor.semanticParameterID)
+            for mappingDefault in parameterMappings {
+                let mapping = mappingDefault.mapping(adapterID: adapterID)
+                if merged[mapping.parameterID] == nil {
+                    order.append(mapping.parameterID)
                 }
-                merged[descriptor.semanticParameterID] = descriptor
+                merged[mapping.parameterID] = mapping
             }
         }
 
@@ -114,8 +114,8 @@ struct LLMDefaultsCatalog {
         providerID: LLMProviderID,
         adapterID: LLMAdapterID,
         modelID: String
-    ) -> [LLMParameterAvailabilityDescriptor] {
-        var merged: [LLMParameterID: LLMParameterAvailabilityDescriptor] = [:]
+    ) -> [LLMParameterAvailability] {
+        var merged: [LLMParameterID: LLMParameterAvailability] = [:]
         var order: [LLMParameterID] = []
 
         for rule in rules {
@@ -124,12 +124,12 @@ struct LLMDefaultsCatalog {
                 continue
             }
 
-            for availability in parameterAvailability {
-                let descriptor = availability.descriptor(adapterID: adapterID)
-                if merged[descriptor.semanticParameterID] == nil {
-                    order.append(descriptor.semanticParameterID)
+            for availabilityDefault in parameterAvailability {
+                let availability = availabilityDefault.availability(adapterID: adapterID)
+                if merged[availability.parameterID] == nil {
+                    order.append(availability.parameterID)
                 }
-                merged[descriptor.semanticParameterID] = descriptor
+                merged[availability.parameterID] = availability
             }
         }
 
@@ -306,10 +306,10 @@ private struct LLMParameterMappingDefault: Decodable {
     var wireKey: String?
     var preset: LLMParameterStructuredPreset?
 
-    func descriptor(adapterID: LLMAdapterID) -> LLMParameterMappingDescriptor {
-        LLMParameterMappingDescriptor(
+    func mapping(adapterID: LLMAdapterID) -> LLMParameterMapping {
+        LLMParameterMapping(
             adapterID: adapterID,
-            semanticParameterID: parameter,
+            parameterID: parameter,
             encodingKind: encoding ?? .scalarKey,
             wireKey: wireKey ?? "",
             structuredPreset: preset
@@ -325,10 +325,10 @@ private struct LLMParameterAvailabilityDefault: Decodable {
     var defaultValue: JSONValue?
     var options: [String]?
 
-    func descriptor(adapterID: LLMAdapterID) -> LLMParameterAvailabilityDescriptor {
-        LLMParameterAvailabilityDescriptor(
+    func availability(adapterID: LLMAdapterID) -> LLMParameterAvailability {
+        LLMParameterAvailability(
             adapterID: adapterID,
-            semanticParameterID: parameter,
+            parameterID: parameter,
             isAvailable: available ?? true,
             isRequired: required ?? false,
             isEnabled: enabled ?? (defaultValue != nil),

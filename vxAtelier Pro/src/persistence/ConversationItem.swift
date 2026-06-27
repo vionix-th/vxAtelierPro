@@ -187,7 +187,7 @@ final class ConversationItem {
     private static func estimatedTokenCount(for message: MessageItem) -> Int {
         var count = 4
         count += message.role.split(separator: " ").count
-        count += max(1, message.displayText.count / 4)
+        count += max(1, message.textContent.count / 4)
         count += message.orderedToolCallItems.reduce(0) { partial, call in
             partial + max(1, call.name.count / 4) + max(1, call.argumentsJSON.count / 4)
         }

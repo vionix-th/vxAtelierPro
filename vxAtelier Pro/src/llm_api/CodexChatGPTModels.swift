@@ -11,9 +11,9 @@ enum CodexChatGPTModels {
         "gpt-5.2"
     ]
 
-    static func candidates() -> [LLMModelDescriptor] {
+    static func candidates() -> [LLMModelMetadata] {
         modelIDs.map {
-            LLMDefaultsCatalog.bundled.modelDescriptor(
+            LLMDefaultsCatalog.bundled.modelMetadata(
                 providerID: .openAICodexChatGPTSubscription,
                 modelID: $0
             )

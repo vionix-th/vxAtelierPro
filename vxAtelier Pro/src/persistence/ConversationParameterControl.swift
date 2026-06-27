@@ -40,13 +40,13 @@ enum ConversationParameterProjection {
             ?? apiConfiguration.defaultModelID
             ?? ""
         let model = apiConfiguration.models.first { $0.modelID == modelID }
-        let mappings = LLMParameterMappingResolver.resolve(
+        let mappings = LLMParameterMappingIndex.resolve(
             adapterID: adapterID,
-            mappings: model?.parameterMappings.map(\.descriptor) ?? []
+            mappings: model?.parameterMappings.map(\.mapping) ?? []
         )
-        let availability = LLMParameterAvailabilityMappingResolver.resolve(
+        let availability = LLMParameterAvailabilityIndex.resolve(
             adapterID: adapterID,
-            availability: model?.parameterAvailability.map(\.descriptor) ?? []
+            availability: model?.parameterAvailability.map(\.availability) ?? []
         )
 
         var controls: [ConversationParameterControl] = []
@@ -66,7 +66,7 @@ enum ConversationParameterProjection {
             } else if required {
                 isEnabled = true
             } else if let descriptor {
-                isEnabled = LLMParameterAvailabilityResolver.isParameterSendable(
+                isEnabled = LLMGenerationOptionsResolver.isParameterSendable(
                     parameterID,
                     value: options.parameterValue(parameterID),
                     conversationPreference: options.parameterInclusionPreference(parameterID),

@@ -13,12 +13,12 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
     }
 
     /// Executes a Responses request through the shared adapter run loop.
-    func stream(
-        _ request: LLMRequest,
+    func generateEvents(
+        _ request: LLMGenerationRequest,
         configuration: LLMProviderConfiguration,
         toolExecutor: LLMToolExecutionHandler?
-    ) -> AsyncThrowingStream<LLMStreamEvent, Error> {
-        return LLMAdapterRunLoop.stream(
+    ) -> AsyncThrowingStream<LLMGenerationEvent, Error> {
+        return LLMHTTPGenerationPipeline.generateEvents(
             request: request,
             configuration: configuration,
             profile: profile,
@@ -40,16 +40,16 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
     }
 
     /// Reuses Chat Completions model listing for Responses-capable configurations.
-    func fetchModels(configuration: LLMProviderConfiguration) async throws -> [LLMModelDescriptor] {
+    func fetchModelMetadata(configuration: LLMProviderConfiguration) async throws -> [LLMModelMetadata] {
         if profile.id == .openAICodexChatGPTSubscription {
             return CodexChatGPTModels.candidates()
         }
         let chatFallback = OpenAIChatCompletionsAdapter(profile: profile)
-        return try await chatFallback.fetchModels(configuration: configuration)
+        return try await chatFallback.fetchModelMetadata(configuration: configuration)
     }
 
     /// Encodes a provider-neutral request into a Responses JSON body.
-    func makeBody(for request: LLMRequest, stream: Bool) throws -> [String: JSONValue] {
+    func makeBody(for request: LLMGenerationRequest, stream: Bool) throws -> [String: JSONValue] {
         var body: [String: JSONValue] = [
             "model": .string(request.modelID),
             "input": .array(try responsesInput(from: request)),
@@ -58,7 +58,7 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
         if !request.options.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             body["instructions"] = .string(request.options.systemPrompt)
         }
-        let mappings = LLMParameterMappingResolver.resolve(
+        let mappings = LLMParameterMappingIndex.resolve(
             adapterID: request.adapterID,
             mappings: request.parameterMappings
         )
@@ -75,13 +75,13 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
     }
 
     /// Converts conversation messages into Responses input items, including tool replay.
-    func responsesInput(from request: LLMRequest) throws -> [JSONValue] {
+    func responsesInput(from request: LLMGenerationRequest) throws -> [JSONValue] {
         try request.messages.flatMap { message -> [JSONValue] in
             if message.role == "tool", let toolCallID = message.toolCallID {
                 return [.object([
                     "type": .string("function_call_output"),
                     "call_id": .string(toolCallID),
-                    "output": .string(message.displayText)
+                    "output": .string(message.textContent)
                 ])]
             }
 
@@ -109,7 +109,7 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
 
     /// Returns whether a message has content that should become a Responses input message.
     private func hasProviderContent(_ message: LLMMessage) -> Bool {
-        if !message.displayText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if !message.textContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return true
         }
         return message.content.contains { part in
@@ -126,11 +126,11 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
     private func handleResponsesStreamEvent(
         _ event: [String: JSONValue],
         assembler: inout LLMToolCallAssembler,
-        continuation: AsyncThrowingStream<LLMStreamEvent, Error>.Continuation
+        continuation: AsyncThrowingStream<LLMGenerationEvent, Error>.Continuation
     ) {
         switch event.string("type") {
         case "response.created", "response.in_progress":
-            continuation.yield(.runStarted(requestID: event.object("response")?.string("id")))
+            continuation.yield(.generationStarted(requestID: event.object("response")?.string("id")))
         case "response.output_text.delta":
             if let delta = event.string("delta") { continuation.yield(.textDelta(delta)) }
         case "response.reasoning_summary_text.delta", "response.reasoning_text.delta":
@@ -163,7 +163,7 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
             if let usage = response?.object("usage") {
                 continuation.yield(.usage(OpenAICompatibleEncoding.usage(from: usage, inputKey: "input_tokens", outputKey: "output_tokens")))
             }
-            continuation.yield(.runCompleted(responseID: response?.string("id"), modelID: response?.string("model")))
+            continuation.yield(.generationCompleted(responseID: response?.string("id"), modelID: response?.string("model")))
         default:
             break
         }
@@ -172,10 +172,10 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
     /// Emits normalized events from a complete Responses JSON response.
     private func emitNonStreamingResponse(
         _ response: JSONValue,
-        continuation: AsyncThrowingStream<LLMStreamEvent, Error>.Continuation
+        continuation: AsyncThrowingStream<LLMGenerationEvent, Error>.Continuation
     ) {
         guard let object = response.objectValue else {
-            continuation.yield(.runCompleted(responseID: nil, modelID: nil))
+            continuation.yield(.generationCompleted(responseID: nil, modelID: nil))
             return
         }
         if let outputText = object.string("output_text"), !outputText.isEmpty {
@@ -205,6 +205,6 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
         if let usage = object.object("usage") {
             continuation.yield(.usage(OpenAICompatibleEncoding.usage(from: usage, inputKey: "input_tokens", outputKey: "output_tokens")))
         }
-        continuation.yield(.runCompleted(responseID: object.string("id"), modelID: object.string("model")))
+        continuation.yield(.generationCompleted(responseID: object.string("id"), modelID: object.string("model")))
     }
 }

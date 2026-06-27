@@ -1,7 +1,7 @@
 import Foundation
 
 /// Shared resolver for draft model candidates and provider defaults.
-struct LLMModelDescriptorResolver {
+struct LLMModelMetadataResolver {
     var defaultsCatalog: LLMDefaultsCatalog = .bundled
 
     func defaultModelID(
@@ -15,11 +15,11 @@ struct LLMModelDescriptorResolver {
         return defaultsCatalog.defaultModelID(for: providerID)
     }
 
-    func catalogDescriptor(
+    func catalogMetadata(
         for modelID: String,
         providerID: LLMProviderID
-    ) -> LLMModelDescriptor {
-        defaultsCatalog.modelDescriptor(
+    ) -> LLMModelMetadata {
+        defaultsCatalog.modelMetadata(
             providerID: providerID,
             modelID: modelID
         )

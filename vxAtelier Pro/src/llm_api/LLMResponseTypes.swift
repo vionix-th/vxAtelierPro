@@ -1,9 +1,9 @@
 import Foundation
 
 /// Lifecycle state for a persisted LLM run.
-enum LLMRunStatus: String, Codable, CaseIterable {
+enum ProviderRunStatus: String, Codable, CaseIterable {
     case pending
-    case streaming
+    case running
     case awaitingTools
     case completed
     case failed

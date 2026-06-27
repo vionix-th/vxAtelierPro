@@ -6,7 +6,7 @@ import SwiftUI
 @Observable
 private final class MessageInputController {
     private let queryManager: QueryManager
-    private let completionUseCase: ConversationCompletionUseCase
+    private let completionUseCase: ConversationResponseUseCase
     private let resolveConversation: @MainActor () throws -> ConversationItem
     private let didSend: ((ConversationItem) -> Void)?
 
@@ -22,7 +22,7 @@ private final class MessageInputController {
 
     init(
         queryManager: QueryManager,
-        completionUseCase: ConversationCompletionUseCase? = nil,
+        completionUseCase: ConversationResponseUseCase? = nil,
         draftStore: ConversationDraftStore,
         focusOnAppear: Bool,
         resolveConversation: @escaping @MainActor () throws -> ConversationItem,
@@ -59,9 +59,9 @@ private final class MessageInputController {
                 autoNameIfNeeded(conversation: conversation, sourceText: textToSend, autoNameConversations: autoNameConversations)
 
                 let expandedMessage = expandVariables(textToSend, conversation: conversation)
-                try await completionUseCase.complete(
-                    conversation: conversation,
-                    message: expandedMessage,
+                try await completionUseCase.sendMessage(
+                    expandedMessage,
+                    in: conversation,
                     draftStore: draftStore
                 )
                 try queryManager.saveContext()
@@ -122,7 +122,7 @@ struct MessageInputView: View {
 
     init(
         queryManager: QueryManager,
-        completionUseCase: ConversationCompletionUseCase? = nil,
+        completionUseCase: ConversationResponseUseCase? = nil,
         draftStore: ConversationDraftStore,
         contextConversation: ConversationItem? = nil,
         focusInputOnAppear: Bool = {

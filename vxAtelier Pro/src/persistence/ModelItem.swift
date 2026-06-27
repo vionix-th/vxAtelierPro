@@ -33,9 +33,9 @@ final class ModelItem {
         capabilitiesRaw.compactMap(LLMModelCapability.init(rawValue:))
     }
 
-    var descriptor: LLMModelDescriptor {
+    var metadata: LLMModelMetadata {
         get {
-            LLMModelDescriptor(
+            LLMModelMetadata(
                 id: modelID,
                 displayName: displayName,
                 providerID: apiConfiguration?.providerIDEnum ?? .customOpenAICompatible,
@@ -74,7 +74,7 @@ final class ModelItem {
         self.parameterMappings = []
         self.parameterAvailability = []
 
-        let defaultCandidate = LLMModelDescriptorResolver().catalogDescriptor(
+        let defaultCandidate = LLMModelMetadataResolver().catalogMetadata(
             for: modelID,
             providerID: apiConfiguration?.providerIDEnum ?? .customOpenAICompatible
         )
@@ -120,13 +120,13 @@ final class ModelItem {
         )
     }
 
-    convenience init(descriptor: LLMModelDescriptor, apiConfiguration: APIConfigurationItem? = nil) {
+    convenience init(metadata: LLMModelMetadata, apiConfiguration: APIConfigurationItem? = nil) {
         self.init(
-            modelID: descriptor.id,
-            contextSize: descriptor.contextSize ?? AppDefaults.ModelContextSizes.defaultSize,
+            modelID: metadata.id,
+            contextSize: metadata.contextSize ?? AppDefaults.ModelContextSizes.defaultSize,
             apiConfiguration: apiConfiguration
         )
-        self.descriptor = descriptor
+        self.metadata = metadata
     }
 
     private func materializeDefaultParameterMappings(
@@ -140,23 +140,23 @@ final class ModelItem {
             modelID: modelID
         )
 
-        for descriptor in defaults {
+        for mapping in defaults {
             if let existing = parameterMappings.first(where: {
-                $0.adapterIDEnum == adapterID && $0.semanticParameterIDEnum == descriptor.semanticParameterID
+                $0.adapterIDEnum == adapterID && $0.parameterIDEnum == mapping.parameterID
             }) {
                 if preserveCustomized && existing.isCustomized {
                     continue
                 }
-                existing.apply(descriptor, markCustomized: false)
+                existing.apply(mapping, markCustomized: false)
             } else {
-                parameterMappings.append(ModelParameterMappingItem(descriptor: descriptor))
+                parameterMappings.append(ModelParameterMappingItem(mapping: mapping))
             }
         }
 
         if !preserveCustomized {
-            let defaultIDs = Set(defaults.map(\.semanticParameterID))
+            let defaultIDs = Set(defaults.map(\.parameterID))
             parameterMappings.removeAll { mapping in
-                mapping.adapterIDEnum == adapterID && !defaultIDs.contains(mapping.semanticParameterIDEnum)
+                mapping.adapterIDEnum == adapterID && !defaultIDs.contains(mapping.parameterIDEnum)
             }
         }
     }
@@ -172,23 +172,23 @@ final class ModelItem {
             modelID: modelID
         )
 
-        for descriptor in defaults {
+        for availability in defaults {
             if let existing = parameterAvailability.first(where: {
-                $0.adapterIDEnum == adapterID && $0.semanticParameterIDEnum == descriptor.semanticParameterID
+                $0.adapterIDEnum == adapterID && $0.parameterIDEnum == availability.parameterID
             }) {
                 if preserveCustomized && existing.isCustomized {
                     continue
                 }
-                existing.apply(descriptor, markCustomized: false)
+                existing.apply(availability, markCustomized: false)
             } else {
-                parameterAvailability.append(ModelParameterAvailabilityItem(descriptor: descriptor))
+                parameterAvailability.append(ModelParameterAvailabilityItem(availability: availability))
             }
         }
 
         if !preserveCustomized {
-            let defaultIDs = Set(defaults.map(\.semanticParameterID))
+            let defaultIDs = Set(defaults.map(\.parameterID))
             parameterAvailability.removeAll { availability in
-                availability.adapterIDEnum == adapterID && !defaultIDs.contains(availability.semanticParameterIDEnum)
+                availability.adapterIDEnum == adapterID && !defaultIDs.contains(availability.parameterIDEnum)
             }
         }
     }

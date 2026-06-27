@@ -33,7 +33,7 @@ enum LLMModelCapability: String, Codable, CaseIterable, Identifiable {
 }
 
 /// Temporary model metadata candidate used during fetch/enrichment before persistence.
-struct LLMModelDescriptor: Codable, Equatable, Identifiable {
+struct LLMModelMetadata: Codable, Equatable, Identifiable {
     var id: String
     var displayName: String
     var providerID: LLMProviderID

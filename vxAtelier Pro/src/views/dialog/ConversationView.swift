@@ -335,7 +335,7 @@ struct ConversationView: View {
             isSelectingMessages = true
             selectedMessages.insert(message.id)
         case .copyText:
-            ExportUtils.copyToClipboard(message.displayText)
+            ExportUtils.copyToClipboard(message.textContent)
         case .copyJSON:
             let messageData = MessageExportData(message)
             ExportUtils.copyToClipboard(messageData)
@@ -481,7 +481,7 @@ struct ConversationView: View {
         guard let conversation else { return }
 
         let selectedMessagesList = selectedMessagesOrdered(in: conversation, messageIDs: selectedMessages)
-        let selectedText = selectedMessagesList.map(\.displayText).joined(separator: "\n\n")
+        let selectedText = selectedMessagesList.map(\.textContent).joined(separator: "\n\n")
         ExportUtils.copyToClipboard(selectedText)
     }
 
@@ -681,7 +681,7 @@ enum ConversationDraftRenderPolicy {
     static func shouldRender(
         isLastTurn: Bool,
         draft: ConversationDraft,
-        latestRunStatus: LLMRunStatus?
+        latestRunStatus: ProviderRunStatus?
     ) -> Bool {
         guard isLastTurn else { return false }
         let draftFailed = draft.runStatus == .failed || draft.runStatus == .cancelled

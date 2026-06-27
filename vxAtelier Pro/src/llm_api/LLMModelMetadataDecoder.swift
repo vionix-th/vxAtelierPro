@@ -7,10 +7,10 @@ enum LLMModelMetadataDecoder {
         from data: [JSONValue],
         profile: LLMProviderProfile,
         defaultsCatalog: LLMDefaultsCatalog = .bundled
-    ) -> [LLMModelDescriptor] {
+    ) -> [LLMModelMetadata] {
         data.compactMap { item in
             guard let object = item.objectValue, let id = object.string("id") else { return nil }
-            var candidate = defaultsCatalog.modelDescriptor(
+            var candidate = defaultsCatalog.modelMetadata(
                 providerID: profile.id,
                 modelID: id,
                 displayName: object.string("name") ?? object.string("display_name") ?? id,
@@ -26,10 +26,10 @@ enum LLMModelMetadataDecoder {
         from data: [JSONValue],
         profile: LLMProviderProfile,
         defaultsCatalog: LLMDefaultsCatalog = .bundled
-    ) -> [LLMModelDescriptor] {
+    ) -> [LLMModelMetadata] {
         data.compactMap { item in
             guard let object = item.objectValue, let id = object.string("id") else { return nil }
-            var candidate = defaultsCatalog.modelDescriptor(
+            var candidate = defaultsCatalog.modelMetadata(
                 providerID: profile.id,
                 modelID: id,
                 displayName: object.string("display_name") ?? object.string("name") ?? id,
@@ -55,7 +55,7 @@ enum LLMModelMetadataDecoder {
     }
 
     /// Applies direct provider metadata over already-resolved bundled defaults.
-    private static func applyProviderMetadata(from object: [String: JSONValue], to candidate: inout LLMModelDescriptor) {
+    private static func applyProviderMetadata(from object: [String: JSONValue], to candidate: inout LLMModelMetadata) {
         if let contextSize = contextSize(from: object) {
             candidate.contextSize = contextSize
         }

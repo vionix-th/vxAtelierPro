@@ -10,8 +10,8 @@ struct ConversationRunContext {
     var adapterID: LLMAdapterID
     var modelID: String
     var modelCapabilities: [LLMModelCapability]
-    var parameterMappings: [LLMParameterMappingDescriptor]
-    var parameterAvailability: [LLMParameterAvailabilityDescriptor]
+    var parameterMappings: [LLMParameterMapping]
+    var parameterAvailability: [LLMParameterAvailability]
     var messages: [LLMMessage]
     var tools: [LLMToolDefinition]
     var options: LLMGenerationOptions

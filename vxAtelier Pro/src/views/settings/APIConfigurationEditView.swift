@@ -62,7 +62,7 @@ struct APIConfigurationEditView: View {
     @State private var isModelPickerPresented = false
     @State private var isValidating = false
     @State private var isRefreshingModels = false
-    @State private var fetchedModelCandidates: [LLMModelDescriptor]?
+    @State private var fetchedModelCandidates: [LLMModelMetadata]?
     @State private var fetchedModelCandidateSignature: String?
     @State private var selectedPreset: APIPreset
     @State private var isCodexAuthenticating = false
@@ -385,7 +385,7 @@ struct APIConfigurationEditView: View {
     }
 
     static func suggestedDefaultModel(for providerID: LLMProviderID) -> String {
-        LLMModelDescriptorResolver().defaultModelID(for: providerID, apiConfiguration: nil) ?? ""
+        LLMModelMetadataResolver().defaultModelID(for: providerID, apiConfiguration: nil) ?? ""
     }
 
     private func validateDraft() -> Bool {

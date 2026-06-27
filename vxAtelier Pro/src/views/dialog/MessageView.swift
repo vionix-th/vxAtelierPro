@@ -21,7 +21,7 @@ struct MessageView: View {
     let isBookmarked: Bool
     var streamingContent: String? = nil
     var streamingToolCalls: [LLMToolCall] = []
-    var streamingRunStatus: LLMRunStatus? = nil
+    var streamingRunStatus: ProviderRunStatus? = nil
     var streamingErrorMessage: String? = nil
 
     @AppStorage(AppSettings.Keys.disableAvatar) private var disableAvatar: Bool = false
@@ -104,7 +104,7 @@ struct MessageView: View {
                     bubbleContent(message: message, conversation: conversation, isStreaming: isStreamingPlaceholder)
                 } else if message.role == "assistant" {
                     // If tool chips are disabled and the assistant text is empty (non-streaming), omit the bubble entirely
-                    let assistantTextIsEmpty = message.displayText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    let assistantTextIsEmpty = message.textContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     if showToolCallChips || isStreamingPlaceholder || !assistantTextIsEmpty {
                         HStack {
                             if !disableAvatar {
@@ -118,7 +118,7 @@ struct MessageView: View {
                         Spacer()
                     }
                 } else if message.role == "system" || message.role == "developer" {
-                    Text(message.displayText)
+                    Text(message.textContent)
                         .font(.footnote)
                         .italic()
                         .foregroundColor(.secondary)
@@ -140,7 +140,7 @@ struct MessageView: View {
         ZStack(alignment: .bottomTrailing) {
             VStack(alignment: .leading, spacing: 8) {
                 // Main content bubble
-                let assistantTextIsEmpty = message.role == "assistant" && message.displayText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                let assistantTextIsEmpty = message.role == "assistant" && message.textContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 let showMainBubble = !(message.role == "assistant" && !isStreaming && assistantTextIsEmpty)
                 if showMainBubble {
                     Group {
@@ -153,7 +153,7 @@ struct MessageView: View {
                                     .foregroundColor(.red)
                                     .textSelection(.enabled)
                             }
-                        } else if isStreaming && message.displayText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        } else if isStreaming && message.textContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                             HStack(spacing: 8) {
                                 ProgressView()
                                     .controlSize(.small)
@@ -162,9 +162,9 @@ struct MessageView: View {
                                     .foregroundColor(.secondary)
                             }
                         } else if conversation.options.isMarkdownEnabled && !(isStreaming && markdownStreamFinalizeOnly) {
-                            MarkdownUIRenderer(markdown: message.displayText)
+                            MarkdownUIRenderer(markdown: message.textContent)
                         } else {
-                            Text(message.displayText)
+                            Text(message.textContent)
                                 .font(.system(size: bubbleFontSize))
                                 .textSelection(.enabled)
                         }
@@ -238,7 +238,7 @@ struct MessageView: View {
                                     let ev = result.event
                                     let rid = ev.id
                                     let toolName = result.toolCall.name
-                                    let isLong = ev.message.displayText.count > 600 || ev.message.displayText.components(separatedBy: "\n").count > 12
+                                    let isLong = ev.message.textContent.count > 600 || ev.message.textContent.components(separatedBy: "\n").count > 12
                                     let expanded = expandedResultIds.contains(rid)
                                     VStack(alignment: .leading, spacing: 6) {
                                         HStack(spacing: 6) {
@@ -260,7 +260,7 @@ struct MessageView: View {
                                             }
                                         }
                                         VStack(alignment: .leading, spacing: 4) {
-                                            Text(ev.message.displayText)
+                                            Text(ev.message.textContent)
                                                 .font(.system(size: 12, design: .monospaced))
                                                 .foregroundColor(.secondary)
                                                 .textSelection(.enabled)
@@ -268,7 +268,7 @@ struct MessageView: View {
                                             HStack(spacing: 8) {
                                                 Spacer()
                                                 Button {
-                                                    copyToClipboard(ev.message.displayText)
+                                                    copyToClipboard(ev.message.textContent)
                                                 } label: {
                                                     Label("Copy", systemImage: "doc.on.doc")
                                                         .labelStyle(.iconOnly)

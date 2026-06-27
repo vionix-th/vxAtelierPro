@@ -61,7 +61,7 @@ private struct ModelEditSnapshot {
 private struct ModelParameterMappingSnapshot {
     let item: ModelParameterMappingItem
     let adapterIDRaw: String
-    let semanticParameterID: String
+    let parameterID: String
     let encodingKindRaw: String
     let wireKey: String
     let structuredPresetRaw: String?
@@ -70,7 +70,7 @@ private struct ModelParameterMappingSnapshot {
     init(_ item: ModelParameterMappingItem) {
         self.item = item
         adapterIDRaw = item.adapterIDRaw
-        semanticParameterID = item.semanticParameterID
+        parameterID = item.parameterID
         encodingKindRaw = item.encodingKindRaw
         wireKey = item.wireKey
         structuredPresetRaw = item.structuredPresetRaw
@@ -79,7 +79,7 @@ private struct ModelParameterMappingSnapshot {
 
     func restore() {
         item.adapterIDRaw = adapterIDRaw
-        item.semanticParameterID = semanticParameterID
+        item.parameterID = parameterID
         item.encodingKindRaw = encodingKindRaw
         item.wireKey = wireKey
         item.structuredPresetRaw = structuredPresetRaw
@@ -91,7 +91,7 @@ private struct ModelParameterMappingSnapshot {
 private struct ModelParameterAvailabilitySnapshot {
     let item: ModelParameterAvailabilityItem
     let adapterIDRaw: String
-    let semanticParameterID: String
+    let parameterID: String
     let isAvailable: Bool
     let isRequired: Bool
     let isEnabled: Bool
@@ -101,7 +101,7 @@ private struct ModelParameterAvailabilitySnapshot {
     init(_ item: ModelParameterAvailabilityItem) {
         self.item = item
         adapterIDRaw = item.adapterIDRaw
-        semanticParameterID = item.semanticParameterID
+        parameterID = item.parameterID
         isAvailable = item.isAvailable
         isRequired = item.isRequired
         isEnabled = item.isEnabled
@@ -111,7 +111,7 @@ private struct ModelParameterAvailabilitySnapshot {
 
     func restore() {
         item.adapterIDRaw = adapterIDRaw
-        item.semanticParameterID = semanticParameterID
+        item.parameterID = parameterID
         item.isAvailable = isAvailable
         item.isRequired = isRequired
         item.isEnabled = isEnabled
@@ -167,13 +167,13 @@ struct ModelEditorView: View {
     }
 
     private var addableParameterIDs: [LLMParameterID] {
-        let existing = Set(selectedAdapterMappings.map(\.semanticParameterIDEnum))
+        let existing = Set(selectedAdapterMappings.map(\.parameterIDEnum))
         return LLMParameterID.allCases
             .filter { $0.isProviderMappable && !existing.contains($0) }
     }
 
     private var addableAvailabilityParameterIDs: [LLMParameterID] {
-        let existing = Set(selectedAdapterAvailability.map(\.semanticParameterIDEnum))
+        let existing = Set(selectedAdapterAvailability.map(\.parameterIDEnum))
         return LLMParameterID.allCases
             .filter { $0.isProviderMappable && !existing.contains($0) }
     }
@@ -743,7 +743,7 @@ struct ModelEditorView: View {
 
     private func applyCatalogDefaultsForSelectedConfiguration() {
         guard let selectedConfiguration else { return }
-        let candidate = LLMModelDescriptorResolver().catalogDescriptor(
+        let candidate = LLMModelMetadataResolver().catalogMetadata(
             for: name,
             providerID: selectedConfiguration.providerIDEnum
         )
@@ -754,7 +754,7 @@ struct ModelEditorView: View {
     private func addMapping(_ parameterID: LLMParameterID) {
         let mapping = ModelParameterMappingItem(
             adapterID: selectedAdapterID,
-            semanticParameterID: parameterID,
+            parameterID: parameterID,
             encodingKind: .scalarKey,
             wireKey: parameterID.rawValue,
             isCustomized: true
@@ -765,7 +765,7 @@ struct ModelEditorView: View {
     private func addAvailability(_ parameterID: LLMParameterID) {
         let availability = ModelParameterAvailabilityItem(
             adapterID: selectedAdapterID,
-            semanticParameterID: parameterID,
+            parameterID: parameterID,
             isAvailable: true,
             isRequired: false,
             isEnabled: false,
@@ -948,7 +948,7 @@ private struct ModelParameterAvailabilityRow: View {
             if trimmed.isEmpty {
                 availability.defaultJSONValue = nil
             } else {
-                switch availability.semanticParameterIDEnum.valueType {
+                switch availability.parameterIDEnum.valueType {
                 case .integer:
                     availability.defaultJSONValue = .integer(Int(trimmed) ?? 0)
                 case .float:
