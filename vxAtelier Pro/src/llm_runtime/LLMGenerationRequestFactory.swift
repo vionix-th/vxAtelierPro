@@ -34,7 +34,7 @@ struct ConversationRunContextResolver {
         let resolvedParameters = LLMGenerationOptionsResolver.resolve(
             options: rawOptions,
             conversationPreferences: conversation.options.parameterInclusionPreferences,
-            parameterContracts: model.resolvedContract.parameters
+            parameterProfiles: model.modelProfile.parameters
         )
         let tools = toolCatalog.allTools()
             .filter { conversation.options.isToolEnabled($0.name) }

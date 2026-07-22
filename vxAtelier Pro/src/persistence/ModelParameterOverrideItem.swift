@@ -8,7 +8,7 @@ enum ModelDefaultValueOverrideKind: String, Codable, CaseIterable {
 }
 
 @Model
-final class ModelParameterPolicyOverrideItem {
+final class ModelParameterOverrideItem {
     var adapterIDRaw: String
     var parameterIDRaw: String
     var supportRaw: String?
@@ -45,7 +45,7 @@ final class ModelParameterPolicyOverrideItem {
         set { defaultValueData = newValue.flatMap { try? JSONEncoder().encode($0) } }
     }
 
-    var policy: LLMParameterPolicyOverride {
+    var overrides: LLMParameterOverrides {
         let valueOverride: LLMDefaultValueOverride
         switch defaultValueOverrideKind {
         case .inherit:
@@ -55,7 +55,7 @@ final class ModelParameterPolicyOverrideItem {
         case .none:
             valueOverride = .none
         }
-        return LLMParameterPolicyOverride(
+        return LLMParameterOverrides(
             support: support,
             isRequired: requiredOverride,
             isEnabledByDefault: enabledByDefaultOverride,

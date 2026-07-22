@@ -555,7 +555,7 @@ final class QueryManager {
         return model
     }
 
-    func updateModelContract(
+    func updateModelProfile(
         _ model: ModelItem,
         modelID: String,
         apiConfiguration: APIConfigurationItem,
@@ -563,7 +563,7 @@ final class QueryManager {
         contextSizeOverride: Int?,
         capabilityOverrides: [LLMModelCapability: LLMSupportState],
         mappingOverrides: [LLMParameterMapping],
-        policyOverrides: [(LLMAdapterID, LLMParameterID, LLMParameterPolicyOverride)]
+        parameterOverrides: [(LLMAdapterID, LLMParameterID, LLMParameterOverrides)]
     ) throws {
         model.modelID = modelID.trimmingCharacters(in: .whitespacesAndNewlines)
         model.apiConfiguration = apiConfiguration
@@ -572,15 +572,15 @@ final class QueryManager {
 
         for item in model.capabilityOverrides { modelContext.delete(item) }
         for item in model.parameterMappingOverrides { modelContext.delete(item) }
-        for item in model.parameterPolicyOverrides { modelContext.delete(item) }
+        for item in model.parameterOverrides { modelContext.delete(item) }
         model.capabilityOverrides = capabilityOverrides
             .filter { $0.value != .unknown }
             .map { ModelCapabilityOverrideItem(capability: $0.key, support: $0.value) }
         model.parameterMappingOverrides = mappingOverrides.map(ModelParameterMappingOverrideItem.init)
-        model.parameterPolicyOverrides = policyOverrides.map { adapterID, parameterID, policy in
+        model.parameterOverrides = parameterOverrides.map { adapterID, parameterID, overrides in
             let kind: ModelDefaultValueOverrideKind
             let value: JSONValue?
-            switch policy.defaultValue {
+            switch overrides.defaultValue {
             case .inherit:
                 kind = .inherit
                 value = nil
@@ -591,12 +591,12 @@ final class QueryManager {
                 kind = .none
                 value = nil
             }
-            return ModelParameterPolicyOverrideItem(
+            return ModelParameterOverrideItem(
                 adapterID: adapterID,
                 parameterID: parameterID,
-                support: policy.support,
-                requiredOverride: policy.isRequired,
-                enabledByDefaultOverride: policy.isEnabledByDefault,
+                support: overrides.support,
+                requiredOverride: overrides.isRequired,
+                enabledByDefaultOverride: overrides.isEnabledByDefault,
                 defaultValueOverrideKind: kind,
                 defaultValue: value
             )
@@ -613,37 +613,37 @@ final class QueryManager {
         return trimmed.isEmpty ? nil : trimmed
     }
 
-    func fetchModelObservations(
+    func fetchModelMetadata(
         providerID: LLMProviderID,
         adapterID: LLMAdapterID,
         configuration: LLMProviderConfiguration
-    ) async throws -> [LLMProviderModelObservation] {
+    ) async throws -> [LLMProviderModelMetadata] {
         let adapter = try LLMProviderRegistry.shared.resolveAdapter(
             for: adapterID,
             providerID: providerID
         )
-        return try await adapter.fetchModelObservations(configuration: configuration)
+        return try await adapter.fetchModelMetadata(configuration: configuration)
     }
 
     @discardableResult
-    func upsertModelObservations(
-        _ observations: [LLMProviderModelObservation],
+    func upsertModelMetadata(
+        _ metadata: [LLMProviderModelMetadata],
         for apiConfiguration: APIConfigurationItem
     ) throws -> ModelProviderFetchSummary {
         let existingModels = models(for: apiConfiguration)
         var summary = ModelProviderFetchSummary()
 
-        for observation in observations {
-            if let existing = existingModels.first(where: { $0.modelID == observation.id }) {
+        for modelMetadata in metadata {
+            if let existing = existingModels.first(where: { $0.modelID == modelMetadata.id }) {
                 existing.apiConfiguration = apiConfiguration
-                existing.apply(observation)
+                existing.apply(modelMetadata)
                 summary.updated += 1
-                vxAtelierPro.log.debug("Updated model observation: \(observation.id)")
+                vxAtelierPro.log.debug("Updated provider model metadata: \(modelMetadata.id)")
             } else {
-                let modelItem = ModelItem(observation: observation, apiConfiguration: apiConfiguration)
+                let modelItem = ModelItem(metadata: modelMetadata, apiConfiguration: apiConfiguration)
                 modelContext.insert(modelItem)
                 summary.added += 1
-                vxAtelierPro.log.debug("Added model observation: \(observation.id)")
+                vxAtelierPro.log.debug("Added provider model metadata: \(modelMetadata.id)")
             }
         }
 
@@ -670,12 +670,12 @@ final class QueryManager {
         var summary = ModelProviderFetchSummary()
 
         do {
-            let fetchedModels = try await fetchModelObservations(
+            let fetchedModels = try await fetchModelMetadata(
                 providerID: providerID,
                 adapterID: adapterID,
                 configuration: providerConfiguration
             )
-            summary = try upsertModelObservations(fetchedModels, for: apiConfiguration)
+            summary = try upsertModelMetadata(fetchedModels, for: apiConfiguration)
             vxAtelierPro.log.info(
                 "refreshModels(for: \(apiConfiguration.name)): Updated \(summary.updated), added \(summary.added) models."
             )

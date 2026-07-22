@@ -40,20 +40,20 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
     func testParameterInclusionPreferencesDoNotClearTypedValues() {
         let options = ConversationOptions()
         options.temperature = 0.9
-        let contract = Self.parameterContract(.temperature)
+        let profile = Self.parameterProfile(.temperature)
 
         XCTAssertTrue(LLMGenerationOptionsResolver.isParameterActive(
             .temperature,
             value: options.parameterValue(.temperature),
             conversationPreference: options.parameterInclusionPreference(.temperature),
-            contract: contract
+            profile: profile
         ))
         options.setParameterEnabled(.temperature, enabled: false)
         XCTAssertFalse(LLMGenerationOptionsResolver.isParameterActive(
             .temperature,
             value: options.parameterValue(.temperature),
             conversationPreference: options.parameterInclusionPreference(.temperature),
-            contract: contract
+            profile: profile
         ))
         XCTAssertEqual(options.temperature, 0.9)
     }
@@ -63,15 +63,15 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
         options.temperature = 0.9
         options.maxOutputTokens = 1000
         options.setParameterEnabled(.temperature, enabled: false)
-        let contracts: [LLMParameterID: LLMResolvedParameterContract] = [
-            .temperature: Self.parameterContract(.temperature, defaultValue: .number(0.4)),
-            .maxOutputTokens: Self.parameterContract(.maxOutputTokens)
+        let parameterProfiles: [LLMParameterID: LLMParameterProfile] = [
+            .temperature: Self.parameterProfile(.temperature, defaultValue: .number(0.4)),
+            .maxOutputTokens: Self.parameterProfile(.maxOutputTokens)
         ]
 
         let resolved = LLMGenerationOptionsResolver.resolve(
             options: options.generationOptions(resolvedModelID: "model"),
             conversationPreferences: options.parameterInclusionPreferences,
-            parameterContracts: contracts
+            parameterProfiles: parameterProfiles
         )
 
         XCTAssertEqual(resolved.options.temperature, 0.9)
@@ -85,14 +85,14 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
         let options = ConversationOptions()
         options.maxOutputTokens = 1000
         options.setParameterEnabled(.maxOutputTokens, enabled: false)
-        let contracts: [LLMParameterID: LLMResolvedParameterContract] = [
-            .maxOutputTokens: Self.parameterContract(.maxOutputTokens, isRequired: true)
+        let parameterProfiles: [LLMParameterID: LLMParameterProfile] = [
+            .maxOutputTokens: Self.parameterProfile(.maxOutputTokens, isRequired: true)
         ]
 
         let resolved = LLMGenerationOptionsResolver.resolve(
             options: options.generationOptions(resolvedModelID: "model"),
             conversationPreferences: options.parameterInclusionPreferences,
-            parameterContracts: contracts
+            parameterProfiles: parameterProfiles
         )
 
         XCTAssertEqual(resolved.options.maxOutputTokens, 1000)
@@ -137,13 +137,13 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
             XCTAssertFalse(AiParameterPresentationCatalog.presentation(for: parameterID).description.isEmpty)
         }
 
-        let contracts = Dictionary(uniqueKeysWithValues: LLMParameterID.allCases
+        let parameterProfiles = Dictionary(uniqueKeysWithValues: LLMParameterID.allCases
             .filter(\.isProviderMappable)
-            .map { ($0, Self.parameterContract($0)) })
+            .map { ($0, Self.parameterProfile($0)) })
         let resolved = LLMGenerationOptionsResolver.resolve(
             options: options.generationOptions(resolvedModelID: "fallback-model"),
             conversationPreferences: options.parameterInclusionPreferences,
-            parameterContracts: contracts
+            parameterProfiles: parameterProfiles
         )
 
         for parameterID in LLMParameterID.allCases {
@@ -151,14 +151,14 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
         }
     }
 
-    private static func parameterContract(
+    private static func parameterProfile(
         _ parameterID: LLMParameterID,
         isRequired: Bool = false,
         defaultValue: JSONValue? = nil
-    ) -> LLMResolvedParameterContract {
-        LLMResolvedParameterContract(
+    ) -> LLMParameterProfile {
+        LLMParameterProfile(
             parameterID: parameterID,
-            support: LLMResolvedSupport(state: .unknown, source: .fallback),
+            support: LLMSupport(state: .unknown, source: .fallback),
             mapping: LLMParameterMapping(
                 adapterID: .openAIChatCompletions,
                 parameterID: parameterID,

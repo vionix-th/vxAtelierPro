@@ -228,7 +228,7 @@ struct StatusBarConversationInfoRow: View {
 
     private var modelName: String {
         guard let conversation else { return "No model" }
-        return selectedModel?.resolvedContract.displayName
+        return selectedModel?.modelProfile.displayName
             ?? conversation.options.selectedModelID
             ?? conversation.options.apiConfiguration?.defaultModelID
             ?? "No model"
@@ -255,7 +255,7 @@ struct StatusBarConversationInfoRow: View {
     }
 
     private var streamingSupportHelp: String {
-        guard let support = selectedModel?.resolvedContract.capabilities[.streaming] else {
+        guard let support = selectedModel?.modelProfile.capabilities[.streaming] else {
             return "Streaming support is unknown; the provider will decide."
         }
         return support.state == .supported

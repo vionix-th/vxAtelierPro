@@ -13,7 +13,7 @@ struct ConversationParameterControl: Identifiable, Equatable {
     var step: Double?
     var options: [String]?
     var value: JSONValue?
-    var support: LLMResolvedSupport
+    var support: LLMSupport
     var isMapped: Bool
     var isEnabled: Bool
 
@@ -36,12 +36,12 @@ enum ConversationParameterProjection {
 
         let modelID = options.selectedModelID ?? apiConfiguration.defaultModelID ?? ""
         let model = apiConfiguration.models.first { $0.modelID == modelID }
-        let contracts = model?.resolvedContract.parameters ?? [:]
+        let parameterProfiles = model?.modelProfile.parameters ?? [:]
 
         return LLMParameterID.allCases.map { parameterID in
-            let contract = contracts[parameterID]
+            let profile = parameterProfiles[parameterID]
             let isProviderMappable = parameterID.isProviderMappable
-            let mapping = contract?.mapping
+            let mapping = profile?.mapping
             let isDirectlyEncodable = parameterID == .stream && (try? LLMProviderRegistry.shared.resolveAdapter(
                 for: apiConfiguration.defaultAdapterIDEnum,
                 providerID: apiConfiguration.providerIDEnum
@@ -49,15 +49,15 @@ enum ConversationParameterProjection {
             let isMapped = !isProviderMappable
                 || isDirectlyEncodable
                 || (mapping != nil && mapping?.encodingKind != .disabled)
-            let required = !isProviderMappable || contract?.isRequired == true
+            let required = !isProviderMappable || profile?.isRequired == true
             let value = options.parameterValue(parameterID)
-                ?? contract?.defaultValue
+                ?? profile?.defaultValue
                 ?? (parameterID == .model ? .string(modelID) : nil)
             let isEnabled = required || LLMGenerationOptionsResolver.isParameterActive(
                 parameterID,
                 value: options.parameterValue(parameterID),
                 conversationPreference: options.parameterInclusionPreference(parameterID),
-                contract: contract
+                profile: profile
             )
             let presentation = AiParameterPresentationCatalog.presentation(for: parameterID)
             return ConversationParameterControl(
@@ -70,9 +70,9 @@ enum ConversationParameterProjection {
                 minValue: parameterID.minValue,
                 maxValue: parameterID.maxValue,
                 step: presentation.step,
-                options: contract?.options ?? parameterID.options,
+                options: profile?.options ?? parameterID.options,
                 value: value,
-                support: contract?.support ?? LLMResolvedSupport(state: .unknown, source: .fallback),
+                support: profile?.support ?? LLMSupport(state: .unknown, source: .fallback),
                 isMapped: isMapped,
                 isEnabled: isEnabled
             )

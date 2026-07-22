@@ -11,7 +11,7 @@ import FoundationModels
 @MainActor
 final class LLMLocalProviderTests: XCTestCase {
     func testFoundationModelsAdapterDelegatesLocalBackend() async throws {
-        let candidate = LLMProviderModelObservation(
+        let candidate = LLMProviderModelMetadata(
             id: "apple-intelligence-default",
             displayName: "Apple Intelligence",
             providerID: .appleIntelligence,
@@ -41,7 +41,7 @@ final class LLMLocalProviderTests: XCTestCase {
         let adapter = FoundationModelsAdapter(profile: LLMProviderRegistry.shared.profile(for: .appleIntelligence), backend: backend)
         let configuration = LLMProviderConfiguration(providerID: .appleIntelligence, baseURL: "", credential: .none)
 
-        let fetchedModels = try await adapter.fetchModelObservations(configuration: configuration)
+        let fetchedModels = try await adapter.fetchModelMetadata(configuration: configuration)
         XCTAssertEqual(fetchedModels, [candidate])
 
         let request = LLMGenerationRequest(
@@ -123,13 +123,13 @@ private final class MockLocalModelBackend: LLMLocalModelBackend {
     let profile = LLMProviderRegistry.shared.profile(for: .appleIntelligence)
     let availabilityResult: LLMLocalModelAvailability
     let statusTextResult: String
-    let candidatesResult: [LLMProviderModelObservation]
+    let candidatesResult: [LLMProviderModelMetadata]
     let streamFactory: (AsyncThrowingStream<LLMGenerationEvent, Error>.Continuation) -> Void
 
     init(
         availabilityResult: LLMLocalModelAvailability,
         statusTextResult: String,
-        candidatesResult: [LLMProviderModelObservation],
+        candidatesResult: [LLMProviderModelMetadata],
         streamFactory: @escaping (AsyncThrowingStream<LLMGenerationEvent, Error>.Continuation) -> Void = { $0.finish() }
     ) {
         self.availabilityResult = availabilityResult
@@ -146,7 +146,7 @@ private final class MockLocalModelBackend: LLMLocalModelBackend {
         statusTextResult
     }
 
-    func modelObservations(configuration: LLMProviderConfiguration) -> [LLMProviderModelObservation] {
+    func modelMetadata(configuration: LLMProviderConfiguration) -> [LLMProviderModelMetadata] {
         candidatesResult
     }
 
@@ -296,7 +296,7 @@ final class FoundationModelsBackendTests: XCTestCase {
     }
 
     private func makeAppleRequest(streamMode: LLMGenerationOptions.StreamMode) -> LLMGenerationRequest {
-        let candidate = LLMProviderModelObservation(
+        let candidate = LLMProviderModelMetadata(
             id: "apple-intelligence-default",
             displayName: "Apple Intelligence",
             providerID: .appleIntelligence,

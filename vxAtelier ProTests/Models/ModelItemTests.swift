@@ -74,12 +74,12 @@ final class ModelItemTests: XCTestCase {
         config.defaultAdapterIDEnum = .anthropicMessages
         let model = ModelItem(modelID: "claude-sonnet-4-5", contextSize: 8192, apiConfiguration: config)
 
-        let maxTokens = model.resolvedContract.parameters[.maxOutputTokens]
+        let maxTokens = model.modelProfile.parameters[.maxOutputTokens]
 
         XCTAssertTrue(maxTokens?.isRequired ?? false)
         XCTAssertEqual(maxTokens?.defaultValue, .integer(4096))
         XCTAssertTrue(model.parameterMappingOverrides.isEmpty)
-        XCTAssertTrue(model.parameterPolicyOverrides.isEmpty)
+        XCTAssertTrue(model.parameterOverrides.isEmpty)
     }
 
     func testModelDerivesUnsupportedParameterFromCatalog() throws {
@@ -91,13 +91,13 @@ final class ModelItemTests: XCTestCase {
         )
         config.defaultAdapterIDEnum = .openAIChatCompletions
         let model = ModelItem(modelID: "gpt-5.4-nano", apiConfiguration: config)
-        let temperature = model.resolvedContract.parameters[.temperature]
+        let temperature = model.modelProfile.parameters[.temperature]
 
         XCTAssertEqual(temperature?.support.state, .unsupported)
         XCTAssertEqual(temperature?.support.source, .catalog)
     }
 
-    func testFetchedModelResolvesCatalogContract() throws {
+    func testFetchedModelResolvesCatalogProfile() throws {
         let config = APIConfigurationItem(
             name: "OpenAI",
             apiKey: "key",
@@ -111,11 +111,11 @@ final class ModelItemTests: XCTestCase {
         try context.save()
 
         let fetched = try XCTUnwrap(try context.fetch(FetchDescriptor<ModelItem>()).first)
-        let temperature = fetched.resolvedContract.parameters[.temperature]
+        let temperature = fetched.modelProfile.parameters[.temperature]
 
         XCTAssertNotNil(temperature)
         XCTAssertEqual(temperature?.support.state, .supported)
-        XCTAssertTrue(fetched.parameterPolicyOverrides.isEmpty)
+        XCTAssertTrue(fetched.parameterOverrides.isEmpty)
     }
 
     func testEdgeCases() throws {

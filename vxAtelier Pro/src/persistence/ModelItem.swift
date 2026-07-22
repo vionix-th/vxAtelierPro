@@ -16,11 +16,11 @@ final class ModelItem {
     var contextSizeOverride: Int?
     @Relationship(deleteRule: .cascade) var capabilityOverrides: [ModelCapabilityOverrideItem] = []
     @Relationship(deleteRule: .cascade) var parameterMappingOverrides: [ModelParameterMappingOverrideItem] = []
-    @Relationship(deleteRule: .cascade) var parameterPolicyOverrides: [ModelParameterPolicyOverrideItem] = []
+    @Relationship(deleteRule: .cascade) var parameterOverrides: [ModelParameterOverrideItem] = []
 
     var name: String { modelID }
 
-    var observation: LLMProviderModelObservation {
+    var providerMetadata: LLMProviderModelMetadata {
         let supported = providerSupportedCapabilitiesRaw.compactMap(LLMModelCapability.init(rawValue:)).map {
             LLMCapabilityClaim(capability: $0, state: .supported)
         }
@@ -33,7 +33,7 @@ final class ModelItem {
         let unsupportedParameters = providerUnsupportedParametersRaw.compactMap(LLMParameterID.init(rawValue:)).map {
             LLMParameterSupportClaim(parameterID: $0, state: .unsupported)
         }
-        return LLMProviderModelObservation(
+        return LLMProviderModelMetadata(
             id: modelID,
             displayName: providerDisplayName,
             providerID: providerID,
@@ -52,7 +52,7 @@ final class ModelItem {
         apiConfiguration?.defaultAdapterIDEnum ?? .openAICompatibleChatCompletions
     }
 
-    var contractOverrides: LLMModelContractOverrides {
+    var modelOverrides: LLMModelOverrides {
         let capabilityPairs: [(LLMModelCapability, LLMSupportState)] = capabilityOverrides.compactMap { item in
             guard item.support != .unknown else { return nil }
             return (item.capability, item.support)
@@ -63,31 +63,31 @@ final class ModelItem {
         let mappings = parameterMappingOverrides
             .filter { $0.adapterID == adapterID }
             .reduce(into: [LLMParameterID: LLMParameterMapping]()) { $0[$1.parameterID] = $1.mapping }
-        let policies = parameterPolicyOverrides
+        let parameterSettings = parameterOverrides
             .filter { $0.adapterID == adapterID }
-            .reduce(into: [LLMParameterID: LLMParameterPolicyOverride]()) { $0[$1.parameterID] = $1.policy }
-        return LLMModelContractOverrides(
+            .reduce(into: [LLMParameterID: LLMParameterOverrides]()) { $0[$1.parameterID] = $1.overrides }
+        return LLMModelOverrides(
             displayName: displayNameOverride,
             contextSize: contextSizeOverride,
             capabilitySupport: capabilitySupport,
             parameterMappings: mappings,
-            parameterPolicies: policies
+            parameterOverrides: parameterSettings
         )
     }
 
-    var resolvedContract: LLMResolvedModelContract {
-        LLMModelContractResolver(fallbackContextSize: AppDefaults.ModelContextSizes.defaultSize).resolve(
+    var modelProfile: LLMModelProfile {
+        LLMModelProfileResolver(fallbackContextSize: AppDefaults.ModelContextSizes.defaultSize).resolve(
             providerID: providerID,
             adapterID: adapterID,
             modelID: modelID,
-            observation: observation,
-            overrides: contractOverrides
+            metadata: providerMetadata,
+            overrides: modelOverrides
         )
     }
 
-    var displayName: String { resolvedContract.displayName }
-    var contextSize: Int { resolvedContract.contextSize }
-    var capabilities: [LLMModelCapability] { resolvedContract.supportedCapabilities }
+    var displayName: String { modelProfile.displayName }
+    var contextSize: Int { modelProfile.contextSize }
+    var capabilities: [LLMModelCapability] { modelProfile.supportedCapabilities }
 
     init(
         modelID: String,
@@ -107,33 +107,33 @@ final class ModelItem {
         contextSizeOverride = contextSize
         capabilityOverrides = []
         parameterMappingOverrides = []
-        parameterPolicyOverrides = []
+        parameterOverrides = []
     }
 
     convenience init(
-        observation: LLMProviderModelObservation,
+        metadata: LLMProviderModelMetadata,
         apiConfiguration: APIConfigurationItem? = nil
     ) {
-        self.init(modelID: observation.id, apiConfiguration: apiConfiguration)
-        apply(observation)
+        self.init(modelID: metadata.id, apiConfiguration: apiConfiguration)
+        apply(metadata)
     }
 
-    func apply(_ observation: LLMProviderModelObservation) {
-        modelID = observation.id
-        providerDisplayName = observation.displayName
-        providerContextSize = observation.contextSize
-        providerSupportedCapabilitiesRaw = observation.capabilityClaims
+    func apply(_ metadata: LLMProviderModelMetadata) {
+        modelID = metadata.id
+        providerDisplayName = metadata.displayName
+        providerContextSize = metadata.contextSize
+        providerSupportedCapabilitiesRaw = metadata.capabilityClaims
             .filter { $0.state == .supported }
             .map { $0.capability.rawValue }
-        providerUnsupportedCapabilitiesRaw = observation.capabilityClaims
+        providerUnsupportedCapabilitiesRaw = metadata.capabilityClaims
             .filter { $0.state == .unsupported }
             .map { $0.capability.rawValue }
-        providerSupportedParametersRaw = observation.parameterSupportClaims
+        providerSupportedParametersRaw = metadata.parameterSupportClaims
             .filter { $0.state == .supported }
             .map { $0.parameterID.rawValue }
-        providerUnsupportedParametersRaw = observation.parameterSupportClaims
+        providerUnsupportedParametersRaw = metadata.parameterSupportClaims
             .filter { $0.state == .unsupported }
             .map { $0.parameterID.rawValue }
-        rawMetadataJSON = observation.rawMetadataJSON
+        rawMetadataJSON = metadata.rawMetadataJSON
     }
 }

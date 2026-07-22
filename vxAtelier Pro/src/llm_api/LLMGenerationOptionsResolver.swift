@@ -22,40 +22,40 @@ enum LLMGenerationOptionsResolver {
         _ parameterID: LLMParameterID,
         value: JSONValue?,
         conversationPreference: Bool?,
-        contract: LLMResolvedParameterContract?
+        profile: LLMParameterProfile?
     ) -> Bool {
         guard parameterID.isProviderMappable else { return true }
-        if contract?.isRequired == true { return true }
+        if profile?.isRequired == true { return true }
         if let conversationPreference { return conversationPreference }
-        guard let contract else { return value != nil }
-        return contract.isEnabledByDefault
+        guard let profile else { return value != nil }
+        return profile.isEnabledByDefault
             || value != nil
-            || contract.defaultValue != nil
+            || profile.defaultValue != nil
     }
 
     static func resolve(
         options: LLMGenerationOptions,
         conversationPreferences: [String: Bool],
-        parameterContracts: [LLMParameterID: LLMResolvedParameterContract]
+        parameterProfiles: [LLMParameterID: LLMParameterProfile]
     ) -> LLMResolvedGenerationParameters {
         var resolvedOptions = options
         var activeParameterIDs = Set<LLMParameterID>()
         var mappings: [LLMParameterMapping] = []
 
         for parameterID in LLMParameterID.allCases where parameterID.isProviderMappable {
-            let contract = parameterContracts[parameterID]
+            let profile = parameterProfiles[parameterID]
             let isActive = isParameterActive(
                 parameterID,
                 value: options.jsonValue(for: parameterID),
                 conversationPreference: conversationPreferences[parameterID.rawValue],
-                contract: contract
+                profile: profile
             )
             guard isActive else { continue }
             activeParameterIDs.insert(parameterID)
-            if resolvedOptions.jsonValue(for: parameterID) == nil, let defaultValue = contract?.defaultValue {
+            if resolvedOptions.jsonValue(for: parameterID) == nil, let defaultValue = profile?.defaultValue {
                 resolvedOptions.setSemanticValue(defaultValue, for: parameterID)
             }
-            if let mapping = contract?.mapping {
+            if let mapping = profile?.mapping {
                 mappings.append(mapping)
             }
         }

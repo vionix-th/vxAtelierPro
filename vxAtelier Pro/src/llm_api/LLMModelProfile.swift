@@ -37,16 +37,16 @@ enum LLMSupportState: String, Codable, CaseIterable {
     case unknown
 }
 
-enum LLMContractSource: String, Codable {
+enum LLMMetadataSource: String, Codable {
     case catalog
     case provider
     case userOverride
     case fallback
 }
 
-struct LLMResolvedSupport: Codable, Equatable {
+struct LLMSupport: Codable, Equatable {
     var state: LLMSupportState
-    var source: LLMContractSource
+    var source: LLMMetadataSource
 }
 
 struct LLMCapabilityClaim: Codable, Equatable, Identifiable {
@@ -61,7 +61,7 @@ struct LLMParameterSupportClaim: Codable, Equatable, Identifiable {
     var state: LLMSupportState
 }
 
-struct LLMProviderModelObservation: Codable, Equatable, Identifiable {
+struct LLMProviderModelMetadata: Codable, Equatable, Identifiable {
     var id: String
     var displayName: String?
     var providerID: LLMProviderID
@@ -89,25 +89,25 @@ struct LLMProviderModelObservation: Codable, Equatable, Identifiable {
     }
 }
 
-struct LLMModelContractOverrides: Equatable {
+struct LLMModelOverrides: Equatable {
     var displayName: String?
     var contextSize: Int?
     var capabilitySupport: [LLMModelCapability: LLMSupportState]
     var parameterMappings: [LLMParameterID: LLMParameterMapping]
-    var parameterPolicies: [LLMParameterID: LLMParameterPolicyOverride]
+    var parameterOverrides: [LLMParameterID: LLMParameterOverrides]
 
     init(
         displayName: String? = nil,
         contextSize: Int? = nil,
         capabilitySupport: [LLMModelCapability: LLMSupportState] = [:],
         parameterMappings: [LLMParameterID: LLMParameterMapping] = [:],
-        parameterPolicies: [LLMParameterID: LLMParameterPolicyOverride] = [:]
+        parameterOverrides: [LLMParameterID: LLMParameterOverrides] = [:]
     ) {
         self.displayName = displayName
         self.contextSize = contextSize
         self.capabilitySupport = capabilitySupport
         self.parameterMappings = parameterMappings
-        self.parameterPolicies = parameterPolicies
+        self.parameterOverrides = parameterOverrides
     }
 }
 
@@ -117,7 +117,7 @@ enum LLMDefaultValueOverride: Equatable {
     case none
 }
 
-struct LLMParameterPolicyOverride: Equatable {
+struct LLMParameterOverrides: Equatable {
     var support: LLMSupportState?
     var isRequired: Bool?
     var isEnabledByDefault: Bool?
@@ -136,10 +136,10 @@ struct LLMParameterPolicyOverride: Equatable {
     }
 }
 
-struct LLMResolvedParameterContract: Equatable, Identifiable {
+struct LLMParameterProfile: Equatable, Identifiable {
     var id: LLMParameterID { parameterID }
     var parameterID: LLMParameterID
-    var support: LLMResolvedSupport
+    var support: LLMSupport
     var mapping: LLMParameterMapping?
     var isRequired: Bool
     var isEnabledByDefault: Bool
@@ -147,24 +147,24 @@ struct LLMResolvedParameterContract: Equatable, Identifiable {
     var options: [String]?
 }
 
-struct LLMResolvedModelContract: Equatable, Identifiable {
+struct LLMModelProfile: Equatable, Identifiable {
     var id: String { modelID }
     var modelID: String
     var providerID: LLMProviderID
     var adapterID: LLMAdapterID
     var displayName: String
-    var displayNameSource: LLMContractSource
+    var displayNameSource: LLMMetadataSource
     var contextSize: Int
-    var contextSizeSource: LLMContractSource
-    var capabilities: [LLMModelCapability: LLMResolvedSupport]
-    var parameters: [LLMParameterID: LLMResolvedParameterContract]
+    var contextSizeSource: LLMMetadataSource
+    var capabilities: [LLMModelCapability: LLMSupport]
+    var parameters: [LLMParameterID: LLMParameterProfile]
 
     var supportedCapabilities: [LLMModelCapability] {
         LLMModelCapability.allCases.filter { capabilities[$0]?.state == .supported }
     }
 }
 
-struct LLMModelContractResolver {
+struct LLMModelProfileResolver {
     var defaultsCatalog: LLMDefaultsCatalog
     var fallbackContextSize: Int
 
@@ -185,34 +185,34 @@ struct LLMModelContractResolver {
         providerID: LLMProviderID,
         adapterID: LLMAdapterID,
         modelID: String,
-        observation: LLMProviderModelObservation?,
-        overrides: LLMModelContractOverrides = LLMModelContractOverrides()
-    ) -> LLMResolvedModelContract {
+        metadata: LLMProviderModelMetadata?,
+        overrides: LLMModelOverrides = LLMModelOverrides()
+    ) -> LLMModelProfile {
         let modelDefaults = defaultsCatalog.modelDefaults(providerID: providerID, modelID: modelID)
         let catalogMappings = defaultsCatalog.parameterMappings(
             providerID: providerID,
             adapterID: adapterID,
             modelID: modelID
         )
-        let catalogPolicies = defaultsCatalog.parameterDefaults(
+        let catalogParameters = defaultsCatalog.parameterDefaults(
             providerID: providerID,
             adapterID: adapterID,
             modelID: modelID
         )
 
-        let display: (String, LLMContractSource)
+        let display: (String, LLMMetadataSource)
         if let override = normalized(overrides.displayName) {
             display = (override, .userOverride)
-        } else if let observed = normalized(observation?.displayName) {
+        } else if let observed = normalized(metadata?.displayName) {
             display = (observed, .provider)
         } else {
             display = (modelID, .fallback)
         }
 
-        let context: (Int, LLMContractSource)
+        let context: (Int, LLMMetadataSource)
         if let override = overrides.contextSize {
             context = (override, .userOverride)
-        } else if let observed = observation?.contextSize {
+        } else if let observed = metadata?.contextSize {
             context = (observed, .provider)
         } else if let catalog = modelDefaults?.contextSize {
             context = (catalog, .catalog)
@@ -221,44 +221,44 @@ struct LLMModelContractResolver {
         }
 
         let catalogCapabilities = Set(modelDefaults?.capabilities ?? [])
-        let providerClaims = (observation?.capabilityClaims ?? []).reduce(into: [LLMModelCapability: LLMSupportState]()) {
+        let providerClaims = (metadata?.capabilityClaims ?? []).reduce(into: [LLMModelCapability: LLMSupportState]()) {
             $0[$1.capability] = $1.state
         }
         let capabilities = Dictionary(uniqueKeysWithValues: LLMModelCapability.allCases.map { capability in
             if let override = overrides.capabilitySupport[capability] {
-                return (capability, LLMResolvedSupport(state: override, source: .userOverride))
+                return (capability, LLMSupport(state: override, source: .userOverride))
             }
             if let provider = providerClaims[capability] {
-                return (capability, LLMResolvedSupport(state: provider, source: .provider))
+                return (capability, LLMSupport(state: provider, source: .provider))
             }
             if catalogCapabilities.contains(capability) {
-                return (capability, LLMResolvedSupport(state: .supported, source: .catalog))
+                return (capability, LLMSupport(state: .supported, source: .catalog))
             }
-            return (capability, LLMResolvedSupport(state: .unknown, source: .fallback))
+            return (capability, LLMSupport(state: .unknown, source: .fallback))
         })
 
         let mappings = Dictionary(uniqueKeysWithValues: catalogMappings.map { ($0.parameterID, $0) })
             .merging(overrides.parameterMappings) { _, override in override }
-        let policies = Dictionary(uniqueKeysWithValues: catalogPolicies.map { ($0.parameterID, $0) })
-        let providerParameterClaims = (observation?.parameterSupportClaims ?? []).reduce(into: [LLMParameterID: LLMSupportState]()) {
+        let catalogParameterIndex = Dictionary(uniqueKeysWithValues: catalogParameters.map { ($0.parameterID, $0) })
+        let providerParameterClaims = (metadata?.parameterSupportClaims ?? []).reduce(into: [LLMParameterID: LLMSupportState]()) {
             $0[$1.parameterID] = $1.state
         }
-        let parameterIDs = Set(LLMParameterID.allCases).union(mappings.keys).union(overrides.parameterPolicies.keys)
+        let parameterIDs = Set(LLMParameterID.allCases).union(mappings.keys).union(overrides.parameterOverrides.keys)
         let parameters = Dictionary(uniqueKeysWithValues: parameterIDs.map { parameterID in
-            let catalog = policies[parameterID]
-            let override = overrides.parameterPolicies[parameterID]
-            let support: LLMResolvedSupport
+            let catalog = catalogParameterIndex[parameterID]
+            let override = overrides.parameterOverrides[parameterID]
+            let support: LLMSupport
             if let state = override?.support {
-                support = LLMResolvedSupport(state: state, source: .userOverride)
+                support = LLMSupport(state: state, source: .userOverride)
             } else if let provider = providerParameterClaims[parameterID] {
-                support = LLMResolvedSupport(state: provider, source: .provider)
+                support = LLMSupport(state: provider, source: .provider)
             } else if let catalog {
-                support = LLMResolvedSupport(
+                support = LLMSupport(
                     state: catalog.support,
                     source: .catalog
                 )
             } else {
-                support = LLMResolvedSupport(state: .unknown, source: .fallback)
+                support = LLMSupport(state: .unknown, source: .fallback)
             }
 
             let defaultValue: JSONValue?
@@ -271,7 +271,7 @@ struct LLMModelContractResolver {
                 defaultValue = nil
             }
 
-            return (parameterID, LLMResolvedParameterContract(
+            return (parameterID, LLMParameterProfile(
                 parameterID: parameterID,
                 support: support,
                 mapping: mappings[parameterID],
@@ -282,7 +282,7 @@ struct LLMModelContractResolver {
             ))
         })
 
-        return LLMResolvedModelContract(
+        return LLMModelProfile(
             modelID: modelID,
             providerID: providerID,
             adapterID: adapterID,

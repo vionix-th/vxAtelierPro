@@ -10,7 +10,7 @@ extension LLMSupportState {
     }
 }
 
-extension LLMContractSource {
+extension LLMMetadataSource {
     var displayName: String {
         switch self {
         case .catalog: return "Catalog"

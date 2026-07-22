@@ -113,16 +113,16 @@ Xcode compile-time diagnostics are authoritative. Add SwiftLint or swift-format 
 ### LLM API And Runtime
 Locations: `src/llm_api/`, `src/llm_runtime/`
 
-The LLM subsystem is split by reuse boundary. `llm_api` contains the reusable provider, model-contract, request-encoding, transport, and tool API surface. `llm_runtime` contains vxAtelier-specific run orchestration, SwiftData persistence, draft state, and concrete tools. Runtime code resolves a persisted provider observation plus explicit overrides through `LLMModelContractResolver`, builds an `LLMGenerationRequest`, materializes `APIConfigurationItem` into pure `LLMProviderConfiguration`, sends the request through the registry-resolved provider adapter, consumes `LLMGenerationEvent` values through a draft sink, then persists stable `MessageItem`, `ToolCallItem`, and `ResponseRunItem` records.
+The LLM subsystem is split by reuse boundary. `llm_api` contains the reusable provider, model-profile, request-encoding, transport, and tool API surface. `llm_runtime` contains vxAtelier-specific run orchestration, SwiftData persistence, draft state, and concrete tools. Runtime code resolves persisted provider metadata plus explicit overrides through `LLMModelProfileResolver`, builds an `LLMGenerationRequest`, materializes `APIConfigurationItem` into pure `LLMProviderConfiguration`, sends the request through the registry-resolved provider adapter, consumes `LLMGenerationEvent` values through a draft sink, then persists stable `MessageItem`, `ToolCallItem`, and `ResponseRunItem` records.
 
-*   **LLM Protocol Files (`llm_api/LLM*`)**: Define `LLMGenerationRequest`, model observations and resolved contracts, messages/content, tools, generation options/events, normalized errors, request encoding, and parameter mappings.
-*   **Provider Files (`llm_api/LLMProvider*`, `llm_api/LLMModelMetadataDecoder.swift`)**: Own `LLMProviderID`, `LLMProviderConfiguration`, profiles, the single throwing adapter route API, and raw provider-observation decoding.
+*   **LLM Protocol Files (`llm_api/LLM*`)**: Define `LLMGenerationRequest`, provider metadata and resolved model profiles, messages/content, tools, generation options/events, normalized errors, request encoding, and parameter mappings.
+*   **Provider Files (`llm_api/LLMProvider*`, `llm_api/LLMModelMetadataDecoder.swift`)**: Own `LLMProviderID`, `LLMProviderConfiguration`, profiles, the single throwing adapter route API, and raw provider-metadata decoding.
 *   **Transport Files (`llm_api/LLMHTTPClient.swift`, `llm_api/LLMSecretRedactor.swift`)**: `NetworkClient` owns shared JSON/SSE transport; `LLMHTTPClient` is the LLM-facing facade for provider-specific header resolution, redacted diagnostics, HTTP status mapping, and normalized provider errors.
 *   **Adapter Files (`llm_api/OpenAI*`, `llm_api/Anthropic*`, `llm_api/LLMAdapterRunLoop.swift`)**: Map provider-specific request/stream formats into domain events. `LLMAdapterRunLoop` owns the shared streamed/non-streamed HTTP flow.
 *   **Tool Framework Files (`llm_api/LLMTool*`, `llm_api/ConfigurableLLMTool.swift`)**: Reusable tool schemas, configuration protocol, catalog interface, and registry.
 *   **Runtime Files (`llm_runtime/Conversation*`, `llm_runtime/ProviderRunExecutor.swift`, `llm_runtime/ToolBatchExecutor.swift`, `llm_runtime/LLMGenerationRequestFactory.swift`)**: Split resolved request assembly, conversation-history validation, draft/event collection, sequential tool execution, SwiftData save boundaries, and turn orchestration.
 *   **Concrete Tool Files (`llm_runtime/*Tool.swift`, `llm_runtime/ConversationTools.swift`, `llm_runtime/ShortcutTools.swift`)**: vxAtelier-specific tools for conversations, settings, shortcuts, web search, and website reading.
-*   **Persistence (`persistence/ModelItem.swift`, `persistence/Model*OverrideItem.swift`)**: Stores provider observations and explicit model-contract overrides only. Effective catalog values are derived and are never materialized into SwiftData.
+*   **Persistence (`persistence/ModelItem.swift`, `persistence/Model*OverrideItem.swift`)**: Stores provider metadata and explicit model overrides only. Effective catalog values are derived and are never materialized into SwiftData.
 
 Model and parameter baseline rules are layered and ordered in `src/llm_api/Resources/LLMDefaults.json`.
 
@@ -130,7 +130,7 @@ Model and parameter baseline rules are layered and ordered in `src/llm_api/Resou
 * `providerRegex` and `modelRegex` are regex matches; `adapterID` is exact.
 * Later matching rules override earlier rules for the same semantic parameter.
 * Broad provider and adapter rules establish the baseline; narrower model-specific rules refine it.
-* `LLMModelMetadataDecoder` produces raw provider observations without catalog enrichment. `LLMModelContractResolver` applies user override, explicit provider observation, catalog, and fallback precedence.
+* `LLMModelMetadataDecoder` produces raw provider metadata without catalog enrichment. `LLMModelProfileResolver` applies user override, explicit provider metadata, catalog, and fallback precedence.
 
 Remote capability and parameter-support states are advisory. Adapters reject only active parameters or content they cannot encode, while `ConversationHistoryValidator` rejects corrupt tool-call replay. The remote provider remains authoritative for semantic request acceptance and normalized remote `4xx` responses are non-retryable.
 
@@ -343,7 +343,7 @@ This is a non-persistent value type that represents one configurable generation 
 
 *   **Dynamic UI Generation**: It combines semantic parameter definitions, presentation metadata, resolved model parameter mappings, and typed values from `ConversationOptions`.
 *   **No Value Ownership**: It does not persist values. `ConversationOptions` owns generation values and parameter enablement overrides.
-*   **Resolved Contract**: It consumes `ModelItem.resolvedContract`, so support provenance and mapping encodability come from the same resolver used by runtime request assembly.
+*   **Resolved Profile**: It consumes `ModelItem.modelProfile`, so support provenance and mapping encodability come from the same resolver used by runtime request assembly.
 
 #### API Configuration (`APIConfigurationItem.swift`)
 
@@ -396,9 +396,9 @@ This SwiftData `@Model` is a comprehensive container for all settings that gover
 
 This SwiftData `@Model` represents a specific, selectable AI model from a provider.
 
-*   **Provider Observations**: It stores provider-reported display name, context size, positive/negative capability claims, and raw metadata without catalog enrichment.
-*   **Explicit Overrides**: It stores optional identity/context overrides, tri-state capability overrides, parameter-policy overrides, and atomic mapping overrides. Inherited catalog values do not create rows.
-*   **Resolved Contract**: `resolvedContract` applies user override, provider observation, last matching catalog rule, and fallback precedence on every read.
+*   **Provider Metadata**: It stores provider-reported display name, context size, positive/negative capability claims, and raw metadata without catalog enrichment.
+*   **Explicit Overrides**: It stores optional identity/context overrides, tri-state capability overrides, parameter overrides, and atomic mapping overrides. Inherited catalog values do not create rows.
+*   **Resolved Profile**: `modelProfile` applies user override, provider metadata, last matching catalog rule, and fallback precedence on every read.
 *   **API Configuration Scoping**: `apiConfiguration` links a model to a provider/adapter configuration, so identical model identifiers can resolve different mappings without copying catalog defaults.
 
 #### Project (`ProjectItem.swift`)
@@ -1017,7 +1017,7 @@ views/
 |----------|---------|----------------|
 | `LLMProviderAdapter` | Top-level provider adapter interface for streaming and model fetches. | `OpenAIResponsesAdapter`, `OpenAIChatCompletionsAdapter`, `OpenAICompatibleChatCompletionsAdapter`, `AnthropicMessagesAdapter` |
 | `LLMGenerationRequest` / `LLMMessage` / `LLMGenerationEvent` | Provider-neutral request, message, and generation event types. | LLM protocol structs under `src/llm_api` |
-| `LLMModelContractResolver` | Sole resolution path for provider observations, catalog rules, fallbacks, and explicit overrides. | Runtime, settings, and model-selection projections |
+| `LLMModelProfileResolver` | Sole resolution path for provider metadata, catalog rules, fallbacks, and explicit overrides. | Runtime, settings, and model-selection projections |
 | `LLMProviderProfile` | Provider capabilities, auth kind, supported adapters, defaults, and feature flags. | Profiles in `LLMProviderRegistry` |
 | `NetworkClient` / `LLMHTTPClient` | Shared JSON/SSE transport plus core-owned provider header resolution, metadata redaction, and normalized provider errors. | Used by web search and all LLM adapters |
 | `LLMHTTPGenerationPipeline` | Shared streamed/non-streamed adapter flow and metadata forwarding. | Used by remote provider adapters |

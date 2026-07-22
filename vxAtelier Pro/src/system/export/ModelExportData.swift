@@ -13,7 +13,7 @@ struct ModelExportData: Codable {
     let contextSizeOverride: Int?
     let capabilityOverrides: [ModelCapabilityOverrideExportData]
     let mappingOverrides: [ModelParameterMappingOverrideExportData]
-    let policyOverrides: [ModelParameterPolicyOverrideExportData]
+    let parameterOverrides: [ModelParameterOverrideExportData]
     let apiConfigurationName: String?
     let apiConfigurationProviderID: String?
     let apiConfigurationBaseURL: String?
@@ -31,7 +31,7 @@ struct ModelExportData: Codable {
         contextSizeOverride = model.contextSizeOverride
         capabilityOverrides = model.capabilityOverrides.map(ModelCapabilityOverrideExportData.init)
         mappingOverrides = model.parameterMappingOverrides.map(ModelParameterMappingOverrideExportData.init)
-        policyOverrides = model.parameterPolicyOverrides.map(ModelParameterPolicyOverrideExportData.init)
+        parameterOverrides = model.parameterOverrides.map(ModelParameterOverrideExportData.init)
         apiConfigurationName = model.apiConfiguration?.name
         apiConfigurationProviderID = model.apiConfiguration?.providerID
         apiConfigurationBaseURL = model.apiConfiguration?.baseURL
@@ -55,7 +55,7 @@ struct ModelExportData: Codable {
         model.contextSizeOverride = contextSizeOverride
         model.capabilityOverrides = capabilityOverrides.map(\.dataItem)
         model.parameterMappingOverrides = mappingOverrides.map(\.dataItem)
-        model.parameterPolicyOverrides = policyOverrides.map(\.dataItem)
+        model.parameterOverrides = parameterOverrides.map(\.dataItem)
         return model
     }
 }
@@ -100,7 +100,7 @@ struct ModelParameterMappingOverrideExportData: Codable {
     }
 }
 
-struct ModelParameterPolicyOverrideExportData: Codable {
+struct ModelParameterOverrideExportData: Codable {
     let adapterID: LLMAdapterID
     let parameterID: LLMParameterID
     let support: LLMSupportState?
@@ -109,7 +109,7 @@ struct ModelParameterPolicyOverrideExportData: Codable {
     let defaultValueOverrideKind: ModelDefaultValueOverrideKind
     let defaultValue: JSONValue?
 
-    init(_ item: ModelParameterPolicyOverrideItem) {
+    init(_ item: ModelParameterOverrideItem) {
         adapterID = item.adapterID
         parameterID = item.parameterID
         support = item.support
@@ -119,8 +119,8 @@ struct ModelParameterPolicyOverrideExportData: Codable {
         defaultValue = item.defaultValue
     }
 
-    var dataItem: ModelParameterPolicyOverrideItem {
-        ModelParameterPolicyOverrideItem(
+    var dataItem: ModelParameterOverrideItem {
+        ModelParameterOverrideItem(
             adapterID: adapterID,
             parameterID: parameterID,
             support: support,

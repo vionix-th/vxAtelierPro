@@ -39,11 +39,11 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
     }
 
     /// Fetches OpenAI-compatible model metadata and maps it into candidates.
-    func fetchModelObservations(configuration: LLMProviderConfiguration) async throws -> [LLMProviderModelObservation] {
+    func fetchModelMetadata(configuration: LLMProviderConfiguration) async throws -> [LLMProviderModelMetadata] {
         let httpConfig = httpClient.makeConfiguration(for: configuration)
         let response: JSONValue = try await httpClient.getJSON(path: Self.modelsPath, configuration: httpConfig, responseType: JSONValue.self)
         guard let data = response.objectValue?.array("data") else { return [] }
-        return LLMModelMetadataDecoder.openAICompatibleCandidates(
+        return LLMModelMetadataDecoder.openAICompatibleMetadata(
             from: data,
             profile: profile
         )
@@ -197,7 +197,7 @@ struct OpenAICompatibleChatCompletionsAdapter: LLMProviderAdapter {
     }
 
     /// Fetches OpenAI-compatible model metadata and maps it into candidates.
-    func fetchModelObservations(configuration: LLMProviderConfiguration) async throws -> [LLMProviderModelObservation] {
-        try await chatAdapter.fetchModelObservations(configuration: configuration)
+    func fetchModelMetadata(configuration: LLMProviderConfiguration) async throws -> [LLMProviderModelMetadata] {
+        try await chatAdapter.fetchModelMetadata(configuration: configuration)
     }
 }

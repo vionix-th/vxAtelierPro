@@ -10,9 +10,9 @@ enum CodexChatGPTModels {
         "gpt-5.2",
     ]
 
-    static func candidates() -> [LLMProviderModelObservation] {
+    static func metadata() -> [LLMProviderModelMetadata] {
         modelIDs.map {
-            LLMProviderModelObservation(
+            LLMProviderModelMetadata(
                 id: $0,
                 providerID: .openAICodexChatGPTSubscription
             )

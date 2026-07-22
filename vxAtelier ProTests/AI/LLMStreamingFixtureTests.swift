@@ -160,7 +160,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
     func testOpenAICompatibleModelMetadataFixtures() throws {
         let openRouterData = try fixtureJSON(name: "openrouter_models").objectValue?.array("data") ?? []
         let openRouterProfile = LLMProviderRegistry.shared.profile(for: .openRouter)
-        let openRouterModels = LLMModelMetadataDecoder.openAICompatibleCandidates(
+        let openRouterModels = LLMModelMetadataDecoder.openAICompatibleMetadata(
             from: openRouterData,
             profile: openRouterProfile
         )
@@ -170,7 +170,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         XCTAssertEqual(openRouterModels.first?.capabilityClaims, [])
 
         let lmStudioData = try fixtureJSON(name: "lmstudio_models").objectValue?.array("data") ?? []
-        let lmStudioModels = LLMModelMetadataDecoder.openAICompatibleCandidates(
+        let lmStudioModels = LLMModelMetadataDecoder.openAICompatibleMetadata(
             from: lmStudioData,
             profile: LLMProviderRegistry.shared.profile(for: .lmStudio)
         )
@@ -178,7 +178,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         XCTAssertEqual(lmStudioModels.first?.capabilityClaims, [])
 
         let ollamaData = try fixtureJSON(name: "ollama_models").objectValue?.array("data") ?? []
-        let ollamaModels = LLMModelMetadataDecoder.openAICompatibleCandidates(
+        let ollamaModels = LLMModelMetadataDecoder.openAICompatibleMetadata(
             from: ollamaData,
             profile: LLMProviderRegistry.shared.profile(for: .ollama)
         )

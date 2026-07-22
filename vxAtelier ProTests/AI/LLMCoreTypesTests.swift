@@ -73,27 +73,27 @@ final class LLMCoreTypesTests: XCTestCase {
         XCTAssertTrue(deepSeek?.capabilities?.contains(.tools) ?? false)
     }
 
-    func testResolverProvidesUnknownFallbackContract() {
+    func testResolverProvidesUnknownFallbackProfile() {
         let catalog = try! LLMDefaultsCatalog(data: Data("""
         {
           "providerDefaults": [],
           "rules": []
         }
         """.utf8))
-        let contract = LLMModelContractResolver(
+        let profile = LLMModelProfileResolver(
             defaultsCatalog: catalog,
             fallbackContextSize: 4096
         ).resolve(
             providerID: .customOpenAICompatible,
             adapterID: .openAICompatibleChatCompletions,
             modelID: "unknown-model",
-            observation: nil
+            metadata: nil
         )
 
-        XCTAssertEqual(contract.displayName, "unknown-model")
-        XCTAssertEqual(contract.displayNameSource, .fallback)
-        XCTAssertEqual(contract.contextSize, 4096)
-        XCTAssertEqual(contract.capabilities[.text], LLMResolvedSupport(state: .unknown, source: .fallback))
+        XCTAssertEqual(profile.displayName, "unknown-model")
+        XCTAssertEqual(profile.displayNameSource, .fallback)
+        XCTAssertEqual(profile.contextSize, 4096)
+        XCTAssertEqual(profile.capabilities[.text], LLMSupport(state: .unknown, source: .fallback))
     }
 
     func testCatalogCanProvideMinimalUnknownModelDefaults() throws {
@@ -109,17 +109,17 @@ final class LLMCoreTypesTests: XCTestCase {
           ]
         }
         """.utf8))
-        let contract = LLMModelContractResolver(
+        let profile = LLMModelProfileResolver(
             defaultsCatalog: defaults,
             fallbackContextSize: 4096
         ).resolve(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
             modelID: "unknown-future-model",
-            observation: nil
+            metadata: nil
         )
 
-        XCTAssertEqual(contract.capabilities[.text], LLMResolvedSupport(state: .supported, source: .catalog))
+        XCTAssertEqual(profile.capabilities[.text], LLMSupport(state: .supported, source: .catalog))
     }
 
     func testDefaultsCatalogDecodesValidJSON() throws {
@@ -361,7 +361,7 @@ final class LLMCoreTypesTests: XCTestCase {
 
     func testModelMetadataDecoderUsesProviderMetadataOverDefaults() {
         let profile = LLMProviderRegistry.shared.profile(for: .openRouter)
-        let models = LLMModelMetadataDecoder.openAICompatibleCandidates(
+        let models = LLMModelMetadataDecoder.openAICompatibleMetadata(
             from: [
                 .object([
                     "id": .string("vision-model"),
@@ -393,7 +393,7 @@ final class LLMCoreTypesTests: XCTestCase {
 
     func testModelMetadataDecoderLeavesMissingFieldsUnclaimed() {
         let profile = LLMProviderRegistry.shared.profile(for: .openRouter)
-        let models = LLMModelMetadataDecoder.openAICompatibleCandidates(
+        let models = LLMModelMetadataDecoder.openAICompatibleMetadata(
             from: [.object(["id": .string("fallback-model")])],
             profile: profile
         )

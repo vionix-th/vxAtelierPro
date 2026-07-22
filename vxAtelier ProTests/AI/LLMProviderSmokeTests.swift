@@ -64,8 +64,8 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
 
         let persistedModels = queryManager.models(for: config)
         XCTAssertFalse(persistedModels.isEmpty)
-        try assertFetchedModelObservations(
-            persistedModels.map(\.observation),
+        try assertFetchedModelMetadata(
+            persistedModels.map(\.providerMetadata),
             provider: provider,
             adapterID: .openAIResponses
         )
@@ -79,7 +79,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
             activity.add(XCTAttachment(string: mappings))
         }
         XCTAssertTrue(primaryModel.parameterMappingOverrides.isEmpty)
-        XCTAssertFalse(primaryModel.resolvedContract.parameters.isEmpty)
+        XCTAssertFalse(primaryModel.modelProfile.parameters.isEmpty)
     }
 
     func testAnthropicMessagesLiveSmoke() async throws {
@@ -127,7 +127,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
 
         if provider.checkModels ?? true {
             _ = try await runProviderOperation(provider: provider, adapterID: adapterID, operation: "models") {
-                _ = try await adapter.fetchModelObservations(configuration: configuration)
+                _ = try await adapter.fetchModelMetadata(configuration: configuration)
                 return true
             }
         }
@@ -167,7 +167,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
             adapter: adapter,
             configuration: configuration
         )
-        try assertFetchedModelObservations(fetchedModels, provider: provider, adapterID: adapterID)
+        try assertFetchedModelMetadata(fetchedModels, provider: provider, adapterID: adapterID)
     }
 
     private func runProviderModelFetch(
@@ -175,10 +175,10 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         adapterID: LLMAdapterID,
         adapter: LLMProviderAdapter,
         configuration: LLMProviderConfiguration
-    ) async throws -> [LLMProviderModelObservation] {
-        var fetchedModels: [LLMProviderModelObservation] = []
+    ) async throws -> [LLMProviderModelMetadata] {
+        var fetchedModels: [LLMProviderModelMetadata] = []
         _ = try await runProviderOperation(provider: provider, adapterID: adapterID, operation: "live model fetch") {
-            fetchedModels = try await adapter.fetchModelObservations(configuration: configuration)
+            fetchedModels = try await adapter.fetchModelMetadata(configuration: configuration)
             return true
         }
         XCTContext.runActivity(named: "Adapter live /models response") { activity in
@@ -283,8 +283,8 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         }
     }
 
-    private func assertFetchedModelObservations(
-        _ fetchedModels: [LLMProviderModelObservation],
+    private func assertFetchedModelMetadata(
+        _ fetchedModels: [LLMProviderModelMetadata],
         provider: LiveSmokeProvider,
         adapterID: LLMAdapterID
     ) throws {
@@ -295,33 +295,33 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         }
 
         let primaryModelID = try XCTUnwrap(provider.primaryModel)
-        let observation = try XCTUnwrap(
+        let metadata = try XCTUnwrap(
             fetchedModels.first { $0.id == primaryModelID },
             "Live /models response missing primary model \(primaryModelID)."
         )
-        let contract = LLMModelContractResolver(fallbackContextSize: AppDefaults.ModelContextSizes.defaultSize).resolve(
+        let profile = LLMModelProfileResolver(fallbackContextSize: AppDefaults.ModelContextSizes.defaultSize).resolve(
             providerID: provider.id,
             adapterID: adapterID,
             modelID: primaryModelID,
-            observation: observation
+            metadata: metadata
         )
 
-        XCTContext.runActivity(named: "Provider observation and resolved contract") { activity in
+        XCTContext.runActivity(named: "Provider metadata and resolved profile") { activity in
             activity.add(XCTAttachment(string: [
-                "modelID=\(observation.id)",
-                "observedContext=\(observation.contextSize.map(String.init) ?? "nil")",
-                "resolvedContext=\(contract.contextSize)",
-                "observedClaims=\(observation.capabilityClaims.map { "\($0.capability.rawValue):\($0.state.rawValue)" }.joined(separator: ","))",
-                "rawMetadata=\(observation.rawMetadataJSON == nil ? "missing" : "present")"
+                "modelID=\(metadata.id)",
+                "providerContext=\(metadata.contextSize.map(String.init) ?? "nil")",
+                "resolvedContext=\(profile.contextSize)",
+                "providerClaims=\(metadata.capabilityClaims.map { "\($0.capability.rawValue):\($0.state.rawValue)" }.joined(separator: ","))",
+                "rawMetadata=\(metadata.rawMetadataJSON == nil ? "missing" : "present")"
             ].joined(separator: "\n")))
         }
 
-        XCTAssertFalse(contract.displayName.isEmpty)
-        XCTAssertGreaterThan(contract.contextSize, 0)
+        XCTAssertFalse(profile.displayName.isEmpty)
+        XCTAssertGreaterThan(profile.contextSize, 0)
         if provider.id == .openAICodexChatGPTSubscription {
-            XCTAssertNil(observation.rawMetadataJSON)
+            XCTAssertNil(metadata.rawMetadataJSON)
         } else {
-            XCTAssertNotNil(observation.rawMetadataJSON)
+            XCTAssertNotNil(metadata.rawMetadataJSON)
         }
     }
 
@@ -481,13 +481,13 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         adapterID: LLMAdapterID,
         model: String
     ) -> [LiveSmokeScenario] {
-        let contract = LLMModelContractResolver(fallbackContextSize: AppDefaults.ModelContextSizes.defaultSize).resolve(
+        let profile = LLMModelProfileResolver(fallbackContextSize: AppDefaults.ModelContextSizes.defaultSize).resolve(
             providerID: providerID,
             adapterID: adapterID,
             modelID: model,
-            observation: nil
+            metadata: nil
         )
-        let capabilities = Set(contract.supportedCapabilities)
+        let capabilities = Set(profile.supportedCapabilities)
         let streamPolicy = LiveSmokeStreamPolicy(allowsBlockMode: true, allowsStreaming: true)
         let maxOutputTokens = capabilities.contains(.reasoning) ? 128 : 32
 

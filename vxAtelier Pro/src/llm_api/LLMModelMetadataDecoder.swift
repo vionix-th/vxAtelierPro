@@ -1,15 +1,15 @@
 import Foundation
 
-/// Decodes provider model-list payloads into provider observations without catalog enrichment.
+/// Decodes model-list payloads into provider metadata without catalog enrichment.
 enum LLMModelMetadataDecoder {
-    /// Maps OpenAI-compatible model objects into provider observations.
-    static func openAICompatibleCandidates(
+    /// Maps OpenAI-compatible model objects into provider metadata.
+    static func openAICompatibleMetadata(
         from data: [JSONValue],
         profile: LLMProviderProfile
-    ) -> [LLMProviderModelObservation] {
+    ) -> [LLMProviderModelMetadata] {
         data.compactMap { item in
             guard let object = item.objectValue, let id = object.string("id") else { return nil }
-            return LLMProviderModelObservation(
+            return LLMProviderModelMetadata(
                 id: id,
                 displayName: object.string("name") ?? object.string("display_name"),
                 providerID: profile.id,
@@ -21,14 +21,14 @@ enum LLMModelMetadataDecoder {
         }
     }
 
-    /// Maps Anthropic model objects into provider observations.
-    static func anthropicCandidates(
+    /// Maps Anthropic model objects into provider metadata.
+    static func anthropicMetadata(
         from data: [JSONValue],
         profile: LLMProviderProfile
-    ) -> [LLMProviderModelObservation] {
+    ) -> [LLMProviderModelMetadata] {
         data.compactMap { item in
             guard let object = item.objectValue, let id = object.string("id") else { return nil }
-            return LLMProviderModelObservation(
+            return LLMProviderModelMetadata(
                 id: id,
                 displayName: object.string("display_name") ?? object.string("name"),
                 providerID: profile.id,

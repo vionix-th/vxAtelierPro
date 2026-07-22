@@ -35,14 +35,14 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
     }
 
     /// Fetches Anthropic model metadata and maps it into candidates.
-    func fetchModelObservations(configuration: LLMProviderConfiguration) async throws -> [LLMProviderModelObservation] {
+    func fetchModelMetadata(configuration: LLMProviderConfiguration) async throws -> [LLMProviderModelMetadata] {
         let response: JSONValue = try await httpClient.getJSON(
             path: Self.modelsPath,
             configuration: httpClient.makeConfiguration(for: configuration),
             responseType: JSONValue.self
         )
         guard let data = response.objectValue?.array("data") else { return [] }
-        return LLMModelMetadataDecoder.anthropicCandidates(from: data, profile: profile)
+        return LLMModelMetadataDecoder.anthropicMetadata(from: data, profile: profile)
     }
 
     /// Encodes a provider-neutral request into an Anthropic Messages JSON body.

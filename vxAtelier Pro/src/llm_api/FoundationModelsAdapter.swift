@@ -27,8 +27,8 @@ struct FoundationModelsAdapter: LLMProviderAdapter {
         )
     }
 
-    func fetchModelObservations(configuration: LLMProviderConfiguration) async throws -> [LLMProviderModelObservation] {
-        backend.modelObservations(configuration: configuration)
+    func fetchModelMetadata(configuration: LLMProviderConfiguration) async throws -> [LLMProviderModelMetadata] {
+        backend.modelMetadata(configuration: configuration)
     }
 }
 
@@ -70,13 +70,13 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
         #endif
     }
 
-    func modelObservations(configuration: LLMProviderConfiguration) -> [LLMProviderModelObservation] {
+    func modelMetadata(configuration: LLMProviderConfiguration) -> [LLMProviderModelMetadata] {
         #if canImport(FoundationModels)
         let model = SystemLanguageModel.default
         let availability = availability()
         let contextSize = model.contextSize
         return [
-            LLMProviderModelObservation(
+            LLMProviderModelMetadata(
                 id: "apple-intelligence-default",
                 displayName: "Apple Intelligence",
                 providerID: .appleIntelligence,
@@ -92,7 +92,7 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
         ]
         #else
         return [
-            LLMProviderModelObservation(
+            LLMProviderModelMetadata(
                 id: "apple-intelligence-default",
                 displayName: "Apple Intelligence",
                 providerID: .appleIntelligence,

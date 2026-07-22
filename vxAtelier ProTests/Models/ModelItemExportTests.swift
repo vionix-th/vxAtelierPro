@@ -43,11 +43,11 @@ final class ModelItemExportTests: XCTestCase {
         XCTAssertEqual(restored.contextSize, original.contextSize)
         XCTAssertEqual(Set(restored.providerSupportedCapabilitiesRaw), Set(original.providerSupportedCapabilitiesRaw))
         XCTAssertEqual(restored.apiConfiguration?.name, config.name)
-        let restoredMaxTokens = restored.resolvedContract.parameters[.maxOutputTokens]?.mapping
+        let restoredMaxTokens = restored.modelProfile.parameters[.maxOutputTokens]?.mapping
         XCTAssertEqual(restoredMaxTokens?.wireKey, "max_tokens")
-        XCTAssertEqual(restored.resolvedContract.parameters[.maxOutputTokens]?.support.state, .supported)
+        XCTAssertEqual(restored.modelProfile.parameters[.maxOutputTokens]?.support.state, .supported)
         XCTAssertTrue(restored.parameterMappingOverrides.isEmpty)
-        XCTAssertTrue(restored.parameterPolicyOverrides.isEmpty)
+        XCTAssertTrue(restored.parameterOverrides.isEmpty)
     }
 
     func testJsonSerializerImportModelResolvesAPIConfigurationOwnership() throws {

@@ -28,7 +28,7 @@ private struct MappingOverrideDraft: Identifiable {
     }
 }
 
-private struct PolicyOverrideDraft: Identifiable {
+private struct ParameterOverrideDraft: Identifiable {
     var id: String { "\(adapterID.rawValue):\(parameterID.rawValue)" }
     var adapterID: LLMAdapterID
     var parameterID: LLMParameterID
@@ -38,7 +38,7 @@ private struct PolicyOverrideDraft: Identifiable {
     var defaultValueKind: ModelDefaultValueOverrideKind
     var defaultValueText: String
 
-    init(_ item: ModelParameterPolicyOverrideItem) {
+    init(_ item: ModelParameterOverrideItem) {
         adapterID = item.adapterID
         parameterID = item.parameterID
         support = item.support
@@ -66,7 +66,7 @@ struct ModelEditorView: View {
     @State private var contextSizeOverride: String
     @State private var capabilityOverrides: [LLMModelCapability: LLMSupportState]
     @State private var mappingOverrides: [MappingOverrideDraft]
-    @State private var policyOverrides: [PolicyOverrideDraft]
+    @State private var parameterOverrides: [ParameterOverrideDraft]
     @State private var errorMessage = ""
     @State private var showError = false
 
@@ -80,7 +80,7 @@ struct ModelEditorView: View {
             ($0.capability, $0.support)
         }))
         _mappingOverrides = State(initialValue: model.parameterMappingOverrides.map(MappingOverrideDraft.init))
-        _policyOverrides = State(initialValue: model.parameterPolicyOverrides.map(PolicyOverrideDraft.init))
+        _parameterOverrides = State(initialValue: model.parameterOverrides.map(ParameterOverrideDraft.init))
     }
 
     private var selectedConfiguration: APIConfigurationItem? {
@@ -91,26 +91,26 @@ struct ModelEditorView: View {
         selectedConfiguration?.defaultAdapterIDEnum ?? model.adapterID
     }
 
-    private var draftContract: LLMResolvedModelContract {
+    private var draftProfile: LLMModelProfile {
         let mappings = mappingOverrides
             .filter { $0.adapterID == selectedAdapterID }
             .reduce(into: [LLMParameterID: LLMParameterMapping]()) { $0[$1.parameterID] = $1.mapping }
-        let policies = policyOverrides
+        let parameterSettings = parameterOverrides
             .filter { $0.adapterID == selectedAdapterID }
-            .reduce(into: [LLMParameterID: LLMParameterPolicyOverride]()) {
-                $0[$1.parameterID] = policy(from: $1, validateValue: false)
+            .reduce(into: [LLMParameterID: LLMParameterOverrides]()) {
+                $0[$1.parameterID] = overrides(from: $1, validateValue: false)
             }
-        return LLMModelContractResolver(fallbackContextSize: AppDefaults.ModelContextSizes.defaultSize).resolve(
+        return LLMModelProfileResolver(fallbackContextSize: AppDefaults.ModelContextSizes.defaultSize).resolve(
             providerID: selectedConfiguration?.providerIDEnum ?? model.providerID,
             adapterID: selectedAdapterID,
             modelID: modelID,
-            observation: model.observation,
-            overrides: LLMModelContractOverrides(
+            metadata: model.providerMetadata,
+            overrides: LLMModelOverrides(
                 displayName: displayNameOverride,
                 contextSize: Int(contextSizeOverride),
                 capabilitySupport: capabilityOverrides,
                 parameterMappings: mappings,
-                parameterPolicies: policies
+                parameterOverrides: parameterSettings
             )
         )
     }
@@ -127,8 +127,8 @@ struct ModelEditorView: View {
                     }
                     TextField("Display name override", text: $displayNameOverride)
                     TextField("Context size override", text: $contextSizeOverride)
-                    LabeledContent("Resolved name", value: draftContract.displayName)
-                    LabeledContent("Resolved context", value: draftContract.contextSize.formatted())
+                    LabeledContent("Resolved name", value: draftProfile.displayName)
+                    LabeledContent("Resolved context", value: draftProfile.contextSize.formatted())
                 }
 
                 Section {
@@ -137,8 +137,8 @@ struct ModelEditorView: View {
                             Label(capability.displayName, systemImage: capability.systemName)
                             Spacer()
                             Text([
-                                draftContract.capabilities[capability]?.state.displayName ?? "Unknown",
-                                draftContract.capabilities[capability]?.source.displayName ?? "Fallback"
+                                draftProfile.capabilities[capability]?.state.displayName ?? "Unknown",
+                                draftProfile.capabilities[capability]?.source.displayName ?? "Fallback"
                             ].joined(separator: " · "))
                                 .foregroundStyle(.secondary)
                             Picker("Override", selection: capabilityOverrideBinding(capability)) {
@@ -155,23 +155,23 @@ struct ModelEditorView: View {
                     Text("Support is advisory for remote providers. Overrides affect presentation and defaults, not request admission.")
                 }
 
-                Section("Parameter Contract") {
+                Section("Parameter Profile") {
                     ForEach(LLMParameterID.allCases.filter(\.isProviderMappable)) { parameterID in
-                        let contract = draftContract.parameters[parameterID]
+                        let profile = draftProfile.parameters[parameterID]
                         HStack {
                             VStack(alignment: .leading) {
                                 Text(AiParameterPresentationCatalog.displayName(for: parameterID))
                                 Text([
-                                    contract?.support.state.displayName ?? "Unknown",
-                                    contract?.support.source.displayName ?? "Fallback",
-                                    contract?.mapping?.encodingKind == .disabled || contract?.mapping == nil ? "Unencodable" : "Mapped"
+                                    profile?.support.state.displayName ?? "Unknown",
+                                    profile?.support.source.displayName ?? "Fallback",
+                                    profile?.mapping?.encodingKind == .disabled || profile?.mapping == nil ? "Unencodable" : "Mapped"
                                 ].joined(separator: " · "))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
                             Menu("Override") {
-                                Button("Parameter policy") { addPolicyOverride(parameterID) }
+                                Button("Parameter settings") { addParameterOverride(parameterID) }
                                 Button("Wire mapping") { addMappingOverride(parameterID) }
                             }
                         }
@@ -212,15 +212,15 @@ struct ModelEditorView: View {
                     }
                 }
 
-                if !policyOverrides.isEmpty {
-                    Section("Policy Overrides") {
-                        ForEach($policyOverrides) { $draft in
+                if !parameterOverrides.isEmpty {
+                    Section("Parameter Overrides") {
+                        ForEach($parameterOverrides) { $draft in
                             VStack(alignment: .leading) {
                                 HStack {
                                     Text(AiParameterPresentationCatalog.displayName(for: draft.parameterID))
                                     Spacer()
                                     Button(role: .destructive) {
-                                        policyOverrides.removeAll { $0.id == draft.id }
+                                        parameterOverrides.removeAll { $0.id == draft.id }
                                     } label: {
                                         Image(systemName: "trash")
                                     }
@@ -263,7 +263,7 @@ struct ModelEditorView: View {
                         .disabled(modelID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || selectedConfiguration == nil)
                 }
             }
-            .alert("Model Contract", isPresented: $showError) {
+            .alert("Model Profile", isPresented: $showError) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(errorMessage)
@@ -280,7 +280,7 @@ struct ModelEditorView: View {
 
     private func addMappingOverride(_ parameterID: LLMParameterID) {
         guard !mappingOverrides.contains(where: { $0.adapterID == selectedAdapterID && $0.parameterID == parameterID }) else { return }
-        let resolved = draftContract.parameters[parameterID]?.mapping
+        let resolved = draftProfile.parameters[parameterID]?.mapping
         mappingOverrides.append(MappingOverrideDraft(ModelParameterMappingOverrideItem(
             mapping: resolved ?? LLMParameterMapping(
                 adapterID: selectedAdapterID,
@@ -291,15 +291,15 @@ struct ModelEditorView: View {
         )))
     }
 
-    private func addPolicyOverride(_ parameterID: LLMParameterID) {
-        guard !policyOverrides.contains(where: { $0.adapterID == selectedAdapterID && $0.parameterID == parameterID }) else { return }
-        policyOverrides.append(PolicyOverrideDraft(ModelParameterPolicyOverrideItem(
+    private func addParameterOverride(_ parameterID: LLMParameterID) {
+        guard !parameterOverrides.contains(where: { $0.adapterID == selectedAdapterID && $0.parameterID == parameterID }) else { return }
+        parameterOverrides.append(ParameterOverrideDraft(ModelParameterOverrideItem(
             adapterID: selectedAdapterID,
             parameterID: parameterID
         )))
     }
 
-    private func policy(from draft: PolicyOverrideDraft, validateValue: Bool) -> LLMParameterPolicyOverride {
+    private func overrides(from draft: ParameterOverrideDraft, validateValue: Bool) -> LLMParameterOverrides {
         let defaultValue: LLMDefaultValueOverride
         switch draft.defaultValueKind {
         case .inherit:
@@ -318,7 +318,7 @@ struct ModelEditorView: View {
                 }
             }
         }
-        return LLMParameterPolicyOverride(
+        return LLMParameterOverrides(
             support: draft.support,
             isRequired: draft.required,
             isEnabledByDefault: draft.enabledByDefault,
@@ -328,14 +328,14 @@ struct ModelEditorView: View {
 
     private func save() {
         guard let selectedConfiguration else { return }
-        var policies: [(LLMAdapterID, LLMParameterID, LLMParameterPolicyOverride)] = []
-        for draft in policyOverrides {
-            let policy = policy(from: draft, validateValue: true)
+        var parameterSettings: [(LLMAdapterID, LLMParameterID, LLMParameterOverrides)] = []
+        for draft in parameterOverrides {
+            let parameterOverrides = overrides(from: draft, validateValue: true)
             guard !showError else { return }
-            policies.append((draft.adapterID, draft.parameterID, policy))
+            parameterSettings.append((draft.adapterID, draft.parameterID, parameterOverrides))
         }
         do {
-            try queryManager.updateModelContract(
+            try queryManager.updateModelProfile(
                 model,
                 modelID: modelID,
                 apiConfiguration: selectedConfiguration,
@@ -343,11 +343,11 @@ struct ModelEditorView: View {
                 contextSizeOverride: Int(contextSizeOverride),
                 capabilityOverrides: capabilityOverrides,
                 mappingOverrides: mappingOverrides.map(\.mapping),
-                policyOverrides: policies
+                parameterOverrides: parameterSettings
             )
             dismiss()
         } catch {
-            vxAtelierPro.log.error("Failed to save model contract: \(error.localizedDescription)")
+            vxAtelierPro.log.error("Failed to save model profile: \(error.localizedDescription)")
             errorMessage = error.localizedDescription
             showError = true
         }

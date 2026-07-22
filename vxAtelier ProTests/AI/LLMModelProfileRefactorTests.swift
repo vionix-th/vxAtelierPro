@@ -7,11 +7,11 @@ import XCTest
 #endif
 
 @MainActor
-final class LLMModelContractRefactorTests: XCTestCase {
-    private let resolver = LLMModelContractResolver(fallbackContextSize: 4096)
+final class LLMModelProfileRefactorTests: XCTestCase {
+    private let resolver = LLMModelProfileResolver(fallbackContextSize: 4096)
 
     func testResolutionPrecedenceAndProvenance() {
-        let observation = LLMProviderModelObservation(
+        let metadata = LLMProviderModelMetadata(
             id: "gpt-5.4-nano",
             displayName: "Provider Name",
             providerID: .openAIPlatform,
@@ -22,45 +22,45 @@ final class LLMModelContractRefactorTests: XCTestCase {
                 state: .unsupported
             )]
         )
-        let contract = resolver.resolve(
+        let profile = resolver.resolve(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
-            modelID: observation.id,
-            observation: observation,
-            overrides: LLMModelContractOverrides(
+            modelID: metadata.id,
+            metadata: metadata,
+            overrides: LLMModelOverrides(
                 displayName: "Override Name",
                 contextSize: 64_000,
                 capabilitySupport: [.streaming: .unsupported],
-                parameterPolicies: [
-                    .maxOutputTokens: LLMParameterPolicyOverride(support: .supported)
+                parameterOverrides: [
+                    .maxOutputTokens: LLMParameterOverrides(support: .supported)
                 ]
             )
         )
 
-        XCTAssertEqual(contract.displayName, "Override Name")
-        XCTAssertEqual(contract.displayNameSource, .userOverride)
-        XCTAssertEqual(contract.contextSize, 64_000)
-        XCTAssertEqual(contract.contextSizeSource, .userOverride)
-        XCTAssertEqual(contract.capabilities[.streaming], LLMResolvedSupport(state: .unsupported, source: .userOverride))
-        XCTAssertEqual(contract.capabilities[.text]?.source, .catalog)
-        XCTAssertEqual(contract.parameters[.maxOutputTokens]?.support, LLMResolvedSupport(state: .supported, source: .userOverride))
+        XCTAssertEqual(profile.displayName, "Override Name")
+        XCTAssertEqual(profile.displayNameSource, .userOverride)
+        XCTAssertEqual(profile.contextSize, 64_000)
+        XCTAssertEqual(profile.contextSizeSource, .userOverride)
+        XCTAssertEqual(profile.capabilities[.streaming], LLMSupport(state: .unsupported, source: .userOverride))
+        XCTAssertEqual(profile.capabilities[.text]?.source, .catalog)
+        XCTAssertEqual(profile.parameters[.maxOutputTokens]?.support, LLMSupport(state: .supported, source: .userOverride))
     }
 
     func testMissingProviderClaimsDoNotEraseCatalogClaims() {
-        let observation = LLMProviderModelObservation(
+        let metadata = LLMProviderModelMetadata(
             id: "gpt-5.4-nano",
             providerID: .openAIPlatform
         )
-        let contract = resolver.resolve(
+        let profile = resolver.resolve(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
-            modelID: observation.id,
-            observation: observation
+            modelID: metadata.id,
+            metadata: metadata
         )
 
-        XCTAssertEqual(contract.capabilities[.tools], LLMResolvedSupport(state: .supported, source: .catalog))
-        XCTAssertEqual(contract.capabilities[.streaming], LLMResolvedSupport(state: .supported, source: .catalog))
-        XCTAssertEqual(contract.parameters[.temperature]?.support, LLMResolvedSupport(state: .unsupported, source: .catalog))
+        XCTAssertEqual(profile.capabilities[.tools], LLMSupport(state: .supported, source: .catalog))
+        XCTAssertEqual(profile.capabilities[.streaming], LLMSupport(state: .supported, source: .catalog))
+        XCTAssertEqual(profile.parameters[.temperature]?.support, LLMSupport(state: .unsupported, source: .catalog))
     }
 
     func testUnsupportedSupportStateDoesNotSuppressExplicitMappedParameter() {
@@ -70,9 +70,9 @@ final class LLMModelContractRefactorTests: XCTestCase {
             encodingKind: .structuredPreset,
             structuredPreset: .openAIResponsesReasoning
         )
-        let contract = LLMResolvedParameterContract(
+        let profile = LLMParameterProfile(
             parameterID: .reasoningEffort,
-            support: LLMResolvedSupport(state: .unsupported, source: .userOverride),
+            support: LLMSupport(state: .unsupported, source: .userOverride),
             mapping: mapping,
             isRequired: false,
             isEnabledByDefault: false,
@@ -82,7 +82,7 @@ final class LLMModelContractRefactorTests: XCTestCase {
         let resolved = LLMGenerationOptionsResolver.resolve(
             options: LLMGenerationOptions(reasoning: "low"),
             conversationPreferences: [LLMParameterID.reasoningEffort.rawValue: true],
-            parameterContracts: [.reasoningEffort: contract]
+            parameterProfiles: [.reasoningEffort: profile]
         )
 
         XCTAssertTrue(resolved.activeParameterIDs.contains(.reasoningEffort))
@@ -261,8 +261,8 @@ final class LLMModelContractRefactorTests: XCTestCase {
         environment.modelContext.insert(model)
 
         let manager = QueryManager(modelContext: environment.modelContext)
-        try manager.upsertModelObservations([
-            LLMProviderModelObservation(
+        try manager.upsertModelMetadata([
+            LLMProviderModelMetadata(
                 id: model.modelID,
                 displayName: "Fetched",
                 providerID: .openAIPlatform,
@@ -272,12 +272,12 @@ final class LLMModelContractRefactorTests: XCTestCase {
 
         XCTAssertEqual(model.capabilityOverrides.first?.support, .unsupported)
         XCTAssertTrue(model.parameterMappingOverrides.isEmpty)
-        XCTAssertTrue(model.parameterPolicyOverrides.isEmpty)
-        XCTAssertEqual(model.resolvedContract.capabilities[.streaming]?.source, .userOverride)
+        XCTAssertTrue(model.parameterOverrides.isEmpty)
+        XCTAssertEqual(model.modelProfile.capabilities[.streaming]?.source, .userOverride)
     }
 
     func testRemovingOverrideRestoresProviderThenCatalogResolution() {
-        let observation = LLMProviderModelObservation(
+        let metadata = LLMProviderModelMetadata(
             id: "gpt-5.4-nano",
             providerID: .openAIPlatform,
             capabilityClaims: [LLMCapabilityClaim(capability: .streaming, state: .unsupported)]
@@ -285,32 +285,32 @@ final class LLMModelContractRefactorTests: XCTestCase {
         let overridden = resolver.resolve(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
-            modelID: observation.id,
-            observation: observation,
-            overrides: LLMModelContractOverrides(capabilitySupport: [.streaming: .supported])
+            modelID: metadata.id,
+            metadata: metadata,
+            overrides: LLMModelOverrides(capabilitySupport: [.streaming: .supported])
         )
         let reset = resolver.resolve(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
-            modelID: observation.id,
-            observation: observation
+            modelID: metadata.id,
+            metadata: metadata
         )
         let catalogOnly = resolver.resolve(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
-            modelID: observation.id,
-            observation: LLMProviderModelObservation(
-                id: observation.id,
-                providerID: observation.providerID
+            modelID: metadata.id,
+            metadata: LLMProviderModelMetadata(
+                id: metadata.id,
+                providerID: metadata.providerID
             )
         )
 
         XCTAssertEqual(overridden.capabilities[.streaming]?.source, .userOverride)
-        XCTAssertEqual(reset.capabilities[.streaming], LLMResolvedSupport(state: .unsupported, source: .provider))
-        XCTAssertEqual(catalogOnly.capabilities[.streaming], LLMResolvedSupport(state: .supported, source: .catalog))
+        XCTAssertEqual(reset.capabilities[.streaming], LLMSupport(state: .unsupported, source: .provider))
+        XCTAssertEqual(catalogOnly.capabilities[.streaming], LLMSupport(state: .supported, source: .catalog))
     }
 
-    func testExportImportRoundTripsObservationsAndOverrides() {
+    func testExportImportRoundTripsMetadataAndOverrides() {
         let configuration = APIConfigurationItem(
             name: "OpenAI",
             apiKey: "key",
@@ -326,15 +326,15 @@ final class LLMModelContractRefactorTests: XCTestCase {
             ModelCapabilityOverrideItem(capability: .streaming, support: .supported)
         ]
 
-        let originalContract = model.resolvedContract
+        let originalProfile = model.modelProfile
         let restored = ModelExportData(model).toDataItem(apiConfigurations: [configuration])
 
         XCTAssertEqual(restored.providerContextSize, 12_000)
         XCTAssertEqual(restored.contextSizeOverride, 24_000)
         XCTAssertEqual(restored.providerUnsupportedParametersRaw, [LLMParameterID.temperature.rawValue])
         XCTAssertEqual(restored.capabilityOverrides.first?.support, .supported)
-        XCTAssertEqual(restored.resolvedContract, originalContract)
+        XCTAssertEqual(restored.modelProfile, originalProfile)
         XCTAssertTrue(restored.parameterMappingOverrides.isEmpty)
-        XCTAssertTrue(restored.parameterPolicyOverrides.isEmpty)
+        XCTAssertTrue(restored.parameterOverrides.isEmpty)
     }
 }

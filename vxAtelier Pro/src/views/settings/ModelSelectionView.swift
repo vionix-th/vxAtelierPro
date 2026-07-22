@@ -9,25 +9,25 @@ struct ModelSelectionView: View {
     let selectedModel: String
     let onModelSelected: (String) -> Void
     let apiConfiguration: APIConfigurationItem?
-    var draftModelObservations: [LLMProviderModelObservation]? = nil
+    var draftModelMetadata: [LLMProviderModelMetadata]? = nil
 
     @State private var showAllModels = false
     @State private var searchText = ""
     @State private var selectedCapabilities: Set<LLMModelCapability> = []
 
     private var isDraftMode: Bool {
-        draftModelObservations != nil
+        draftModelMetadata != nil
     }
 
     private var filteredModels: [ModelSelectionOption] {
         var models: [ModelSelectionOption]
-        if let draftModelObservations {
-            models = draftModelObservations.map { observation in
+        if let draftModelMetadata {
+            models = draftModelMetadata.map { metadata in
                 ModelSelectionOption(
-                    observation: observation,
+                    metadata: metadata,
                     adapterID: apiConfiguration?.defaultAdapterIDEnum
-                        ?? LLMProviderRegistry.shared.profile(for: observation.providerID).defaultAdapterID,
-                    groupName: apiConfiguration?.name ?? observation.providerID.displayName
+                        ?? LLMProviderRegistry.shared.profile(for: metadata.providerID).defaultAdapterID,
+                    groupName: apiConfiguration?.name ?? metadata.providerID.displayName
                 )
             }
         } else if let apiConfiguration, !showAllModels {
@@ -218,7 +218,7 @@ private struct ModelSelectionOption: Identifiable {
     init(model: ModelItem) {
         self.id = String(describing: model.persistentModelID)
         self.name = model.modelID
-        self.displayName = model.resolvedContract.displayName
+        self.displayName = model.modelProfile.displayName
         self.provider = model.apiConfiguration?.providerIDEnum.displayName ?? "Unknown Provider"
         self.contextSize = model.contextSize
         self.capabilities = model.capabilities
@@ -227,22 +227,22 @@ private struct ModelSelectionOption: Identifiable {
         self.apiConfigurationID = model.apiConfiguration?.id
     }
 
-    init(observation: LLMProviderModelObservation, adapterID: LLMAdapterID, groupName: String) {
-        let contract = LLMModelContractResolver(
+    init(metadata: LLMProviderModelMetadata, adapterID: LLMAdapterID, groupName: String) {
+        let profile = LLMModelProfileResolver(
             fallbackContextSize: AppDefaults.ModelContextSizes.defaultSize
         ).resolve(
-            providerID: observation.providerID,
+            providerID: metadata.providerID,
             adapterID: adapterID,
-            modelID: observation.id,
-            observation: observation
+            modelID: metadata.id,
+            metadata: metadata
         )
-        self.id = "observation-\(observation.providerID.rawValue)-\(observation.id)"
-        self.name = observation.id
-        self.displayName = contract.displayName
-        self.provider = observation.providerID.displayName
-        self.contextSize = contract.contextSize
-        self.capabilities = contract.supportedCapabilities
-        self.metadataSearchTerms = contract.supportedCapabilities.map(\.displayName)
+        self.id = "metadata-\(metadata.providerID.rawValue)-\(metadata.id)"
+        self.name = metadata.id
+        self.displayName = profile.displayName
+        self.provider = metadata.providerID.displayName
+        self.contextSize = profile.contextSize
+        self.capabilities = profile.supportedCapabilities
+        self.metadataSearchTerms = profile.supportedCapabilities.map(\.displayName)
         self.groupName = groupName
         self.apiConfigurationID = nil
     }

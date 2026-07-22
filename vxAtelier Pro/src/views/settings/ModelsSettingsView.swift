@@ -42,7 +42,7 @@ struct ModelsSettingsView: View {
                 ModelRowItem(
                     id: model.persistentModelID,
                     modelID: model.modelID,
-                    displayName: model.resolvedContract.displayName,
+                    displayName: model.modelProfile.displayName,
                     providerName: model.apiConfiguration?.name ?? "No API Configuration",
                     providerDisplayName: model.apiConfiguration?.providerIDEnum.displayName ?? "Unknown",
                     contextSize: model.contextSize,

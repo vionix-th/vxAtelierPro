@@ -15,8 +15,8 @@
 - `llm_api/*` must not depend on `ConversationItem`, `ConversationTurn`, `ConversationOptions`, `APIConfigurationItem`, `ModelItem`, `MessageItem`, `ToolCallItem`, `ResponseRunItem`, `ConversationDraftStore`, SwiftData, SwiftUI, or concrete app services.
 
 ## Direction Of Flow
-- Runtime code resolves persisted provider observations and explicit overrides into `llm_api/*` value types.
-- `LLMModelContractResolver` is the only model-contract resolution path. Capability and parameter support are advisory for remote providers.
+- Runtime code resolves persisted provider metadata and explicit overrides into `llm_api/*` value types.
+- `LLMModelProfileResolver` is the only model-profile resolution path. Capability and parameter support are advisory for remote providers.
 - `llm_api/*` resolves mappings, enforces adapter encodability, executes provider adapters, and emits provider-neutral events.
 - `llm_api/*` must not persist results, mutate conversation storage, update UI draft state, or execute concrete vxAtelier tools.
 
@@ -26,7 +26,7 @@
 - Parameter mapping is selected-model semantic-to-wire translation: wire key or structured preset.
 - Conversation storage may contain semantic values and per-conversation enable/disable intent for optional parameters only.
 - Conversation storage must not own resolved support, model policy defaults, or wire names.
-- Keep contract and inclusion resolution in `LLMModelContractResolver` and `LLMGenerationOptionsResolver`; keep semantic-to-wire translation and hard encodability checks in `LLMParameterMapping` and provider encoders.
+- Keep profile and inclusion resolution in `LLMModelProfileResolver` and `LLMGenerationOptionsResolver`; keep semantic-to-wire translation and hard encodability checks in `LLMParameterMapping` and provider encoders.
 
 ## Validation Boundary
 - Remote providers decide whether supported, unsupported, or unknown model features are accepted.

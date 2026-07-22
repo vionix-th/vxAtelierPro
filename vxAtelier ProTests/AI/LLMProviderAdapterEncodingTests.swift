@@ -481,16 +481,16 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         activeParameterIDs: Set<LLMParameterID>,
         options: LLMGenerationOptions
     ) {
-        let contract = LLMModelContractResolver(fallbackContextSize: 4096).resolve(
+        let profile = LLMModelProfileResolver(fallbackContextSize: 4096).resolve(
             providerID: providerID,
             adapterID: adapterID,
             modelID: modelID,
-            observation: nil
+            metadata: nil
         )
         let resolved = LLMGenerationOptionsResolver.resolve(
             options: options,
             conversationPreferences: [:],
-            parameterContracts: contract.parameters
+            parameterProfiles: profile.parameters
         )
         return (resolved.mappings, resolved.activeParameterIDs, resolved.options)
     }
