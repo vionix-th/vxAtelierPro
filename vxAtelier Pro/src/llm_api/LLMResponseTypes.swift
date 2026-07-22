@@ -16,8 +16,10 @@ enum LLMProviderError: Error, LocalizedError, Equatable {
     case invalidURL(String)
     case authUnavailable(String)
     case localModelUnavailable(String)
-    case unsupportedCapability(String)
-    case unsupportedParameter(String)
+    case requestEncoding(String)
+    case invalidConversationState(String)
+    case toolExecution(String)
+    case runLimitExceeded(String)
     case network(String)
     case provider(statusCode: Int, message: String, metadata: LLMResponseMetadata?)
     case decoding(String)
@@ -30,8 +32,10 @@ enum LLMProviderError: Error, LocalizedError, Equatable {
         case .invalidURL(let message): return message
         case .authUnavailable(let message): return message
         case .localModelUnavailable(let message): return message
-        case .unsupportedCapability(let message): return message
-        case .unsupportedParameter(let message): return message
+        case .requestEncoding(let message): return message
+        case .invalidConversationState(let message): return message
+        case .toolExecution(let message): return message
+        case .runLimitExceeded(let message): return message
         case .network(let message): return message
         case .provider(let statusCode, let message, _): return "Provider error \(statusCode): \(message)"
         case .decoding(let message): return message

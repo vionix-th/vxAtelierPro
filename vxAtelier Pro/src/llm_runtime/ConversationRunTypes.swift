@@ -5,13 +5,11 @@ import SwiftData
 struct ConversationRunContext {
     var conversationID: PersistentIdentifier
     var providerConfiguration: LLMProviderConfiguration
-    var providerProfile: LLMProviderProfile
     var providerID: LLMProviderID
     var adapterID: LLMAdapterID
     var modelID: String
-    var modelCapabilities: [LLMModelCapability]
     var parameterMappings: [LLMParameterMapping]
-    var parameterAvailability: [LLMParameterAvailability]
+    var activeParameterIDs: Set<LLMParameterID>
     var messages: [LLMMessage]
     var tools: [LLMToolDefinition]
     var options: LLMGenerationOptions

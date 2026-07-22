@@ -191,12 +191,14 @@ class DataManager {
             }
             
             let restoredApiConfigurations = try context.fetch(FetchDescriptor<APIConfigurationItem>())
+            let queryManager = QueryManager(modelContext: context)
             for modelData in backup.models {
-                let model = modelData.toDataItem(apiConfigurations: restoredApiConfigurations)
-                context.insert(model)
+                try queryManager.importModel(
+                    modelData,
+                    apiConfigurations: restoredApiConfigurations
+                )
             }
             
-            let queryManager = QueryManager(modelContext: context)
             queryManager.normalizeDefaultAPIConfigurations()
             queryManager.normalizeDefaultWebSearchConfigurations()
             try queryManager.saveContext()
@@ -466,9 +468,13 @@ class DataManager {
         }
 
         do {
-            let model = try JsonSerializer.importModel(from: data, context: context)
-            context.insert(model)
+            let modelData = try JSONDecoder().decode(ModelExportData.self, from: data)
             let queryManager = QueryManager(modelContext: context)
+            let apiConfigurations = try context.fetch(FetchDescriptor<APIConfigurationItem>())
+            let model = try queryManager.importModel(
+                modelData,
+                apiConfigurations: apiConfigurations
+            )
             try await normalizeModelContext(context)
             try queryManager.saveContext()
             return model

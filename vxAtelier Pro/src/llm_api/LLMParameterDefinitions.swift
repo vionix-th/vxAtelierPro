@@ -32,7 +32,7 @@ enum LLMParameterID: String, Codable, CaseIterable, Identifiable {
     /// Exposes the semantic parameter key as the SwiftUI identity.
     var id: String { rawValue }
 
-    /// Built-in metadata for validation and settings controls.
+    /// Built-in metadata for settings controls and value presentation.
     var definition: LLMParameterDefinition {
         LLMParameterDefinitionCatalog.definition(for: self)
     }
@@ -57,7 +57,7 @@ public enum LLMParameterValueType: String, Codable {
     case boolean
 }
 
-/// Metadata describing valid values for a semantic generation parameter.
+/// Metadata describing UI value shape for a semantic generation parameter.
 struct LLMParameterDefinition: Codable, Equatable, Identifiable {
     var id: LLMParameterID
     var valueType: LLMParameterValueType

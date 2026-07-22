@@ -1,12 +1,10 @@
 import Foundation
 import SwiftData
 
-/// Resolves persisted conversation and API configuration into provider-neutral run context.
 struct ConversationRunContextResolver {
     let registry: LLMProviderRegistry
     let toolCatalog: LLMToolCatalog
 
-    /// Creates a resolver with injectable provider and tool registries.
     init(
         registry: LLMProviderRegistry = .shared,
         toolCatalog: LLMToolCatalog = LLMToolRegistry.shared
@@ -15,67 +13,49 @@ struct ConversationRunContextResolver {
         self.toolCatalog = toolCatalog
     }
 
-    /// Resolves model, adapter, tools, options, and message history for one run.
     @MainActor
     func resolve(
         conversation: ConversationItem,
         apiConfig: APIConfigurationItem
     ) async throws -> ConversationRunContext {
         let providerID = apiConfig.providerIDEnum
-        let profile = registry.profile(for: providerID)
         let adapterID = apiConfig.defaultAdapterIDEnum
-        guard profile.supportedAdapterIDs.contains(adapterID) else {
-            throw LLMProviderError.unsupportedCapability("\(profile.name) does not support \(adapterID.rawValue).")
-        }
+        try registry.validateRoute(adapterID: adapterID, providerID: providerID)
 
         let modelID = conversation.options.selectedModelID ?? apiConfig.defaultModelID
         guard let modelID, !modelID.isEmpty else {
-            throw LLMProviderError.invalidConfiguration("No model configured for \(profile.name).")
+            throw LLMProviderError.invalidConfiguration("No model configured for \(apiConfig.name).")
         }
-
         guard let model = apiConfig.models.first(where: { $0.modelID == modelID }) else {
             throw LLMProviderError.invalidConfiguration("Model \(modelID) is not available for \(apiConfig.name).")
         }
-        let mappings = LLMParameterMappingIndex.resolve(
-            adapterID: adapterID,
-            mappings: model.parameterMappings.map(\.mapping)
-        )
-        let availability = LLMParameterAvailabilityIndex.resolve(
-            adapterID: adapterID,
-            availability: model.parameterAvailability.map(\.availability)
-        )
-        conversation.options.reconcileParameters(apiConfiguration: apiConfig, modelID: modelID)
+
         let rawOptions = conversation.options.generationOptions(resolvedModelID: modelID)
-        let sendableAvailability = LLMGenerationOptionsResolver.sendableModelAvailability(
-            for: rawOptions,
+        let resolvedParameters = LLMGenerationOptionsResolver.resolve(
+            options: rawOptions,
             conversationPreferences: conversation.options.parameterInclusionPreferences,
-            modelAvailability: availability
+            parameterContracts: model.resolvedContract.parameters
         )
-        let options = rawOptions
-        let sendableModelMappings = mappings.filter { entry in
-            sendableAvailability[entry.key] != nil && entry.value.encodingKind != .disabled
-        }
         let tools = toolCatalog.allTools()
             .filter { conversation.options.isToolEnabled($0.name) }
             .map { LLMRequestEncoding.toolDefinition(from: $0) }
+        let messages = orderedMessages(in: conversation).map { $0.asDomainMessage() }
+        try ConversationHistoryValidator.validate(messages)
 
         return ConversationRunContext(
-            conversationID: conversation.id,
+            conversationID: conversation.persistentModelID,
             providerConfiguration: try await CodexChatGPTOAuthService.resolvedProviderConfiguration(for: apiConfig),
-            providerProfile: profile,
             providerID: providerID,
             adapterID: adapterID,
             modelID: modelID,
-            modelCapabilities: model.capabilities,
-            parameterMappings: Array(sendableModelMappings.values),
-            parameterAvailability: Array(sendableAvailability.values),
-            messages: orderedMessages(in: conversation).map { $0.asDomainMessage() },
+            parameterMappings: resolvedParameters.mappings,
+            activeParameterIDs: resolvedParameters.activeParameterIDs,
+            messages: messages,
             tools: tools,
-            options: options
+            options: resolvedParameters.options
         )
     }
 
-    /// Returns conversation messages in provider replay order.
     @MainActor
     private func orderedMessages(in conversation: ConversationItem) -> [MessageItem] {
         conversation.turns
@@ -84,25 +64,61 @@ struct ConversationRunContextResolver {
                 [turn.userMessage] + turn.events.sorted { $0.timestamp < $1.timestamp }.map(\.message)
             }
     }
-
 }
 
-/// Builds and validates provider-neutral `LLMGenerationRequest` values from resolved run context.
+enum ConversationHistoryValidator {
+    static func validate(_ messages: [LLMMessage]) throws {
+        var knownToolIDs = Set<String>()
+        var answeredToolIDs = Set<String>()
+        var pendingToolIDs: [String] = []
+
+        for message in messages {
+            if message.role != "tool", !pendingToolIDs.isEmpty {
+                throw LLMProviderError.invalidConversationState(
+                    "Tool results must immediately follow their assistant tool calls."
+                )
+            }
+            if message.role == "assistant" {
+                let ids = message.toolCalls.sorted { $0.index < $1.index }.map { $0.callID ?? $0.id }
+                guard Set(ids).count == ids.count, knownToolIDs.isDisjoint(with: ids) else {
+                    throw LLMProviderError.invalidConversationState("Assistant tool calls must have unique ids.")
+                }
+                knownToolIDs.formUnion(ids)
+                pendingToolIDs = ids
+            } else if message.role == "tool" {
+                guard let toolCallID = message.toolCallID, !toolCallID.isEmpty else {
+                    throw LLMProviderError.invalidConversationState("Tool result requires a tool-call id.")
+                }
+                guard knownToolIDs.contains(toolCallID) else {
+                    throw LLMProviderError.invalidConversationState(
+                        "Tool result \(toolCallID) has no prior assistant tool call."
+                    )
+                }
+                guard !answeredToolIDs.contains(toolCallID),
+                      let index = pendingToolIDs.firstIndex(of: toolCallID) else {
+                    throw LLMProviderError.invalidConversationState("Tool result \(toolCallID) is duplicated or out of order.")
+                }
+                pendingToolIDs.remove(at: index)
+                answeredToolIDs.insert(toolCallID)
+            }
+        }
+        guard pendingToolIDs.isEmpty else {
+            throw LLMProviderError.invalidConversationState("Assistant tool calls must be followed by tool results.")
+        }
+    }
+}
+
 struct LLMGenerationRequestFactory {
-    /// Creates a request with concrete streaming mode resolved before final validation.
-    func makeRequest(from context: ConversationRunContext) throws -> LLMGenerationRequest {
-        let request = LLMGenerationRequest(
+    func makeRequest(from context: ConversationRunContext) -> LLMGenerationRequest {
+        LLMGenerationRequest(
             providerID: context.providerID,
             adapterID: context.adapterID,
             modelID: context.modelID,
-            modelCapabilities: context.modelCapabilities,
             parameterMappings: context.parameterMappings,
-            parameterAvailability: context.parameterAvailability,
+            activeParameterIDs: context.activeParameterIDs,
             messages: context.messages,
             tools: context.tools,
             options: context.options
         )
-        try LLMCapabilityValidator.validate(request, profile: context.providerProfile)
-        return request
     }
 }

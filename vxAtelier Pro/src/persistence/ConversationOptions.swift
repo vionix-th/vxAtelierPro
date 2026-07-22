@@ -170,8 +170,9 @@ final class ConversationOptions: Equatable {
 
     func normalizeKnownParameters() {
         var enabledStates = parameterEnabledStates
-        for parameterID in LLMParameterID.allCases where enabledStates[parameterID.rawValue] == nil {
-            enabledStates[parameterID.rawValue] = Self.defaultEnabledState(for: parameterID)
+        for parameterID in [LLMParameterID.model, .systemPrompt]
+            where enabledStates[parameterID.rawValue] == nil {
+            enabledStates[parameterID.rawValue] = true
         }
         parameterEnabledStates = enabledStates
     }
@@ -180,46 +181,7 @@ final class ConversationOptions: Equatable {
         apiConfiguration: APIConfigurationItem? = nil,
         modelID explicitModelID: String? = nil
     ) {
-        let configuration = apiConfiguration ?? self.apiConfiguration
-        let previousEnabledStates = parameterEnabledStates
         normalizeKnownParameters()
-        guard let configuration else { return }
-
-        let selectedModel = explicitModelID ?? selectedModelID ?? configuration.defaultModelID
-        guard let modelID = selectedModel,
-              let model = configuration.models.first(where: { $0.modelID == modelID }) else {
-            return
-        }
-
-        let adapterID = configuration.defaultAdapterIDEnum
-        let availability = LLMParameterAvailabilityIndex.resolve(
-            adapterID: adapterID,
-            availability: model.parameterAvailability.map(\.availability)
-        )
-        var enabledStates = parameterEnabledStates
-
-        for parameterID in LLMParameterID.allCases {
-            guard parameterID.isProviderMappable else {
-                enabledStates[parameterID.rawValue] = true
-                continue
-            }
-            guard let descriptor = availability[parameterID] else {
-                enabledStates[parameterID.rawValue] = false
-                continue
-            }
-            if descriptor.isRequired {
-                enabledStates[parameterID.rawValue] = true
-            } else if !descriptor.isAvailable {
-                enabledStates[parameterID.rawValue] = false
-            } else if previousEnabledStates[parameterID.rawValue] == nil {
-                enabledStates[parameterID.rawValue] = descriptor.isEnabled
-            }
-            if parameterValue(parameterID) == nil, let defaultValue = descriptor.defaultValue {
-                setParameterValue(parameterID, value: defaultValue, reconcileAfterModelChange: false)
-            }
-        }
-
-        parameterEnabledStates = enabledStates
     }
 
     func applyAPIConfigurationDefaults(replaceSelectedModel: Bool) {
@@ -291,7 +253,6 @@ final class ConversationOptions: Equatable {
     func generationOptions(
         resolvedModelID: String?
     ) -> LLMGenerationOptions {
-        normalizeKnownParameters()
         let modelID = selectedModelID ?? resolvedModelID
         let extras = enabledProviderExtras()
 

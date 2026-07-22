@@ -64,21 +64,22 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
 
         let persistedModels = queryManager.models(for: config)
         XCTAssertFalse(persistedModels.isEmpty)
-        try assertFetchedModelsCompleteDefaults(
-            persistedModels.map(\.descriptor),
+        try assertFetchedModelObservations(
+            persistedModels.map(\.observation),
             provider: provider,
             adapterID: .openAIResponses
         )
 
         let primaryModel = try XCTUnwrap(persistedModels.first { $0.modelID == provider.primaryModel })
-        XCTContext.runActivity(named: "QueryManager materialized parameter mappings") { activity in
-            let mappings = primaryModel.parameterMappings
-                .sorted { $0.semanticParameterID < $1.semanticParameterID }
-                .map { "\($0.adapterIDRaw):\($0.semanticParameterID) wireKey=\($0.wireKey)" }
+        XCTContext.runActivity(named: "QueryManager persisted parameter overrides") { activity in
+            let mappings = primaryModel.parameterMappingOverrides
+                .sorted { $0.parameterIDRaw < $1.parameterIDRaw }
+                .map { "\($0.adapterIDRaw):\($0.parameterIDRaw) wireKey=\($0.wireKey)" }
                 .joined(separator: "\n")
             activity.add(XCTAttachment(string: mappings))
         }
-        XCTAssertFalse(primaryModel.parameterMappings.isEmpty)
+        XCTAssertTrue(primaryModel.parameterMappingOverrides.isEmpty)
+        XCTAssertFalse(primaryModel.resolvedContract.parameters.isEmpty)
     }
 
     func testAnthropicMessagesLiveSmoke() async throws {
@@ -120,13 +121,13 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         adapterID: LLMAdapterID
     ) async throws {
         let providerID = provider.id
-        let adapter = LLMProviderRegistry.shared.adapter(for: adapterID, providerID: providerID)
+        let adapter = try LLMProviderRegistry.shared.resolveAdapter(for: adapterID, providerID: providerID)
         let models = try provider.resolvedModels()
         let configuration = try await makeConfiguration(for: provider, suite: suite, adapterID: adapterID)
 
         if provider.checkModels ?? true {
             _ = try await runProviderOperation(provider: provider, adapterID: adapterID, operation: "models") {
-                _ = try await adapter.fetchModels(configuration: configuration)
+                _ = try await adapter.fetchModelObservations(configuration: configuration)
                 return true
             }
         }
@@ -138,9 +139,10 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
                 recordActivity(named: activity)
                 let passed = try await runProviderOperation(provider: provider, adapterID: adapterID, model: model, operation: scenario.name) {
                     let events = try await collectEvents(
-                        adapter.stream(
+                        adapter.generateEvents(
                             makeRequest(providerID: providerID, adapterID: adapterID, model: model, scenario: scenario),
-                            configuration: configuration
+                            configuration: configuration,
+                            toolExecutor: nil
                         )
                     )
                     return assertTurn(events, provider: provider, adapterID: adapterID, model: model, scenario: scenario)
@@ -154,7 +156,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
 
     private func runLiveModelFetch(providerID: LLMProviderID, adapterID: LLMAdapterID) async throws {
         let (suite, provider) = try loadEnabledProvider(providerID: providerID, adapterID: adapterID)
-        let adapter = LLMProviderRegistry.shared.adapter(for: adapterID, providerID: providerID)
+        let adapter = try LLMProviderRegistry.shared.resolveAdapter(for: adapterID, providerID: providerID)
         let configuration = try await makeConfiguration(for: provider, suite: suite, adapterID: adapterID)
         recordConfigurationActivity(provider: provider, adapterID: adapterID, configuration: configuration)
         assertRequiredCredentialPresent(provider: provider, configuration: configuration)
@@ -165,7 +167,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
             adapter: adapter,
             configuration: configuration
         )
-        try assertFetchedModelsCompleteDefaults(fetchedModels, provider: provider, adapterID: adapterID)
+        try assertFetchedModelObservations(fetchedModels, provider: provider, adapterID: adapterID)
     }
 
     private func runProviderModelFetch(
@@ -173,10 +175,10 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         adapterID: LLMAdapterID,
         adapter: LLMProviderAdapter,
         configuration: LLMProviderConfiguration
-    ) async throws -> [LLMModelDescriptor] {
-        var fetchedModels: [LLMModelDescriptor] = []
+    ) async throws -> [LLMProviderModelObservation] {
+        var fetchedModels: [LLMProviderModelObservation] = []
         _ = try await runProviderOperation(provider: provider, adapterID: adapterID, operation: "live model fetch") {
-            fetchedModels = try await adapter.fetchModels(configuration: configuration)
+            fetchedModels = try await adapter.fetchModelObservations(configuration: configuration)
             return true
         }
         XCTContext.runActivity(named: "Adapter live /models response") { activity in
@@ -281,8 +283,8 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         }
     }
 
-    private func assertFetchedModelsCompleteDefaults(
-        _ fetchedModels: [LLMModelDescriptor],
+    private func assertFetchedModelObservations(
+        _ fetchedModels: [LLMProviderModelObservation],
         provider: LiveSmokeProvider,
         adapterID: LLMAdapterID
     ) throws {
@@ -293,34 +295,33 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         }
 
         let primaryModelID = try XCTUnwrap(provider.primaryModel)
-        let descriptor = try XCTUnwrap(
+        let observation = try XCTUnwrap(
             fetchedModels.first { $0.id == primaryModelID },
             "Live /models response missing primary model \(primaryModelID)."
         )
-        let defaults = try XCTUnwrap(
-            LLMDefaultsCatalog.bundled.modelDefaults(providerID: provider.id, modelID: primaryModelID),
-            "LLMDefaults.json has no rule for \(provider.id.rawValue) \(primaryModelID)."
+        let contract = LLMModelContractResolver(fallbackContextSize: AppDefaults.ModelContextSizes.defaultSize).resolve(
+            providerID: provider.id,
+            adapterID: adapterID,
+            modelID: primaryModelID,
+            observation: observation
         )
 
-        XCTContext.runActivity(named: "LLMDefaults completion for live model") { activity in
+        XCTContext.runActivity(named: "Provider observation and resolved contract") { activity in
             activity.add(XCTAttachment(string: [
-                "modelID=\(descriptor.id)",
-                "context=\(descriptor.contextSize.map(String.init) ?? "nil")",
-                "capabilities=\(descriptor.capabilities.map(\.rawValue).joined(separator: ","))",
-                "rawMetadata=\(descriptor.rawMetadataJSON == nil ? "missing" : "present")"
+                "modelID=\(observation.id)",
+                "observedContext=\(observation.contextSize.map(String.init) ?? "nil")",
+                "resolvedContext=\(contract.contextSize)",
+                "observedClaims=\(observation.capabilityClaims.map { "\($0.capability.rawValue):\($0.state.rawValue)" }.joined(separator: ","))",
+                "rawMetadata=\(observation.rawMetadataJSON == nil ? "missing" : "present")"
             ].joined(separator: "\n")))
         }
 
-        if let contextSize = defaults.contextSize {
-            XCTAssertEqual(descriptor.contextSize, contextSize)
-        }
-        if let capabilities = defaults.capabilities {
-            XCTAssertEqual(Set(descriptor.capabilities), Set(capabilities))
-        }
+        XCTAssertFalse(contract.displayName.isEmpty)
+        XCTAssertGreaterThan(contract.contextSize, 0)
         if provider.id == .openAICodexChatGPTSubscription {
-            XCTAssertNil(descriptor.rawMetadataJSON)
+            XCTAssertNil(observation.rawMetadataJSON)
         } else {
-            XCTAssertNotNil(descriptor.rawMetadataJSON)
+            XCTAssertNotNil(observation.rawMetadataJSON)
         }
     }
 
@@ -367,8 +368,8 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         adapterID: LLMAdapterID,
         model: String,
         scenario: LiveSmokeScenario
-    ) -> LLMRequest {
-        var request = LLMRequest.runtimeEquivalent(
+    ) -> LLMGenerationRequest {
+        LLMGenerationRequest.runtimeEquivalent(
             providerID: providerID,
             adapterID: adapterID,
             modelID: model,
@@ -380,20 +381,10 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
                 streamMode: scenario.streamMode
             )
         )
-        let availability = LLMParameterAvailabilityMappingResolver.resolve(
-            adapterID: adapterID,
-            availability: request.parameterAvailability
-        )
-        request.options = LLMParameterAvailabilityResolver.resolvedOptions(
-            from: request.options,
-            conversationPreferences: [:],
-            modelAvailability: availability
-        )
-        return request
     }
 
     private func assertTurn(
-        _ events: [LLMStreamEvent],
+        _ events: [LLMGenerationEvent],
         provider: LiveSmokeProvider,
         adapterID: LLMAdapterID,
         model: String,
@@ -421,7 +412,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
     }
 
     private func assertCompletedTextTurn(
-        _ events: [LLMStreamEvent],
+        _ events: [LLMGenerationEvent],
         provider: LiveSmokeProvider,
         adapterID: LLMAdapterID,
         model: String,
@@ -435,7 +426,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         .trimmingCharacters(in: .whitespacesAndNewlines)
 
         let completed = events.contains { event in
-            if case .runCompleted = event { return true }
+            if case .generationCompleted = event { return true }
             return false
         }
 
@@ -452,7 +443,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
     }
 
     private func assertCompletedToolCallTurn(
-        _ events: [LLMStreamEvent],
+        _ events: [LLMGenerationEvent],
         expectedName: String,
         provider: LiveSmokeProvider,
         adapterID: LLMAdapterID,
@@ -468,7 +459,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
             return nil
         }
         let completed = events.contains { event in
-            if case .runCompleted = event { return true }
+            if case .generationCompleted = event { return true }
             return false
         }
 
@@ -490,15 +481,14 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         adapterID: LLMAdapterID,
         model: String
     ) -> [LiveSmokeScenario] {
-        let request = LLMRequest.runtimeEquivalent(
+        let contract = LLMModelContractResolver(fallbackContextSize: AppDefaults.ModelContextSizes.defaultSize).resolve(
             providerID: providerID,
             adapterID: adapterID,
             modelID: model,
-            messages: [],
-            options: LLMGenerationOptions()
+            observation: nil
         )
-        let capabilities = Set(request.modelCapabilities)
-        let streamPolicy = resolvedStreamPolicy(request: request, adapterID: adapterID)
+        let capabilities = Set(contract.supportedCapabilities)
+        let streamPolicy = LiveSmokeStreamPolicy(allowsBlockMode: true, allowsStreaming: true)
         let maxOutputTokens = capabilities.contains(.reasoning) ? 128 : 32
 
         var scenarios: [LiveSmokeScenario] = []
@@ -508,10 +498,10 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
             recordActivity(named: "\(providerID.rawValue) / \(adapterID.rawValue) / \(model) / block text skipped: \(reason)")
         }
 
-        if capabilities.contains(.streaming), streamPolicy.allowsStreaming {
+        if streamPolicy.allowsStreaming {
             scenarios.append(.text(name: "stream text", streamMode: .enabled, maxOutputTokens: maxOutputTokens))
         } else {
-            let reason = capabilities.contains(.streaming) ? (streamPolicy.streamingSkipReason ?? "stream disabled by metadata") : "model lacks streaming capability"
+            let reason = streamPolicy.streamingSkipReason ?? "adapter cannot encode streaming"
             recordActivity(named: "\(providerID.rawValue) / \(adapterID.rawValue) / \(model) / stream text skipped: \(reason)")
         }
 
@@ -524,41 +514,6 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         }
 
         return scenarios
-    }
-
-    private func resolvedStreamPolicy(request: LLMRequest, adapterID: LLMAdapterID) -> LiveSmokeStreamPolicy {
-        let availability = LLMParameterAvailabilityMappingResolver.resolve(
-            adapterID: adapterID,
-            availability: request.parameterAvailability
-        )
-        guard let streamAvailability = availability[.stream] else {
-            return LiveSmokeStreamPolicy(allowsBlockMode: true, allowsStreaming: true)
-        }
-        guard streamAvailability.isAvailable else {
-            return LiveSmokeStreamPolicy(
-                allowsBlockMode: true,
-                allowsStreaming: false,
-                streamingSkipReason: "stream parameter is unavailable"
-            )
-        }
-
-        let defaultStreamValue = streamAvailability.defaultValue?.boolValue
-        if streamAvailability.isRequired {
-            if defaultStreamValue ?? streamAvailability.isEnabled {
-                return LiveSmokeStreamPolicy(
-                    allowsBlockMode: false,
-                    allowsStreaming: true,
-                    blockSkipReason: "stream parameter is required enabled"
-                )
-            }
-            return LiveSmokeStreamPolicy(
-                allowsBlockMode: true,
-                allowsStreaming: false,
-                streamingSkipReason: "stream parameter is required disabled"
-            )
-        }
-
-        return LiveSmokeStreamPolicy(allowsBlockMode: true, allowsStreaming: true)
     }
 
     private func adapterSupportsTools(_ adapterID: LLMAdapterID) -> Bool {
@@ -602,8 +557,11 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
             case .invalidConfiguration,
                  .invalidURL,
                  .authUnavailable,
-                 .unsupportedCapability,
-                 .unsupportedParameter,
+                 .localModelUnavailable,
+                 .requestEncoding,
+                 .invalidConversationState,
+                 .toolExecution,
+                 .runLimitExceeded,
                  .decoding:
                 return nil
             }
@@ -617,9 +575,9 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
     }
 
     private func collectEvents(
-        _ stream: AsyncThrowingStream<LLMStreamEvent, Error>
-    ) async throws -> [LLMStreamEvent] {
-        var events: [LLMStreamEvent] = []
+        _ stream: AsyncThrowingStream<LLMGenerationEvent, Error>
+    ) async throws -> [LLMGenerationEvent] {
+        var events: [LLMGenerationEvent] = []
         for try await event in stream {
             events.append(event)
         }

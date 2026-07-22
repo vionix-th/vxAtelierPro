@@ -1,975 +1,355 @@
-import Foundation
-import SwiftUI
 import SwiftData
+import SwiftUI
 
-/// Rollback snapshot for model edits.
-private struct ModelEditSnapshot {
-    let modelID: String
-    let displayName: String
-    let apiConfiguration: APIConfigurationItem?
-    let contextSize: Int
-    let capabilitiesRaw: [String]
-    let rawMetadataJSON: String?
-    let mappingObjects: [ModelParameterMappingItem]
-    let mappingSnapshots: [ModelParameterMappingSnapshot]
-    let availabilityObjects: [ModelParameterAvailabilityItem]
-    let availabilitySnapshots: [ModelParameterAvailabilitySnapshot]
+private struct MappingOverrideDraft: Identifiable {
+    var id: String { "\(adapterID.rawValue):\(parameterID.rawValue)" }
+    var adapterID: LLMAdapterID
+    var parameterID: LLMParameterID
+    var encodingKind: LLMParameterEncodingKind
+    var wireKey: String
+    var structuredPreset: LLMParameterStructuredPreset?
 
-    init(model: ModelItem) {
-        modelID = model.modelID
-        displayName = model.displayName
-        apiConfiguration = model.apiConfiguration
-        contextSize = model.contextSize
-        capabilitiesRaw = model.capabilitiesRaw
-        rawMetadataJSON = model.rawMetadataJSON
-        mappingObjects = model.parameterMappings
-        mappingSnapshots = model.parameterMappings.map(ModelParameterMappingSnapshot.init)
-        availabilityObjects = model.parameterAvailability
-        availabilitySnapshots = model.parameterAvailability.map(ModelParameterAvailabilitySnapshot.init)
-    }
-
-    func restore(_ model: ModelItem) {
-        let originalMappingIDs = Set(mappingObjects.map(ObjectIdentifier.init))
-        for mapping in model.parameterMappings where !originalMappingIDs.contains(ObjectIdentifier(mapping)) {
-            model.modelContext?.delete(mapping)
-        }
-
-        let originalAvailabilityIDs = Set(availabilityObjects.map(ObjectIdentifier.init))
-        for availability in model.parameterAvailability where !originalAvailabilityIDs.contains(ObjectIdentifier(availability)) {
-            model.modelContext?.delete(availability)
-        }
-
-        model.modelID = modelID
-        model.displayName = displayName
-        model.apiConfiguration = apiConfiguration
-        model.contextSize = contextSize
-        model.capabilitiesRaw = capabilitiesRaw
-        model.rawMetadataJSON = rawMetadataJSON
-        model.parameterMappings = mappingObjects
-        model.parameterAvailability = availabilityObjects
-
-        for snapshot in mappingSnapshots {
-            snapshot.restore()
-        }
-        for snapshot in availabilitySnapshots {
-            snapshot.restore()
-        }
-    }
-}
-
-/// Rollback snapshot for one parameter-mapping row.
-private struct ModelParameterMappingSnapshot {
-    let item: ModelParameterMappingItem
-    let adapterIDRaw: String
-    let parameterID: String
-    let encodingKindRaw: String
-    let wireKey: String
-    let structuredPresetRaw: String?
-    let isCustomized: Bool
-
-    init(_ item: ModelParameterMappingItem) {
-        self.item = item
-        adapterIDRaw = item.adapterIDRaw
+    init(_ item: ModelParameterMappingOverrideItem) {
+        adapterID = item.adapterID
         parameterID = item.parameterID
-        encodingKindRaw = item.encodingKindRaw
+        encodingKind = item.encodingKind
         wireKey = item.wireKey
-        structuredPresetRaw = item.structuredPresetRaw
-        isCustomized = item.isCustomized
+        structuredPreset = item.structuredPreset
     }
 
-    func restore() {
-        item.adapterIDRaw = adapterIDRaw
-        item.parameterID = parameterID
-        item.encodingKindRaw = encodingKindRaw
-        item.wireKey = wireKey
-        item.structuredPresetRaw = structuredPresetRaw
-        item.isCustomized = isCustomized
+    var mapping: LLMParameterMapping {
+        LLMParameterMapping(
+            adapterID: adapterID,
+            parameterID: parameterID,
+            encodingKind: encodingKind,
+            wireKey: wireKey,
+            structuredPreset: structuredPreset
+        )
     }
 }
 
-/// Rollback snapshot for one parameter-availability row.
-private struct ModelParameterAvailabilitySnapshot {
-    let item: ModelParameterAvailabilityItem
-    let adapterIDRaw: String
-    let parameterID: String
-    let isAvailable: Bool
-    let isRequired: Bool
-    let isEnabled: Bool
-    let defaultValueData: Data?
-    let isCustomized: Bool
+private struct PolicyOverrideDraft: Identifiable {
+    var id: String { "\(adapterID.rawValue):\(parameterID.rawValue)" }
+    var adapterID: LLMAdapterID
+    var parameterID: LLMParameterID
+    var support: LLMSupportState?
+    var required: Bool?
+    var enabledByDefault: Bool?
+    var defaultValueKind: ModelDefaultValueOverrideKind
+    var defaultValueText: String
 
-    init(_ item: ModelParameterAvailabilityItem) {
-        self.item = item
-        adapterIDRaw = item.adapterIDRaw
+    init(_ item: ModelParameterPolicyOverrideItem) {
+        adapterID = item.adapterID
         parameterID = item.parameterID
-        isAvailable = item.isAvailable
-        isRequired = item.isRequired
-        isEnabled = item.isEnabled
-        defaultValueData = item.defaultValueData
-        isCustomized = item.isCustomized
-    }
-
-    func restore() {
-        item.adapterIDRaw = adapterIDRaw
-        item.parameterID = parameterID
-        item.isAvailable = isAvailable
-        item.isRequired = isRequired
-        item.isEnabled = isEnabled
-        item.defaultValueData = defaultValueData
-        item.isCustomized = isCustomized
+        support = item.support
+        required = item.requiredOverride
+        enabledByDefault = item.enabledByDefaultOverride
+        defaultValueKind = item.defaultValueOverrideKind
+        if let value = item.defaultValue,
+           let data = try? JSONEncoder().encode(value) {
+            defaultValueText = String(data: data, encoding: .utf8) ?? ""
+        } else {
+            defaultValueText = ""
+        }
     }
 }
 
-// MARK: - Model Editor View
-/// Editor for model metadata, capabilities, and parameter mappings.
 struct ModelEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(QueryManager.self) private var queryManager
     @Query(sort: [SortDescriptor(\APIConfigurationItem.name)]) private var apiConfigurations: [APIConfigurationItem]
-    
+
     let model: ModelItem
-    @State private var name: String
+    @State private var modelID: String
     @State private var selectedConfigurationID: PersistentIdentifier?
-    @State private var contextSize: Int
-    @State private var capabilities: [LLMModelCapability]
-    @State private var originalSnapshot: ModelEditSnapshot?
-    @State private var confirmation: SettingsConfirmation?
-    @State private var editorErrorMessage = ""
-    @State private var showEditorError = false
-    
+    @State private var displayNameOverride: String
+    @State private var contextSizeOverride: String
+    @State private var capabilityOverrides: [LLMModelCapability: LLMSupportState]
+    @State private var mappingOverrides: [MappingOverrideDraft]
+    @State private var policyOverrides: [PolicyOverrideDraft]
+    @State private var errorMessage = ""
+    @State private var showError = false
+
     init(model: ModelItem) {
         self.model = model
-        _name = State(initialValue: model.name)
+        _modelID = State(initialValue: model.modelID)
         _selectedConfigurationID = State(initialValue: model.apiConfiguration?.persistentModelID)
-        _contextSize = State(initialValue: model.contextSize)
-        _capabilities = State(initialValue: model.capabilities)
-        _originalSnapshot = State(initialValue: ModelEditSnapshot(model: model))
-    }
-
-    private var selectedAdapterID: LLMAdapterID {
-        selectedConfiguration?.defaultAdapterIDEnum ?? .openAIChatCompletions
-    }
-
-    private var selectedAdapterMappings: [ModelParameterMappingItem] {
-        model.parameterMappings
-            .filter { $0.adapterIDEnum == selectedAdapterID }
-            .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
-    }
-
-    private var selectedAdapterAvailability: [ModelParameterAvailabilityItem] {
-        model.parameterAvailability
-            .filter { $0.adapterIDEnum == selectedAdapterID }
-            .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+        _displayNameOverride = State(initialValue: model.displayNameOverride ?? "")
+        _contextSizeOverride = State(initialValue: model.contextSizeOverride.map(String.init) ?? "")
+        _capabilityOverrides = State(initialValue: Dictionary(uniqueKeysWithValues: model.capabilityOverrides.map {
+            ($0.capability, $0.support)
+        }))
+        _mappingOverrides = State(initialValue: model.parameterMappingOverrides.map(MappingOverrideDraft.init))
+        _policyOverrides = State(initialValue: model.parameterPolicyOverrides.map(PolicyOverrideDraft.init))
     }
 
     private var selectedConfiguration: APIConfigurationItem? {
         apiConfigurations.first { $0.persistentModelID == selectedConfigurationID }
     }
 
-    private var addableParameterIDs: [LLMParameterID] {
-        let existing = Set(selectedAdapterMappings.map(\.parameterIDEnum))
-        return LLMParameterID.allCases
-            .filter { $0.isProviderMappable && !existing.contains($0) }
+    private var selectedAdapterID: LLMAdapterID {
+        selectedConfiguration?.defaultAdapterIDEnum ?? model.adapterID
     }
 
-    private var addableAvailabilityParameterIDs: [LLMParameterID] {
-        let existing = Set(selectedAdapterAvailability.map(\.parameterIDEnum))
-        return LLMParameterID.allCases
-            .filter { $0.isProviderMappable && !existing.contains($0) }
+    private var draftContract: LLMResolvedModelContract {
+        let mappings = mappingOverrides
+            .filter { $0.adapterID == selectedAdapterID }
+            .reduce(into: [LLMParameterID: LLMParameterMapping]()) { $0[$1.parameterID] = $1.mapping }
+        let policies = policyOverrides
+            .filter { $0.adapterID == selectedAdapterID }
+            .reduce(into: [LLMParameterID: LLMParameterPolicyOverride]()) {
+                $0[$1.parameterID] = policy(from: $1, validateValue: false)
+            }
+        return LLMModelContractResolver(fallbackContextSize: AppDefaults.ModelContextSizes.defaultSize).resolve(
+            providerID: selectedConfiguration?.providerIDEnum ?? model.providerID,
+            adapterID: selectedAdapterID,
+            modelID: modelID,
+            observation: model.observation,
+            overrides: LLMModelContractOverrides(
+                displayName: displayNameOverride,
+                contextSize: Int(contextSizeOverride),
+                capabilitySupport: capabilityOverrides,
+                parameterMappings: mappings,
+                parameterPolicies: policies
+            )
+        )
     }
-    
+
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 18) {
-                    headerSummary
-
-                    ViewThatFits(in: .horizontal) {
-                        HStack(alignment: .top, spacing: 18) {
-                            identitySection
-                                .frame(maxWidth: .infinity)
-                            contextSection
-                                .frame(maxWidth: .infinity)
-                        }
-
-                        VStack(spacing: 18) {
-                            identitySection
-                            contextSection
+            Form {
+                Section("Identity") {
+                    TextField("Model ID", text: $modelID)
+                    Picker("API Configuration", selection: $selectedConfigurationID) {
+                        ForEach(apiConfigurations) { configuration in
+                            Text(configuration.name).tag(Optional(configuration.persistentModelID))
                         }
                     }
+                    TextField("Display name override", text: $displayNameOverride)
+                    TextField("Context size override", text: $contextSizeOverride)
+                    LabeledContent("Resolved name", value: draftContract.displayName)
+                    LabeledContent("Resolved context", value: draftContract.contextSize.formatted())
+                }
 
-                    editorSection(
-                        icon: "switch.2",
-                        title: "Capabilities",
-                        subtitle: "Select the content types and runtime features this model supports."
-                    ) {
-                        LazyVGrid(
-                            columns: [GridItem(.adaptive(minimum: 180), spacing: AppDefaults.paddingMedium)],
-                            alignment: .leading,
-                            spacing: AppDefaults.paddingMedium
-                        ) {
-                            ForEach(LLMModelCapability.allCases.sorted(by: { $0.displayName < $1.displayName })) { capability in
-                                capabilityTile(capability)
+                Section {
+                    ForEach(LLMModelCapability.allCases) { capability in
+                        HStack {
+                            Label(capability.displayName, systemImage: capability.systemName)
+                            Spacer()
+                            Text([
+                                draftContract.capabilities[capability]?.state.displayName ?? "Unknown",
+                                draftContract.capabilities[capability]?.source.displayName ?? "Fallback"
+                            ].joined(separator: " · "))
+                                .foregroundStyle(.secondary)
+                            Picker("Override", selection: capabilityOverrideBinding(capability)) {
+                                Text("Inherit").tag(LLMSupportState?.none)
+                                Text("Supported").tag(Optional(LLMSupportState.supported))
+                                Text("Unsupported").tag(Optional(LLMSupportState.unsupported))
                             }
-                        }
-                        .padding(AppDefaults.paddingLarge)
-                    }
-
-                    editorSection(
-                        icon: "arrow.left.arrow.right",
-                        title: "Parameter Translation",
-                        subtitle: "Map semantic controls to adapter-specific request payload fields."
-                    ) {
-                        sectionActionRow(
-                            status: "API Mode: \(selectedAdapterID.displayName)",
-                            primaryTitle: "Reset Adapter Defaults",
-                            primarySystemImage: "arrow.counterclockwise",
-                            primaryAction: {
-                                model.resetDefaultParameterMappings(adapterID: selectedAdapterID)
-                            },
-                            secondaryTitle: "Add Parameter",
-                            secondarySystemImage: "plus",
-                            secondaryEnabled: !addableParameterIDs.isEmpty,
-                            secondaryMenu: {
-                                ForEach(addableParameterIDs) { parameterID in
-                                    Button(AiParameterPresentationCatalog.displayName(for: parameterID)) {
-                                        addMapping(parameterID)
-                                    }
-                                }
-                            }
-                        )
-
-                        if selectedAdapterMappings.isEmpty {
-                            emptyStateText("No parameters configured for this adapter.")
-                        } else {
-                            Divider()
-                            VStack(spacing: 0) {
-                                ForEach(selectedAdapterMappings) { mapping in
-                                    ModelParameterMappingRow(mapping: mapping)
-                                    if mapping.id != selectedAdapterMappings.last?.id {
-                                        Divider()
-                                    }
-                                }
-                            }
+                            .labelsHidden()
                         }
                     }
+                } header: {
+                    Text("Capabilities")
+                } footer: {
+                    Text("Support is advisory for remote providers. Overrides affect presentation and defaults, not request admission.")
+                }
 
-                    editorSection(
-                        icon: "slider.horizontal.3",
-                        title: "Parameter Availability",
-                        subtitle: "Declare parameter support, defaults, and required flags for the active adapter."
-                    ) {
-                        sectionActionRow(
-                            status: "API Mode: \(selectedAdapterID.displayName)",
-                            primaryTitle: "Reset Availability Defaults",
-                            primarySystemImage: "arrow.counterclockwise",
-                            primaryAction: {
-                                model.resetDefaultParameterAvailability(adapterID: selectedAdapterID)
-                            },
-                            secondaryTitle: "Add Availability",
-                            secondarySystemImage: "plus",
-                            secondaryEnabled: !addableAvailabilityParameterIDs.isEmpty,
-                            secondaryMenu: {
-                                ForEach(addableAvailabilityParameterIDs) { parameterID in
-                                    Button(AiParameterPresentationCatalog.displayName(for: parameterID)) {
-                                        addAvailability(parameterID)
-                                    }
-                                }
+                Section("Parameter Contract") {
+                    ForEach(LLMParameterID.allCases.filter(\.isProviderMappable)) { parameterID in
+                        let contract = draftContract.parameters[parameterID]
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(AiParameterPresentationCatalog.displayName(for: parameterID))
+                                Text([
+                                    contract?.support.state.displayName ?? "Unknown",
+                                    contract?.support.source.displayName ?? "Fallback",
+                                    contract?.mapping?.encodingKind == .disabled || contract?.mapping == nil ? "Unencodable" : "Mapped"
+                                ].joined(separator: " · "))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
-                        )
-
-                        if selectedAdapterAvailability.isEmpty {
-                            emptyStateText("No parameter availability configured for this adapter.")
-                        } else {
-                            Divider()
-                            VStack(spacing: 0) {
-                                ForEach(selectedAdapterAvailability) { availability in
-                                    ModelParameterAvailabilityRow(availability: availability)
-                                    if availability.id != selectedAdapterAvailability.last?.id {
-                                        Divider()
-                                    }
-                                }
+                            Spacer()
+                            Menu("Override") {
+                                Button("Parameter policy") { addPolicyOverride(parameterID) }
+                                Button("Wire mapping") { addMappingOverride(parameterID) }
                             }
-                        }
-                    }
-
-                    if model.modelContext != nil {
-                        editorSection(
-                            icon: "exclamationmark.triangle",
-                            title: "Danger Zone",
-                            subtitle: "Remove this model from the database."
-                        ) {
-                            HStack {
-                                Button(role: .destructive) {
-                                    confirmation = SettingsConfirmation(
-                                        title: "Delete Model",
-                                        message: "Delete \"\(model.name)\"? This action cannot be undone.",
-                                        confirmTitle: "Delete",
-                                        itemID: model.persistentModelID,
-                                        action: { _ in deleteModel() }
-                                    )
-                                } label: {
-                                    Label("Delete Model", systemImage: "trash")
-                                        .frame(maxWidth: .infinity)
-                                }
-                                .buttonStyle(.bordered)
-                            }
-                            .padding(AppDefaults.paddingLarge)
                         }
                     }
                 }
-                .padding(20)
-                .frame(maxWidth: 1040)
-                .frame(maxWidth: .infinity, alignment: .center)
+
+                if !mappingOverrides.isEmpty {
+                    Section("Mapping Overrides") {
+                        ForEach($mappingOverrides) { $draft in
+                            VStack(alignment: .leading) {
+                                HStack {
+                                    Text(AiParameterPresentationCatalog.displayName(for: draft.parameterID))
+                                    Spacer()
+                                    Button(role: .destructive) {
+                                        mappingOverrides.removeAll { $0.id == draft.id }
+                                    } label: {
+                                        Image(systemName: "trash")
+                                    }
+                                }
+                                Picker("Encoding", selection: $draft.encodingKind) {
+                                    ForEach(LLMParameterEncodingKind.allCases) { kind in
+                                        Text(kind.displayName).tag(kind)
+                                    }
+                                }
+                                if draft.encodingKind == .scalarKey {
+                                    TextField("Wire key", text: $draft.wireKey)
+                                }
+                                if draft.encodingKind == .structuredPreset {
+                                    Picker("Preset", selection: $draft.structuredPreset) {
+                                        Text("None").tag(LLMParameterStructuredPreset?.none)
+                                        ForEach(LLMParameterStructuredPreset.allCases) { preset in
+                                            Text(preset.displayName).tag(Optional(preset))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if !policyOverrides.isEmpty {
+                    Section("Policy Overrides") {
+                        ForEach($policyOverrides) { $draft in
+                            VStack(alignment: .leading) {
+                                HStack {
+                                    Text(AiParameterPresentationCatalog.displayName(for: draft.parameterID))
+                                    Spacer()
+                                    Button(role: .destructive) {
+                                        policyOverrides.removeAll { $0.id == draft.id }
+                                    } label: {
+                                        Image(systemName: "trash")
+                                    }
+                                }
+                                Picker("Support", selection: $draft.support) {
+                                    Text("Inherit").tag(LLMSupportState?.none)
+                                    Text("Supported").tag(Optional(LLMSupportState.supported))
+                                    Text("Unsupported").tag(Optional(LLMSupportState.unsupported))
+                                }
+                                Picker("Required", selection: $draft.required) {
+                                    Text("Inherit").tag(Bool?.none)
+                                    Text("Required").tag(Optional(true))
+                                    Text("Optional").tag(Optional(false))
+                                }
+                                Picker("Default activation", selection: $draft.enabledByDefault) {
+                                    Text("Inherit").tag(Bool?.none)
+                                    Text("Enabled").tag(Optional(true))
+                                    Text("Disabled").tag(Optional(false))
+                                }
+                                Picker("Default value", selection: $draft.defaultValueKind) {
+                                    Text("Inherit").tag(ModelDefaultValueOverrideKind.inherit)
+                                    Text("Override").tag(ModelDefaultValueOverrideKind.value)
+                                    Text("No default").tag(ModelDefaultValueOverrideKind.none)
+                                }
+                                if draft.defaultValueKind == .value {
+                                    TextField("JSON value", text: $draft.defaultValueText)
+                                }
+                            }
+                        }
+                    }
+                }
             }
             .navigationTitle(model.modelContext == nil ? "Add Model" : "Edit Model")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        originalSnapshot?.restore(model)
-                        dismiss()
-                    }
-                        .font(.system(.body, design: .rounded))
+                    Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }
-                        .font(.system(.body, design: .rounded))
-                        .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || selectedConfiguration == nil)
+                    Button("Save", action: save)
+                        .disabled(modelID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || selectedConfiguration == nil)
                 }
             }
-            .onAppear {
-                if selectedConfigurationID == nil {
-                    selectedConfigurationID = model.apiConfiguration?.persistentModelID ?? apiConfigurations.first?.persistentModelID
-                }
-            }
-            .onChange(of: selectedConfigurationID) { _, _ in
-                applyCatalogDefaultsForSelectedConfiguration()
-            }
-            .alert("Model Error", isPresented: $showEditorError) {
-                Button("OK") { showEditorError = false }
+            .alert("Model Contract", isPresented: $showError) {
+                Button("OK", role: .cancel) {}
             } message: {
-                Text(editorErrorMessage)
+                Text(errorMessage)
             }
-            .settingsConfirmationDialog($confirmation)
         }
     }
 
-    private var headerSummary: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .top, spacing: AppDefaults.paddingLarge) {
-                Image(systemName: "cpu")
-                    .font(.system(size: 28, weight: .semibold))
-                    .foregroundColor(.accentColor)
-                    .frame(width: 56, height: 56)
-                    .background(
-                        RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous)
-                            .fill(Color.accentColor.opacity(0.12))
-                    )
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(model.modelContext == nil ? "Add Model" : "Edit Model")
-                        .font(.system(.title2, design: .rounded).weight(.semibold))
-                    Text(name.isEmpty ? "Configure a model profile for conversations and provider requests." : name)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .lineLimit(2)
-                }
-
-                Spacer(minLength: AppDefaults.paddingLarge)
-
-                VStack(alignment: .trailing, spacing: AppDefaults.paddingSmall) {
-                    statusPill(
-                        selectedConfiguration?.providerIDEnum.displayName ?? "No Provider",
-                        systemImage: "network"
-                    )
-                    statusPill(
-                        selectedAdapterID.displayName,
-                        systemImage: "point.3.connected.trianglepath.dotted"
-                    )
-                }
-            }
-
-            HStack(spacing: AppDefaults.paddingMedium) {
-                metricPill(title: "Context", value: formattedTokenCount(contextSize), systemImage: "rectangle.expand.vertical")
-                metricPill(title: "Capabilities", value: "\(capabilities.count)", systemImage: "checklist")
-                metricPill(title: "Parameters", value: "\(selectedAdapterMappings.count)", systemImage: "arrow.left.arrow.right")
-            }
-        }
-        .padding(18)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous)
-                .stroke(Color.secondary.opacity(0.16), lineWidth: 1)
+    private func capabilityOverrideBinding(_ capability: LLMModelCapability) -> Binding<LLMSupportState?> {
+        Binding(
+            get: { capabilityOverrides[capability] },
+            set: { capabilityOverrides[capability] = $0 }
         )
     }
 
-    private var identitySection: some View {
-        editorSection(
-            icon: "person.text.rectangle",
-            title: "Model Identity",
-            subtitle: "Name and provider configuration used when resolving this model."
-        ) {
-            editorRow("Model Name") {
-                TextField("Model Name", text: $name)
-                    .textFieldStyle(.roundedBorder)
-            }
-
-            editorDivider()
-
-            editorRow("API Configuration") {
-                Picker(selection: $selectedConfigurationID) {
-                    ForEach(apiConfigurations) { config in
-                        Text(config.name)
-                            .tag(config.persistentModelID as PersistentIdentifier?)
-                    }
-                } label: {
-                    Text(selectedConfiguration?.name ?? "Select Configuration")
-                }
-                .pickerStyle(.menu)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            editorDivider()
-
-            editorRow("Provider") {
-                Text(selectedConfiguration?.providerIDEnum.displayName ?? "No API configuration selected")
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-    }
-
-    private var contextSection: some View {
-        editorSection(
-            icon: "rectangle.expand.vertical",
-            title: "Context Size",
-            subtitle: "Maximum tokens the model can process in a single request."
-        ) {
-            VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
-                HStack(alignment: .firstTextBaseline, spacing: AppDefaults.paddingMedium) {
-                    TextField("", value: $contextSize, format: .number)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 140)
-                        .monospacedDigit()
-
-                    Text("tokens")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-
-                    Spacer(minLength: AppDefaults.paddingMedium)
-
-                    Menu {
-                        Group {
-                            Button("4K (4,096)") { contextSize = 4_096 }
-                            Button("8K (8,192)") { contextSize = 8_192 }
-                            Button("16K (16,384)") { contextSize = 16_384 }
-                        }
-                        Divider()
-                        Group {
-                            Button("32K (32,768)") { contextSize = 32_768 }
-                            Button("128K (131,072)") { contextSize = 131_072 }
-                        }
-                    } label: {
-                        Label("Presets", systemImage: "slider.horizontal.3")
-                    }
-                    .menuStyle(.borderlessButton)
-                }
-
-                Text(formattedTokenCount(contextSize))
-                    .font(.system(.title3, design: .rounded).weight(.semibold))
-                    .monospacedDigit()
-            }
-            .padding(AppDefaults.paddingLarge)
-        }
-    }
-
-    private func editorSection<Content: View>(
-        icon: String,
-        title: String,
-        subtitle: String? = nil,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: AppDefaults.paddingLarge) {
-            HStack(alignment: .top, spacing: AppDefaults.paddingMedium) {
-                Image(systemName: icon)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.accentColor)
-                    .frame(width: 30, height: 30)
-                    .background(
-                        RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium, style: .continuous)
-                            .fill(Color.accentColor.opacity(0.10))
-                    )
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(.headline)
-                    if let subtitle {
-                        Text(subtitle)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-            }
-
-            VStack(spacing: 0) {
-                content()
-            }
-            .background(Color.secondary.opacity(0.07))
-            .overlay(
-                RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium, style: .continuous)
-                    .stroke(Color.secondary.opacity(0.16), lineWidth: 1)
+    private func addMappingOverride(_ parameterID: LLMParameterID) {
+        guard !mappingOverrides.contains(where: { $0.adapterID == selectedAdapterID && $0.parameterID == parameterID }) else { return }
+        let resolved = draftContract.parameters[parameterID]?.mapping
+        mappingOverrides.append(MappingOverrideDraft(ModelParameterMappingOverrideItem(
+            mapping: resolved ?? LLMParameterMapping(
+                adapterID: selectedAdapterID,
+                parameterID: parameterID,
+                encodingKind: .scalarKey,
+                wireKey: parameterID.rawValue
             )
-            .clipShape(RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium, style: .continuous))
-        }
-        .padding(16)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusLarge, style: .continuous)
-                .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
-        )
+        )))
     }
 
-    private func editorRow<Content: View>(
-        _ title: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        ViewThatFits(in: .horizontal) {
-            LabeledContent {
-                content()
-            } label: {
-                Text(title)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundColor(.secondary)
-            }
-
-            VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
-                Text(title)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundColor(.secondary)
-
-                content()
-            }
-        }
-        .padding(.horizontal, AppDefaults.paddingLarge)
-        .padding(.vertical, 10)
+    private func addPolicyOverride(_ parameterID: LLMParameterID) {
+        guard !policyOverrides.contains(where: { $0.adapterID == selectedAdapterID && $0.parameterID == parameterID }) else { return }
+        policyOverrides.append(PolicyOverrideDraft(ModelParameterPolicyOverrideItem(
+            adapterID: selectedAdapterID,
+            parameterID: parameterID
+        )))
     }
 
-    private func editorDivider() -> some View {
-        Divider()
-            .padding(.leading, AppDefaults.paddingLarge)
-    }
-
-    private func sectionActionRow<Content: View>(
-        status: String,
-        primaryTitle: String,
-        primarySystemImage: String,
-        primaryAction: @escaping () -> Void,
-        secondaryTitle: String,
-        secondarySystemImage: String,
-        secondaryEnabled: Bool,
-        @ViewBuilder secondaryMenu: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: AppDefaults.paddingLarge) {
-            statusPill(status, systemImage: "bolt.horizontal")
-
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: AppDefaults.paddingMedium) {
-                    Button {
-                        primaryAction()
-                    } label: {
-                        Label(primaryTitle, systemImage: primarySystemImage)
-                    }
-                    .buttonStyle(.bordered)
-
-                    Menu {
-                        secondaryMenu()
-                    } label: {
-                        Label(secondaryTitle, systemImage: secondarySystemImage)
-                    }
-                    .disabled(!secondaryEnabled)
-
-                    Spacer(minLength: 0)
-                }
-
-                VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
-                    Button {
-                        primaryAction()
-                    } label: {
-                        Label(primaryTitle, systemImage: primarySystemImage)
-                    }
-                    .buttonStyle(.bordered)
-
-                    Menu {
-                        secondaryMenu()
-                    } label: {
-                        Label(secondaryTitle, systemImage: secondarySystemImage)
-                    }
-                    .disabled(!secondaryEnabled)
-                }
-            }
-        }
-        .padding(.horizontal, AppDefaults.paddingLarge)
-        .padding(.vertical, AppDefaults.paddingLarge)
-    }
-
-    private func emptyStateText(_ text: String) -> some View {
-        HStack(spacing: AppDefaults.paddingMedium) {
-            Image(systemName: "tray")
-                .foregroundColor(.secondary)
-            Text(text)
-                .foregroundColor(.secondary)
-            Spacer(minLength: 0)
-        }
-        .font(.subheadline)
-        .padding(.horizontal, AppDefaults.paddingLarge)
-        .padding(.vertical, AppDefaults.paddingLarge)
-    }
-
-    private func capabilityTile(_ capability: LLMModelCapability) -> some View {
-        let isSelected = capabilities.contains(capability)
-
-        return Button {
-            if isSelected {
-                capabilities.removeAll { $0 == capability }
+    private func policy(from draft: PolicyOverrideDraft, validateValue: Bool) -> LLMParameterPolicyOverride {
+        let defaultValue: LLMDefaultValueOverride
+        switch draft.defaultValueKind {
+        case .inherit:
+            defaultValue = .inherit
+        case .none:
+            defaultValue = .none
+        case .value:
+            if let data = draft.defaultValueText.data(using: .utf8),
+               let value = try? JSONDecoder().decode(JSONValue.self, from: data) {
+                defaultValue = .value(value)
             } else {
-                capabilities.append(capability)
+                defaultValue = .inherit
+                if validateValue {
+                    errorMessage = "Default values must be valid JSON."
+                    showError = true
+                }
             }
-        } label: {
-            HStack(spacing: AppDefaults.paddingMedium) {
-                Image(systemName: capability.systemName)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(isSelected ? .accentColor : .secondary)
-                    .frame(width: 24, height: 24)
-
-                Text(capability.displayName)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-
-                Spacer(minLength: 0)
-
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .foregroundColor(isSelected ? .accentColor : .secondary.opacity(0.6))
-            }
-            .padding(.horizontal, AppDefaults.paddingMedium)
-            .padding(.vertical, 9)
-            .background(
-                RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium, style: .continuous)
-                    .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.06))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: AppDefaults.cornerRadiusMedium, style: .continuous)
-                    .stroke(isSelected ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.12), lineWidth: 1)
-            )
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(capability.displayName)
-        .accessibilityValue(isSelected ? "Enabled" : "Disabled")
-    }
-
-    private func statusPill(_ text: String, systemImage: String) -> some View {
-        Label(text, systemImage: systemImage)
-            .font(.caption.weight(.medium))
-            .foregroundColor(.secondary)
-            .lineLimit(1)
-            .padding(.horizontal, AppDefaults.paddingMedium)
-            .padding(.vertical, AppDefaults.paddingSmall)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(Color.secondary.opacity(0.09))
-            )
-    }
-
-    private func metricPill(title: String, value: String, systemImage: String) -> some View {
-        HStack(spacing: AppDefaults.paddingSmall) {
-            Image(systemName: systemImage)
-                .foregroundColor(.accentColor)
-            Text(title)
-                .foregroundColor(.secondary)
-            Text(value)
-                .fontWeight(.semibold)
-                .monospacedDigit()
-        }
-        .font(.caption)
-        .padding(.horizontal, AppDefaults.paddingMedium)
-        .padding(.vertical, 6)
-        .background(
-            Capsule(style: .continuous)
-                .fill(Color.secondary.opacity(0.08))
+        return LLMParameterPolicyOverride(
+            support: draft.support,
+            isRequired: draft.required,
+            isEnabledByDefault: draft.enabledByDefault,
+            defaultValue: defaultValue
         )
     }
 
-    private func formattedTokenCount(_ value: Int) -> String {
-        value.formatted(.number.grouping(.automatic))
-    }
-    
     private func save() {
         guard let selectedConfiguration else { return }
-        model.modelID = name
-        model.displayName = name
-        model.apiConfiguration = selectedConfiguration
-        model.contextSize = contextSize
-        model.capabilitiesRaw = capabilities.map(\.rawValue)
-        model.materializeDefaultParameterMappings(preserveCustomized: true)
-        model.materializeDefaultParameterAvailability(preserveCustomized: true)
-        
+        var policies: [(LLMAdapterID, LLMParameterID, LLMParameterPolicyOverride)] = []
+        for draft in policyOverrides {
+            let policy = policy(from: draft, validateValue: true)
+            guard !showError else { return }
+            policies.append((draft.adapterID, draft.parameterID, policy))
+        }
         do {
-            if model.modelContext == nil {
-                try queryManager.insert(model)
-            } else {
-                try queryManager.saveContext()
-            }
+            try queryManager.updateModelContract(
+                model,
+                modelID: modelID,
+                apiConfiguration: selectedConfiguration,
+                displayNameOverride: displayNameOverride,
+                contextSizeOverride: Int(contextSizeOverride),
+                capabilityOverrides: capabilityOverrides,
+                mappingOverrides: mappingOverrides.map(\.mapping),
+                policyOverrides: policies
+            )
             dismiss()
         } catch {
-            originalSnapshot?.restore(model)
-            vxAtelierPro.log.error("Failed to save model \(name): \(error.localizedDescription)")
-            editorErrorMessage = "Failed to save model: \(error.localizedDescription)"
-            showEditorError = true
+            vxAtelierPro.log.error("Failed to save model contract: \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
+            showError = true
         }
-    }
-    
-    private func deleteModel() {
-        do {
-            try queryManager.delete(model)
-            dismiss()
-        } catch {
-            vxAtelierPro.log.error("Failed to delete model \(model.name): \(error.localizedDescription)")
-            editorErrorMessage = "Failed to delete model: \(error.localizedDescription)"
-            showEditorError = true
-        }
-    }
-
-    private func applyCatalogDefaultsForSelectedConfiguration() {
-        guard let selectedConfiguration else { return }
-        let candidate = LLMModelMetadataResolver().catalogMetadata(
-            for: name,
-            providerID: selectedConfiguration.providerIDEnum
-        )
-        contextSize = candidate.contextSize ?? AppDefaults.ModelContextSizes.defaultSize
-        capabilities = candidate.capabilities
-    }
-
-    private func addMapping(_ parameterID: LLMParameterID) {
-        let mapping = ModelParameterMappingItem(
-            adapterID: selectedAdapterID,
-            parameterID: parameterID,
-            encodingKind: .scalarKey,
-            wireKey: parameterID.rawValue,
-            isCustomized: true
-        )
-        model.parameterMappings.append(mapping)
-    }
-
-    private func addAvailability(_ parameterID: LLMParameterID) {
-        let availability = ModelParameterAvailabilityItem(
-            adapterID: selectedAdapterID,
-            parameterID: parameterID,
-            isAvailable: true,
-            isRequired: false,
-            isEnabled: false,
-            isCustomized: true
-        )
-        model.parameterAvailability.append(availability)
-    }
-}
-
-/// Row editor for adapter parameter mappings.
-private struct ModelParameterMappingRow: View {
-    @Bindable var mapping: ModelParameterMappingItem
-
-    var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: AppDefaults.paddingLarge) {
-                Text(mapping.displayName)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundColor(.primary)
-                    .frame(width: 150, alignment: .leading)
-                    .help(mapping.paramDescription)
-
-                VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
-                    Picker("Encoding", selection: Binding(
-                        get: { mapping.encodingKind },
-                        set: {
-                            mapping.encodingKind = $0
-                            mapping.markCustomized()
-                        }
-                    )) {
-                        ForEach(LLMParameterEncodingKind.allCases) { kind in
-                            Text(kind.displayName).tag(kind)
-                        }
-                    }
-                    .pickerStyle(.menu)
-
-                    parameterMappingDetail
-                }
-
-                Spacer(minLength: 0)
-            }
-
-            VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
-                Text(mapping.displayName)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundColor(.primary)
-                    .help(mapping.paramDescription)
-
-                Picker("Encoding", selection: Binding(
-                    get: { mapping.encodingKind },
-                    set: {
-                        mapping.encodingKind = $0
-                        mapping.markCustomized()
-                    }
-                )) {
-                    ForEach(LLMParameterEncodingKind.allCases) { kind in
-                        Text(kind.displayName).tag(kind)
-                    }
-                }
-                .pickerStyle(.menu)
-
-                parameterMappingDetail
-            }
-        }
-        .padding(.horizontal, AppDefaults.paddingLarge)
-        .padding(.vertical, 12)
-    }
-
-    @ViewBuilder
-    private var parameterMappingDetail: some View {
-        if mapping.encodingKind == .scalarKey {
-            TextField("Wire Key", text: Binding(
-                get: { mapping.wireKey },
-                set: {
-                    mapping.wireKey = $0
-                    mapping.markCustomized()
-                }
-            ))
-            .textFieldStyle(.roundedBorder)
-        } else if mapping.encodingKind == .structuredPreset {
-            Picker("Preset", selection: Binding(
-                get: { mapping.structuredPreset ?? .openAIChatResponseFormat },
-                set: {
-                    mapping.structuredPreset = $0
-                    mapping.markCustomized()
-                }
-            )) {
-                ForEach(LLMParameterStructuredPreset.allCases) { preset in
-                    Text(preset.displayName).tag(preset)
-                }
-            }
-            .pickerStyle(.menu)
-        } else {
-            Text("Omitted from request")
-                .foregroundColor(.secondary)
-        }
-    }
-}
-
-/// Row editor for adapter parameter availability rules.
-private struct ModelParameterAvailabilityRow: View {
-    @Bindable var availability: ModelParameterAvailabilityItem
-
-    var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: AppDefaults.paddingLarge) {
-                Text(availability.displayName)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundColor(.primary)
-                    .frame(width: 150, alignment: .leading)
-                    .help(availability.paramDescription)
-
-                VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
-                    HStack(spacing: AppDefaults.paddingLarge) {
-                        Toggle("Available", isOn: binding(\.isAvailable))
-                            .toggleStyle(.switch)
-
-                        Toggle("Required", isOn: binding(\.isRequired))
-                            .toggleStyle(.switch)
-
-                        Toggle("Enabled", isOn: binding(\.isEnabled))
-                            .toggleStyle(.switch)
-                    }
-
-                    HStack(spacing: AppDefaults.paddingMedium) {
-                        TextField("Default", text: Binding(
-                            get: { defaultValueText },
-                            set: { defaultValueText = $0 }
-                        ))
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 180)
-
-                        Text("Leave empty for no model default value.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-
-                Spacer(minLength: 0)
-            }
-
-            VStack(alignment: .leading, spacing: AppDefaults.paddingMedium) {
-                Text(availability.displayName)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundColor(.primary)
-                    .help(availability.paramDescription)
-
-                HStack(spacing: AppDefaults.paddingLarge) {
-                    Toggle("Available", isOn: binding(\.isAvailable))
-                        .toggleStyle(.switch)
-
-                    Toggle("Required", isOn: binding(\.isRequired))
-                        .toggleStyle(.switch)
-                }
-
-                Toggle("Enabled", isOn: binding(\.isEnabled))
-                    .toggleStyle(.switch)
-
-                HStack(spacing: AppDefaults.paddingMedium) {
-                    TextField("Default", text: Binding(
-                        get: { defaultValueText },
-                        set: { defaultValueText = $0 }
-                    ))
-                    .textFieldStyle(.roundedBorder)
-
-                    Text("Leave empty for no model default value.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-        }
-        .padding(.horizontal, AppDefaults.paddingLarge)
-        .padding(.vertical, 12)
-    }
-
-    private var defaultValueText: String {
-        get { availability.defaultJSONValue?.stringValue ?? "" }
-        nonmutating set {
-            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.isEmpty {
-                availability.defaultJSONValue = nil
-            } else {
-                switch availability.parameterIDEnum.valueType {
-                case .integer:
-                    availability.defaultJSONValue = .integer(Int(trimmed) ?? 0)
-                case .float:
-                    availability.defaultJSONValue = .number(Double(trimmed) ?? 0)
-                case .boolean:
-                    availability.defaultJSONValue = .boolean(trimmed.lowercased() == "true")
-                case .string:
-                    availability.defaultJSONValue = .string(trimmed)
-                }
-            }
-            availability.markCustomized()
-        }
-    }
-
-    private func binding(_ keyPath: ReferenceWritableKeyPath<ModelParameterAvailabilityItem, Bool>) -> Binding<Bool> {
-        Binding(
-            get: { availability[keyPath: keyPath] },
-            set: {
-                availability[keyPath: keyPath] = $0
-                availability.markCustomized()
-            }
-        )
     }
 }

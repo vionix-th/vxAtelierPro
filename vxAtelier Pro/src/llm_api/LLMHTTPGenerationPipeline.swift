@@ -1,6 +1,6 @@
 import Foundation
 
-/// Shared adapter loop that validates requests and normalizes streaming/non-streaming HTTP execution.
+/// Shared adapter loop that normalizes streaming/non-streaming HTTP execution.
 enum LLMHTTPGenerationPipeline {
     typealias Continuation = AsyncThrowingStream<LLMGenerationEvent, Error>.Continuation
     typealias BodyBuilder = (Bool) throws -> [String: JSONValue]
@@ -11,7 +11,6 @@ enum LLMHTTPGenerationPipeline {
     static func generateEvents(
         request: LLMGenerationRequest,
         configuration: LLMProviderConfiguration,
-        profile: LLMProviderProfile,
         httpClient: LLMHTTPClient,
         endpoint: String,
         completionPolicy: LLMSSECompletionPolicy,
@@ -22,8 +21,7 @@ enum LLMHTTPGenerationPipeline {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    try LLMCapabilityValidator.validate(request, profile: profile)
-                    let streamEnabled = LLMCapabilityValidator.streamEnabled(for: request)
+                    let streamEnabled = request.options.streamMode == .enabled
                     let body = try makeBody(streamEnabled)
                     let httpConfig = httpClient.makeConfiguration(for: configuration)
                     continuation.yield(.generationStarted(requestID: nil))

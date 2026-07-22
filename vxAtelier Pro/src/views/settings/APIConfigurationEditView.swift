@@ -62,7 +62,7 @@ struct APIConfigurationEditView: View {
     @State private var isModelPickerPresented = false
     @State private var isValidating = false
     @State private var isRefreshingModels = false
-    @State private var fetchedModelCandidates: [LLMModelMetadata]?
+    @State private var fetchedModelObservations: [LLMProviderModelObservation]?
     @State private var fetchedModelCandidateSignature: String?
     @State private var selectedPreset: APIPreset
     @State private var isCodexAuthenticating = false
@@ -249,7 +249,7 @@ struct APIConfigurationEditView: View {
                     invalidateFetchedModelCandidates()
                 },
                 apiConfiguration: configuration,
-                draftModelCandidates: fetchedModelCandidates
+                draftModelObservations: fetchedModelObservations
             )
         }
     }
@@ -385,7 +385,9 @@ struct APIConfigurationEditView: View {
     }
 
     static func suggestedDefaultModel(for providerID: LLMProviderID) -> String {
-        LLMModelMetadataResolver().defaultModelID(for: providerID, apiConfiguration: nil) ?? ""
+        LLMModelContractResolver(
+            fallbackContextSize: AppDefaults.ModelContextSizes.defaultSize
+        ).defaultModelID(for: providerID) ?? ""
     }
 
     private func validateDraft() -> Bool {
@@ -462,7 +464,7 @@ struct APIConfigurationEditView: View {
         defer { isRefreshingModels = false }
 
         do {
-            fetchedModelCandidates = try await queryManager.fetchModelCandidates(
+            fetchedModelObservations = try await queryManager.fetchModelObservations(
                 providerID: providerID,
                 adapterID: defaultAdapterID,
                 configuration: makeProviderConfigurationFromDraft()
@@ -480,20 +482,20 @@ struct APIConfigurationEditView: View {
 
     private func refreshModelsAfterSave() async -> ModelProviderFetchSummary {
         do {
-            let candidates = try await queryManager.fetchModelCandidates(
+            let candidates = try await queryManager.fetchModelObservations(
                 providerID: configuration.providerIDEnum,
                 adapterID: configuration.defaultAdapterIDEnum,
                 configuration: configuration.makeLLMProviderConfiguration()
             )
-            return try queryManager.upsertModelCandidates(candidates, for: configuration)
+            return try queryManager.upsertModelObservations(candidates, for: configuration)
         } catch {
             let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             vxAtelierPro.log.error("Failed to refresh models after save for \(configuration.name): \(message)")
             if fetchedModelCandidateSignature == draftModelFetchSignature,
-               let fetchedModelCandidates,
-               !fetchedModelCandidates.isEmpty {
+               let fetchedModelObservations,
+               !fetchedModelObservations.isEmpty {
                 do {
-                    var summary = try queryManager.upsertModelCandidates(fetchedModelCandidates, for: configuration)
+                    var summary = try queryManager.upsertModelObservations(fetchedModelObservations, for: configuration)
                     summary.failures.append(ModelProviderFetchFailure(
                         configurationName: configuration.name,
                         providerID: configuration.providerIDEnum,
@@ -534,7 +536,7 @@ struct APIConfigurationEditView: View {
 
     private func invalidateFetchedModelCandidates() {
         guard fetchedModelCandidateSignature != draftModelFetchSignature else { return }
-        fetchedModelCandidates = nil
+        fetchedModelObservations = nil
         fetchedModelCandidateSignature = nil
     }
 

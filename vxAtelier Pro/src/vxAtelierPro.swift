@@ -59,42 +59,6 @@ struct vxAtelierPro: App {
 
     static let log = LoggingService.shared
 
-    // MARK: - Data Management
-    enum ProjectMigrationPlan: SchemaMigrationPlan {
-        static var schemas: [any VersionedSchema.Type] {
-            [CurrentSchema.self]
-        }
-
-        static var stages: [MigrationStage] = []  // Empty stages = lightweight migration
-
-        enum CurrentSchema: VersionedSchema {
-            static var versionIdentifier = Schema.Version(1, 1, 0)
-            static var models: [any PersistentModel.Type] {
-                [
-                    ConversationItem.self,
-                    ProjectItem.self,
-                    BookmarkItem.self,
-                    PromptTemplate.self,
-                    VoiceConfigurationItem.self,
-                    TTSPlaylist.self,
-                    TTSPlaylistEntry.self,
-                    APIConfigurationItem.self,
-                    ModelItem.self,
-                    ModelParameterMappingItem.self,
-                    ModelParameterAvailabilityItem.self,
-                    MessageItem.self,
-                    MessageContentPartItem.self,
-                    ToolCallItem.self,
-                    ResponseRunItem.self,
-                    ConversationTurn.self,
-                    TurnEvent.self,
-                    ConversationOptions.self,
-                    WebSearchConfigurationItem.self,
-                ]
-            }
-        }
-    }
-
     private enum LaunchMode {
         case normal(AppBootstrap)
         case recovery

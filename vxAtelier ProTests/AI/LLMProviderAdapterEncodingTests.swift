@@ -10,7 +10,7 @@ import XCTest
 final class LLMProviderAdapterEncodingTests: XCTestCase {
     func testOpenAIResponsesReplayIncludesFunctionCallItemsBeforeOutputs() throws {
         let adapter = OpenAIResponsesAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
-        let request = LLMRequest(
+        let request = LLMGenerationRequest(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
             modelID: "gpt-test",
@@ -50,7 +50,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
 
     func testOpenAIChatEncodesImageContentParts() throws {
         let adapter = OpenAIChatCompletionsAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
-        let request = LLMRequest(
+        let request = LLMGenerationRequest(
             providerID: .openAIPlatform,
             adapterID: .openAIChatCompletions,
             modelID: "gpt-test",
@@ -75,7 +75,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
 
     func testOpenAIResponsesEncodesImageContentParts() throws {
         let adapter = OpenAIResponsesAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
-        let request = LLMRequest(
+        let request = LLMGenerationRequest(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
             modelID: "gpt-test",
@@ -100,7 +100,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
 
     func testOpenAIResponsesEncodesFileDataAsDataURL() throws {
         let adapter = OpenAIResponsesAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
-        let request = LLMRequest(
+        let request = LLMGenerationRequest(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
             modelID: "gpt-test",
@@ -126,7 +126,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
 
     func testAnthropicEncodesImageContentParts() throws {
         let adapter = AnthropicMessagesAdapter(profile: LLMProviderRegistry.shared.profile(for: .anthropic))
-        let request = LLMRequest(
+        let request = LLMGenerationRequest(
             providerID: .anthropic,
             adapterID: .anthropicMessages,
             modelID: "claude-test",
@@ -152,7 +152,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
 
     func testAnthropicRejectsUnsupportedImageMediaType() {
         let adapter = AnthropicMessagesAdapter(profile: LLMProviderRegistry.shared.profile(for: .anthropic))
-        let request = LLMRequest(
+        let request = LLMGenerationRequest(
             providerID: .anthropic,
             adapterID: .anthropicMessages,
             modelID: "claude-test",
@@ -165,13 +165,13 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         )
 
         XCTAssertThrowsError(try adapter.anthropicMessages(from: request)) { error in
-            XCTAssertEqual(error as? LLMProviderError, .unsupportedParameter("Anthropic image content does not support image/heic."))
+            XCTAssertEqual(error as? LLMProviderError, .requestEncoding("Anthropic image content does not support image/heic."))
         }
     }
 
     func testAnthropicGroupsAdjacentToolResults() throws {
         let adapter = AnthropicMessagesAdapter(profile: LLMProviderRegistry.shared.profile(for: .anthropic))
-        let request = LLMRequest(
+        let request = LLMGenerationRequest(
             providerID: .anthropic,
             adapterID: .anthropicMessages,
             modelID: "claude-test",
@@ -207,7 +207,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         var body: [String: JSONValue] = [:]
         let options = LLMGenerationOptions(
             responseFormat: .jsonSchema,
-            providerExtras: [
+            providerSpecificOptions: [
                 "json_schema": .object([
                     "name": .string("answer"),
                     "strict": .boolean(true),
@@ -224,13 +224,14 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
             options,
             to: &body,
             mappings: [
-                .responseFormat: LLMParameterMappingDescriptor(
+                .responseFormat: LLMParameterMapping(
                     adapterID: .openAIChatCompletions,
-                    semanticParameterID: .responseFormat,
+                    parameterID: .responseFormat,
                     encodingKind: .structuredPreset,
                     structuredPreset: .openAIChatResponseFormat
                 )
-            ]
+            ],
+            activeParameterIDs: [.responseFormat]
         )
 
         let responseFormat = try XCTUnwrap(body["response_format"]?.objectValue)
@@ -242,7 +243,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
 
     func testOpenAIResponsesJsonSchemaEncodingUsesTextFormat() throws {
         let adapter = OpenAIResponsesAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
-        let request = LLMRequest(
+        let request = LLMGenerationRequest(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
             modelID: "gpt-test",
@@ -251,10 +252,11 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
                 adapterID: .openAIResponses,
                 modelID: "gpt-test"
             ),
+            activeParameterIDs: [.responseFormat],
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Answer")])],
             options: LLMGenerationOptions(
                 responseFormat: .jsonSchema,
-                providerExtras: [
+                providerSpecificOptions: [
                     "json_schema": .object([
                         "name": .string("answer"),
                         "schema": .object(["type": .string("object")])
@@ -273,31 +275,31 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
 
     func testOpenAIChatRejectsReservedProviderExtraCollision() {
         let adapter = OpenAIChatCompletionsAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
-        let request = LLMRequest(
+        let request = LLMGenerationRequest(
             providerID: .openAIPlatform,
             adapterID: .openAIChatCompletions,
             modelID: "gpt-test",
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Answer")])],
-            options: LLMGenerationOptions(providerExtras: ["stream": .boolean(false)])
+            options: LLMGenerationOptions(providerSpecificOptions: ["stream": .boolean(false)])
         )
 
         XCTAssertThrowsError(try adapter.makeBody(for: request, stream: true)) { error in
-            XCTAssertEqual(error as? LLMProviderError, .unsupportedParameter("providerExtras.stream cannot override a reserved request field."))
+            XCTAssertEqual(error as? LLMProviderError, .requestEncoding("providerSpecificOptions.stream cannot override a reserved request field."))
         }
     }
 
     func testOpenAIResponsesRejectsReservedProviderExtraCollision() {
         let adapter = OpenAIResponsesAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
-        let request = LLMRequest(
+        let request = LLMGenerationRequest(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
             modelID: "gpt-test",
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Answer")])],
-            options: LLMGenerationOptions(providerExtras: ["text": .object(["format": .object(["type": .string("text")])])])
+            options: LLMGenerationOptions(providerSpecificOptions: ["text": .object(["format": .object(["type": .string("text")])])])
         )
 
         XCTAssertThrowsError(try adapter.makeBody(for: request, stream: false)) { error in
-            XCTAssertEqual(error as? LLMProviderError, .unsupportedParameter("providerExtras.text cannot override a reserved request field."))
+            XCTAssertEqual(error as? LLMProviderError, .requestEncoding("providerSpecificOptions.text cannot override a reserved request field."))
         }
     }
 
@@ -309,15 +311,16 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
             options,
             to: &body,
             mappings: [
-                .responseFormat: LLMParameterMappingDescriptor(
+                .responseFormat: LLMParameterMapping(
                     adapterID: .openAIChatCompletions,
-                    semanticParameterID: .responseFormat,
+                    parameterID: .responseFormat,
                     encodingKind: .structuredPreset,
                     structuredPreset: .openAIChatResponseFormat
                 )
-            ]
+            ],
+            activeParameterIDs: [.responseFormat]
         )) { error in
-            XCTAssertEqual(error as? LLMProviderError, .unsupportedParameter("response_format json_schema requires providerExtras.json_schema object."))
+            XCTAssertEqual(error as? LLMProviderError, .requestEncoding("response_format json_schema requires providerSpecificOptions.json_schema object."))
         }
     }
 
@@ -335,12 +338,12 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
                 reasoning: "low"
             )
         )
-        let request = LLMRequest(
+        let request = LLMGenerationRequest(
             providerID: .openAIPlatform,
             adapterID: .openAIChatCompletions,
             modelID: "gpt-5.4-nano",
             parameterMappings: resolved.mappings,
-            parameterAvailability: resolved.availability,
+            activeParameterIDs: resolved.activeParameterIDs,
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])],
             options: resolved.options
         )
@@ -356,7 +359,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
 
     func testOpenAIChatMapsGPT41MaxOutputTokensToMaxTokens() throws {
         let adapter = OpenAIChatCompletionsAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
-        let request = LLMRequest(
+        let request = LLMGenerationRequest(
             providerID: .openAIPlatform,
             adapterID: .openAIChatCompletions,
             modelID: "gpt-4.1-nano",
@@ -365,6 +368,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
                 adapterID: .openAIChatCompletions,
                 modelID: "gpt-4.1-nano"
             ),
+            activeParameterIDs: [.maxOutputTokens],
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])],
             options: LLMGenerationOptions(maxOutputTokens: 16)
         )
@@ -385,12 +389,12 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
                 streamMode: .enabled
             )
         )
-        let request = LLMRequest(
+        let request = LLMGenerationRequest(
             providerID: .openAICodexChatGPTSubscription,
             adapterID: .openAIResponses,
             modelID: "gpt-5.4-mini",
             parameterMappings: resolved.mappings,
-            parameterAvailability: resolved.availability,
+            activeParameterIDs: resolved.activeParameterIDs,
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])],
             options: resolved.options
         )
@@ -409,12 +413,12 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
             modelID: "claude-test",
             options: LLMGenerationOptions()
         )
-        let request = LLMRequest(
+        let request = LLMGenerationRequest(
             providerID: .anthropic,
             adapterID: .anthropicMessages,
             modelID: "claude-test",
             parameterMappings: resolved.mappings,
-            parameterAvailability: resolved.availability,
+            activeParameterIDs: resolved.activeParameterIDs,
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])],
             options: resolved.options
         )
@@ -425,7 +429,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
 
     func testAnthropicRejectsInvalidToolArgumentJSON() {
         let adapter = AnthropicMessagesAdapter(profile: LLMProviderRegistry.shared.profile(for: .anthropic))
-        let request = LLMRequest(
+        let request = LLMGenerationRequest(
             providerID: .anthropic,
             adapterID: .anthropicMessages,
             modelID: "claude-test",
@@ -441,13 +445,13 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         )
 
         XCTAssertThrowsError(try adapter.anthropicMessages(from: request)) { error in
-            XCTAssertEqual(error as? LLMProviderError, .decoding("Anthropic tool_use arguments must be valid JSON object."))
+            XCTAssertEqual(error as? LLMProviderError, .requestEncoding("Anthropic tool_use arguments must be valid JSON object."))
         }
     }
 
     func testAnthropicRejectsNonObjectToolArgumentJSON() {
         let adapter = AnthropicMessagesAdapter(profile: LLMProviderRegistry.shared.profile(for: .anthropic))
-        let request = LLMRequest(
+        let request = LLMGenerationRequest(
             providerID: .anthropic,
             adapterID: .anthropicMessages,
             modelID: "claude-test",
@@ -463,7 +467,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         )
 
         XCTAssertThrowsError(try adapter.anthropicMessages(from: request)) { error in
-            XCTAssertEqual(error as? LLMProviderError, .unsupportedParameter("Anthropic tool_use arguments must decode to a JSON object."))
+            XCTAssertEqual(error as? LLMProviderError, .requestEncoding("Anthropic tool_use arguments must decode to a JSON object."))
         }
     }
 
@@ -473,38 +477,21 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         modelID: String,
         options: LLMGenerationOptions
     ) -> (
-        mappings: [LLMParameterMappingDescriptor],
-        availability: [LLMParameterAvailabilityDescriptor],
+        mappings: [LLMParameterMapping],
+        activeParameterIDs: Set<LLMParameterID>,
         options: LLMGenerationOptions
     ) {
-        let mappingList = LLMParameterMappingCatalog.defaults(
+        let contract = LLMModelContractResolver(fallbackContextSize: 4096).resolve(
             providerID: providerID,
             adapterID: adapterID,
-            modelID: modelID
+            modelID: modelID,
+            observation: nil
         )
-        let mappings = LLMParameterMappingResolver.resolve(adapterID: adapterID, mappings: mappingList)
-        let availabilityList = LLMParameterAvailabilityCatalog.defaults(
-            providerID: providerID,
-            adapterID: adapterID,
-            modelID: modelID
-        )
-        let availability = LLMParameterAvailabilityMappingResolver.resolve(
-            adapterID: adapterID,
-            availability: availabilityList
-        )
-        let sendableAvailability = LLMParameterAvailabilityResolver.sendableModelAvailability(
-            for: options,
+        let resolved = LLMGenerationOptionsResolver.resolve(
+            options: options,
             conversationPreferences: [:],
-            modelAvailability: availability
+            parameterContracts: contract.parameters
         )
-        let sendableMappings = mappings.filter { entry in
-            sendableAvailability[entry.key] != nil && entry.value.encodingKind != .disabled
-        }
-        let resolvedOptions = LLMParameterAvailabilityResolver.resolvedOptions(
-            from: options,
-            conversationPreferences: [:],
-            modelAvailability: availability
-        )
-        return (Array(sendableMappings.values), Array(sendableAvailability.values), resolvedOptions)
+        return (resolved.mappings, resolved.activeParameterIDs, resolved.options)
     }
 }

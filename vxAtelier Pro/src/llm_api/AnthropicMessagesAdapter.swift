@@ -17,7 +17,6 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
         return LLMHTTPGenerationPipeline.generateEvents(
             request: request,
             configuration: configuration,
-            profile: profile,
             httpClient: httpClient,
             endpoint: Self.generationPath,
             completionPolicy: .requireExplicitEvent { event in
@@ -36,7 +35,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
     }
 
     /// Fetches Anthropic model metadata and maps it into candidates.
-    func fetchModelMetadata(configuration: LLMProviderConfiguration) async throws -> [LLMModelMetadata] {
+    func fetchModelObservations(configuration: LLMProviderConfiguration) async throws -> [LLMProviderModelObservation] {
         let response: JSONValue = try await httpClient.getJSON(
             path: Self.modelsPath,
             configuration: httpClient.makeConfiguration(for: configuration),
@@ -61,8 +60,13 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
             mappings: request.parameterMappings
         )
         try LLMParameterWireEncoder.applyScalarOptions(
-            request.options, to: &body, mappings: mappings)
-        if let budgetTokens = request.options.reasoningBudgetTokens {
+            request.options,
+            to: &body,
+            mappings: mappings,
+            activeParameterIDs: request.activeParameterIDs
+        )
+        if request.activeParameterIDs.contains(.reasoningBudgetTokens),
+           let budgetTokens = request.options.reasoningBudgetTokens {
             body["thinking"] = .object([
                 "type": .string("enabled"),
                 "budget_tokens": .integer(budgetTokens)
@@ -99,7 +103,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
                     let toolMessage = request.messages[index]
                     guard toolMessage.role == "tool" else { break }
                     guard let toolCallID = toolMessage.toolCallID, !toolCallID.isEmpty else {
-                        throw LLMProviderError.unsupportedParameter(
+                        throw LLMProviderError.requestEncoding(
                             "Anthropic tool_result requires toolCallID.")
                     }
                     content.append(
@@ -161,7 +165,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
                     ])
                 }
                 guard let data = part.dataBase64, !data.isEmpty else {
-                    throw LLMProviderError.unsupportedParameter(
+                    throw LLMProviderError.requestEncoding(
                         "Anthropic image content requires sourceURL or dataBase64.")
                 }
                 let mediaType = try anthropicImageMediaType(part.mimeType)
@@ -174,10 +178,10 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
                     ]),
                 ])
             case .audio:
-                throw LLMProviderError.unsupportedParameter(
+                throw LLMProviderError.requestEncoding(
                     "Anthropic audio content is not supported by this adapter.")
             case .file:
-                throw LLMProviderError.unsupportedParameter(
+                throw LLMProviderError.requestEncoding(
                     "Anthropic file content is not supported by this adapter.")
             }
         }
@@ -188,7 +192,7 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
         let mediaType = mimeType ?? "image/png"
         let supported = ["image/jpeg", "image/png", "image/gif", "image/webp"]
         guard supported.contains(mediaType) else {
-            throw LLMProviderError.unsupportedParameter(
+            throw LLMProviderError.requestEncoding(
                 "Anthropic image content does not support \(mediaType).")
         }
         return mediaType
@@ -283,18 +287,18 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
     /// Parses assistant tool-call arguments into the JSON object required by Anthropic.
     private func jsonFromString(_ string: String) throws -> JSONValue {
         guard let data = string.data(using: .utf8) else {
-            throw LLMProviderError.decoding(
+            throw LLMProviderError.requestEncoding(
                 "Anthropic tool_use arguments must be valid UTF-8 JSON.")
         }
         let value: JSONValue
         do {
             value = try JSONDecoder().decode(JSONValue.self, from: data)
         } catch {
-            throw LLMProviderError.decoding(
+            throw LLMProviderError.requestEncoding(
                 "Anthropic tool_use arguments must be valid JSON object.")
         }
         guard let object = value.objectValue else {
-            throw LLMProviderError.unsupportedParameter(
+            throw LLMProviderError.requestEncoding(
                 "Anthropic tool_use arguments must decode to a JSON object.")
         }
         return .object(object)

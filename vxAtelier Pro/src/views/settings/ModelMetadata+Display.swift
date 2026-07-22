@@ -1,5 +1,26 @@
 import SwiftUI
 
+extension LLMSupportState {
+    var displayName: String {
+        switch self {
+        case .supported: return "Supported"
+        case .unsupported: return "Unsupported"
+        case .unknown: return "Unknown"
+        }
+    }
+}
+
+extension LLMContractSource {
+    var displayName: String {
+        switch self {
+        case .catalog: return "Catalog"
+        case .provider: return "Provider"
+        case .userOverride: return "Override"
+        case .fallback: return "Fallback"
+        }
+    }
+}
+
 extension LLMModelCapability {
     var displayName: String {
         switch self {

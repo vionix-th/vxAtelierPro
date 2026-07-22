@@ -27,8 +27,8 @@ struct FoundationModelsAdapter: LLMProviderAdapter {
         )
     }
 
-    func fetchModelMetadata(configuration: LLMProviderConfiguration) async throws -> [LLMModelMetadata] {
-        backend.modelMetadata(configuration: configuration)
+    func fetchModelObservations(configuration: LLMProviderConfiguration) async throws -> [LLMProviderModelObservation] {
+        backend.modelObservations(configuration: configuration)
     }
 }
 
@@ -70,18 +70,20 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
         #endif
     }
 
-    func modelMetadata(configuration: LLMProviderConfiguration) -> [LLMModelMetadata] {
+    func modelObservations(configuration: LLMProviderConfiguration) -> [LLMProviderModelObservation] {
         #if canImport(FoundationModels)
         let model = SystemLanguageModel.default
         let availability = availability()
         let contextSize = model.contextSize
         return [
-            LLMModelMetadata(
+            LLMProviderModelObservation(
                 id: "apple-intelligence-default",
                 displayName: "Apple Intelligence",
                 providerID: .appleIntelligence,
                 contextSize: contextSize,
-                capabilities: [.text, .tools, .streaming],
+                capabilityClaims: [.text, .tools, .streaming].map {
+                    LLMCapabilityClaim(capability: $0, state: .supported)
+                },
                 rawMetadataJSON: Self.modelMetadataJSON(
                     availability: availability,
                     contextSize: contextSize
@@ -90,12 +92,14 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
         ]
         #else
         return [
-            LLMModelMetadata(
+            LLMProviderModelObservation(
                 id: "apple-intelligence-default",
                 displayName: "Apple Intelligence",
                 providerID: .appleIntelligence,
                 contextSize: 4096,
-                capabilities: [.text, .tools, .streaming],
+                capabilityClaims: [.text, .tools, .streaming].map {
+                    LLMCapabilityClaim(capability: $0, state: .supported)
+                },
                 rawMetadataJSON: Self.modelMetadataJSON(
                     availability: availability(),
                     contextSize: 4096
@@ -309,7 +313,7 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
             return []
         }
         guard let toolExecutor else {
-            throw LLMProviderError.invalidConfiguration("Native tool execution requires a tool executor callback.")
+            throw LLMProviderError.toolExecution("Native tool execution requires a tool executor callback.")
         }
         return try definitions.map { definition in
             try FoundationModelsToolBridge(
@@ -346,7 +350,9 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
         do {
             return try GeneratedContent(json: jsonString)
         } catch {
-            throw LLMProviderError.decoding("Invalid persisted tool-call arguments for Foundation Models: \(error.localizedDescription)")
+            throw LLMProviderError.invalidConversationState(
+                "Invalid persisted tool-call arguments for Foundation Models: \(error.localizedDescription)"
+            )
         }
     }
 

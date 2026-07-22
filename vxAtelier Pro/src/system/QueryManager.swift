@@ -139,7 +139,7 @@ final class QueryManager {
         fetch(WebSearchConfigurationItem.self, sort: webSearchConfigurationSort)
     }
 
-    private func fetchModelMetadata() -> [ModelItem] {
+    private func fetchModels() -> [ModelItem] {
         fetch(ModelItem.self, sort: modelSort)
     }
 
@@ -167,7 +167,7 @@ final class QueryManager {
 
     func models(for apiConfiguration: APIConfigurationItem?) -> [ModelItem] {
         guard let apiConfiguration else { return [] }
-        return fetchModelMetadata().filter { $0.apiConfiguration?.id == apiConfiguration.id }
+        return fetchModels().filter { $0.apiConfiguration?.id == apiConfiguration.id }
     }
 
     func model(with modelID: String, for apiConfiguration: APIConfigurationItem) -> ModelItem? {
@@ -544,37 +544,106 @@ final class QueryManager {
     }
 
     // MARK: - Models
-    func fetchModelCandidates(
+    @discardableResult
+    func importModel(
+        _ exportData: ModelExportData,
+        apiConfigurations: [APIConfigurationItem]
+    ) throws -> ModelItem {
+        let model = exportData.toDataItem(apiConfigurations: apiConfigurations)
+        modelContext.insert(model)
+        try saveContext()
+        return model
+    }
+
+    func updateModelContract(
+        _ model: ModelItem,
+        modelID: String,
+        apiConfiguration: APIConfigurationItem,
+        displayNameOverride: String?,
+        contextSizeOverride: Int?,
+        capabilityOverrides: [LLMModelCapability: LLMSupportState],
+        mappingOverrides: [LLMParameterMapping],
+        policyOverrides: [(LLMAdapterID, LLMParameterID, LLMParameterPolicyOverride)]
+    ) throws {
+        model.modelID = modelID.trimmingCharacters(in: .whitespacesAndNewlines)
+        model.apiConfiguration = apiConfiguration
+        model.displayNameOverride = normalizedOptional(displayNameOverride)
+        model.contextSizeOverride = contextSizeOverride
+
+        for item in model.capabilityOverrides { modelContext.delete(item) }
+        for item in model.parameterMappingOverrides { modelContext.delete(item) }
+        for item in model.parameterPolicyOverrides { modelContext.delete(item) }
+        model.capabilityOverrides = capabilityOverrides
+            .filter { $0.value != .unknown }
+            .map { ModelCapabilityOverrideItem(capability: $0.key, support: $0.value) }
+        model.parameterMappingOverrides = mappingOverrides.map(ModelParameterMappingOverrideItem.init)
+        model.parameterPolicyOverrides = policyOverrides.map { adapterID, parameterID, policy in
+            let kind: ModelDefaultValueOverrideKind
+            let value: JSONValue?
+            switch policy.defaultValue {
+            case .inherit:
+                kind = .inherit
+                value = nil
+            case .value(let overriddenValue):
+                kind = .value
+                value = overriddenValue
+            case .none:
+                kind = .none
+                value = nil
+            }
+            return ModelParameterPolicyOverrideItem(
+                adapterID: adapterID,
+                parameterID: parameterID,
+                support: policy.support,
+                requiredOverride: policy.isRequired,
+                enabledByDefaultOverride: policy.isEnabledByDefault,
+                defaultValueOverrideKind: kind,
+                defaultValue: value
+            )
+        }
+
+        if model.modelContext == nil {
+            modelContext.insert(model)
+        }
+        try saveContext()
+    }
+
+    private func normalizedOptional(_ value: String?) -> String? {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    func fetchModelObservations(
         providerID: LLMProviderID,
         adapterID: LLMAdapterID,
         configuration: LLMProviderConfiguration
-    ) async throws -> [LLMModelMetadata] {
-        let adapter = LLMProviderRegistry.shared.adapter(
+    ) async throws -> [LLMProviderModelObservation] {
+        let adapter = try LLMProviderRegistry.shared.resolveAdapter(
             for: adapterID,
             providerID: providerID
         )
-        return try await adapter.fetchModelMetadata(configuration: configuration)
+        return try await adapter.fetchModelObservations(configuration: configuration)
     }
 
     @discardableResult
-    func upsertModelCandidates(
-        _ candidates: [LLMModelMetadata],
+    func upsertModelObservations(
+        _ observations: [LLMProviderModelObservation],
         for apiConfiguration: APIConfigurationItem
     ) throws -> ModelProviderFetchSummary {
         let existingModels = models(for: apiConfiguration)
         var summary = ModelProviderFetchSummary()
 
-        for candidate in candidates {
-            if let existing = existingModels.first(where: { $0.modelID == candidate.id }) {
+        for observation in observations {
+            if let existing = existingModels.first(where: { $0.modelID == observation.id }) {
                 existing.apiConfiguration = apiConfiguration
-                existing.metadata = candidate
+                existing.apply(observation)
                 summary.updated += 1
-                vxAtelierPro.log.debug("Overwrote model: \(candidate.id)")
+                vxAtelierPro.log.debug("Updated model observation: \(observation.id)")
             } else {
-                let modelItem = ModelItem(metadata: candidate, apiConfiguration: apiConfiguration)
+                let modelItem = ModelItem(observation: observation, apiConfiguration: apiConfiguration)
                 modelContext.insert(modelItem)
                 summary.added += 1
-                vxAtelierPro.log.debug("Added new model: \(candidate.id)")
+                vxAtelierPro.log.debug("Added model observation: \(observation.id)")
             }
         }
 
@@ -601,12 +670,12 @@ final class QueryManager {
         var summary = ModelProviderFetchSummary()
 
         do {
-            let fetchedModels = try await fetchModelCandidates(
+            let fetchedModels = try await fetchModelObservations(
                 providerID: providerID,
                 adapterID: adapterID,
                 configuration: providerConfiguration
             )
-            summary = try upsertModelCandidates(fetchedModels, for: apiConfiguration)
+            summary = try upsertModelObservations(fetchedModels, for: apiConfiguration)
             vxAtelierPro.log.info(
                 "refreshModels(for: \(apiConfiguration.name)): Updated \(summary.updated), added \(summary.added) models."
             )

@@ -24,7 +24,7 @@ struct ConversationRunStore {
         return turn
     }
 
-    /// Removes an unsent turn after run setup fails before any provider run is recorded.
+    /// Removes an empty turn and its response runs when no assistant or tool event was persisted.
     @MainActor
     func rollbackTurn(_ turn: ConversationTurn, from conversation: ConversationItem) throws {
         if let index = conversation.turns.firstIndex(where: {
@@ -32,6 +32,7 @@ struct ConversationRunStore {
         }) {
             conversation.turns.remove(at: index)
         }
+        conversation.modelContext?.delete(turn)
         conversation.forceUpdateTokenCount(updateContextCount: true, updateTotalCount: false)
         try save(conversation)
     }

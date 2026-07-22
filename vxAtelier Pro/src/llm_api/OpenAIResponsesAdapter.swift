@@ -21,7 +21,6 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
         return LLMHTTPGenerationPipeline.generateEvents(
             request: request,
             configuration: configuration,
-            profile: profile,
             httpClient: httpClient,
             endpoint: Self.generationPath,
             completionPolicy: .requireExplicitEvent { event in
@@ -40,12 +39,12 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
     }
 
     /// Reuses Chat Completions model listing for Responses-capable configurations.
-    func fetchModelMetadata(configuration: LLMProviderConfiguration) async throws -> [LLMModelMetadata] {
+    func fetchModelObservations(configuration: LLMProviderConfiguration) async throws -> [LLMProviderModelObservation] {
         if profile.id == .openAICodexChatGPTSubscription {
             return CodexChatGPTModels.candidates()
         }
         let chatFallback = OpenAIChatCompletionsAdapter(profile: profile)
-        return try await chatFallback.fetchModelMetadata(configuration: configuration)
+        return try await chatFallback.fetchModelObservations(configuration: configuration)
     }
 
     /// Encodes a provider-neutral request into a Responses JSON body.
@@ -66,6 +65,7 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
             request.options,
             to: &body,
             mappings: mappings,
+            activeParameterIDs: request.activeParameterIDs,
             reservedProviderExtraKeys: OpenAICompatibleEncoding.responsesReservedProviderExtraKeys
         )
         if !request.tools.isEmpty {

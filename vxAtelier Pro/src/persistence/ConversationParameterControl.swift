@@ -1,6 +1,5 @@
 import Foundation
 
-/// Non-persistent parameter row rendered from typed conversation options and model availability.
 struct ConversationParameterControl: Identifiable, Equatable {
     var id: LLMParameterID { parameterID }
     var parameterID: LLMParameterID
@@ -14,16 +13,16 @@ struct ConversationParameterControl: Identifiable, Equatable {
     var step: Double?
     var options: [String]?
     var value: JSONValue?
-    var isAvailable: Bool
+    var support: LLMResolvedSupport
     var isMapped: Bool
     var isEnabled: Bool
 
     var canToggleEnabled: Bool {
-        isAvailable && isMapped && !required
+        !required && (isMapped || isEnabled)
     }
 
     var isValueEditable: Bool {
-        isAvailable && isMapped
+        isMapped && isEnabled
     }
 }
 
@@ -35,98 +34,54 @@ enum ConversationParameterProjection {
     ) -> [ConversationParameterControl] {
         guard let apiConfiguration else { return [] }
 
-        let adapterID = apiConfiguration.defaultAdapterIDEnum
-        let modelID = options.selectedModelID
-            ?? apiConfiguration.defaultModelID
-            ?? ""
+        let modelID = options.selectedModelID ?? apiConfiguration.defaultModelID ?? ""
         let model = apiConfiguration.models.first { $0.modelID == modelID }
-        let mappings = LLMParameterMappingIndex.resolve(
-            adapterID: adapterID,
-            mappings: model?.parameterMappings.map(\.mapping) ?? []
-        )
-        let availability = LLMParameterAvailabilityIndex.resolve(
-            adapterID: adapterID,
-            availability: model?.parameterAvailability.map(\.availability) ?? []
-        )
+        let contracts = model?.resolvedContract.parameters ?? [:]
 
-        var controls: [ConversationParameterControl] = []
-        for parameterID in LLMParameterID.allCases {
-            let descriptor = availability[parameterID]
-            let mapping = mappings[parameterID]
+        return LLMParameterID.allCases.map { parameterID in
+            let contract = contracts[parameterID]
             let isProviderMappable = parameterID.isProviderMappable
-            let isAvailable = !isProviderMappable || descriptor?.isAvailable == true
-            let isMapped = !isProviderMappable || (mapping != nil && mapping?.encodingKind != .disabled)
-            let required = !isProviderMappable || descriptor?.isRequired == true
+            let mapping = contract?.mapping
+            let isDirectlyEncodable = parameterID == .stream && (try? LLMProviderRegistry.shared.resolveAdapter(
+                for: apiConfiguration.defaultAdapterIDEnum,
+                providerID: apiConfiguration.providerIDEnum
+            )) != nil
+            let isMapped = !isProviderMappable
+                || isDirectlyEncodable
+                || (mapping != nil && mapping?.encodingKind != .disabled)
+            let required = !isProviderMappable || contract?.isRequired == true
             let value = options.parameterValue(parameterID)
-                ?? descriptor?.defaultValue
+                ?? contract?.defaultValue
                 ?? (parameterID == .model ? .string(modelID) : nil)
-            let isEnabled: Bool
-            if !isAvailable || !isMapped {
-                isEnabled = false
-            } else if required {
-                isEnabled = true
-            } else if let descriptor {
-                isEnabled = LLMGenerationOptionsResolver.isParameterSendable(
-                    parameterID,
-                    value: options.parameterValue(parameterID),
-                    conversationPreference: options.parameterInclusionPreference(parameterID),
-                    modelAvailability: descriptor
-                )
-            } else {
-                isEnabled = options.isParameterEnabled(parameterID)
-            }
-            controls.append(control(
-                for: parameterID,
+            let isEnabled = required || LLMGenerationOptionsResolver.isParameterActive(
+                parameterID,
+                value: options.parameterValue(parameterID),
+                conversationPreference: options.parameterInclusionPreference(parameterID),
+                contract: contract
+            )
+            let presentation = AiParameterPresentationCatalog.presentation(for: parameterID)
+            return ConversationParameterControl(
+                parameterID: parameterID,
+                displayName: presentation.displayName,
+                description: presentation.description,
                 required: required,
-                options: descriptor?.options,
+                valueType: parameterID.valueType,
+                controlType: presentation.controlType,
+                minValue: parameterID.minValue,
+                maxValue: parameterID.maxValue,
+                step: presentation.step,
+                options: contract?.options ?? parameterID.options,
                 value: value,
-                isAvailable: isAvailable,
+                support: contract?.support ?? LLMResolvedSupport(state: .unknown, source: .fallback),
                 isMapped: isMapped,
                 isEnabled: isEnabled
-            ))
+            )
         }
-
-        return controls.sorted { lhs, rhs in
-            let lhsGroup = sortGroup(for: lhs)
-            let rhsGroup = sortGroup(for: rhs)
-            if lhsGroup != rhsGroup {
-                return lhsGroup < rhsGroup
-            }
+        .sorted { lhs, rhs in
+            let lhsGroup = lhs.isEnabled ? 0 : (lhs.isMapped ? 1 : 2)
+            let rhsGroup = rhs.isEnabled ? 0 : (rhs.isMapped ? 1 : 2)
+            if lhsGroup != rhsGroup { return lhsGroup < rhsGroup }
             return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
         }
-    }
-
-    private static func sortGroup(for control: ConversationParameterControl) -> Int {
-        if control.isEnabled { return 0 }
-        if control.isAvailable && control.isMapped { return 1 }
-        return 2
-    }
-
-    private static func control(
-        for parameterID: LLMParameterID,
-        required: Bool,
-        options: [String]?,
-        value: JSONValue?,
-        isAvailable: Bool,
-        isMapped: Bool,
-        isEnabled: Bool
-    ) -> ConversationParameterControl {
-        let presentation = AiParameterPresentationCatalog.presentation(for: parameterID)
-        return ConversationParameterControl(
-            parameterID: parameterID,
-            displayName: presentation.displayName,
-            description: presentation.description,
-            required: required,
-            valueType: parameterID.valueType,
-            controlType: presentation.controlType,
-            minValue: parameterID.minValue,
-            maxValue: parameterID.maxValue,
-            step: presentation.step,
-            options: options ?? parameterID.options,
-            value: value,
-            isAvailable: isAvailable,
-            isMapped: isMapped,
-            isEnabled: isEnabled
-        )
     }
 }

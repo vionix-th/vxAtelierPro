@@ -9,21 +9,26 @@ struct ModelSelectionView: View {
     let selectedModel: String
     let onModelSelected: (String) -> Void
     let apiConfiguration: APIConfigurationItem?
-    var draftModelCandidates: [LLMModelMetadata]? = nil
+    var draftModelObservations: [LLMProviderModelObservation]? = nil
 
     @State private var showAllModels = false
     @State private var searchText = ""
     @State private var selectedCapabilities: Set<LLMModelCapability> = []
 
     private var isDraftMode: Bool {
-        draftModelCandidates != nil
+        draftModelObservations != nil
     }
 
     private var filteredModels: [ModelSelectionOption] {
         var models: [ModelSelectionOption]
-        if let draftModelCandidates {
-            models = draftModelCandidates.map { metadata in
-                ModelSelectionOption(metadata: metadata, groupName: apiConfiguration?.name ?? metadata.providerID.displayName)
+        if let draftModelObservations {
+            models = draftModelObservations.map { observation in
+                ModelSelectionOption(
+                    observation: observation,
+                    adapterID: apiConfiguration?.defaultAdapterIDEnum
+                        ?? LLMProviderRegistry.shared.profile(for: observation.providerID).defaultAdapterID,
+                    groupName: apiConfiguration?.name ?? observation.providerID.displayName
+                )
             }
         } else if let apiConfiguration, !showAllModels {
             models = allModels
@@ -41,6 +46,7 @@ struct ModelSelectionView: View {
             let lowercasedSearch = searchText.lowercased()
             models = models.filter { model in
                 model.name.lowercased().contains(lowercasedSearch)
+                    || model.displayName.lowercased().contains(lowercasedSearch)
                     || model.groupName.lowercased().contains(lowercasedSearch)
                     || model.metadataSearchTerms.map { $0.lowercased() }.contains { $0.contains(lowercasedSearch) }
             }
@@ -201,6 +207,7 @@ struct ModelSelectionView: View {
 private struct ModelSelectionOption: Identifiable {
     let id: String
     let name: String
+    let displayName: String
     let provider: String
     let contextSize: Int
     let capabilities: [LLMModelCapability]
@@ -211,6 +218,7 @@ private struct ModelSelectionOption: Identifiable {
     init(model: ModelItem) {
         self.id = String(describing: model.persistentModelID)
         self.name = model.modelID
+        self.displayName = model.resolvedContract.displayName
         self.provider = model.apiConfiguration?.providerIDEnum.displayName ?? "Unknown Provider"
         self.contextSize = model.contextSize
         self.capabilities = model.capabilities
@@ -219,13 +227,22 @@ private struct ModelSelectionOption: Identifiable {
         self.apiConfigurationID = model.apiConfiguration?.id
     }
 
-    init(metadata: LLMModelMetadata, groupName: String) {
-        self.id = "metadata-\(metadata.providerID.rawValue)-\(metadata.id)"
-        self.name = metadata.id
-        self.provider = metadata.providerID.displayName
-        self.contextSize = metadata.contextSize ?? 0
-        self.capabilities = metadata.capabilities
-        self.metadataSearchTerms = metadata.capabilities.map(\.displayName)
+    init(observation: LLMProviderModelObservation, adapterID: LLMAdapterID, groupName: String) {
+        let contract = LLMModelContractResolver(
+            fallbackContextSize: AppDefaults.ModelContextSizes.defaultSize
+        ).resolve(
+            providerID: observation.providerID,
+            adapterID: adapterID,
+            modelID: observation.id,
+            observation: observation
+        )
+        self.id = "observation-\(observation.providerID.rawValue)-\(observation.id)"
+        self.name = observation.id
+        self.displayName = contract.displayName
+        self.provider = observation.providerID.displayName
+        self.contextSize = contract.contextSize
+        self.capabilities = contract.supportedCapabilities
+        self.metadataSearchTerms = contract.supportedCapabilities.map(\.displayName)
         self.groupName = groupName
         self.apiConfigurationID = nil
     }
@@ -241,10 +258,10 @@ private struct ModelRowView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(model.name)
+                    Text(model.displayName)
                         .font(.headline)
 
-                    Text(model.provider)
+                    Text(model.displayName == model.name ? model.provider : "\(model.name) · \(model.provider)")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }

@@ -79,7 +79,7 @@ final class ConversationResponseUseCase {
     ) async throws {
         for _ in 0..<maxToolDepth {
             let context = try await contextResolver.resolve(conversation: conversation, apiConfig: apiConfig)
-            let request = try requestFactory.makeRequest(from: context)
+            let request = requestFactory.makeRequest(from: context)
             let run = try runStore.createResponseRun(for: request, turn: turn, conversation: conversation)
 
             let result: ProviderRunResult
@@ -143,7 +143,7 @@ final class ConversationResponseUseCase {
             draftSink.start(conversationID: conversation.persistentModelID)
         }
 
-        throw LLMProviderError.unsupportedCapability("Max tool recursion depth exceeded.")
+        throw LLMProviderError.runLimitExceeded("Max tool recursion depth exceeded.")
     }
 
     /// Executes tool calls sequentially so persisted tool results preserve provider order.
@@ -190,7 +190,7 @@ final class ConversationResponseUseCase {
         var matchedCallIDs = Set<String>()
         for output in toolOutputs.sorted(by: { $0.index < $1.index }) {
             guard let toolCall = toolCallsByID[output.callID] else {
-                throw LLMProviderError.invalidConfiguration(
+                throw LLMProviderError.toolExecution(
                     "Native tool output \(output.callID) has no matching assistant tool call."
                 )
             }
@@ -204,7 +204,7 @@ final class ConversationResponseUseCase {
             )
         }
         guard matchedCallIDs.count == assistantMessage.toolCallItems.count else {
-            throw LLMProviderError.invalidConfiguration("Native tool execution did not return all assistant tool outputs.")
+            throw LLMProviderError.toolExecution("Native tool execution did not return all assistant tool outputs.")
         }
     }
 

@@ -16,7 +16,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         }
 
         let adapter = OpenAIChatCompletionsAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
-        let request = LLMRequest.runtimeEquivalent(
+        let request = LLMGenerationRequest.runtimeEquivalent(
             providerID: .openAIPlatform,
             adapterID: .openAIChatCompletions,
             modelID: "gpt-test",
@@ -31,9 +31,10 @@ final class LLMStreamingFixtureTests: LLMTestCase {
             providerID: .openAIPlatform
         )
 
-        let events = try await collectEvents(adapter.stream(
+        let events = try await collectEvents(adapter.generateEvents(
             request,
-            configuration: config.makeLLMProviderConfiguration()
+            configuration: config.makeLLMProviderConfiguration(),
+            toolExecutor: nil
         ))
         XCTAssertTrue(events.contains(.textDelta("Hello")))
         XCTAssertTrue(events.contains(where: { event in
@@ -42,7 +43,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
             }
             return false
         }))
-        XCTAssertTrue(events.contains(.runCompleted(responseID: nil, modelID: nil)))
+        XCTAssertTrue(events.contains(.generationCompleted(responseID: nil, modelID: nil)))
     }
 
     func testOpenAIResponsesStreamingFixture() async throws {
@@ -53,7 +54,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         }
 
         let adapter = OpenAIResponsesAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
-        let request = LLMRequest.runtimeEquivalent(
+        let request = LLMGenerationRequest.runtimeEquivalent(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
             modelID: "gpt-test",
@@ -68,14 +69,15 @@ final class LLMStreamingFixtureTests: LLMTestCase {
             providerID: .openAIPlatform
         )
 
-        let events = try await collectEvents(adapter.stream(
+        let events = try await collectEvents(adapter.generateEvents(
             request,
-            configuration: config.makeLLMProviderConfiguration()
+            configuration: config.makeLLMProviderConfiguration(),
+            toolExecutor: nil
         ))
-        XCTAssertTrue(events.contains(.runStarted(requestID: "resp_fixture")))
+        XCTAssertTrue(events.contains(.generationStarted(requestID: "resp_fixture")))
         XCTAssertTrue(events.contains(.textDelta("Hello")))
         XCTAssertTrue(events.contains(.usage(LLMUsage(inputTokens: 5, outputTokens: 7, totalTokens: 12))))
-        XCTAssertTrue(events.contains(.runCompleted(responseID: "resp_fixture", modelID: "gpt-4.1-mini")))
+        XCTAssertTrue(events.contains(.generationCompleted(responseID: "resp_fixture", modelID: "gpt-4.1-mini")))
         XCTAssertTrue(events.contains(where: { event in
             if case .toolCallCompleted(let call) = event {
                 return call.id == "fc_1" && call.callID == "call_1" && call.argumentsJSON == "{\"q\":\"test\"}"
@@ -92,7 +94,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         }
 
         let adapter = OpenAIResponsesAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
-        let request = LLMRequest.runtimeEquivalent(
+        let request = LLMGenerationRequest.runtimeEquivalent(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
             modelID: "gpt-test",
@@ -107,9 +109,10 @@ final class LLMStreamingFixtureTests: LLMTestCase {
             providerID: .openAIPlatform
         )
 
-        await assertThrowsAsyncError(try await collectEvents(adapter.stream(
+        await assertThrowsAsyncError(try await collectEvents(adapter.generateEvents(
             request,
-            configuration: config.makeLLMProviderConfiguration()
+            configuration: config.makeLLMProviderConfiguration(),
+            toolExecutor: nil
         ))) { error in
             XCTAssertEqual(error as? LLMProviderError, .decoding("Provider stream ended before completion event."))
         }
@@ -123,7 +126,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         }
 
         let adapter = AnthropicMessagesAdapter(profile: LLMProviderRegistry.shared.profile(for: .anthropic))
-        let request = LLMRequest.runtimeEquivalent(
+        let request = LLMGenerationRequest.runtimeEquivalent(
             providerID: .anthropic,
             adapterID: .anthropicMessages,
             modelID: "claude-test",
@@ -138,13 +141,14 @@ final class LLMStreamingFixtureTests: LLMTestCase {
             providerID: .anthropic
         )
 
-        let events = try await collectEvents(adapter.stream(
+        let events = try await collectEvents(adapter.generateEvents(
             request,
-            configuration: config.makeLLMProviderConfiguration()
+            configuration: config.makeLLMProviderConfiguration(),
+            toolExecutor: nil
         ))
-        XCTAssertTrue(events.contains(.runStarted(requestID: "msg_fixture")))
+        XCTAssertTrue(events.contains(.generationStarted(requestID: "msg_fixture")))
         XCTAssertTrue(events.contains(.textDelta("Hello")))
-        XCTAssertTrue(events.contains(.runCompleted(responseID: nil, modelID: nil)))
+        XCTAssertTrue(events.contains(.generationCompleted(responseID: nil, modelID: nil)))
         XCTAssertTrue(events.contains(where: { event in
             if case .toolCallCompleted(let call) = event {
                 return call.callID == "toolu_1" && call.name == "lookup" && call.argumentsJSON == "{\"q\":\"test\"}"
@@ -163,7 +167,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         XCTAssertEqual(openRouterModels.first?.id, "openai/gpt-4o-mini")
         XCTAssertEqual(openRouterModels.first?.displayName, "GPT-4o Mini")
         XCTAssertEqual(openRouterModels.first?.contextSize, 128000)
-        XCTAssertEqual(openRouterModels.first?.capabilities, [.text])
+        XCTAssertEqual(openRouterModels.first?.capabilityClaims, [])
 
         let lmStudioData = try fixtureJSON(name: "lmstudio_models").objectValue?.array("data") ?? []
         let lmStudioModels = LLMModelMetadataDecoder.openAICompatibleCandidates(
@@ -171,7 +175,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
             profile: LLMProviderRegistry.shared.profile(for: .lmStudio)
         )
         XCTAssertEqual(lmStudioModels.first?.id, "local-model")
-        XCTAssertEqual(lmStudioModels.first?.capabilities, [.text])
+        XCTAssertEqual(lmStudioModels.first?.capabilityClaims, [])
 
         let ollamaData = try fixtureJSON(name: "ollama_models").objectValue?.array("data") ?? []
         let ollamaModels = LLMModelMetadataDecoder.openAICompatibleCandidates(
@@ -179,7 +183,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
             profile: LLMProviderRegistry.shared.profile(for: .ollama)
         )
         XCTAssertEqual(ollamaModels.first?.id, "llama3.2")
-        XCTAssertTrue(ollamaModels.first?.capabilities.contains(.text) ?? false)
+        XCTAssertEqual(ollamaModels.first?.capabilityClaims, [])
     }
 
     func testMessageExportRoundtripPreservesPartsAndToolCalls() {

@@ -17,13 +17,13 @@ struct ToolBatchExecutor {
         turn: ConversationTurn
     ) async throws -> String {
         guard conversation.options.isToolEnabled(toolCall.name) else {
-            throw LLMProviderError.unsupportedCapability("Tool '\(toolCall.name)' is not enabled.")
+            throw LLMProviderError.toolExecution("Tool '\(toolCall.name)' is not enabled.")
         }
         guard let tool = toolCatalog.tool(named: toolCall.name) else {
-            throw LLMProviderError.unsupportedCapability("Tool not found: \(toolCall.name)")
+            throw LLMProviderError.toolExecution("Tool not found: \(toolCall.name)")
         }
         guard let executableTool = tool as? any ExecutableLLMTool else {
-            throw LLMProviderError.unsupportedCapability("Tool execution not supported: \(toolCall.name)")
+            throw LLMProviderError.toolExecution("Tool execution not supported: \(toolCall.name)")
         }
 
         let configuration = conversation.options.getToolConfiguration(toolCall.name)

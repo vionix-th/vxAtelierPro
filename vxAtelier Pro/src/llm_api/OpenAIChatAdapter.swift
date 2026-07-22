@@ -6,13 +6,10 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
     private static let modelsPath = "/models"
 
     let profile: LLMProviderProfile
-    private let adapterID: LLMAdapterID
     private let httpClient = LLMHTTPClient()
 
-    /// Creates a Chat Completions adapter for a concrete adapter identity.
-    init(profile: LLMProviderProfile, adapterID: LLMAdapterID = .openAIChatCompletions) {
+    init(profile: LLMProviderProfile) {
         self.profile = profile
-        self.adapterID = adapterID
     }
 
     /// Executes a Chat Completions request through the shared adapter run loop.
@@ -21,36 +18,28 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
         configuration: LLMProviderConfiguration,
         toolExecutor: LLMToolExecutionHandler?
     ) -> AsyncThrowingStream<LLMGenerationEvent, Error> {
-        do {
-            try validateAdapterID(request.adapterID)
-            return LLMHTTPGenerationPipeline.generateEvents(
-                request: request,
-                configuration: configuration,
-                profile: profile,
-                httpClient: httpClient,
-                endpoint: Self.generationPath,
-                completionPolicy: .synthesizeOnStreamEnd,
-                makeBody: { stream in
-                    try makeBody(for: request, stream: stream)
-                },
-                emitNonStreaming: { response, continuation in
-                    emitNonStreamingResponse(response, continuation: continuation)
-                },
-                handleStreamingEvent: { event, assembler, continuation in
-                    for emitted in handleStreamEvent(event, assembler: &assembler) {
-                        continuation.yield(emitted)
-                    }
+        LLMHTTPGenerationPipeline.generateEvents(
+            request: request,
+            configuration: configuration,
+            httpClient: httpClient,
+            endpoint: Self.generationPath,
+            completionPolicy: .synthesizeOnStreamEnd,
+            makeBody: { stream in
+                try makeBody(for: request, stream: stream)
+            },
+            emitNonStreaming: { response, continuation in
+                emitNonStreamingResponse(response, continuation: continuation)
+            },
+            handleStreamingEvent: { event, assembler, continuation in
+                for emitted in handleStreamEvent(event, assembler: &assembler) {
+                    continuation.yield(emitted)
                 }
-            )
-        } catch {
-            return AsyncThrowingStream { continuation in
-                continuation.finish(throwing: error)
             }
-        }
+        )
     }
 
     /// Fetches OpenAI-compatible model metadata and maps it into candidates.
-    func fetchModelMetadata(configuration: LLMProviderConfiguration) async throws -> [LLMModelMetadata] {
+    func fetchModelObservations(configuration: LLMProviderConfiguration) async throws -> [LLMProviderModelObservation] {
         let httpConfig = httpClient.makeConfiguration(for: configuration)
         let response: JSONValue = try await httpClient.getJSON(path: Self.modelsPath, configuration: httpConfig, responseType: JSONValue.self)
         guard let data = response.objectValue?.array("data") else { return [] }
@@ -58,13 +47,6 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
             from: data,
             profile: profile
         )
-    }
-
-    /// Confirms the runtime request is routed through the expected chat adapter.
-    private func validateAdapterID(_ requestedAdapterID: LLMAdapterID) throws {
-        guard requestedAdapterID == adapterID else {
-            throw LLMProviderError.unsupportedCapability("\(profile.name) does not support \(adapterID.rawValue).")
-        }
     }
 
     /// Encodes a provider-neutral request into a Chat Completions JSON body.
@@ -82,6 +64,7 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
             request.options,
             to: &body,
             mappings: mappings,
+            activeParameterIDs: request.activeParameterIDs,
             reservedProviderExtraKeys: OpenAICompatibleEncoding.chatReservedProviderExtraKeys
         )
         if !request.tools.isEmpty {
@@ -201,10 +184,7 @@ struct OpenAICompatibleChatCompletionsAdapter: LLMProviderAdapter {
     /// Creates an OpenAI-compatible Chat Completions adapter for a provider profile.
     init(profile: LLMProviderProfile) {
         self.profile = profile
-        self.chatAdapter = OpenAIChatCompletionsAdapter(
-            profile: profile,
-            adapterID: .openAICompatibleChatCompletions
-        )
+        self.chatAdapter = OpenAIChatCompletionsAdapter(profile: profile)
     }
 
     /// Executes a compatible Chat Completions request through the shared chat implementation.
@@ -217,7 +197,7 @@ struct OpenAICompatibleChatCompletionsAdapter: LLMProviderAdapter {
     }
 
     /// Fetches OpenAI-compatible model metadata and maps it into candidates.
-    func fetchModelMetadata(configuration: LLMProviderConfiguration) async throws -> [LLMModelMetadata] {
-        try await chatAdapter.fetchModelMetadata(configuration: configuration)
+    func fetchModelObservations(configuration: LLMProviderConfiguration) async throws -> [LLMProviderModelObservation] {
+        try await chatAdapter.fetchModelObservations(configuration: configuration)
     }
 }

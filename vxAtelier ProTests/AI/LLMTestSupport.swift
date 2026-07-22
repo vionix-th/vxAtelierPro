@@ -41,9 +41,9 @@ class LLMTestCase: XCTestCase {
     }
 
     func collectEvents(
-        _ stream: AsyncThrowingStream<LLMStreamEvent, Error>
-    ) async throws -> [LLMStreamEvent] {
-        var events: [LLMStreamEvent] = []
+        _ stream: AsyncThrowingStream<LLMGenerationEvent, Error>
+    ) async throws -> [LLMGenerationEvent] {
+        var events: [LLMGenerationEvent] = []
         for try await event in stream {
             events.append(event)
         }

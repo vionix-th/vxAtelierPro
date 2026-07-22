@@ -1,171 +1,74 @@
 import Foundation
 
-/// Model-level availability and enabled state for one semantic parameter.
-struct LLMParameterAvailability: Codable, Equatable, Identifiable {
-    /// Combines adapter and semantic parameter so one model can store per-adapter availability.
+struct LLMParameterDefaults: Codable, Equatable, Identifiable {
     var id: String { "\(adapterID.rawValue):\(parameterID.rawValue)" }
     var adapterID: LLMAdapterID
     var parameterID: LLMParameterID
-    var isAvailable: Bool
+    var support: LLMSupportState
     var isRequired: Bool
-    var isEnabled: Bool
+    var isEnabledByDefault: Bool
     var defaultValue: JSONValue?
     var options: [String]?
-
-    /// Creates model-level sendability metadata for a semantic parameter at one adapter.
-    init(
-        adapterID: LLMAdapterID,
-        parameterID: LLMParameterID,
-        isAvailable: Bool = true,
-        isRequired: Bool = false,
-        isEnabled: Bool = false,
-        defaultValue: JSONValue? = nil,
-        options: [String]? = nil
-    ) {
-        self.adapterID = adapterID
-        self.parameterID = parameterID
-        self.isAvailable = isAvailable
-        self.isRequired = isRequired
-        self.isEnabled = isEnabled
-        self.defaultValue = defaultValue
-        self.options = options
-    }
 }
 
-/// Default parameter availability loaded from bundled LLM defaults.
-enum LLMParameterAvailabilityCatalog {
-    /// Returns default availability for a provider, adapter, and model.
-    static func defaults(
-        providerID: LLMProviderID,
-        adapterID: LLMAdapterID,
-        modelID: String
-    ) -> [LLMParameterAvailability] {
-        LLMDefaultsCatalog.bundled.parameterAvailability(
-            providerID: providerID,
-            adapterID: adapterID,
-            modelID: modelID
-        )
-    }
+struct LLMResolvedGenerationParameters: Equatable {
+    var options: LLMGenerationOptions
+    var activeParameterIDs: Set<LLMParameterID>
+    var mappings: [LLMParameterMapping]
 }
 
-/// Resolves persisted model-specific parameter availability.
-struct LLMParameterAvailabilityIndex {
-    /// Returns availability keyed by semantic parameter for one adapter.
-    static func resolve(
-        adapterID: LLMAdapterID,
-        availability: [LLMParameterAvailability]
-    ) -> [LLMParameterID: LLMParameterAvailability] {
-        Dictionary(uniqueKeysWithValues: availability
-            .filter { $0.adapterID == adapterID }
-            .map { ($0.parameterID, $0) })
-    }
-}
-
-/// Resolves model-specific semantic parameter availability before provider wire encoding.
 enum LLMGenerationOptionsResolver {
-    /// Returns true when a semantic parameter should remain in the provider-neutral request.
-    static func isParameterSendable(
+    static func isParameterActive(
         _ parameterID: LLMParameterID,
         value: JSONValue?,
         conversationPreference: Bool?,
-        modelAvailability: LLMParameterAvailability?
+        contract: LLMResolvedParameterContract?
     ) -> Bool {
         guard parameterID.isProviderMappable else { return true }
-        guard let availability = modelAvailability else { return false }
-        guard availability.isAvailable else { return false }
-        if availability.isRequired { return true }
+        if contract?.isRequired == true { return true }
         if let conversationPreference { return conversationPreference }
-        return availability.isEnabled || value != nil || availability.defaultValue != nil
+        guard let contract else { return value != nil }
+        return contract.isEnabledByDefault
+            || value != nil
+            || contract.defaultValue != nil
     }
 
-    /// Returns provider-neutral options after model availability and conversation preferences are applied.
-    static func resolvedOptions(
-        from options: LLMGenerationOptions,
+    static func resolve(
+        options: LLMGenerationOptions,
         conversationPreferences: [String: Bool],
-        modelAvailability: [LLMParameterID: LLMParameterAvailability]
-    ) -> LLMGenerationOptions {
-        var resolved = options
-        let sendableAvailability = sendableModelAvailability(
-            for: options,
-            conversationPreferences: conversationPreferences,
-            modelAvailability: modelAvailability
-        )
+        parameterContracts: [LLMParameterID: LLMResolvedParameterContract]
+    ) -> LLMResolvedGenerationParameters {
+        var resolvedOptions = options
+        var activeParameterIDs = Set<LLMParameterID>()
+        var mappings: [LLMParameterMapping] = []
+
         for parameterID in LLMParameterID.allCases where parameterID.isProviderMappable {
-            guard let availability = sendableAvailability[parameterID] else {
-                resolved.removeSemanticValue(for: parameterID)
-                continue
-            }
-            if resolved.jsonValue(for: parameterID) == nil, let defaultValue = availability.defaultValue {
-                resolved.setSemanticValue(defaultValue, for: parameterID)
-            }
-        }
-        return resolved
-    }
-
-    /// Returns model availability only for semantic parameters that may affect this request.
-    static func sendableModelAvailability(
-        for options: LLMGenerationOptions,
-        conversationPreferences: [String: Bool],
-        modelAvailability: [LLMParameterID: LLMParameterAvailability]
-    ) -> [LLMParameterID: LLMParameterAvailability] {
-        modelAvailability.filter { entry in
-            isParameterSendable(
-                entry.key,
-                value: options.jsonValue(for: entry.key),
-                conversationPreference: conversationPreferences[entry.key.rawValue],
-                modelAvailability: entry.value
+            let contract = parameterContracts[parameterID]
+            let isActive = isParameterActive(
+                parameterID,
+                value: options.jsonValue(for: parameterID),
+                conversationPreference: conversationPreferences[parameterID.rawValue],
+                contract: contract
             )
+            guard isActive else { continue }
+            activeParameterIDs.insert(parameterID)
+            if resolvedOptions.jsonValue(for: parameterID) == nil, let defaultValue = contract?.defaultValue {
+                resolvedOptions.setSemanticValue(defaultValue, for: parameterID)
+            }
+            if let mapping = contract?.mapping {
+                mappings.append(mapping)
+            }
         }
+
+        return LLMResolvedGenerationParameters(
+            options: resolvedOptions,
+            activeParameterIDs: activeParameterIDs,
+            mappings: mappings
+        )
     }
 }
 
-private extension LLMGenerationOptions {
-    /// Removes a provider-mappable semantic value after availability has been resolved.
-    mutating func removeSemanticValue(for parameterID: LLMParameterID) {
-        switch parameterID {
-        case .model, .systemPrompt:
-            break
-        case .maxOutputTokens:
-            maxOutputTokens = nil
-        case .topK:
-            topK = nil
-        case .temperature:
-            temperature = nil
-        case .topP:
-            topP = nil
-        case .stopSequences:
-            stop = []
-        case .responseFormat:
-            responseFormat = .text
-        case .reasoningEffort:
-            reasoning = nil
-        case .reasoningSummary:
-            reasoningSummary = nil
-        case .reasoningBudgetTokens:
-            reasoningBudgetTokens = nil
-        case .serviceTier:
-            serviceTier = nil
-        case .textVerbosity:
-            textVerbosity = nil
-        case .stream:
-            streamMode = .disabled
-        case .store,
-             .toolChoice,
-             .parallelToolCalls,
-             .promptCacheKey,
-             .previousResponseID,
-             .include,
-             .frequencyPenalty,
-             .presencePenalty,
-             .logitBias,
-             .seed,
-             .user,
-             .safetyIdentifier:
-            providerSpecificOptions.removeValue(forKey: parameterID.rawValue)
-        }
-    }
-
-    /// Applies a model-level default value before provider-specific request encoding.
+extension LLMGenerationOptions {
     mutating func setSemanticValue(_ value: JSONValue, for parameterID: LLMParameterID) {
         switch parameterID {
         case .model:

@@ -64,8 +64,9 @@ struct AppBootstrap {
         let schema = Schema([
             APIConfigurationItem.self,
             ModelItem.self,
-            ModelParameterMappingItem.self,
-            ModelParameterAvailabilityItem.self,
+            ModelCapabilityOverrideItem.self,
+            ModelParameterMappingOverrideItem.self,
+            ModelParameterPolicyOverrideItem.self,
             ConversationOptions.self,
             MessageItem.self,
             MessageContentPartItem.self,
@@ -95,11 +96,7 @@ struct AppBootstrap {
         )
 
         do {
-            return try ModelContainer(
-                for: schema,
-                migrationPlan: vxAtelierPro.ProjectMigrationPlan.self,
-                configurations: modelConfiguration
-            )
+            return try ModelContainer(for: schema, configurations: modelConfiguration)
         } catch {
             vxAtelierPro.log.error("Failed to create ModelContainer: \(error.localizedDescription)")
             fatalError("Could not create ModelContainer: \(error)")

@@ -119,23 +119,27 @@ struct LLMProviderRegistry {
     }
 
     /// Creates the default adapter appropriate for the provider profile.
-    func defaultAdapter(for providerID: LLMProviderID) -> LLMProviderAdapter {
+    func defaultAdapter(for providerID: LLMProviderID) throws -> LLMProviderAdapter {
         let profile = profile(for: providerID)
-        return adapter(for: profile.defaultAdapterID, providerID: providerID)
+        return try resolveAdapter(for: profile.defaultAdapterID, providerID: providerID)
     }
 
-    /// Creates an adapter appropriate for a provider and generation wire contract.
-    func adapter(for adapterID: LLMAdapterID, providerID: LLMProviderID) -> LLMProviderAdapter {
+    func validateRoute(adapterID: LLMAdapterID, providerID: LLMProviderID) throws {
         let profile = profile(for: providerID)
         guard profile.isEnabled else {
-            return DisabledLLMProviderAdapter(profile: profile, message: "\(profile.name) is disabled.")
+            throw LLMProviderError.authUnavailable("\(profile.name) is disabled.")
         }
         guard profile.supportedAdapterIDs.contains(adapterID) else {
-            return DisabledLLMProviderAdapter(
-                profile: profile,
-                message: "\(profile.name) does not support \(adapterID.rawValue)."
+            throw LLMProviderError.invalidConfiguration(
+                "\(profile.name) cannot use \(adapterID.rawValue)."
             )
         }
+    }
+
+    /// Creates the adapter for a validated provider and wire contract.
+    func resolveAdapter(for adapterID: LLMAdapterID, providerID: LLMProviderID) throws -> LLMProviderAdapter {
+        try validateRoute(adapterID: adapterID, providerID: providerID)
+        let profile = profile(for: providerID)
 
         switch adapterID {
         case .openAIResponses:
@@ -152,9 +156,8 @@ struct LLMProviderRegistry {
                 return FoundationModelsAdapter(profile: profile)
             }
             #endif
-            return DisabledLLMProviderAdapter(
-                profile: profile,
-                message: "\(profile.name) requires macOS 26.0 or iOS 26.0 or newer."
+            throw LLMProviderError.localModelUnavailable(
+                "\(profile.name) requires macOS 26.0 or iOS 26.0 or newer."
             )
         }
     }
@@ -175,11 +178,11 @@ struct LLMProviderRegistry {
     }
 
     /// Returns the synthetic model candidates exposed by a local-model backend.
-    func localModelMetadata(
+    func localModelObservations(
         for providerID: LLMProviderID,
         configuration: LLMProviderConfiguration
-    ) -> [LLMModelMetadata] {
-        localBackend(for: providerID)?.modelMetadata(configuration: configuration) ?? []
+    ) -> [LLMProviderModelObservation] {
+        localBackend(for: providerID)?.modelObservations(configuration: configuration) ?? []
     }
 
     /// Returns the local backend associated with one provider profile.

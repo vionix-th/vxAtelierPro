@@ -99,6 +99,21 @@ struct LLMParameterMappingIndex {
             .filter { $0.adapterID == adapterID }
             .map { ($0.parameterID, $0) })
     }
+
+    static func requireEncodableMappings(
+        activeParameterIDs: Set<LLMParameterID>,
+        mappings: [LLMParameterID: LLMParameterMapping],
+        directlyEncodedParameterIDs: Set<LLMParameterID> = [.stream]
+    ) throws -> [LLMParameterID: LLMParameterMapping] {
+        for parameterID in activeParameterIDs.subtracting(directlyEncodedParameterIDs) {
+            guard let mapping = mappings[parameterID], mapping.encodingKind != .disabled else {
+                throw LLMProviderError.requestEncoding(
+                    "No active wire mapping for \(parameterID.rawValue)."
+                )
+            }
+        }
+        return mappings.filter { activeParameterIDs.contains($0.key) }
+    }
 }
 
 /// Encodes scalar semantic parameters into a provider request body.
@@ -107,13 +122,22 @@ enum LLMParameterWireEncoder {
     static func applyScalarOptions(
         _ options: LLMGenerationOptions,
         to body: inout [String: JSONValue],
-        mappings: [LLMParameterID: LLMParameterMapping]
+        mappings: [LLMParameterID: LLMParameterMapping],
+        activeParameterIDs: Set<LLMParameterID>
     ) throws {
-        for mapping in mappings.values {
+        let activeMappings = try LLMParameterMappingIndex.requireEncodableMappings(
+            activeParameterIDs: activeParameterIDs,
+            mappings: mappings
+        )
+        for mapping in activeMappings.values {
+            guard let value = options.jsonValue(for: mapping.parameterID) else {
+                throw LLMProviderError.requestEncoding(
+                    "Active parameter \(mapping.parameterID.rawValue) has no value."
+                )
+            }
             guard mapping.encodingKind == .scalarKey else { continue }
-            guard let value = options.jsonValue(for: mapping.parameterID) else { continue }
             guard !mapping.wireKey.isEmpty else {
-                throw LLMProviderError.unsupportedParameter("\(mapping.parameterID.rawValue) has no wire key.")
+                throw LLMProviderError.requestEncoding("\(mapping.parameterID.rawValue) has no wire key.")
             }
             body[mapping.wireKey] = value
         }

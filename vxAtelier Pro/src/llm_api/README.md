@@ -1,79 +1,62 @@
 # LLM API
 
-`llm_api` is the reusable LLM provider and tool API surface for vxAtelier Pro.
-
-- `LLMGenerationRequest`, `LLMContentTypes`, `LLMResponseTypes`, and related files define provider-neutral LLM values and generation events.
-- `LLMCapabilityValidator`, `LLMParameter*`, and `LLMRequestEncoding` define validation, parameter mapping, and request encoding.
-- `LLMProvider*`, `LLMDefaultsCatalog`, and `LLMModelMetadataDecoder` define provider identities, transport profiles, configuration values, adapter lookup, defaults, and model metadata decoding.
-- `OpenAI*`, `Anthropic*`, and `LLMHTTPGenerationPipeline` map provider-specific wire protocols into provider-neutral events.
-- `LLMHTTPClient` and `LLMSecretRedactor` contain provider HTTP/SSE helpers, response metadata handling, redaction, and normalized provider errors.
-- `LLMTool*` and `ConfigurableLLMTool` contain reusable tool schema, configuration, catalog, and registry contracts.
-
-SwiftData run orchestration and concrete vxAtelier tools live in `llm_runtime`.
+`llm_api` is the reusable provider, model-contract, request-encoding, transport, and tool API surface for vxAtelier Pro. SwiftData-aware run orchestration and concrete application tools live in `llm_runtime`.
 
 ## Runtime Flow
 
-1. `llm_runtime` resolves persisted configuration and conversation state.
-2. `llm_runtime` builds an `LLMGenerationRequest` from `llm_api` values.
-3. `llm_api` supplies provider profiles and configuration values.
-4. `llm_api` executes provider requests through adapters/transport and emits `LLMGenerationEvent` values.
-5. `llm_runtime` persists stable `MessageItem`, `ToolCallItem`, and `ResponseRunItem` records.
-6. `llm_runtime` executes concrete app tools through the reusable tool contracts.
+1. A provider model-list endpoint produces `LLMProviderModelObservation` values. Observations contain only facts returned by the provider.
+2. `ModelItem` persists those observations and explicit user overrides. Catalog values are never copied into SwiftData.
+3. `LLMModelContractResolver` creates the effective `LLMResolvedModelContract` used by settings, conversation controls, status UI, and request assembly.
+4. `LLMGenerationOptionsResolver` combines conversation inclusion intent with the resolved required/default policy and returns resolved options, active parameter identifiers, and mappings.
+5. A provider adapter builds the wire body before dispatch. `LLMHTTPGenerationPipeline` sends it and emits provider-neutral `LLMGenerationEvent` values.
+6. `llm_runtime` persists stable `MessageItem`, `ToolCallItem`, and `ResponseRunItem` records. SwiftData is not written per token or tool-argument delta.
 
-SwiftData is not written per token or per tool-argument delta.
+## Model Contract
 
-## Providers
+`LLMModelContractResolver` is the sole model-contract resolution path. Precedence is fixed:
 
-Supported profiles:
+1. Explicit user override.
+2. Explicit provider observation.
+3. Last matching catalog rule.
+4. Fallback: model identifier as display name, application default context size, and `unknown` support.
 
-- OpenAI Platform: Responses first, with OpenAI Chat Completions adapter support.
-- Anthropic: Messages API.
-- OpenRouter, LM Studio, Ollama, xAI, DeepSeek, custom OpenAI-compatible: Chat Completions-compatible adapter.
-- Codex ChatGPT Subscription: Responses adapter routed through `https://chatgpt.com/backend-api/codex/responses`, authenticated by app-owned OAuth or device-code tokens, with static model inventory when remote model listing is unavailable.
+Provider capability arrays are positive, non-exhaustive observations. An omitted field makes no claim. Only an explicit provider `false` becomes an `unsupported` observation. The resolved support source is retained as `userOverride`, `provider`, `catalog`, or `fallback` so the UI can show provenance.
 
-## Validation
+`LLMDefaultsCatalog` evaluates ordered rules from `Resources/LLMDefaults.json`. Rules are evaluated from top to bottom; later matching rules override earlier rules. `providerRegex` and `modelRegex` are regular-expression matches and `adapterID` is exact.
 
-`LLMCapabilityValidator` performs provider/model preflight before runtime persists a run:
-
-- adapter support
-- stream mode support
-- typed parameter support
-- JSON object/schema response format support
-- image/file/audio content support
-- tool replay ordering and tool-result correlation
+The SwiftData schema is changed in place with no migration plan. Development stores created with the former materialized model schema must be removed with the startup recovery **Wipe Store** action. Backup format 3 exports observations and overrides only and intentionally rejects earlier model-contract backup formats.
 
 ## Parameters
 
-Keep these concepts separate:
+The subsystem keeps three concepts separate:
 
-- Semantic parameter: app-level name and value, such as `temperature`, `max_output_tokens`, or `reasoning_effort`.
-- Parameter availability: selected-model support state, including available, unavailable, required, and defaulted.
-- Parameter mapping: selected-model semantic-to-wire translation, such as `max_output_tokens` to `max_tokens`, `max_completion_tokens`, or a structured preset.
+- Semantic value and inclusion intent belong to the conversation.
+- Advisory support, required/default policy, options, and effective mapping belong to `LLMResolvedParameterContract`.
+- Wire encoding belongs to the selected adapter.
 
-`LLMParameterDefinitions` owns semantic parameter identities and value metadata. `LLMParameterMapping` owns semantic-to-wire translation. `LLMGenerationOptionsResolver` applies selected-model availability plus conversation inclusion preferences before encoding. Provider adapters then encode only the resulting sendable parameters.
+An explicitly enabled mapped parameter remains active when support is `unsupported` or `unknown`; the provider decides whether to accept it. A missing or disabled mapping is different: the application cannot encode that parameter, so an active unmapped parameter produces `LLMProviderError.requestEncoding` before network dispatch. Streaming is read directly from resolved request options and model streaming support is advisory.
 
-Conversation storage may hold semantic values and user enable/disable intent for optional parameters. It must not own model availability, mandatory rules, or wire names.
+## Validation Responsibility
 
-## Defaults Precedence
+Remote providers are authoritative for request acceptance. There is no general capability preflight.
 
-`LLMDefaultsCatalog` loads `LLMDefaults.json` as an ordered rule list.
+Local checks are limited to boundaries owned by the application:
 
-- Rules are evaluated top to bottom.
-- `providerRegex` and `modelRegex` are regular-expression matches.
-- `adapterID` is an exact match.
-- Later matching rules override earlier rules for the same semantic parameter.
-- Broad provider and adapter rules should appear before narrower model-specific rules.
-- Unknown models inherit the broader provider or adapter baseline instead of failing.
-- Fetched model metadata may refine model facts such as context size and capabilities, but it does not create parameter mappings or availability rules.
+- `LLMProviderRegistry.resolveAdapter` validates provider/adapter composition.
+- `ConversationHistoryValidator` rejects duplicate, missing, dangling, or out-of-order tool-call identifiers as `invalidConversationState`.
+- Provider adapters reject missing/disabled active mappings, required image/file/schema/tool encoding data, reserved option collisions, and unrepresentable wire formats as `requestEncoding`.
+- Local backends retain framework availability and platform constraints.
 
-For baseline model creation and fetch normalization, the intended stack is:
+Provider HTTP errors retain normalized metadata, redaction, and retry classification. Remote `4xx` responses are non-retryable. A provider rejection before any assistant event is surfaced transiently and the otherwise empty turn/run is rolled back; failures after persisted assistant or tool events retain the failed run.
 
-`provider -> adapter -> provider+adapter -> model family -> exact model`
+## Providers
 
-That stack applies only to bundled defaults and fetched model metadata. Conversation storage and runtime request composition do not define the baseline.
+- OpenAI Platform: Responses and Chat Completions.
+- Anthropic: Messages.
+- OpenRouter, LM Studio, Ollama, xAI, DeepSeek, and custom OpenAI-compatible services: Chat Completions-compatible transport.
+- Codex ChatGPT Subscription: Responses routed through the ChatGPT Codex backend, with app-owned OAuth/device-code credentials and a static observation inventory when remote listing is unavailable.
+- Apple Intelligence: local Foundation Models backend with local availability enforcement.
 
-## Smoke Tests
+## Tests
 
-Offline adapter and LLM runtime tests use fixtures in `vxAtelier ProTests/AI/Fixtures`.
-
-Live provider smoke tests live in `LLMProviderLiveSmokeTests` and are skipped by default. To run them, copy `vxAtelier ProTests/AI/LiveLLMProviders.template.json` to `vxAtelier ProTests/AI/LiveLLMProviders.local.json`, set the top-level `enabled` flag to `true`, and enable only the provider entries that should run locally.
+Offline adapter and runtime fixtures live in `vxAtelier ProTests/AI/Fixtures`. Live provider smoke tests are skipped by default and use `LiveLLMProviders.local.json` when explicitly enabled.

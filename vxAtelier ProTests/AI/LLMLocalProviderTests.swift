@@ -11,19 +11,21 @@ import FoundationModels
 @MainActor
 final class LLMLocalProviderTests: XCTestCase {
     func testFoundationModelsAdapterDelegatesLocalBackend() async throws {
-        let candidate = LLMModelDescriptor(
+        let candidate = LLMProviderModelObservation(
             id: "apple-intelligence-default",
             displayName: "Apple Intelligence",
             providerID: .appleIntelligence,
             contextSize: 4096,
-            capabilities: [.text, .tools, .streaming]
+            capabilityClaims: [.text, .tools, .streaming].map {
+                LLMCapabilityClaim(capability: $0, state: .supported)
+            }
         )
         let backend = MockLocalModelBackend(
             availabilityResult: .available,
             statusTextResult: "On-device model available",
             candidatesResult: [candidate],
             streamFactory: { continuation in
-                continuation.yield(.runStarted(requestID: "apple-request"))
+                continuation.yield(.generationStarted(requestID: "apple-request"))
                 continuation.yield(.textDelta("Hello"))
                 continuation.yield(.toolCallCompleted(LLMToolCall(
                     id: "tool-1",
@@ -32,21 +34,20 @@ final class LLMLocalProviderTests: XCTestCase {
                     name: "lookup",
                     argumentsJSON: "{\"q\":\"test\"}"
                 )))
-                continuation.yield(.runCompleted(responseID: "apple-response", modelID: "apple-intelligence-default"))
+                continuation.yield(.generationCompleted(responseID: "apple-response", modelID: "apple-intelligence-default"))
                 continuation.finish()
             }
         )
         let adapter = FoundationModelsAdapter(profile: LLMProviderRegistry.shared.profile(for: .appleIntelligence), backend: backend)
         let configuration = LLMProviderConfiguration(providerID: .appleIntelligence, baseURL: "", credential: .none)
 
-        let fetchedModels = try await adapter.fetchModels(configuration: configuration)
+        let fetchedModels = try await adapter.fetchModelObservations(configuration: configuration)
         XCTAssertEqual(fetchedModels, [candidate])
 
-        let request = LLMRequest(
+        let request = LLMGenerationRequest(
             providerID: .appleIntelligence,
             adapterID: .foundationModels,
             modelID: candidate.id,
-            modelCapabilities: candidate.capabilities,
             messages: [
                 LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Hello")])
             ],
@@ -60,9 +61,13 @@ final class LLMLocalProviderTests: XCTestCase {
             options: LLMGenerationOptions(streamMode: .enabled)
         )
 
-        let events = try await collectEvents(adapter.stream(request, configuration: configuration))
+        let events = try await collectEvents(adapter.generateEvents(
+            request,
+            configuration: configuration,
+            toolExecutor: nil
+        ))
         XCTAssertEqual(events, [
-            .runStarted(requestID: "apple-request"),
+            .generationStarted(requestID: "apple-request"),
             .textDelta("Hello"),
             .toolCallCompleted(LLMToolCall(
                 id: "tool-1",
@@ -71,7 +76,7 @@ final class LLMLocalProviderTests: XCTestCase {
                 name: "lookup",
                 argumentsJSON: "{\"q\":\"test\"}"
             )),
-            .runCompleted(responseID: "apple-response", modelID: "apple-intelligence-default")
+            .generationCompleted(responseID: "apple-response", modelID: "apple-intelligence-default")
         ])
     }
 
@@ -84,7 +89,7 @@ final class LLMLocalProviderTests: XCTestCase {
         let adapter = FoundationModelsAdapter(profile: LLMProviderRegistry.shared.profile(for: .appleIntelligence), backend: backend)
         let configuration = LLMProviderConfiguration(providerID: .appleIntelligence, baseURL: "", credential: .none)
 
-        let request = LLMRequest(
+        let request = LLMGenerationRequest(
             providerID: .appleIntelligence,
             adapterID: .foundationModels,
             modelID: "apple-intelligence-default",
@@ -94,15 +99,19 @@ final class LLMLocalProviderTests: XCTestCase {
         )
 
         do {
-            _ = try await collectEvents(adapter.stream(request, configuration: configuration))
+            _ = try await collectEvents(adapter.generateEvents(
+                request,
+                configuration: configuration,
+                toolExecutor: nil
+            ))
             XCTFail("Expected adapter to fail when backend is unavailable.")
         } catch let error as LLMProviderError {
             XCTAssertEqual(error, .localModelUnavailable("Apple Intelligence unavailable."))
         }
     }
 
-    private func collectEvents(_ stream: AsyncThrowingStream<LLMStreamEvent, Error>) async throws -> [LLMStreamEvent] {
-        var events: [LLMStreamEvent] = []
+    private func collectEvents(_ stream: AsyncThrowingStream<LLMGenerationEvent, Error>) async throws -> [LLMGenerationEvent] {
+        var events: [LLMGenerationEvent] = []
         for try await event in stream {
             events.append(event)
         }
@@ -114,14 +123,14 @@ private final class MockLocalModelBackend: LLMLocalModelBackend {
     let profile = LLMProviderRegistry.shared.profile(for: .appleIntelligence)
     let availabilityResult: LLMLocalModelAvailability
     let statusTextResult: String
-    let candidatesResult: [LLMModelDescriptor]
-    let streamFactory: (AsyncThrowingStream<LLMStreamEvent, Error>.Continuation) -> Void
+    let candidatesResult: [LLMProviderModelObservation]
+    let streamFactory: (AsyncThrowingStream<LLMGenerationEvent, Error>.Continuation) -> Void
 
     init(
         availabilityResult: LLMLocalModelAvailability,
         statusTextResult: String,
-        candidatesResult: [LLMModelDescriptor],
-        streamFactory: @escaping (AsyncThrowingStream<LLMStreamEvent, Error>.Continuation) -> Void = { $0.finish() }
+        candidatesResult: [LLMProviderModelObservation],
+        streamFactory: @escaping (AsyncThrowingStream<LLMGenerationEvent, Error>.Continuation) -> Void = { $0.finish() }
     ) {
         self.availabilityResult = availabilityResult
         self.statusTextResult = statusTextResult
@@ -137,15 +146,15 @@ private final class MockLocalModelBackend: LLMLocalModelBackend {
         statusTextResult
     }
 
-    func modelCandidates(configuration: LLMProviderConfiguration) -> [LLMModelDescriptor] {
+    func modelObservations(configuration: LLMProviderConfiguration) -> [LLMProviderModelObservation] {
         candidatesResult
     }
 
-    func stream(
-        request: LLMRequest,
+    func generateEvents(
+        request: LLMGenerationRequest,
         configuration: LLMProviderConfiguration,
         toolExecutor: LLMToolExecutionHandler?
-    ) -> AsyncThrowingStream<LLMStreamEvent, Error> {
+    ) -> AsyncThrowingStream<LLMGenerationEvent, Error> {
         AsyncThrowingStream { continuation in
             streamFactory(continuation)
         }
@@ -158,8 +167,8 @@ private final class MockLocalModelBackend: LLMLocalModelBackend {
 final class FoundationModelsBackendTests: XCTestCase {
     func testGeneratedContentThrowsOnInvalidJSON() {
         XCTAssertThrowsError(try FoundationModelsBackend.generatedContent(from: "{invalid")) { error in
-            guard case .decoding(let message) = error as? LLMProviderError else {
-                return XCTFail("Expected decoding error, got \(error)")
+            guard case .invalidConversationState(let message) = error as? LLMProviderError else {
+                return XCTFail("Expected invalid conversation state, got \(error)")
             }
             XCTAssertTrue(message.contains("Invalid persisted tool-call arguments for Foundation Models"))
         }
@@ -196,7 +205,7 @@ final class FoundationModelsBackendTests: XCTestCase {
         }
         let request = makeAppleRequest(streamMode: .disabled)
 
-        let events = try await collectEvents(backend.stream(
+        let events = try await collectEvents(backend.generateEvents(
             request: request,
             configuration: .init(providerID: .appleIntelligence, baseURL: "", credential: .none),
             toolExecutor: { _, _ in "result" }
@@ -205,7 +214,7 @@ final class FoundationModelsBackendTests: XCTestCase {
         XCTAssertTrue(session.respondCalled)
         XCTAssertFalse(session.streamCalled)
         XCTAssertEqual(events, [
-            .runStarted(requestID: nil),
+            .generationStarted(requestID: nil),
             .textDelta("Final answer"),
             .toolCallCompleted(LLMToolCall(
                 id: "call-1",
@@ -221,7 +230,7 @@ final class FoundationModelsBackendTests: XCTestCase {
                 name: "lookup",
                 output: "result"
             )),
-            .runCompleted(responseID: nil, modelID: "apple-intelligence-default")
+            .generationCompleted(responseID: nil, modelID: "apple-intelligence-default")
         ])
     }
 
@@ -256,7 +265,7 @@ final class FoundationModelsBackendTests: XCTestCase {
         }
         let request = makeAppleRequest(streamMode: .enabled)
 
-        let events = try await collectEvents(backend.stream(
+        let events = try await collectEvents(backend.generateEvents(
             request: request,
             configuration: .init(providerID: .appleIntelligence, baseURL: "", credential: .none),
             toolExecutor: { _, _ in "result" }
@@ -265,7 +274,7 @@ final class FoundationModelsBackendTests: XCTestCase {
         XCTAssertTrue(session.streamCalled)
         XCTAssertFalse(session.respondCalled)
         XCTAssertEqual(events, [
-            .runStarted(requestID: nil),
+            .generationStarted(requestID: nil),
             .textDelta("Fin"),
             .textDelta("al answer"),
             .toolCallCompleted(LLMToolCall(
@@ -282,24 +291,25 @@ final class FoundationModelsBackendTests: XCTestCase {
                 name: "lookup",
                 output: "result"
             )),
-            .runCompleted(responseID: nil, modelID: "apple-intelligence-default")
+            .generationCompleted(responseID: nil, modelID: "apple-intelligence-default")
         ])
     }
 
-    private func makeAppleRequest(streamMode: LLMGenerationOptions.StreamMode) -> LLMRequest {
-        let candidate = LLMModelDescriptor(
+    private func makeAppleRequest(streamMode: LLMGenerationOptions.StreamMode) -> LLMGenerationRequest {
+        let candidate = LLMProviderModelObservation(
             id: "apple-intelligence-default",
             displayName: "Apple Intelligence",
             providerID: .appleIntelligence,
             contextSize: 4096,
-            capabilities: [.text, .tools, .streaming]
+            capabilityClaims: [.text, .tools, .streaming].map {
+                LLMCapabilityClaim(capability: $0, state: .supported)
+            }
         )
 
-        return LLMRequest(
+        return LLMGenerationRequest(
             providerID: .appleIntelligence,
             adapterID: .foundationModels,
             modelID: candidate.id,
-            modelCapabilities: candidate.capabilities,
             messages: [
                 LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Hello")])
             ],
@@ -314,8 +324,8 @@ final class FoundationModelsBackendTests: XCTestCase {
         )
     }
 
-    private func collectEvents(_ stream: AsyncThrowingStream<LLMStreamEvent, Error>) async throws -> [LLMStreamEvent] {
-        var events: [LLMStreamEvent] = []
+    private func collectEvents(_ stream: AsyncThrowingStream<LLMGenerationEvent, Error>) async throws -> [LLMGenerationEvent] {
+        var events: [LLMGenerationEvent] = []
         for try await event in stream {
             events.append(event)
         }

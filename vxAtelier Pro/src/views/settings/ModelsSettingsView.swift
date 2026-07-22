@@ -24,6 +24,7 @@ struct ModelsSettingsView: View {
     struct ModelRowItem: Identifiable {
         let id: PersistentIdentifier
         let modelID: String
+        let displayName: String
         let providerName: String
         let providerDisplayName: String
         let contextSize: Int
@@ -41,6 +42,7 @@ struct ModelsSettingsView: View {
                 ModelRowItem(
                     id: model.persistentModelID,
                     modelID: model.modelID,
+                    displayName: model.resolvedContract.displayName,
                     providerName: model.apiConfiguration?.name ?? "No API Configuration",
                     providerDisplayName: model.apiConfiguration?.providerIDEnum.displayName ?? "Unknown",
                     contextSize: model.contextSize,
@@ -118,7 +120,6 @@ struct ModelsSettingsView: View {
             editingModel = EditingModel(
                 model: ModelItem(
                     modelID: "New Model",
-                    contextSize: AppDefaults.ModelContextSizes.defaultSize,
                     apiConfiguration: apiConfigurations.first
                 ),
                 isNew: true
@@ -178,9 +179,9 @@ struct ModelsSettingsView: View {
                 }
             ) { row in
                 SettingsEntityRow(
-                    title: row.modelID,
+                    title: row.displayName,
                     subtitle: row.providerName,
-                    metadata: "Provider: \(row.providerDisplayName)  Context: \(row.contextSize)",
+                    metadata: "Model: \(row.modelID)  Provider: \(row.providerDisplayName)  Context: \(row.contextSize)",
                     systemImages: row.capabilitySystemImages
                 )
             } actions: { row in

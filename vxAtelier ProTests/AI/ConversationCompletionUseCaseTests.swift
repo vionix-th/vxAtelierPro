@@ -53,7 +53,7 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         options.streamMode = .disabled
         let conversation = ConversationItem("Auto stream", options: options)
         let model = ModelItem(modelID: "gpt-test", apiConfiguration: config)
-        model.capabilitiesRaw = [LLMModelCapability.text.rawValue, LLMModelCapability.usage.rawValue]
+        model.providerSupportedCapabilitiesRaw = [LLMModelCapability.text.rawValue, LLMModelCapability.usage.rawValue]
         env.modelContext.insert(config)
         env.modelContext.insert(model)
         env.modelContext.insert(conversation)
@@ -69,7 +69,47 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         XCTAssertEqual(run.requestID, "req_nonstream")
     }
 
-    func testStreamModeEnabledFailsPreflightWhenModelDoesNotSupportStreaming() async {
+    func testStreamModeEnabledReachesProviderWhenModelReportsStreamingUnsupported() async throws {
+        let responseData = Data("""
+        data: {"type":"response.created","response":{"id":"resp_stream","model":"gpt-test"}}
+
+        data: {"type":"response.output_text.delta","delta":"Done"}
+
+        data: {"type":"response.completed","response":{"id":"resp_stream","model":"gpt-test"}}
+
+        """.utf8)
+        URLProtocol.registerClass(MockLLMURLProtocol.self)
+        defer {
+            URLProtocol.unregisterClass(MockLLMURLProtocol.self)
+            MockLLMURLProtocol.requestHandler = nil
+        }
+        var requestCount = 0
+        MockLLMURLProtocol.requestHandler = { request in
+            requestCount += 1
+            let data = request.httpBodyStream.flatMap { stream -> Data? in
+                stream.open()
+                defer { stream.close() }
+                var data = Data()
+                let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: 4096)
+                defer { buffer.deallocate() }
+                while stream.hasBytesAvailable {
+                    let count = stream.read(buffer, maxLength: 4096)
+                    if count <= 0 { break }
+                    data.append(buffer, count: count)
+                }
+                return data
+            } ?? request.httpBody ?? Data()
+            let body = try JSONDecoder().decode(JSONValue.self, from: data)
+            XCTAssertEqual(body.objectValue?.bool("stream"), true)
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["content-type": "text/event-stream"]
+            )!
+            return (response, responseData)
+        }
+
         let env = TestEnvironment()
         let config = APIConfigurationItem(
             name: "OpenAI",
@@ -84,21 +124,22 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         options.streamMode = .enabled
         let conversation = ConversationItem("Stream required", options: options)
         let model = ModelItem(modelID: "gpt-test", apiConfiguration: config)
-        model.capabilitiesRaw = [LLMModelCapability.text.rawValue, LLMModelCapability.usage.rawValue]
+        model.providerUnsupportedCapabilitiesRaw = [LLMModelCapability.streaming.rawValue]
         env.modelContext.insert(config)
         env.modelContext.insert(model)
         env.modelContext.insert(conversation)
 
-        await assertThrowsAsyncError(try await ConversationCompletionUseCase.shared.complete(
+        try await ConversationCompletionUseCase.shared.complete(
             conversation: conversation,
             message: "Hello",
             draftStore: ConversationDraftStore()
-        ))
+        )
 
-        XCTAssertTrue(conversation.turns.isEmpty)
+        XCTAssertEqual(requestCount, 1)
+        XCTAssertEqual(conversation.turns.first?.responseRuns.first?.status, .completed)
     }
 
-    func testProviderFailureAfterRunCreationPersistsFailedResponseRun() async throws {
+    func testProviderFailureBeforeAssistantEventRollsBackTurn() async throws {
         URLProtocol.registerClass(MockLLMURLProtocol.self)
         defer {
             URLProtocol.unregisterClass(MockLLMURLProtocol.self)
@@ -139,14 +180,7 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
             draftStore: ConversationDraftStore()
         ))
 
-        XCTAssertEqual(conversation.turns.count, 1)
-        let run = try XCTUnwrap(conversation.turns.first?.responseRuns.first)
-        XCTAssertEqual(run.status, .failed)
-        XCTAssertEqual(run.requestID, "req_failed")
-        XCTAssertEqual(run.statusCode, 500)
-        XCTAssertNotNil(run.responseMetadataJSON)
-        XCTAssertNotNil(run.errorMessage)
-        XCTAssertNotNil(run.completedAt)
+        XCTAssertTrue(conversation.turns.isEmpty)
     }
 
     func testRetryPolicyRetriesTransientProviderErrorOnce() async throws {
@@ -245,17 +279,24 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         insertOpenAIModel(config: config, env: env)
         env.modelContext.insert(conversation)
 
+        let draftStore = ConversationDraftStore()
         await assertThrowsAsyncError(try await ConversationCompletionUseCase.shared.complete(
             conversation: conversation,
             message: "Hello",
-            draftStore: ConversationDraftStore()
-        ))
+            draftStore: draftStore
+        )) { error in
+            guard case .provider(let statusCode, let message, let metadata) = error as? LLMProviderError else {
+                return XCTFail("Expected normalized provider rejection, got \(error)")
+            }
+            XCTAssertEqual(statusCode, 400)
+            XCTAssertTrue(message.contains("bad request"))
+            XCTAssertEqual(metadata?.requestID, "req_bad")
+        }
 
         XCTAssertEqual(requestCount, 1)
-        let run = try XCTUnwrap(conversation.turns.first?.responseRuns.first)
-        XCTAssertEqual(run.status, .failed)
-        XCTAssertEqual(run.requestID, "req_bad")
-        XCTAssertEqual(run.statusCode, 400)
+        XCTAssertTrue(conversation.turns.isEmpty)
+        XCTAssertEqual(draftStore.draft(for: conversation.persistentModelID).runStatus, .failed)
+        XCTAssertNotNil(draftStore.draft(for: conversation.persistentModelID).errorMessage)
     }
 
     func testToolExecutionFailureMarksAwaitingRunFailed() async throws {
@@ -399,10 +440,7 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
             XCTAssertEqual(error as? LLMProviderError, .cancelled)
         }
 
-        XCTAssertEqual(conversation.turns.count, 1)
-        let run = try XCTUnwrap(conversation.turns.first?.responseRuns.first)
-        XCTAssertEqual(run.status, .cancelled)
-        XCTAssertNotNil(run.completedAt)
+        XCTAssertTrue(conversation.turns.isEmpty)
     }
 
     func testPreflightModelErrorRemovesNewUserTurn() async {
@@ -433,7 +471,7 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         env: TestEnvironment
     ) {
         let model = ModelItem(modelID: modelID, apiConfiguration: config)
-        model.capabilitiesRaw = [
+        model.providerSupportedCapabilitiesRaw = [
             LLMModelCapability.text.rawValue,
             LLMModelCapability.streaming.rawValue,
             LLMModelCapability.usage.rawValue,

@@ -14,7 +14,7 @@ enum AppBootstrapPreviewData {
         )
 
         let previewModel = ModelItem(modelID: "preview-model", apiConfiguration: apiConfiguration)
-        previewModel.displayName = "Preview Model"
+        previewModel.displayNameOverride = "Preview Model"
 
         let conversationOptions = ConversationOptions(apiConfiguration: apiConfiguration)
         conversationOptions.selectedModelID = previewModel.modelID

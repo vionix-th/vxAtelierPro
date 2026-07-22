@@ -228,7 +228,8 @@ struct StatusBarConversationInfoRow: View {
 
     private var modelName: String {
         guard let conversation else { return "No model" }
-        return conversation.options.selectedModelID
+        return selectedModel?.resolvedContract.displayName
+            ?? conversation.options.selectedModelID
             ?? conversation.options.apiConfiguration?.defaultModelID
             ?? "No model"
     }
@@ -245,8 +246,21 @@ struct StatusBarConversationInfoRow: View {
         conversation?.usedTokenCount ?? 0
     }
 
-    private var supportsStreaming: Bool {
-        selectedModel?.capabilities.contains(.streaming) == true
+    private var canEncodeStreaming: Bool {
+        guard let configuration = conversation?.options.apiConfiguration else { return false }
+        return (try? LLMProviderRegistry.shared.resolveAdapter(
+            for: configuration.defaultAdapterIDEnum,
+            providerID: configuration.providerIDEnum
+        )) != nil
+    }
+
+    private var streamingSupportHelp: String {
+        guard let support = selectedModel?.resolvedContract.capabilities[.streaming] else {
+            return "Streaming support is unknown; the provider will decide."
+        }
+        return support.state == .supported
+            ? "Streaming is reported as supported."
+            : "Streaming support is \(support.state.displayName.lowercased()); the provider will decide."
     }
 
     private var isStreamingEnabled: Bool {
@@ -299,7 +313,7 @@ struct StatusBarConversationInfoRow: View {
                 .padding(.horizontal, AppDefaults.paddingSmall)
 
                 if !dense {
-                    if allowsStreamingToggle && supportsStreaming, let onToggleStreaming {
+                    if allowsStreamingToggle && canEncodeStreaming, let onToggleStreaming {
                         HStack(spacing: AppDefaults.paddingSmall) {
                             Image(systemName: isStreamingEnabled ? "sparkles" : "text.alignleft")
                                 .font(.caption)
@@ -311,6 +325,7 @@ struct StatusBarConversationInfoRow: View {
                         .onTapGesture {
                             onToggleStreaming(!isStreamingEnabled)
                         }
+                        .help(streamingSupportHelp)
                     }
 
                     if !capabilities.isEmpty {

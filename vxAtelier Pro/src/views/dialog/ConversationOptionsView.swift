@@ -473,14 +473,12 @@ struct ParameterControlView: View {
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
-            Text(control.isAvailable ? "Available" : "Unavailable")
+            Text(control.support.state.displayName)
                 .font(.caption2)
-                .foregroundColor(control.isAvailable ? .secondary : .red)
-            if !control.isMapped {
-                Text("Unmapped")
-                    .font(.caption2)
-                    .foregroundColor(.orange)
-            }
+                .foregroundColor(control.support.state == .supported ? .secondary : .orange)
+            Text(control.isMapped ? "Mapped" : "Unencodable")
+                .font(.caption2)
+                .foregroundColor(control.isMapped ? .secondary : .orange)
         }
     }
 
@@ -488,11 +486,13 @@ struct ParameterControlView: View {
         if control.required {
             return "Required parameters are always enabled."
         }
-        if !control.isAvailable {
-            return "Unavailable parameters cannot be sent."
-        }
         if !control.isMapped {
-            return "Unmapped parameters cannot be sent."
+            return control.isEnabled
+                ? "Disable this parameter before sending; the adapter cannot encode it."
+                : "The adapter has no wire mapping for this parameter."
+        }
+        if control.support.state != .supported {
+            return "Support is advisory; the provider will decide whether to accept this parameter."
         }
         return "Controls whether this parameter is sent with requests."
     }

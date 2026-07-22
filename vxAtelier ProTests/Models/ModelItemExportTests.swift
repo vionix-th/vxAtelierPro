@@ -30,7 +30,7 @@ final class ModelItemExportTests: XCTestCase {
         )
         config.defaultAdapterIDEnum = .openAIChatCompletions
         let original = ModelItem(modelID: "gpt-4", contextSize: 8192, apiConfiguration: config)
-        original.capabilitiesRaw = [
+        original.providerSupportedCapabilitiesRaw = [
             LLMModelCapability.text.rawValue,
             LLMModelCapability.image.rawValue,
             LLMModelCapability.streaming.rawValue
@@ -41,16 +41,13 @@ final class ModelItemExportTests: XCTestCase {
         let restored = decoded.toDataItem(apiConfigurations: [config])
         XCTAssertEqual(restored.name, original.name)
         XCTAssertEqual(restored.contextSize, original.contextSize)
-        XCTAssertEqual(Set(restored.capabilitiesRaw), Set(original.capabilitiesRaw))
+        XCTAssertEqual(Set(restored.providerSupportedCapabilitiesRaw), Set(original.providerSupportedCapabilitiesRaw))
         XCTAssertEqual(restored.apiConfiguration?.name, config.name)
-        let restoredMaxTokens = restored.parameterMappings.first {
-            $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
-        }
+        let restoredMaxTokens = restored.resolvedContract.parameters[.maxOutputTokens]?.mapping
         XCTAssertEqual(restoredMaxTokens?.wireKey, "max_tokens")
-        let restoredMaxTokensAvailability = restored.parameterAvailability.first {
-            $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .maxOutputTokens
-        }
-        XCTAssertTrue(restoredMaxTokensAvailability?.isAvailable ?? false)
+        XCTAssertEqual(restored.resolvedContract.parameters[.maxOutputTokens]?.support.state, .supported)
+        XCTAssertTrue(restored.parameterMappingOverrides.isEmpty)
+        XCTAssertTrue(restored.parameterPolicyOverrides.isEmpty)
     }
 
     func testJsonSerializerImportModelResolvesAPIConfigurationOwnership() throws {

@@ -64,24 +64,6 @@ struct LLMDefaultsCatalog {
         return didMatch ? resolved : nil
     }
 
-    /// Builds a model candidate from bundled defaults for draft fetch/create flows.
-    func modelMetadata(
-        providerID: LLMProviderID,
-        modelID: String,
-        displayName: String? = nil,
-        rawMetadataJSON: String? = nil
-    ) -> LLMModelMetadata {
-        let defaults = modelDefaults(providerID: providerID, modelID: modelID)
-        return LLMModelMetadata(
-            id: modelID,
-            displayName: displayName,
-            providerID: providerID,
-            contextSize: defaults?.contextSize,
-            capabilities: defaults?.capabilities ?? [.text],
-            rawMetadataJSON: rawMetadataJSON
-        )
-    }
-
     /// Returns parameter mappings for matching provider/model/adapter rules.
     func parameterMappings(
         providerID: LLMProviderID,
@@ -110,12 +92,12 @@ struct LLMDefaultsCatalog {
     }
 
     /// Returns parameter availability for matching provider/model/adapter rules.
-    func parameterAvailability(
+    func parameterDefaults(
         providerID: LLMProviderID,
         adapterID: LLMAdapterID,
         modelID: String
-    ) -> [LLMParameterAvailability] {
-        var merged: [LLMParameterID: LLMParameterAvailability] = [:]
+    ) -> [LLMParameterDefaults] {
+        var merged: [LLMParameterID: LLMParameterDefaults] = [:]
         var order: [LLMParameterID] = []
 
         for rule in rules {
@@ -125,11 +107,11 @@ struct LLMDefaultsCatalog {
             }
 
             for availabilityDefault in parameterAvailability {
-                let availability = availabilityDefault.availability(adapterID: adapterID)
-                if merged[availability.parameterID] == nil {
-                    order.append(availability.parameterID)
+                let defaults = availabilityDefault.defaults(adapterID: adapterID)
+                if merged[defaults.parameterID] == nil {
+                    order.append(defaults.parameterID)
                 }
-                merged[availability.parameterID] = availability
+                merged[defaults.parameterID] = defaults
             }
         }
 
@@ -325,13 +307,13 @@ private struct LLMParameterAvailabilityDefault: Decodable {
     var defaultValue: JSONValue?
     var options: [String]?
 
-    func availability(adapterID: LLMAdapterID) -> LLMParameterAvailability {
-        LLMParameterAvailability(
+    func defaults(adapterID: LLMAdapterID) -> LLMParameterDefaults {
+        LLMParameterDefaults(
             adapterID: adapterID,
             parameterID: parameter,
-            isAvailable: available ?? true,
+            support: (available ?? true) ? .supported : .unsupported,
             isRequired: required ?? false,
-            isEnabled: enabled ?? (defaultValue != nil),
+            isEnabledByDefault: enabled ?? (defaultValue != nil),
             defaultValue: defaultValue,
             options: options
         )

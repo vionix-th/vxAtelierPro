@@ -20,7 +20,7 @@ final class ProviderRunExecutorTests: LLMTestCase {
         let profile = LLMProviderRegistry.shared.profile(for: .openAIPlatform)
         var options = LLMGenerationOptions(streamMode: .enabled)
         options.modelID = "gpt-4.1-mini"
-        let request = LLMRequest.runtimeEquivalent(
+        let request = LLMGenerationRequest.runtimeEquivalent(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
             modelID: "gpt-4.1-mini",
@@ -114,12 +114,12 @@ final class ConversationDisplayPolicyTests: LLMTestCase {
     }
 
     func testActiveFollowUpDraftRendersAfterAssistantEventExists() {
-        let draft = ConversationDraft(isActive: true, runStatus: .streaming)
+        let draft = ConversationDraft(isActive: true, runStatus: .running)
 
         XCTAssertTrue(ConversationDraftRenderPolicy.shouldRender(
             isLastTurn: true,
             draft: draft,
-            latestRunStatus: .streaming
+            latestRunStatus: .running
         ))
     }
 

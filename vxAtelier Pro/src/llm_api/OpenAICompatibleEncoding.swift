@@ -16,17 +16,29 @@ enum OpenAICompatibleEncoding {
         _ options: LLMGenerationOptions,
         to body: inout [String: JSONValue],
         mappings: [LLMParameterID: LLMParameterMapping],
+        activeParameterIDs: Set<LLMParameterID>,
         reservedProviderExtraKeys: Set<String> = []
     ) throws {
         var providerSpecificOptions = options.providerSpecificOptions
-        for mapping in mappings.values {
-            guard let value = options.jsonValue(for: mapping.parameterID) else { continue }
+        for parameterID in LLMParameterID.allCases where !activeParameterIDs.contains(parameterID) {
+            providerSpecificOptions.removeValue(forKey: parameterID.rawValue)
+        }
+        let activeMappings = try LLMParameterMappingIndex.requireEncodableMappings(
+            activeParameterIDs: activeParameterIDs,
+            mappings: mappings
+        )
+        for mapping in activeMappings.values {
+            guard let value = options.jsonValue(for: mapping.parameterID) else {
+                throw LLMProviderError.requestEncoding(
+                    "Active parameter \(mapping.parameterID.rawValue) has no value."
+                )
+            }
             providerSpecificOptions.removeValue(forKey: mapping.parameterID.rawValue)
 
             switch mapping.encodingKind {
             case .scalarKey:
                 guard !mapping.wireKey.isEmpty else {
-                    throw LLMProviderError.unsupportedParameter("\(mapping.parameterID.rawValue) has no wire key.")
+                    throw LLMProviderError.requestEncoding("\(mapping.parameterID.rawValue) has no wire key.")
                 }
                 body[mapping.wireKey] = value
             case .structuredPreset:
@@ -38,7 +50,7 @@ enum OpenAICompatibleEncoding {
 
         for (key, value) in providerSpecificOptions {
             guard !reservedProviderExtraKeys.contains(key), body[key] == nil else {
-                throw LLMProviderError.unsupportedParameter("providerSpecificOptions.\(key) cannot override a reserved request field.")
+                throw LLMProviderError.requestEncoding("providerSpecificOptions.\(key) cannot override a reserved request field.")
             }
             body[key] = value
         }
@@ -106,7 +118,7 @@ enum OpenAICompatibleEncoding {
     private static func jsonSchemaPayload(from providerSpecificOptions: inout [String: JSONValue]) throws -> [String: JSONValue] {
         guard let value = providerSpecificOptions.removeValue(forKey: "json_schema"),
               let object = value.objectValue else {
-            throw LLMProviderError.unsupportedParameter("response_format json_schema requires providerSpecificOptions.json_schema object.")
+            throw LLMProviderError.requestEncoding("response_format json_schema requires providerSpecificOptions.json_schema object.")
         }
         return object
     }
@@ -138,7 +150,7 @@ enum OpenAICompatibleEncoding {
                 return .object(["type": .string("text"), "text": .string(part.text ?? "")])
             case .image:
                 guard let url = imageURL(from: part) else {
-                    throw LLMProviderError.unsupportedParameter("OpenAI Chat image content requires sourceURL or dataBase64.")
+                    throw LLMProviderError.requestEncoding("OpenAI Chat image content requires sourceURL or dataBase64.")
                 }
                 return .object([
                     "type": .string("image_url"),
@@ -146,7 +158,7 @@ enum OpenAICompatibleEncoding {
                 ])
             case .file:
                 guard let data = fileData(from: part) else {
-                    throw LLMProviderError.unsupportedParameter("OpenAI Chat file content requires dataBase64.")
+                    throw LLMProviderError.requestEncoding("OpenAI Chat file content requires dataBase64.")
                 }
                 return .object([
                     "type": .string("file"),
@@ -156,7 +168,7 @@ enum OpenAICompatibleEncoding {
                     ])
                 ])
             case .audio:
-                throw LLMProviderError.unsupportedParameter("OpenAI Chat audio content is not supported by this adapter.")
+                throw LLMProviderError.requestEncoding("OpenAI Chat audio content is not encodable by this adapter.")
             }
         })
     }
@@ -174,7 +186,7 @@ enum OpenAICompatibleEncoding {
                 return .object(["type": .string("input_text"), "text": .string(part.text ?? "")])
             case .image:
                 guard let url = imageURL(from: part) else {
-                    throw LLMProviderError.unsupportedParameter("OpenAI Responses image content requires sourceURL or dataBase64.")
+                    throw LLMProviderError.requestEncoding("OpenAI Responses image content requires sourceURL or dataBase64.")
                 }
                 return .object([
                     "type": .string("input_image"),
@@ -189,11 +201,11 @@ enum OpenAICompatibleEncoding {
                 } else if let url = part.sourceURL {
                     file["file_url"] = .string(url)
                 } else {
-                    throw LLMProviderError.unsupportedParameter("OpenAI Responses file content requires sourceURL or dataBase64.")
+                    throw LLMProviderError.requestEncoding("OpenAI Responses file content requires sourceURL or dataBase64.")
                 }
                 return .object(file)
             case .audio:
-                throw LLMProviderError.unsupportedParameter("OpenAI Responses audio content is not supported by this adapter.")
+                throw LLMProviderError.requestEncoding("OpenAI Responses audio content is not encodable by this adapter.")
             }
         })
     }

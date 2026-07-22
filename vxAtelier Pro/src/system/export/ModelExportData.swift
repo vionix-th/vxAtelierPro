@@ -1,169 +1,133 @@
 import Foundation
-import SwiftData
-
-// MARK: - Model Export
 
 struct ModelExportData: Codable {
-    let name: String
-    let contextSize: Int
-    let modelID: String?
-    let displayName: String?
-    let capabilities: [String]?
+    let modelID: String
+    let providerDisplayName: String?
+    let providerContextSize: Int?
+    let providerSupportedCapabilities: [String]
+    let providerUnsupportedCapabilities: [String]
+    let providerSupportedParameters: [String]
+    let providerUnsupportedParameters: [String]
     let rawMetadataJSON: String?
-    let parameterMappings: [ModelParameterMappingExportData]?
-    let parameterAvailability: [ModelParameterAvailabilityExportData]?
+    let displayNameOverride: String?
+    let contextSizeOverride: Int?
+    let capabilityOverrides: [ModelCapabilityOverrideExportData]
+    let mappingOverrides: [ModelParameterMappingOverrideExportData]
+    let policyOverrides: [ModelParameterPolicyOverrideExportData]
     let apiConfigurationName: String?
     let apiConfigurationProviderID: String?
     let apiConfigurationBaseURL: String?
-    
+
     init(_ model: ModelItem) {
-        self.name = model.name
-        self.contextSize = model.contextSize
-        self.modelID = model.modelID
-        self.displayName = model.displayName
-        self.capabilities = model.capabilitiesRaw
-        self.rawMetadataJSON = model.rawMetadataJSON
-        self.parameterMappings = model.parameterMappings.map { ModelParameterMappingExportData($0) }
-        self.parameterAvailability = model.parameterAvailability.map { ModelParameterAvailabilityExportData($0) }
-        self.apiConfigurationName = model.apiConfiguration?.name
-        self.apiConfigurationProviderID = model.apiConfiguration?.providerID
-        self.apiConfigurationBaseURL = model.apiConfiguration?.baseURL
+        modelID = model.modelID
+        providerDisplayName = model.providerDisplayName
+        providerContextSize = model.providerContextSize
+        providerSupportedCapabilities = model.providerSupportedCapabilitiesRaw
+        providerUnsupportedCapabilities = model.providerUnsupportedCapabilitiesRaw
+        providerSupportedParameters = model.providerSupportedParametersRaw
+        providerUnsupportedParameters = model.providerUnsupportedParametersRaw
+        rawMetadataJSON = model.rawMetadataJSON
+        displayNameOverride = model.displayNameOverride
+        contextSizeOverride = model.contextSizeOverride
+        capabilityOverrides = model.capabilityOverrides.map(ModelCapabilityOverrideExportData.init)
+        mappingOverrides = model.parameterMappingOverrides.map(ModelParameterMappingOverrideExportData.init)
+        policyOverrides = model.parameterPolicyOverrides.map(ModelParameterPolicyOverrideExportData.init)
+        apiConfigurationName = model.apiConfiguration?.name
+        apiConfigurationProviderID = model.apiConfiguration?.providerID
+        apiConfigurationBaseURL = model.apiConfiguration?.baseURL
     }
-    
+
     func toDataItem(apiConfigurations: [APIConfigurationItem] = []) -> ModelItem {
         let apiConfiguration = apiConfigurations.first {
             $0.name == apiConfigurationName
                 && $0.providerID == apiConfigurationProviderID
                 && $0.baseURL == apiConfigurationBaseURL
         }
-        let model = ModelItem(
-            modelID: modelID ?? name,
-            contextSize: contextSize,
-            apiConfiguration: apiConfiguration
-        )
-        model.displayName = displayName ?? name
-        let defaultCandidate = LLMModelMetadataResolver().catalogMetadata(
-            for: model.modelID,
-            providerID: apiConfiguration?.providerIDEnum ?? .customOpenAICompatible
-        )
-        model.capabilitiesRaw = defaultCandidate.capabilities.map(\.rawValue)
-        if let capabilities { model.capabilitiesRaw = capabilities }
+        let model = ModelItem(modelID: modelID, apiConfiguration: apiConfiguration)
+        model.providerDisplayName = providerDisplayName
+        model.providerContextSize = providerContextSize
+        model.providerSupportedCapabilitiesRaw = providerSupportedCapabilities
+        model.providerUnsupportedCapabilitiesRaw = providerUnsupportedCapabilities
+        model.providerSupportedParametersRaw = providerSupportedParameters
+        model.providerUnsupportedParametersRaw = providerUnsupportedParameters
         model.rawMetadataJSON = rawMetadataJSON
-        model.parameterMappings = parameterMappings?.map { $0.toDataItem() } ?? []
-        model.parameterAvailability = parameterAvailability?.map { $0.toDataItem() } ?? []
-        model.materializeDefaultParameterMappings(preserveCustomized: true)
-        model.materializeDefaultParameterAvailability(preserveCustomized: true)
+        model.displayNameOverride = displayNameOverride
+        model.contextSizeOverride = contextSizeOverride
+        model.capabilityOverrides = capabilityOverrides.map(\.dataItem)
+        model.parameterMappingOverrides = mappingOverrides.map(\.dataItem)
+        model.parameterPolicyOverrides = policyOverrides.map(\.dataItem)
         return model
     }
 }
 
-struct ModelParameterMappingExportData: Codable {
-    let adapterIDRaw: String
-    let parameterID: String
-    let encodingKindRaw: String
-    let wireKey: String
-    let structuredPresetRaw: String?
-    let displayName: String
-    let paramDescription: String
-    let valueType: String
-    let controlType: String
-    let minValue: Double?
-    let maxValue: Double?
-    let step: Double?
-    let options: [String]?
-    let isCustomized: Bool
+struct ModelCapabilityOverrideExportData: Codable {
+    let capability: LLMModelCapability
+    let support: LLMSupportState
 
-    init(_ mapping: ModelParameterMappingItem) {
-        adapterIDRaw = mapping.adapterIDRaw
-        parameterID = mapping.parameterID
-        encodingKindRaw = mapping.encodingKindRaw
-        wireKey = mapping.wireKey
-        structuredPresetRaw = mapping.structuredPresetRaw
-        displayName = mapping.displayName
-        paramDescription = mapping.paramDescription
-        valueType = mapping.valueType
-        controlType = mapping.controlType
-        minValue = mapping.minValue
-        maxValue = mapping.maxValue
-        step = mapping.step
-        options = mapping.options
-        isCustomized = mapping.isCustomized
+    init(_ item: ModelCapabilityOverrideItem) {
+        capability = item.capability
+        support = item.support
     }
 
-    func toDataItem() -> ModelParameterMappingItem {
-        let mapping = ModelParameterMappingItem(
-            adapterID: LLMAdapterID(rawValue: adapterIDRaw) ?? .openAIChatCompletions,
-            parameterID: LLMParameterID(rawValue: parameterID) ?? .maxOutputTokens,
-            encodingKind: LLMParameterEncodingKind(rawValue: encodingKindRaw) ?? .scalarKey,
-            wireKey: wireKey,
-            structuredPreset: structuredPresetRaw.flatMap(LLMParameterStructuredPreset.init(rawValue:)),
-            isCustomized: isCustomized
-        )
-        mapping.displayName = displayName
-        mapping.paramDescription = paramDescription
-        mapping.valueType = valueType
-        mapping.controlType = controlType
-        mapping.minValue = minValue
-        mapping.maxValue = maxValue
-        mapping.step = step
-        mapping.options = options
-        return mapping
+    var dataItem: ModelCapabilityOverrideItem {
+        ModelCapabilityOverrideItem(capability: capability, support: support)
     }
 }
 
-struct ModelParameterAvailabilityExportData: Codable {
-    let adapterIDRaw: String
-    let parameterID: String
-    let isAvailable: Bool
-    let isRequired: Bool
-    let isEnabled: Bool
-    let displayName: String
-    let paramDescription: String
-    let valueType: String
-    let controlType: String
-    let minValue: Double?
-    let maxValue: Double?
-    let step: Double?
-    let options: [String]?
-    let defaultValueData: Data?
-    let isCustomized: Bool
+struct ModelParameterMappingOverrideExportData: Codable {
+    let adapterID: LLMAdapterID
+    let parameterID: LLMParameterID
+    let encodingKind: LLMParameterEncodingKind
+    let wireKey: String
+    let structuredPreset: LLMParameterStructuredPreset?
 
-    init(_ availability: ModelParameterAvailabilityItem) {
-        adapterIDRaw = availability.adapterIDRaw
-        parameterID = availability.parameterID
-        isAvailable = availability.isAvailable
-        isRequired = availability.isRequired
-        isEnabled = availability.isEnabled
-        displayName = availability.displayName
-        paramDescription = availability.paramDescription
-        valueType = availability.valueType
-        controlType = availability.controlType
-        minValue = availability.minValue
-        maxValue = availability.maxValue
-        step = availability.step
-        options = availability.options
-        defaultValueData = availability.defaultValueData
-        isCustomized = availability.isCustomized
+    init(_ item: ModelParameterMappingOverrideItem) {
+        adapterID = item.adapterID
+        parameterID = item.parameterID
+        encodingKind = item.encodingKind
+        wireKey = item.wireKey
+        structuredPreset = item.structuredPreset
     }
 
-    func toDataItem() -> ModelParameterAvailabilityItem {
-        let availability = ModelParameterAvailabilityItem(
-            adapterID: LLMAdapterID(rawValue: adapterIDRaw) ?? .openAIChatCompletions,
-            parameterID: LLMParameterID(rawValue: parameterID) ?? .maxOutputTokens,
-            isAvailable: isAvailable,
-            isRequired: isRequired,
-            isEnabled: isEnabled,
-            isCustomized: isCustomized
+    var dataItem: ModelParameterMappingOverrideItem {
+        ModelParameterMappingOverrideItem(mapping: LLMParameterMapping(
+            adapterID: adapterID,
+            parameterID: parameterID,
+            encodingKind: encodingKind,
+            wireKey: wireKey,
+            structuredPreset: structuredPreset
+        ))
+    }
+}
+
+struct ModelParameterPolicyOverrideExportData: Codable {
+    let adapterID: LLMAdapterID
+    let parameterID: LLMParameterID
+    let support: LLMSupportState?
+    let requiredOverride: Bool?
+    let enabledByDefaultOverride: Bool?
+    let defaultValueOverrideKind: ModelDefaultValueOverrideKind
+    let defaultValue: JSONValue?
+
+    init(_ item: ModelParameterPolicyOverrideItem) {
+        adapterID = item.adapterID
+        parameterID = item.parameterID
+        support = item.support
+        requiredOverride = item.requiredOverride
+        enabledByDefaultOverride = item.enabledByDefaultOverride
+        defaultValueOverrideKind = item.defaultValueOverrideKind
+        defaultValue = item.defaultValue
+    }
+
+    var dataItem: ModelParameterPolicyOverrideItem {
+        ModelParameterPolicyOverrideItem(
+            adapterID: adapterID,
+            parameterID: parameterID,
+            support: support,
+            requiredOverride: requiredOverride,
+            enabledByDefaultOverride: enabledByDefaultOverride,
+            defaultValueOverrideKind: defaultValueOverrideKind,
+            defaultValue: defaultValue
         )
-        availability.displayName = displayName
-        availability.paramDescription = paramDescription
-        availability.valueType = valueType
-        availability.controlType = controlType
-        availability.minValue = minValue
-        availability.maxValue = maxValue
-        availability.step = step
-        availability.options = options
-        availability.defaultValueData = defaultValueData
-        return availability
     }
 }

@@ -15,17 +15,23 @@
 - `llm_api/*` must not depend on `ConversationItem`, `ConversationTurn`, `ConversationOptions`, `APIConfigurationItem`, `ModelItem`, `MessageItem`, `ToolCallItem`, `ResponseRunItem`, `ConversationDraftStore`, SwiftData, SwiftUI, or concrete app services.
 
 ## Direction Of Flow
-- Runtime code materializes persisted configuration into `llm_api/*` value types.
-- `llm_api/*` validates capabilities, resolves mappings, encodes provider requests, executes provider adapters, and emits provider-neutral events.
+- Runtime code resolves persisted provider observations and explicit overrides into `llm_api/*` value types.
+- `LLMModelContractResolver` is the only model-contract resolution path. Capability and parameter support are advisory for remote providers.
+- `llm_api/*` resolves mappings, enforces adapter encodability, executes provider adapters, and emits provider-neutral events.
 - `llm_api/*` must not persist results, mutate conversation storage, update UI draft state, or execute concrete vxAtelier tools.
 
 ## Parameter Boundary
 - A semantic parameter is the app-level identity and value, for example `temperature` or `reasoning_effort`.
-- Parameter availability is selected-model support and policy: available, unavailable, required, and defaulted.
+- Parameter support is advisory model metadata; required/default policy controls initial inclusion behavior.
 - Parameter mapping is selected-model semantic-to-wire translation: wire key or structured preset.
 - Conversation storage may contain semantic values and per-conversation enable/disable intent for optional parameters only.
-- Conversation storage must not decide model availability, mandatory behavior, defaults, or wire names.
-- Keep availability resolution in `LLMGenerationOptionsResolver`; keep semantic-to-wire translation and encoding in `LLMParameterMapping` and provider encoders.
+- Conversation storage must not own resolved support, model policy defaults, or wire names.
+- Keep contract and inclusion resolution in `LLMModelContractResolver` and `LLMGenerationOptionsResolver`; keep semantic-to-wire translation and hard encodability checks in `LLMParameterMapping` and provider encoders.
+
+## Validation Boundary
+- Remote providers decide whether supported, unsupported, or unknown model features are accepted.
+- Do not add capability-based request rejection for remote providers.
+- Local rejection is limited to invalid provider/adapter composition, corrupt conversation history, and payloads the selected adapter or local backend cannot represent.
 
 ## Refactoring Rule
 - If a type is reusable across apps and does not require SwiftData, SwiftUI, persisted app models, or concrete app services, it belongs in `llm_api/*`.

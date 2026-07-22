@@ -40,23 +40,20 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
     func testParameterInclusionPreferencesDoNotClearTypedValues() {
         let options = ConversationOptions()
         options.temperature = 0.9
-        let availability = LLMParameterAvailabilityDescriptor(
-            adapterID: .openAIChatCompletions,
-            semanticParameterID: .temperature
-        )
+        let contract = Self.parameterContract(.temperature)
 
-        XCTAssertTrue(LLMParameterAvailabilityResolver.isParameterSendable(
+        XCTAssertTrue(LLMGenerationOptionsResolver.isParameterActive(
             .temperature,
             value: options.parameterValue(.temperature),
             conversationPreference: options.parameterInclusionPreference(.temperature),
-            modelAvailability: availability
+            contract: contract
         ))
         options.setParameterEnabled(.temperature, enabled: false)
-        XCTAssertFalse(LLMParameterAvailabilityResolver.isParameterSendable(
+        XCTAssertFalse(LLMGenerationOptionsResolver.isParameterActive(
             .temperature,
             value: options.parameterValue(.temperature),
             conversationPreference: options.parameterInclusionPreference(.temperature),
-            modelAvailability: availability
+            contract: contract
         ))
         XCTAssertEqual(options.temperature, 0.9)
     }
@@ -66,32 +63,21 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
         options.temperature = 0.9
         options.maxOutputTokens = 1000
         options.setParameterEnabled(.temperature, enabled: false)
-        let modelAvailability: [LLMParameterID: LLMParameterAvailabilityDescriptor] = [
-            .temperature: LLMParameterAvailabilityDescriptor(
-                adapterID: .openAIChatCompletions,
-                semanticParameterID: .temperature,
-                defaultValue: .number(0.4)
-            ),
-            .maxOutputTokens: LLMParameterAvailabilityDescriptor(
-                adapterID: .openAIChatCompletions,
-                semanticParameterID: .maxOutputTokens
-            )
+        let contracts: [LLMParameterID: LLMResolvedParameterContract] = [
+            .temperature: Self.parameterContract(.temperature, defaultValue: .number(0.4)),
+            .maxOutputTokens: Self.parameterContract(.maxOutputTokens)
         ]
 
-        let generationOptions = LLMParameterAvailabilityResolver.resolvedOptions(
-            from: options.generationOptions(resolvedModelID: "model"),
+        let resolved = LLMGenerationOptionsResolver.resolve(
+            options: options.generationOptions(resolvedModelID: "model"),
             conversationPreferences: options.parameterInclusionPreferences,
-            modelAvailability: modelAvailability
-        )
-        let sendableAvailability = LLMParameterAvailabilityResolver.sendableModelAvailability(
-            for: options.generationOptions(resolvedModelID: "model"),
-            conversationPreferences: options.parameterInclusionPreferences,
-            modelAvailability: modelAvailability
+            parameterContracts: contracts
         )
 
-        XCTAssertNil(generationOptions.temperature)
-        XCTAssertNil(sendableAvailability[.temperature])
-        XCTAssertEqual(generationOptions.maxOutputTokens, 1000)
+        XCTAssertEqual(resolved.options.temperature, 0.9)
+        XCTAssertFalse(resolved.activeParameterIDs.contains(.temperature))
+        XCTAssertEqual(resolved.options.maxOutputTokens, 1000)
+        XCTAssertTrue(resolved.activeParameterIDs.contains(.maxOutputTokens))
         XCTAssertEqual(options.temperature, 0.9)
     }
 
@@ -99,27 +85,18 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
         let options = ConversationOptions()
         options.maxOutputTokens = 1000
         options.setParameterEnabled(.maxOutputTokens, enabled: false)
-        let modelAvailability: [LLMParameterID: LLMParameterAvailabilityDescriptor] = [
-            .maxOutputTokens: LLMParameterAvailabilityDescriptor(
-                adapterID: .openAIChatCompletions,
-                semanticParameterID: .maxOutputTokens,
-                isRequired: true
-            )
+        let contracts: [LLMParameterID: LLMResolvedParameterContract] = [
+            .maxOutputTokens: Self.parameterContract(.maxOutputTokens, isRequired: true)
         ]
 
-        let generationOptions = LLMParameterAvailabilityResolver.resolvedOptions(
-            from: options.generationOptions(resolvedModelID: "model"),
+        let resolved = LLMGenerationOptionsResolver.resolve(
+            options: options.generationOptions(resolvedModelID: "model"),
             conversationPreferences: options.parameterInclusionPreferences,
-            modelAvailability: modelAvailability
-        )
-        let sendableAvailability = LLMParameterAvailabilityResolver.sendableModelAvailability(
-            for: options.generationOptions(resolvedModelID: "model"),
-            conversationPreferences: options.parameterInclusionPreferences,
-            modelAvailability: modelAvailability
+            parameterContracts: contracts
         )
 
-        XCTAssertEqual(generationOptions.maxOutputTokens, 1000)
-        XCTAssertNotNil(sendableAvailability[.maxOutputTokens])
+        XCTAssertEqual(resolved.options.maxOutputTokens, 1000)
+        XCTAssertTrue(resolved.activeParameterIDs.contains(.maxOutputTokens))
     }
 
     func testProjectionUsesSemanticPresentationAndMappings() {
@@ -160,23 +137,38 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
             XCTAssertFalse(AiParameterPresentationCatalog.presentation(for: parameterID).description.isEmpty)
         }
 
-        let availability = Dictionary(uniqueKeysWithValues: LLMParameterID.allCases
+        let contracts = Dictionary(uniqueKeysWithValues: LLMParameterID.allCases
             .filter(\.isProviderMappable)
-            .map {
-                ($0, LLMParameterAvailabilityDescriptor(
-                    adapterID: .openAIChatCompletions,
-                    semanticParameterID: $0
-                ))
-            })
-        let generationOptions = LLMParameterAvailabilityResolver.resolvedOptions(
-            from: options.generationOptions(resolvedModelID: "fallback-model"),
+            .map { ($0, Self.parameterContract($0)) })
+        let resolved = LLMGenerationOptionsResolver.resolve(
+            options: options.generationOptions(resolvedModelID: "fallback-model"),
             conversationPreferences: options.parameterInclusionPreferences,
-            modelAvailability: availability
+            parameterContracts: contracts
         )
 
         for parameterID in LLMParameterID.allCases {
-            XCTAssertEqual(generationOptions.jsonValue(for: parameterID), Self.expectedGenerationValue(for: parameterID))
+            XCTAssertEqual(resolved.options.jsonValue(for: parameterID), Self.expectedGenerationValue(for: parameterID))
         }
+    }
+
+    private static func parameterContract(
+        _ parameterID: LLMParameterID,
+        isRequired: Bool = false,
+        defaultValue: JSONValue? = nil
+    ) -> LLMResolvedParameterContract {
+        LLMResolvedParameterContract(
+            parameterID: parameterID,
+            support: LLMResolvedSupport(state: .unknown, source: .fallback),
+            mapping: LLMParameterMapping(
+                adapterID: .openAIChatCompletions,
+                parameterID: parameterID,
+                wireKey: parameterID.rawValue
+            ),
+            isRequired: isRequired,
+            isEnabledByDefault: false,
+            defaultValue: defaultValue,
+            options: parameterID.options
+        )
     }
 
     func testToolEnableDisable() {

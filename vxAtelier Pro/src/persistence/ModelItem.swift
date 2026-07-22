@@ -1,195 +1,139 @@
-import AVFoundation
 import Foundation
-import Observation
 import SwiftData
-import SwiftUI
 
-#if os(macOS)
-    import AppKit
-#endif
-
-/// Represents an AI model for one API configuration.
-///
-/// This model stores information about AI models including:
-/// - Base model name (e.g., "gpt-4", "claude-3")
-/// - Context window size for token limits
-/// - Model capabilities
 @Model
 final class ModelItem {
-    /// Maximum context size in tokens that this model supports
-    var contextSize: Int
-
     var modelID: String
-    var displayName: String
     var apiConfiguration: APIConfigurationItem?
-    var capabilitiesRaw: [String]
+    var providerDisplayName: String?
+    var providerContextSize: Int?
+    var providerSupportedCapabilitiesRaw: [String]
+    var providerUnsupportedCapabilitiesRaw: [String]
+    var providerSupportedParametersRaw: [String]
+    var providerUnsupportedParametersRaw: [String]
     var rawMetadataJSON: String?
-    @Relationship(deleteRule: .cascade) var parameterMappings: [ModelParameterMappingItem] = []
-    @Relationship(deleteRule: .cascade) var parameterAvailability: [ModelParameterAvailabilityItem] = []
+    var displayNameOverride: String?
+    var contextSizeOverride: Int?
+    @Relationship(deleteRule: .cascade) var capabilityOverrides: [ModelCapabilityOverrideItem] = []
+    @Relationship(deleteRule: .cascade) var parameterMappingOverrides: [ModelParameterMappingOverrideItem] = []
+    @Relationship(deleteRule: .cascade) var parameterPolicyOverrides: [ModelParameterPolicyOverrideItem] = []
 
     var name: String { modelID }
 
-    var capabilities: [LLMModelCapability] {
-        capabilitiesRaw.compactMap(LLMModelCapability.init(rawValue:))
+    var observation: LLMProviderModelObservation {
+        let supported = providerSupportedCapabilitiesRaw.compactMap(LLMModelCapability.init(rawValue:)).map {
+            LLMCapabilityClaim(capability: $0, state: .supported)
+        }
+        let unsupported = providerUnsupportedCapabilitiesRaw.compactMap(LLMModelCapability.init(rawValue:)).map {
+            LLMCapabilityClaim(capability: $0, state: .unsupported)
+        }
+        let supportedParameters = providerSupportedParametersRaw.compactMap(LLMParameterID.init(rawValue:)).map {
+            LLMParameterSupportClaim(parameterID: $0, state: .supported)
+        }
+        let unsupportedParameters = providerUnsupportedParametersRaw.compactMap(LLMParameterID.init(rawValue:)).map {
+            LLMParameterSupportClaim(parameterID: $0, state: .unsupported)
+        }
+        return LLMProviderModelObservation(
+            id: modelID,
+            displayName: providerDisplayName,
+            providerID: providerID,
+            contextSize: providerContextSize,
+            capabilityClaims: supported + unsupported,
+            parameterSupportClaims: supportedParameters + unsupportedParameters,
+            rawMetadataJSON: rawMetadataJSON
+        )
     }
 
-    var metadata: LLMModelMetadata {
-        get {
-            LLMModelMetadata(
-                id: modelID,
-                displayName: displayName,
-                providerID: apiConfiguration?.providerIDEnum ?? .customOpenAICompatible,
-                contextSize: contextSize,
-                capabilities: capabilities,
-                rawMetadataJSON: rawMetadataJSON
-            )
-        }
-        set {
-            modelID = newValue.id
-            displayName = newValue.displayName
-            contextSize = newValue.contextSize ?? AppDefaults.ModelContextSizes.defaultSize
-            capabilitiesRaw = newValue.capabilities.map(\.rawValue)
-            rawMetadataJSON = newValue.rawMetadataJSON
-            self.materializeDefaultParameterMappings(preserveCustomized: true)
-            self.materializeDefaultParameterAvailability(preserveCustomized: true)
-        }
+    var providerID: LLMProviderID {
+        apiConfiguration?.providerIDEnum ?? .customOpenAICompatible
     }
 
-    /// Creates a new model item with the specified properties.
-    ///
-    /// - Parameters:
-    ///   - modelID: The provider-facing model identifier
-    ///   - contextSize: Maximum context size in tokens, defaults to app's default size
+    var adapterID: LLMAdapterID {
+        apiConfiguration?.defaultAdapterIDEnum ?? .openAICompatibleChatCompletions
+    }
+
+    var contractOverrides: LLMModelContractOverrides {
+        let capabilityPairs: [(LLMModelCapability, LLMSupportState)] = capabilityOverrides.compactMap { item in
+            guard item.support != .unknown else { return nil }
+            return (item.capability, item.support)
+        }
+        let capabilitySupport = capabilityPairs.reduce(into: [LLMModelCapability: LLMSupportState]()) {
+            $0[$1.0] = $1.1
+        }
+        let mappings = parameterMappingOverrides
+            .filter { $0.adapterID == adapterID }
+            .reduce(into: [LLMParameterID: LLMParameterMapping]()) { $0[$1.parameterID] = $1.mapping }
+        let policies = parameterPolicyOverrides
+            .filter { $0.adapterID == adapterID }
+            .reduce(into: [LLMParameterID: LLMParameterPolicyOverride]()) { $0[$1.parameterID] = $1.policy }
+        return LLMModelContractOverrides(
+            displayName: displayNameOverride,
+            contextSize: contextSizeOverride,
+            capabilitySupport: capabilitySupport,
+            parameterMappings: mappings,
+            parameterPolicies: policies
+        )
+    }
+
+    var resolvedContract: LLMResolvedModelContract {
+        LLMModelContractResolver(fallbackContextSize: AppDefaults.ModelContextSizes.defaultSize).resolve(
+            providerID: providerID,
+            adapterID: adapterID,
+            modelID: modelID,
+            observation: observation,
+            overrides: contractOverrides
+        )
+    }
+
+    var displayName: String { resolvedContract.displayName }
+    var contextSize: Int { resolvedContract.contextSize }
+    var capabilities: [LLMModelCapability] { resolvedContract.supportedCapabilities }
+
     init(
         modelID: String,
-        contextSize: Int = AppDefaults.ModelContextSizes.defaultSize,
+        contextSize: Int? = nil,
         apiConfiguration: APIConfigurationItem? = nil
     ) {
         self.modelID = modelID
-        self.displayName = modelID
-        self.contextSize = contextSize
         self.apiConfiguration = apiConfiguration
-        self.capabilitiesRaw = []
-        self.rawMetadataJSON = nil
-        self.parameterMappings = []
-        self.parameterAvailability = []
-
-        let defaultCandidate = LLMModelMetadataResolver().catalogMetadata(
-            for: modelID,
-            providerID: apiConfiguration?.providerIDEnum ?? .customOpenAICompatible
-        )
-        self.contextSize = defaultCandidate.contextSize ?? contextSize
-        self.capabilitiesRaw = defaultCandidate.capabilities.map(\.rawValue)
-        self.materializeDefaultParameterMappings(preserveCustomized: true)
-        self.materializeDefaultParameterAvailability(preserveCustomized: true)
+        providerDisplayName = nil
+        providerContextSize = nil
+        providerSupportedCapabilitiesRaw = []
+        providerUnsupportedCapabilitiesRaw = []
+        providerSupportedParametersRaw = []
+        providerUnsupportedParametersRaw = []
+        rawMetadataJSON = nil
+        displayNameOverride = nil
+        contextSizeOverride = contextSize
+        capabilityOverrides = []
+        parameterMappingOverrides = []
+        parameterPolicyOverrides = []
     }
 
-    func materializeDefaultParameterMappings(preserveCustomized: Bool = true) {
-        guard let apiConfiguration else { return }
-        materializeDefaultParameterMappings(
-            adapterID: apiConfiguration.defaultAdapterIDEnum,
-            providerID: apiConfiguration.providerIDEnum,
-            preserveCustomized: preserveCustomized
-        )
-    }
-
-    func resetDefaultParameterMappings(adapterID: LLMAdapterID) {
-        guard let apiConfiguration else { return }
-        materializeDefaultParameterMappings(
-            adapterID: adapterID,
-            providerID: apiConfiguration.providerIDEnum,
-            preserveCustomized: false
-        )
-    }
-
-    func materializeDefaultParameterAvailability(preserveCustomized: Bool = true) {
-        guard let apiConfiguration else { return }
-        materializeDefaultParameterAvailability(
-            adapterID: apiConfiguration.defaultAdapterIDEnum,
-            providerID: apiConfiguration.providerIDEnum,
-            preserveCustomized: preserveCustomized
-        )
-    }
-
-    func resetDefaultParameterAvailability(adapterID: LLMAdapterID) {
-        guard let apiConfiguration else { return }
-        materializeDefaultParameterAvailability(
-            adapterID: adapterID,
-            providerID: apiConfiguration.providerIDEnum,
-            preserveCustomized: false
-        )
-    }
-
-    convenience init(metadata: LLMModelMetadata, apiConfiguration: APIConfigurationItem? = nil) {
-        self.init(
-            modelID: metadata.id,
-            contextSize: metadata.contextSize ?? AppDefaults.ModelContextSizes.defaultSize,
-            apiConfiguration: apiConfiguration
-        )
-        self.metadata = metadata
-    }
-
-    private func materializeDefaultParameterMappings(
-        adapterID: LLMAdapterID,
-        providerID: LLMProviderID,
-        preserveCustomized: Bool
+    convenience init(
+        observation: LLMProviderModelObservation,
+        apiConfiguration: APIConfigurationItem? = nil
     ) {
-        let defaults = LLMParameterMappingCatalog.defaults(
-            providerID: providerID,
-            adapterID: adapterID,
-            modelID: modelID
-        )
-
-        for mapping in defaults {
-            if let existing = parameterMappings.first(where: {
-                $0.adapterIDEnum == adapterID && $0.parameterIDEnum == mapping.parameterID
-            }) {
-                if preserveCustomized && existing.isCustomized {
-                    continue
-                }
-                existing.apply(mapping, markCustomized: false)
-            } else {
-                parameterMappings.append(ModelParameterMappingItem(mapping: mapping))
-            }
-        }
-
-        if !preserveCustomized {
-            let defaultIDs = Set(defaults.map(\.parameterID))
-            parameterMappings.removeAll { mapping in
-                mapping.adapterIDEnum == adapterID && !defaultIDs.contains(mapping.parameterIDEnum)
-            }
-        }
+        self.init(modelID: observation.id, apiConfiguration: apiConfiguration)
+        apply(observation)
     }
 
-    private func materializeDefaultParameterAvailability(
-        adapterID: LLMAdapterID,
-        providerID: LLMProviderID,
-        preserveCustomized: Bool
-    ) {
-        let defaults = LLMParameterAvailabilityCatalog.defaults(
-            providerID: providerID,
-            adapterID: adapterID,
-            modelID: modelID
-        )
-
-        for availability in defaults {
-            if let existing = parameterAvailability.first(where: {
-                $0.adapterIDEnum == adapterID && $0.parameterIDEnum == availability.parameterID
-            }) {
-                if preserveCustomized && existing.isCustomized {
-                    continue
-                }
-                existing.apply(availability, markCustomized: false)
-            } else {
-                parameterAvailability.append(ModelParameterAvailabilityItem(availability: availability))
-            }
-        }
-
-        if !preserveCustomized {
-            let defaultIDs = Set(defaults.map(\.parameterID))
-            parameterAvailability.removeAll { availability in
-                availability.adapterIDEnum == adapterID && !defaultIDs.contains(availability.parameterIDEnum)
-            }
-        }
+    func apply(_ observation: LLMProviderModelObservation) {
+        modelID = observation.id
+        providerDisplayName = observation.displayName
+        providerContextSize = observation.contextSize
+        providerSupportedCapabilitiesRaw = observation.capabilityClaims
+            .filter { $0.state == .supported }
+            .map { $0.capability.rawValue }
+        providerUnsupportedCapabilitiesRaw = observation.capabilityClaims
+            .filter { $0.state == .unsupported }
+            .map { $0.capability.rawValue }
+        providerSupportedParametersRaw = observation.parameterSupportClaims
+            .filter { $0.state == .supported }
+            .map { $0.parameterID.rawValue }
+        providerUnsupportedParametersRaw = observation.parameterSupportClaims
+            .filter { $0.state == .unsupported }
+            .map { $0.parameterID.rawValue }
+        rawMetadataJSON = observation.rawMetadataJSON
     }
 }

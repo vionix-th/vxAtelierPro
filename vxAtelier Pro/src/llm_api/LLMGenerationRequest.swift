@@ -1,13 +1,12 @@
 import Foundation
 
-/// Fully resolved provider-neutral request ready for validation and adapter encoding.
+/// Fully resolved provider-neutral request ready for adapter encoding.
 struct LLMGenerationRequest: Codable, Equatable {
     var providerID: LLMProviderID
     var adapterID: LLMAdapterID
     var modelID: String
-    var modelCapabilities: [LLMModelCapability]
     var parameterMappings: [LLMParameterMapping]
-    var parameterAvailability: [LLMParameterAvailability]
+    var activeParameterIDs: Set<LLMParameterID>
     var messages: [LLMMessage]
     var tools: [LLMToolDefinition]
     var options: LLMGenerationOptions
@@ -17,9 +16,8 @@ struct LLMGenerationRequest: Codable, Equatable {
         providerID: LLMProviderID,
         adapterID: LLMAdapterID,
         modelID: String,
-        modelCapabilities: [LLMModelCapability] = [],
         parameterMappings: [LLMParameterMapping] = [],
-        parameterAvailability: [LLMParameterAvailability] = [],
+        activeParameterIDs: Set<LLMParameterID> = [],
         messages: [LLMMessage],
         tools: [LLMToolDefinition] = [],
         options: LLMGenerationOptions = LLMGenerationOptions()
@@ -27,9 +25,8 @@ struct LLMGenerationRequest: Codable, Equatable {
         self.providerID = providerID
         self.adapterID = adapterID
         self.modelID = modelID
-        self.modelCapabilities = modelCapabilities
         self.parameterMappings = parameterMappings
-        self.parameterAvailability = parameterAvailability
+        self.activeParameterIDs = activeParameterIDs
         self.messages = messages
         self.tools = tools
         self.options = options

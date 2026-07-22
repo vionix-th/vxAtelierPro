@@ -65,7 +65,7 @@ struct ProviderRunExecutor {
                 "Provider configuration \(providerConfiguration.providerID.rawValue) does not match request provider \(request.providerID.rawValue)."
             )
         }
-        let adapter = registry.adapter(for: request.adapterID, providerID: request.providerID)
+        let adapter = try registry.resolveAdapter(for: request.adapterID, providerID: request.providerID)
         var result = ProviderRunResult()
 
         for try await event in adapter.generateEvents(request, configuration: providerConfiguration, toolExecutor: toolExecutor) {
@@ -131,7 +131,9 @@ struct ProviderRunExecutor {
             return true
         case .provider(let statusCode, _, _):
             return statusCode == 408 || statusCode == 409 || statusCode == 425 || statusCode == 429 || (500...599).contains(statusCode)
-        case .invalidConfiguration, .invalidURL, .authUnavailable, .localModelUnavailable, .unsupportedCapability, .unsupportedParameter, .decoding, .cancelled:
+        case .invalidConfiguration, .invalidURL, .authUnavailable, .localModelUnavailable,
+             .requestEncoding, .invalidConversationState, .toolExecution, .runLimitExceeded,
+             .decoding, .cancelled:
             return false
         }
     }

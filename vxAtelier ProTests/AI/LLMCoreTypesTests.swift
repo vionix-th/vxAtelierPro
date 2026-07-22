@@ -73,17 +73,27 @@ final class LLMCoreTypesTests: XCTestCase {
         XCTAssertTrue(deepSeek?.capabilities?.contains(.tools) ?? false)
     }
 
-    func testBundledDefaultsProvideConservativeFallbackCandidate() {
+    func testResolverProvidesUnknownFallbackContract() {
         let catalog = try! LLMDefaultsCatalog(data: Data("""
         {
           "providerDefaults": [],
           "rules": []
         }
         """.utf8))
-        let candidate = catalog.modelDescriptor(providerID: .customOpenAICompatible, modelID: "unknown-model")
+        let contract = LLMModelContractResolver(
+            defaultsCatalog: catalog,
+            fallbackContextSize: 4096
+        ).resolve(
+            providerID: .customOpenAICompatible,
+            adapterID: .openAICompatibleChatCompletions,
+            modelID: "unknown-model",
+            observation: nil
+        )
 
-        XCTAssertEqual(candidate.capabilities, [.text])
-        XCTAssertEqual(candidate.displayName, "unknown-model")
+        XCTAssertEqual(contract.displayName, "unknown-model")
+        XCTAssertEqual(contract.displayNameSource, .fallback)
+        XCTAssertEqual(contract.contextSize, 4096)
+        XCTAssertEqual(contract.capabilities[.text], LLMResolvedSupport(state: .unknown, source: .fallback))
     }
 
     func testCatalogCanProvideMinimalUnknownModelDefaults() throws {
@@ -99,12 +109,17 @@ final class LLMCoreTypesTests: XCTestCase {
           ]
         }
         """.utf8))
-        let candidate = defaults.modelDescriptor(
+        let contract = LLMModelContractResolver(
+            defaultsCatalog: defaults,
+            fallbackContextSize: 4096
+        ).resolve(
             providerID: .openAIPlatform,
-            modelID: "unknown-future-model"
+            adapterID: .openAIResponses,
+            modelID: "unknown-future-model",
+            observation: nil
         )
 
-        XCTAssertEqual(candidate.capabilities, [.text])
+        XCTAssertEqual(contract.capabilities[.text], LLMResolvedSupport(state: .supported, source: .catalog))
     }
 
     func testDefaultsCatalogDecodesValidJSON() throws {
@@ -320,27 +335,27 @@ final class LLMCoreTypesTests: XCTestCase {
             providerID: .openAIPlatform,
             adapterID: .openAIChatCompletions,
             modelID: "gpt-5.4-nano"
-        ).first { $0.semanticParameterID == .maxOutputTokens }
+        ).first { $0.parameterID == .maxOutputTokens }
         XCTAssertEqual(mapping?.wireKey, "max_completion_tokens")
         let mappingJSON = try JSONEncoder().encode(mapping)
         XCTAssertFalse(String(data: mappingJSON, encoding: .utf8)?.contains("required") ?? true)
 
-        let availability = catalog.parameterAvailability(
+        let parameterDefaults = catalog.parameterDefaults(
             providerID: .openAIPlatform,
             adapterID: .openAIChatCompletions,
             modelID: "gpt-5.4-nano"
         )
-        let maxTokenAvailability = availability.first { $0.semanticParameterID == .maxOutputTokens }
-        XCTAssertTrue(maxTokenAvailability?.isRequired ?? false)
-        XCTAssertTrue(maxTokenAvailability?.isEnabled ?? false)
-        XCTAssertEqual(maxTokenAvailability?.defaultValue, .integer(4096))
-        XCTAssertFalse(availability.first { $0.semanticParameterID == .temperature }?.isAvailable ?? true)
+        let maxTokenDefaults = parameterDefaults.first { $0.parameterID == .maxOutputTokens }
+        XCTAssertTrue(maxTokenDefaults?.isRequired ?? false)
+        XCTAssertTrue(maxTokenDefaults?.isEnabledByDefault ?? false)
+        XCTAssertEqual(maxTokenDefaults?.defaultValue, .integer(4096))
+        XCTAssertEqual(parameterDefaults.first { $0.parameterID == .temperature }?.support, .unsupported)
 
         let aggregatorMapping = catalog.parameterMappings(
             providerID: .openRouter,
             adapterID: .openAICompatibleChatCompletions,
             modelID: "openai/gpt-5-mini"
-        ).first { $0.semanticParameterID == .maxOutputTokens }
+        ).first { $0.parameterID == .maxOutputTokens }
         XCTAssertEqual(aggregatorMapping?.wireKey, "max_completion_tokens")
     }
 
@@ -352,27 +367,40 @@ final class LLMCoreTypesTests: XCTestCase {
                     "id": .string("vision-model"),
                     "context_window": .integer(999),
                     "modalities": .array([.string("image")]),
-                    "capabilities": .array([.string("tools")])
+                    "capabilities": .array([.string("tools")]),
+                    "supports_streaming": .boolean(false),
+                    "supported_parameters": .array([.string("temperature")])
                 ])
             ],
             profile: profile
         )
 
         XCTAssertEqual(models.first?.contextSize, 999)
-        XCTAssertTrue(models.first?.capabilities.contains(.image) ?? false)
-        XCTAssertTrue(models.first?.capabilities.contains(.tools) ?? false)
+        XCTAssertTrue(models.first?.capabilityClaims.contains {
+            $0.capability == .image && $0.state == .supported
+        } ?? false)
+        XCTAssertTrue(models.first?.capabilityClaims.contains {
+            $0.capability == .tools && $0.state == .supported
+        } ?? false)
+        XCTAssertTrue(models.first?.capabilityClaims.contains {
+            $0.capability == .streaming && $0.state == .unsupported
+        } ?? false)
+        XCTAssertEqual(
+            models.first?.parameterSupportClaims,
+            [LLMParameterSupportClaim(parameterID: .temperature, state: .supported)]
+        )
     }
 
-    func testModelMetadataDecoderFillsMissingFieldsFromDefaults() {
+    func testModelMetadataDecoderLeavesMissingFieldsUnclaimed() {
         let profile = LLMProviderRegistry.shared.profile(for: .openRouter)
         let models = LLMModelMetadataDecoder.openAICompatibleCandidates(
             from: [.object(["id": .string("fallback-model")])],
             profile: profile
         )
 
-        XCTAssertEqual(models.first?.contextSize, 128000)
-        XCTAssertTrue(models.first?.capabilities.contains(.text) ?? false)
-        XCTAssertTrue(models.first?.capabilities.contains(.streaming) ?? false)
+        XCTAssertNil(models.first?.contextSize)
+        XCTAssertEqual(models.first?.capabilityClaims, [])
+        XCTAssertEqual(models.first?.parameterSupportClaims, [])
     }
 
     func testLLMToolSettingsRegistryUsesAppSettingsDescriptors() {

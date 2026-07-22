@@ -29,8 +29,9 @@ final class TestEnvironment {
             PromptTemplate.self,
             VoiceConfigurationItem.self,
             ModelItem.self,
-            ModelParameterMappingItem.self,
-            ModelParameterAvailabilityItem.self,
+            ModelCapabilityOverrideItem.self,
+            ModelParameterMappingOverrideItem.self,
+            ModelParameterPolicyOverrideItem.self,
             WebSearchConfigurationItem.self
         ])
         
@@ -161,7 +162,7 @@ extension XCTestCase {
     }
 }
 
-extension LLMRequest {
+extension LLMGenerationRequest {
     static func runtimeEquivalent(
         providerID: LLMProviderID,
         adapterID: LLMAdapterID,
@@ -169,29 +170,27 @@ extension LLMRequest {
         messages: [LLMMessage],
         tools: [LLMToolDefinition] = [],
         options: LLMGenerationOptions = LLMGenerationOptions()
-    ) -> LLMRequest {
-        let candidate = LLMDefaultsCatalog.bundled.modelDescriptor(
-            providerID: providerID,
-            modelID: modelID
-        )
-        return LLMRequest(
+    ) -> LLMGenerationRequest {
+        let contract = LLMModelContractResolver(fallbackContextSize: 4096).resolve(
             providerID: providerID,
             adapterID: adapterID,
             modelID: modelID,
-            modelCapabilities: candidate.capabilities,
-            parameterMappings: LLMParameterMappingCatalog.defaults(
-                providerID: providerID,
-                adapterID: adapterID,
-                modelID: modelID
-            ),
-            parameterAvailability: LLMParameterAvailabilityCatalog.defaults(
-                providerID: providerID,
-                adapterID: adapterID,
-                modelID: modelID
-            ),
+            observation: nil
+        )
+        let resolved = LLMGenerationOptionsResolver.resolve(
+            options: options,
+            conversationPreferences: [:],
+            parameterContracts: contract.parameters
+        )
+        return LLMGenerationRequest(
+            providerID: providerID,
+            adapterID: adapterID,
+            modelID: modelID,
+            parameterMappings: resolved.mappings,
+            activeParameterIDs: resolved.activeParameterIDs,
             messages: messages,
             tools: tools,
-            options: options
+            options: resolved.options
         )
     }
 }

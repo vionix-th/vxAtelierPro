@@ -125,7 +125,7 @@ public struct RunShortcutTool: ExecutableLLMTool {
               let args = try? JSONDecoder().decode([String: String].self, from: jsonData),
               let identifier = args["identifier"]
         else {
-            throw LLMProviderError.invalidConfiguration("Shortcut tool arguments must include identifier.")
+            throw LLMProviderError.toolExecution("Shortcut tool arguments must include identifier.")
         }
 
         let input = args["input"]

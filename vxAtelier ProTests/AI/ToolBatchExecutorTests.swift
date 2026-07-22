@@ -85,7 +85,7 @@ final class ToolBatchExecutorTests: LLMTestCase {
             turn: turn,
             toolCatalog: StaticLLMToolCatalog([UnitEchoTool()])
         )) { error in
-            XCTAssertEqual(error as? LLMProviderError, .unsupportedCapability("Tool '\(UnitEchoTool.toolName)' is not enabled."))
+            XCTAssertEqual(error as? LLMProviderError, .toolExecution("Tool '\(UnitEchoTool.toolName)' is not enabled."))
         }
 
         XCTAssertEqual(toolCall.status, .failed)
@@ -126,7 +126,7 @@ final class ToolBatchExecutorTests: LLMTestCase {
             turn: turn,
             toolCatalog: StaticLLMToolCatalog([])
         )) { error in
-            XCTAssertEqual(error as? LLMProviderError, .unsupportedCapability("Tool not found: \(missingToolName)"))
+            XCTAssertEqual(error as? LLMProviderError, .toolExecution("Tool not found: \(missingToolName)"))
         }
 
         XCTAssertEqual(toolCall.status, .failed)
@@ -146,7 +146,7 @@ final class ToolBatchExecutorTests: LLMTestCase {
             turn: turn,
             toolCatalog: StaticLLMToolCatalog([UnitSchemaOnlyTool()])
         )) { error in
-            XCTAssertEqual(error as? LLMProviderError, .unsupportedCapability("Tool execution not supported: \(UnitSchemaOnlyTool.toolName)"))
+            XCTAssertEqual(error as? LLMProviderError, .toolExecution("Tool execution not supported: \(UnitSchemaOnlyTool.toolName)"))
         }
 
         XCTAssertEqual(toolCall.status, .failed)

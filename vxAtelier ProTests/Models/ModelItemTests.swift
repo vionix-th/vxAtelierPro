@@ -40,7 +40,7 @@ final class ModelItemTests: XCTestCase {
 
     func testModelMetadata() throws {
         let model = ModelItem(modelID: "gpt-4", contextSize: 8192)
-        model.capabilitiesRaw = [LLMModelCapability.text.rawValue, LLMModelCapability.image.rawValue, LLMModelCapability.streaming.rawValue]
+        model.providerSupportedCapabilitiesRaw = [LLMModelCapability.text.rawValue, LLMModelCapability.image.rawValue, LLMModelCapability.streaming.rawValue]
         context.insert(model)
         try context.save()
         let fetched = try context.fetch(FetchDescriptor<ModelItem>()).first
@@ -64,7 +64,7 @@ final class ModelItemTests: XCTestCase {
         XCTAssertEqual(fetched.apiConfiguration?.providerIDEnum, .openAIPlatform)
     }
 
-    func testManualModelCreationStoresDefaultParameterAvailability() throws {
+    func testManualModelCreationDerivesDefaultsWithoutPersistingRows() throws {
         let config = APIConfigurationItem(
             name: "Anthropic",
             apiKey: "key",
@@ -74,15 +74,15 @@ final class ModelItemTests: XCTestCase {
         config.defaultAdapterIDEnum = .anthropicMessages
         let model = ModelItem(modelID: "claude-sonnet-4-5", contextSize: 8192, apiConfiguration: config)
 
-        let maxTokens = model.parameterAvailability.first {
-            $0.adapterIDEnum == .anthropicMessages && $0.semanticParameterIDEnum == .maxOutputTokens
-        }
+        let maxTokens = model.resolvedContract.parameters[.maxOutputTokens]
 
         XCTAssertTrue(maxTokens?.isRequired ?? false)
-        XCTAssertEqual(maxTokens?.defaultJSONValue, .integer(4096))
+        XCTAssertEqual(maxTokens?.defaultValue, .integer(4096))
+        XCTAssertTrue(model.parameterMappingOverrides.isEmpty)
+        XCTAssertTrue(model.parameterPolicyOverrides.isEmpty)
     }
 
-    func testDescriptorCreatedModelStoresDefaultParameterAvailability() throws {
+    func testModelDerivesUnsupportedParameterFromCatalog() throws {
         let config = APIConfigurationItem(
             name: "OpenAI",
             apiKey: "key",
@@ -90,20 +90,14 @@ final class ModelItemTests: XCTestCase {
             providerID: .openAIPlatform
         )
         config.defaultAdapterIDEnum = .openAIChatCompletions
-        let descriptor = LLMDefaultsCatalog.bundled.modelDescriptor(
-            providerID: .openAIPlatform,
-            modelID: "gpt-5.4-nano"
-        )
-        let model = ModelItem(descriptor: descriptor, apiConfiguration: config)
+        let model = ModelItem(modelID: "gpt-5.4-nano", apiConfiguration: config)
+        let temperature = model.resolvedContract.parameters[.temperature]
 
-        let temperature = model.parameterAvailability.first {
-            $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .temperature
-        }
-
-        XCTAssertFalse(temperature?.isAvailable ?? true)
+        XCTAssertEqual(temperature?.support.state, .unsupported)
+        XCTAssertEqual(temperature?.support.source, .catalog)
     }
 
-    func testFetchedModelRetainsDefaultParameterAvailability() throws {
+    func testFetchedModelResolvesCatalogContract() throws {
         let config = APIConfigurationItem(
             name: "OpenAI",
             apiKey: "key",
@@ -117,12 +111,11 @@ final class ModelItemTests: XCTestCase {
         try context.save()
 
         let fetched = try XCTUnwrap(try context.fetch(FetchDescriptor<ModelItem>()).first)
-        let temperature = fetched.parameterAvailability.first {
-            $0.adapterIDEnum == .openAIChatCompletions && $0.semanticParameterIDEnum == .temperature
-        }
+        let temperature = fetched.resolvedContract.parameters[.temperature]
 
         XCTAssertNotNil(temperature)
-        XCTAssertTrue(temperature?.isAvailable ?? false)
+        XCTAssertEqual(temperature?.support.state, .supported)
+        XCTAssertTrue(fetched.parameterPolicyOverrides.isEmpty)
     }
 
     func testEdgeCases() throws {

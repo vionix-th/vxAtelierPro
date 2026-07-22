@@ -1,42 +1,42 @@
 import Foundation
 
-/// Decodes provider model-list payloads into normalized draft model candidates.
+/// Decodes provider model-list payloads into provider observations without catalog enrichment.
 enum LLMModelMetadataDecoder {
-    /// Maps OpenAI-compatible model objects using provider metadata plus bundled model defaults.
+    /// Maps OpenAI-compatible model objects into provider observations.
     static func openAICompatibleCandidates(
         from data: [JSONValue],
-        profile: LLMProviderProfile,
-        defaultsCatalog: LLMDefaultsCatalog = .bundled
-    ) -> [LLMModelMetadata] {
+        profile: LLMProviderProfile
+    ) -> [LLMProviderModelObservation] {
         data.compactMap { item in
             guard let object = item.objectValue, let id = object.string("id") else { return nil }
-            var candidate = defaultsCatalog.modelMetadata(
+            return LLMProviderModelObservation(
+                id: id,
+                displayName: object.string("name") ?? object.string("display_name"),
                 providerID: profile.id,
-                modelID: id,
-                displayName: object.string("name") ?? object.string("display_name") ?? id,
+                contextSize: contextSize(from: object),
+                capabilityClaims: explicitCapabilityClaims(from: object),
+                parameterSupportClaims: explicitParameterClaims(from: object),
                 rawMetadataJSON: rawJSONString(from: item)
             )
-            applyProviderMetadata(from: object, to: &candidate)
-            return candidate
         }
     }
 
-    /// Maps Anthropic model objects using provider metadata plus bundled model defaults.
+    /// Maps Anthropic model objects into provider observations.
     static func anthropicCandidates(
         from data: [JSONValue],
-        profile: LLMProviderProfile,
-        defaultsCatalog: LLMDefaultsCatalog = .bundled
-    ) -> [LLMModelMetadata] {
+        profile: LLMProviderProfile
+    ) -> [LLMProviderModelObservation] {
         data.compactMap { item in
             guard let object = item.objectValue, let id = object.string("id") else { return nil }
-            var candidate = defaultsCatalog.modelMetadata(
+            return LLMProviderModelObservation(
+                id: id,
+                displayName: object.string("display_name") ?? object.string("name"),
                 providerID: profile.id,
-                modelID: id,
-                displayName: object.string("display_name") ?? object.string("name") ?? id,
+                contextSize: contextSize(from: object),
+                capabilityClaims: explicitCapabilityClaims(from: object),
+                parameterSupportClaims: explicitParameterClaims(from: object),
                 rawMetadataJSON: rawJSONString(from: item)
             )
-            applyProviderMetadata(from: object, to: &candidate)
-            return candidate
         }
     }
 
@@ -54,54 +54,117 @@ enum LLMModelMetadataDecoder {
             ?? object.int("max_context_window")
     }
 
-    /// Applies direct provider metadata over already-resolved bundled defaults.
-    private static func applyProviderMetadata(from object: [String: JSONValue], to candidate: inout LLMModelMetadata) {
-        if let contextSize = contextSize(from: object) {
-            candidate.contextSize = contextSize
-        }
-
-        let directCapabilities = explicitCapabilities(from: object)
-        if !directCapabilities.isEmpty {
-            candidate.capabilities = directCapabilities
-        }
-    }
-
-    /// Reads explicit provider capability fields.
-    private static func explicitCapabilities(from object: [String: JSONValue]) -> [LLMModelCapability] {
-        var capabilities = Set<LLMModelCapability>()
+    /// Reads explicit provider claims without treating omitted capabilities as unsupported.
+    private static func explicitCapabilityClaims(from object: [String: JSONValue]) -> [LLMCapabilityClaim] {
+        var claims: [LLMModelCapability: LLMSupportState] = [:]
         for key in ["capabilities", "schema_features", "features"] {
             for value in stringArray(object[key]) {
                 if let capability = LLMModelCapability(rawValue: value) {
-                    capabilities.insert(capability)
+                    claims[capability] = .supported
                 }
             }
         }
-        appendContentCapabilities(from: object, to: &capabilities)
-        if object.bool("supports_streaming") == true || object.bool("streaming") == true {
-            capabilities.insert(.streaming)
+        appendContentCapabilities(from: object, to: &claims)
+        let booleanClaims: [LLMModelCapability: [String]] = [
+            .text: ["supports_text"],
+            .image: ["supports_image", "supports_images", "supports_vision"],
+            .audio: ["supports_audio"],
+            .file: ["supports_file", "supports_files"],
+            .video: ["supports_video"],
+            .tools: ["supports_tools", "supports_tool_calls"],
+            .strictTools: ["supports_strict_tools"],
+            .jsonSchema: ["supports_json_schema", "supports_structured_outputs"],
+            .jsonObject: ["supports_json_object", "supports_json_mode"],
+            .reasoning: ["supports_reasoning"],
+            .usage: ["supports_usage"],
+            .streaming: ["supports_streaming", "streaming"]
+        ]
+        for (capability, keys) in booleanClaims {
+            for key in keys {
+                if let value = object[key]?.boolValue {
+                    claims[capability] = value ? .supported : .unsupported
+                }
+            }
         }
-        return Array(capabilities).sorted { $0.rawValue < $1.rawValue }
+        return claims
+            .map { LLMCapabilityClaim(capability: $0.key, state: $0.value) }
+            .sorted { $0.capability.rawValue < $1.capability.rawValue }
     }
 
     /// Reads explicit content capability arrays from provider metadata.
-    private static func appendContentCapabilities(from object: [String: JSONValue], to capabilities: inout Set<LLMModelCapability>) {
+    private static func appendContentCapabilities(
+        from object: [String: JSONValue],
+        to claims: inout [LLMModelCapability: LLMSupportState]
+    ) {
         for value in stringArray(object["modalities"]) {
-            appendCapability(value, to: &capabilities)
+            appendCapability(value, to: &claims)
         }
 
         if let architecture = object.object("architecture") {
             for key in ["input_modalities", "output_modalities"] {
                 for value in stringArray(architecture[key]) {
-                    appendCapability(value, to: &capabilities)
+                    appendCapability(value, to: &claims)
                 }
             }
         }
     }
 
+    /// Reads non-exhaustive provider parameter claims without deriving support from omission.
+    private static func explicitParameterClaims(from object: [String: JSONValue]) -> [LLMParameterSupportClaim] {
+        var claims: [LLMParameterID: LLMSupportState] = [:]
+        for value in stringArray(object["supported_parameters"]) {
+            if let parameterID = semanticParameterID(forProviderToken: value) {
+                claims[parameterID] = .supported
+            }
+        }
+
+        for parameterID in LLMParameterID.allCases where parameterID.isProviderMappable {
+            let key = "supports_\(parameterID.rawValue)"
+            if let value = object[key]?.boolValue {
+                claims[parameterID] = value ? .supported : .unsupported
+            }
+        }
+        let booleanAliases: [LLMParameterID: [String]] = [
+            .maxOutputTokens: ["supports_max_tokens", "supports_max_completion_tokens"],
+            .stopSequences: ["supports_stop"],
+            .responseFormat: ["supports_structured_outputs", "supports_json_schema"],
+            .reasoningEffort: ["supports_reasoning"]
+        ]
+        for (parameterID, keys) in booleanAliases {
+            for key in keys {
+                if let value = object[key]?.boolValue {
+                    claims[parameterID] = value ? .supported : .unsupported
+                }
+            }
+        }
+
+        return claims
+            .map { LLMParameterSupportClaim(parameterID: $0.key, state: $0.value) }
+            .sorted { $0.parameterID.rawValue < $1.parameterID.rawValue }
+    }
+
+    private static func semanticParameterID(forProviderToken token: String) -> LLMParameterID? {
+        switch token.lowercased() {
+        case "max_tokens", "max_completion_tokens", "max_output_tokens":
+            return .maxOutputTokens
+        case "stop", "stop_sequences":
+            return .stopSequences
+        case "response_format", "structured_outputs":
+            return .responseFormat
+        case "reasoning", "reasoning_effort":
+            return .reasoningEffort
+        default:
+            return LLMParameterID(rawValue: token.lowercased())
+        }
+    }
+
     /// Adds one exact capability token from provider metadata.
-    private static func appendCapability(_ value: String, to capabilities: inout Set<LLMModelCapability>) {
+    private static func appendCapability(
+        _ value: String,
+        to claims: inout [LLMModelCapability: LLMSupportState]
+    ) {
         if let capability = LLMModelCapability(rawValue: value.lowercased()) {
-            capabilities.insert(capability)
+            claims[capability] = .supported
         }
     }
 

@@ -7,7 +7,7 @@ import SwiftUI
 
 // Add version constant at the top level
 private enum BackupVersion {
-    static let current = 2
+    static let current = 3
 }
 
 struct FullBackup: Codable {
@@ -48,15 +48,10 @@ struct FullBackup: Codable {
         self.webSearchConfigurations = webSearchConfigurations
     }
     
-    // Add decoder init to handle version differences
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        
-        // Decode version, defaulting to 1 for older backups
-        version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
-        
-        // Ensure version is supported
-        guard version <= BackupVersion.current else {
+        version = try container.decode(Int.self, forKey: .version)
+        guard version == BackupVersion.current else {
             throw BackupError.unsupportedVersion(version)
         }
         
@@ -102,7 +97,7 @@ enum BackupError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unsupportedVersion(let version):
-            return "This backup was created with a newer version (\(version)) and cannot be restored with the current version (\(BackupVersion.current))"
+            return "Backup version \(version) is incompatible with format \(BackupVersion.current)."
         }
     }
 }
