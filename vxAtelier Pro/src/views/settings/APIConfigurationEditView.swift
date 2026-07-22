@@ -135,7 +135,8 @@ struct APIConfigurationEditView: View {
                     }
                 }
 
-                if selectableAdapterIDs.count > 1 {
+                if currentProfile.adapterSelectionPolicy == .configuration,
+                   selectableAdapterIDs.count > 1 {
                     SettingsPickerRow("API Mode", selection: $defaultAdapterID) {
                         ForEach(selectableAdapterIDs) { family in
                             Text(family.displayName).tag(family)
@@ -715,6 +716,7 @@ struct APIConfigurationEditView: View {
 enum APIPreset: String, CaseIterable {
     case openAI = "OpenAI"
     case codexChatGPTSubscription = "Codex ChatGPT Subscription"
+    case openCodeZen = "OpenCode Zen"
     case appleIntelligence = "Apple Intelligence"
     case anthropic = "Anthropic"
     case xAI = "xAI"
@@ -732,6 +734,7 @@ enum APIPreset: String, CaseIterable {
         switch self {
         case .openAI: return "sparkles"
         case .codexChatGPTSubscription: return "terminal"
+        case .openCodeZen: return "chevron.left.forwardslash.chevron.right"
         case .appleIntelligence: return "apple.logo"
         case .anthropic: return "person.text.rectangle"
         case .xAI: return "bolt.fill"
@@ -747,6 +750,7 @@ enum APIPreset: String, CaseIterable {
         switch self {
         case .openAI: return .openAIPlatform
         case .codexChatGPTSubscription: return .openAICodexChatGPTSubscription
+        case .openCodeZen: return .openCodeZen
         case .appleIntelligence: return .appleIntelligence
         case .anthropic: return .anthropic
         case .xAI: return .xAI
@@ -764,6 +768,8 @@ enum APIPreset: String, CaseIterable {
             return .openAI
         case .openAICodexChatGPTSubscription:
             return .codexChatGPTSubscription
+        case .openCodeZen:
+            return .openCodeZen
         case .appleIntelligence:
             return .appleIntelligence
         case .anthropic:
@@ -787,6 +793,7 @@ enum APIPreset: String, CaseIterable {
         switch self {
         case .openAI: return AppDefaults.OpenAi.baseURL
         case .codexChatGPTSubscription: return CodexChatGPTOAuthService.codexBackendBaseURL
+        case .openCodeZen: return "https://opencode.ai/zen/v1"
         case .appleIntelligence: return ""
         case .anthropic: return AppDefaults.Anthropic.baseURL
         case .xAI: return AppDefaults.XAI.baseURL

@@ -62,6 +62,7 @@ let package = Package(
                 "llm_api/OpenAIChatAdapter.swift",
                 "llm_api/OpenAIResponsesAdapter.swift",
                 "llm_api/AnthropicMessagesAdapter.swift",
+                "llm_api/OpenCodeZenAdapter.swift",
                 "llm_api/LLMToolSchema.swift",
                 "llm_api/ConfigurableLLMTool.swift",
                 "llm_api/LLMToolRegistry.swift",

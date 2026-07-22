@@ -9,6 +9,10 @@
       "defaultModel": "gpt-5.5"
     },
     {
+      "provider": "openCodeZen",
+      "defaultModel": "gpt-5.6-terra"
+    },
+    {
       "provider": "appleIntelligence",
       "defaultModel": "apple-intelligence-default"
     },
@@ -388,6 +392,40 @@
     {
       "level": "provider",
       "match": {
+        "providerRegex": "^openCodeZen$"
+      },
+      "modelDefaults": {
+        "contextSize": 128000,
+        "capabilities": [
+          "text",
+          "tools",
+          "usage",
+          "streaming"
+        ]
+      }
+    },
+    {
+      "match": {
+        "providerRegex": "^openCodeZen$",
+        "modelRegex": "^gpt-5\\.6-(sol|terra)$"
+      },
+      "modelDefaults": {
+        "contextSize": 1050000,
+        "capabilities": [
+          "text",
+          "image",
+          "file",
+          "tools",
+          "jsonSchema",
+          "jsonObject",
+          "reasoning",
+          "usage",
+          "streaming"
+        ]
+      }
+    },
+    {
+      "match": {
         "providerRegex": "^anthropic$"
       },
       "modelDefaults": {
@@ -691,7 +729,7 @@
     {
       "level": "provider",
       "match": {
-        "providerRegex": "^(openAIPlatform|openAICodexChatGPTSubscription)$",
+        "providerRegex": "^(openAIPlatform|openAICodexChatGPTSubscription|openCodeZen)$",
         "adapterID": "openAIResponses"
       },
       "parameters": [
@@ -801,7 +839,7 @@
     {
       "level": "model",
       "match": {
-        "providerRegex": "^(openAIPlatform|openAICodexChatGPTSubscription)$",
+        "providerRegex": "^(openAIPlatform|openAICodexChatGPTSubscription|openCodeZen)$",
         "adapterID": "openAIResponses",
         "modelRegex": "^gpt-5\\.(1|2)(?:-.*)?$|^gpt-5\\.4(?:-mini|-nano)?$"
       },
@@ -824,7 +862,7 @@
     {
       "level": "model",
       "match": {
-        "providerRegex": "^(openAIPlatform|openAICodexChatGPTSubscription)$",
+        "providerRegex": "^(openAIPlatform|openAICodexChatGPTSubscription|openCodeZen)$",
         "adapterID": "openAIResponses",
         "modelRegex": "^gpt-5\\.5$"
       },
@@ -846,6 +884,21 @@
     },
     {
       "level": "provider",
+      "match": {
+        "providerRegex": "^openCodeZen$",
+        "adapterID": "openAIResponses",
+        "modelRegex": "^gpt-5\\.6-(sol|terra)$"
+      },
+      "parameterAvailability": [
+        {
+          "parameter": "reasoning_effort",
+          "enabled": true,
+          "defaultValue": "medium",
+          "options": ["none", "low", "medium", "high", "xhigh", "max"]
+        }
+      ]
+    },
+    {
       "match": {
         "providerRegex": "^openAICodexChatGPTSubscription$",
         "adapterID": "openAIResponses"
@@ -1431,7 +1484,7 @@
     {
       "level": "provider",
       "match": {
-        "providerRegex": "^anthropic$",
+        "providerRegex": "^(anthropic|openCodeZen)$",
         "adapterID": "anthropicMessages"
       },
       "parameters": [

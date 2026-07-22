@@ -47,6 +47,48 @@
       ]
     },
     {
+      "id": "openCodeZen",
+      "name": "OpenCode Zen Responses",
+      "enabled": false,
+      "baseURL": "https://opencode.ai/zen/v1",
+      "apiKey": "replace-with-opencode-zen-api-key",
+      "models": [
+        "gpt-5.6-terra"
+      ],
+      "checkModels": true,
+      "adapterIDs": [
+        "openAIResponses"
+      ]
+    },
+    {
+      "id": "openCodeZen",
+      "name": "OpenCode Zen Messages",
+      "enabled": false,
+      "baseURL": "https://opencode.ai/zen/v1",
+      "apiKey": "replace-with-opencode-zen-api-key",
+      "models": [
+        "claude-sonnet-4-6"
+      ],
+      "checkModels": true,
+      "adapterIDs": [
+        "anthropicMessages"
+      ]
+    },
+    {
+      "id": "openCodeZen",
+      "name": "OpenCode Zen Chat Completions",
+      "enabled": false,
+      "baseURL": "https://opencode.ai/zen/v1",
+      "apiKey": "replace-with-opencode-zen-api-key",
+      "models": [
+        "minimax-m3"
+      ],
+      "checkModels": true,
+      "adapterIDs": [
+        "openAICompatibleChatCompletions"
+      ]
+    },
+    {
       "id": "openRouter",
       "name": "OpenRouter",
       "enabled": false,

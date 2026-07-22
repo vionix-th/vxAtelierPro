@@ -36,3 +36,7 @@
 ## Refactoring Rule
 - If a type is reusable across apps and does not require SwiftData, SwiftUI, persisted app models, or concrete app services, it belongs in `llm_api/*`.
 - If a type coordinates app persistence, concrete tool execution, draft state, or conversation run lifecycle, it belongs in `llm_runtime/*`.
+
+## README
+
+- Read README.md for further details

@@ -11,6 +11,7 @@ enum LLMProviderTransportKind: String, Codable, CaseIterable {
 enum LLMProviderID: String, Codable, CaseIterable, Identifiable {
     case openAIPlatform
     case openAICodexChatGPTSubscription
+    case openCodeZen
     case appleIntelligence
     case openRouter
     case lmStudio
@@ -28,6 +29,7 @@ enum LLMProviderID: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .openAIPlatform: return "OpenAI Platform"
         case .openAICodexChatGPTSubscription: return "Codex ChatGPT Subscription"
+        case .openCodeZen: return "OpenCode Zen"
         case .appleIntelligence: return "Apple Intelligence"
         case .openRouter: return "OpenRouter"
         case .lmStudio: return "LM Studio"
@@ -38,6 +40,12 @@ enum LLMProviderID: String, Codable, CaseIterable, Identifiable {
         case .customOpenAICompatible: return "Custom OpenAI Compatible"
         }
     }
+}
+
+/// Selects whether one configuration or each discovered model owns adapter routing.
+enum LLMAdapterSelectionPolicy: String, Codable {
+    case configuration
+    case model
 }
 
 /// Stable identifier for a generation adapter wire contract.
@@ -82,6 +90,7 @@ struct LLMProviderProfile: Codable, Identifiable, Equatable {
     var authKind: LLMAuthKind
     var defaultAdapterID: LLMAdapterID
     var supportedAdapterIDs: [LLMAdapterID]
+    var adapterSelectionPolicy: LLMAdapterSelectionPolicy = .configuration
     var isEnabled: Bool
 
     var requiresBaseURL: Bool {

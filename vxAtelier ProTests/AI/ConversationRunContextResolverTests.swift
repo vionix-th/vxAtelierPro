@@ -105,6 +105,51 @@ final class ConversationRunContextResolverTests: XCTestCase {
         }
     }
 
+    func testResolverUsesModelSpecificOpenCodeZenAdapter() async throws {
+        let env = TestEnvironment()
+        let config = APIConfigurationItem(
+            name: "OpenCode Zen",
+            apiKey: "zen-key",
+            baseURL: "https://opencode.ai/zen/v1",
+            defaultModel: "claude-sonnet-4-6",
+            providerID: .openCodeZen
+        )
+        let model = ModelItem(modelID: "claude-sonnet-4-6", apiConfiguration: config)
+        model.adapterIDEnum = .anthropicMessages
+        model.resetDefaultParameterMappings(
+            adapterID: .anthropicMessages,
+            providerID: .openCodeZen
+        )
+        model.resetDefaultParameterAvailability(
+            adapterID: .anthropicMessages,
+            providerID: .openCodeZen
+        )
+        let options = ConversationOptions(apiConfiguration: config)
+        options.selectedModelID = model.modelID
+        let conversation = ConversationItem("Zen routing", options: options)
+
+        env.modelContext.insert(config)
+        env.modelContext.insert(model)
+        env.modelContext.insert(conversation)
+
+        let context = try await ConversationRunContextResolver(
+            toolCatalog: StaticLLMToolCatalog([])
+        ).resolve(conversation: conversation, apiConfig: config)
+
+        XCTAssertEqual(context.adapterID, .anthropicMessages)
+        XCTAssertTrue(context.parameterMappings.contains {
+            $0.adapterID == .anthropicMessages && $0.semanticParameterID == .maxOutputTokens
+        })
+        let controls = ConversationParameterProjection.controls(
+            for: options,
+            apiConfiguration: config
+        )
+        XCTAssertEqual(
+            controls.first { $0.parameterID == .maxOutputTokens }?.required,
+            true
+        )
+    }
+
     func testRequestFactoryProducesStableRequestFromFixedContext() throws {
         let profile = LLMProviderRegistry.shared.profile(for: .openAIPlatform)
         let options = LLMGenerationOptions(

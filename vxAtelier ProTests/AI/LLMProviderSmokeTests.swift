@@ -86,6 +86,18 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         try await runLiveSmoke(providerID: .anthropic, adapterID: .anthropicMessages)
     }
 
+    func testOpenCodeZenResponsesLiveSmoke() async throws {
+        try await runLiveSmoke(providerID: .openCodeZen, adapterID: .openAIResponses)
+    }
+
+    func testOpenCodeZenMessagesLiveSmoke() async throws {
+        try await runLiveSmoke(providerID: .openCodeZen, adapterID: .anthropicMessages)
+    }
+
+    func testOpenCodeZenChatCompletionsLiveSmoke() async throws {
+        try await runLiveSmoke(providerID: .openCodeZen, adapterID: .openAICompatibleChatCompletions)
+    }
+
     func testOpenRouterChatCompletionsLiveSmoke() async throws {
         try await runLiveSmoke(providerID: .openRouter, adapterID: .openAICompatibleChatCompletions)
     }

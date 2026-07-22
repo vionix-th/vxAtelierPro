@@ -31,7 +31,7 @@ vxAtelier Pro is designed for writers, researchers, and professionals who want t
 ## Features
 - **AI Conversations:** Start, manage, and organize conversations with leading AI models.
 - **Project Management:** Group dialogs into projects for better organization.
-- **Multi-Provider AI Support:** Seamlessly switch between OpenAI, Anthropic, xAI, and DeepSeek.
+- **Multi-Provider AI Support:** Seamlessly switch between OpenAI, OpenCode Zen, Anthropic, OpenRouter, xAI, and DeepSeek.
 - **Prompt Templates:** Create and reuse system/user prompt templates for consistent results.
 - **Text-to-Speech (TTS):** Customizable voice feedback with per-role and per-language configuration.
 - **Web Search Integration:** Configure and use web search providers (e.g., Google Custom Search) in conversations.

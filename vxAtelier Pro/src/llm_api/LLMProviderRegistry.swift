@@ -30,6 +30,21 @@ struct LLMProviderRegistry {
                 isEnabled: true
             ),
             LLMProviderProfile(
+                id: .openCodeZen,
+                name: "OpenCode Zen",
+                transportKind: .remoteHTTP,
+                defaultBaseURL: "https://opencode.ai/zen/v1",
+                authKind: .bearerToken,
+                defaultAdapterID: .openAIResponses,
+                supportedAdapterIDs: [
+                    .openAIResponses,
+                    .anthropicMessages,
+                    .openAICompatibleChatCompletions
+                ],
+                adapterSelectionPolicy: .model,
+                isEnabled: true
+            ),
+            LLMProviderProfile(
                 id: .appleIntelligence,
                 name: "Apple Intelligence",
                 transportKind: .localSystem,
@@ -141,6 +156,10 @@ struct LLMProviderRegistry {
         try validateRoute(adapterID: adapterID, providerID: providerID)
         let profile = profile(for: providerID)
 
+        if providerID == .openCodeZen {
+            return OpenCodeZenAdapter(profile: profile, adapterID: adapterID)
+        }
+
         switch adapterID {
         case .openAIResponses:
             return OpenAIResponsesAdapter(profile: profile)
@@ -208,6 +227,7 @@ struct LLMProviderRegistry {
             return .appleIntelligence
         }
         if probe.contains("openrouter") { return .openRouter }
+        if probe.contains("opencode") || probe.contains("open code zen") { return .openCodeZen }
         if probe.contains("lm studio") { return .lmStudio }
         if probe.contains("ollama") { return .ollama }
         if probe.contains("xai") || probe.contains("x.ai") || probe.contains("grok") { return .xAI }
