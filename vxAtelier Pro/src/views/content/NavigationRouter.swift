@@ -1,10 +1,18 @@
 import Observation
+import Foundation
 import SwiftData
+
+struct ConversationScrollRequest: Equatable {
+    let requestID: UUID
+    let conversationID: PersistentIdentifier
+    let messageID: PersistentIdentifier
+}
 
 @Observable
 @MainActor
 final class NavigationRouter {
     var selection: SidebarSelection? = nil
+    private(set) var conversationScrollRequest: ConversationScrollRequest?
     private var projectPaths: [PersistentIdentifier: [ProjectRoute]] = [:]
 
     var activeConversationID: PersistentIdentifier? {
@@ -76,12 +84,31 @@ final class NavigationRouter {
         return true
     }
 
-    func openConversation(_ conversationID: PersistentIdentifier, in projectID: PersistentIdentifier?) {
+    func openConversation(
+        _ conversationID: PersistentIdentifier,
+        in projectID: PersistentIdentifier?,
+        scrollTo messageID: PersistentIdentifier? = nil
+    ) {
+        if let messageID {
+            conversationScrollRequest = ConversationScrollRequest(
+                requestID: UUID(),
+                conversationID: conversationID,
+                messageID: messageID
+            )
+        } else {
+            conversationScrollRequest = nil
+        }
+
         if let projectID {
             setSelection(.project(projectID))
             setPath([.conversation(conversationID)], for: projectID)
         } else {
             setSelection(.conversation(conversationID))
         }
+    }
+
+    func consumeConversationScrollRequest(_ requestID: UUID) {
+        guard conversationScrollRequest?.requestID == requestID else { return }
+        conversationScrollRequest = nil
     }
 }

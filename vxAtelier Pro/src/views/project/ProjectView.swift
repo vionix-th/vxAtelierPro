@@ -241,7 +241,7 @@ struct ProjectView: View {
                 .navigationDestination(for: ProjectRoute.self) { route in
                     switch route {
                     case .conversation(let id):
-                        ConversationView(
+                        ConversationScreen(
                             conversationID: id,
                             onRequestOptions: onRequestOptions
                         )
@@ -279,7 +279,7 @@ struct ProjectView: View {
             Divider()
             
             if let project = self.project {
-                MessageInputView(
+                ConversationComposerView(
                     queryManager: queryManager,
                     draftStore: composerDraftStore,
                     resolveConversation: {
@@ -288,10 +288,11 @@ struct ProjectView: View {
                         }
                         return try queryManager.createConversation(in: project)
                     },
-                    didSend: { conversation in
+                    didCompleteConversation: { conversationID in
+                        guard let conversation = queryManager.conversation(with: conversationID) else { return }
                         let projectName = queryManager.project(with: projectID)?.name ?? project.name
                         vxAtelierPro.log.debug("Created new conversation '\(conversation.title)' in project '\(projectName)'")
-                        router.setPath([.conversation(conversation.id)], for: projectID)
+                        router.setPath([.conversation(conversation.persistentModelID)], for: projectID)
                     }
                 )
                 .padding(AppDefaults.paddingSmall)

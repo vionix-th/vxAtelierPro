@@ -237,15 +237,21 @@ struct ContentView: View {
     
     private func selectBookmark(id: PersistentIdentifier) {
         guard let bookmark = queryManager.bookmark(with: id),
-              let conversation = bookmark.turn?.conversation else {
+              let turn = bookmark.turn,
+              let conversation = turn.conversation else {
             vxAtelierPro.log.error("Bookmark selection failed: missing conversation.")
             return
         }
-        
+
+        let messageID = bookmark.target?.message.persistentModelID ?? turn.userMessage.persistentModelID
         if let project = conversation.project {
-            router.openConversation(conversation.id, in: project.id)
+            router.openConversation(
+                conversation.persistentModelID,
+                in: project.persistentModelID,
+                scrollTo: messageID
+            )
         } else {
-            router.openConversation(conversation.id, in: nil)
+            router.openConversation(conversation.persistentModelID, in: nil, scrollTo: messageID)
         }
     }
     
@@ -295,12 +301,14 @@ struct ContentView: View {
         if let selection {
             switch selection {
             case .conversation(let id):
-                if let conversation = standaloneConversations.first(where: { $0.id == id }) {
-                    ConversationView(
-                        conversationID: conversation.id,
+                if let conversation = standaloneConversations.first(where: {
+                    $0.persistentModelID == id
+                }) {
+                    ConversationScreen(
+                        conversationID: conversation.persistentModelID,
                         onRequestOptions: onRequestOptions
                     )
-                    .id(conversation.id)
+                    .id(conversation.persistentModelID)
                 } else {
                     Text("Item not found.")
                 }

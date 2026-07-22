@@ -11,7 +11,6 @@ struct DeveloperSettingsView: View {
     @AppStorage(AppSettings.Keys.streamingThrottleEnabled) private var streamingThrottleEnabled: Bool = false
     @AppStorage(AppSettings.Keys.streamingThrottleIntervalMs) private var streamingThrottleIntervalMs: Int = 50
     @AppStorage(AppSettings.Keys.streamingDebugEnabled) private var streamingDebugEnabled: Bool = false
-    @AppStorage(AppSettings.Keys.markdownStreamFinalizeOnly) private var markdownStreamFinalizeOnly: Bool = false
     @AppStorage(AppSettings.Keys.showToolCallChips) private var showToolCallChips: Bool = true
 
     var body: some View {
@@ -35,7 +34,6 @@ struct DeveloperSettingsView: View {
                     value: $streamingThrottleIntervalMs
                 )
                 SettingsToggleRow("Streaming Debug Logs", isOn: $streamingDebugEnabled)
-                SettingsToggleRow("Markdown: Finalize Only on Stream", isOn: $markdownStreamFinalizeOnly)
             }
         }
     }

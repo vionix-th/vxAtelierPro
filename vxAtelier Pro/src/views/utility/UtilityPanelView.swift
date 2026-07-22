@@ -14,10 +14,10 @@ struct UtilityPanelView: View {
     var body: some View {
         Group {
             if let conversation {
-                MessageInputView(
+                ConversationComposerView(
                     queryManager: queryManager,
                     draftStore: draftStore,
-                    contextConversation: conversation,
+                    contextConversationID: conversation.persistentModelID,
                     focusInputOnAppear: true,
                     resolveConversation: {
                         guard let resolved = self.conversation else {
@@ -25,8 +25,8 @@ struct UtilityPanelView: View {
                         }
                         return resolved
                     },
-                    didSend: { conversation in
-                        sceneModel.router.openConversation(conversation.id, in: nil)
+                    didCompleteConversation: { conversationID in
+                        sceneModel.router.openConversation(conversationID, in: nil)
                         dismissWindow(id: "utilityPanel")
                     }
                 )
@@ -50,7 +50,7 @@ struct UtilityPanelView: View {
     private func resolveUtilityConversation() {
         do {
             let conversation = try queryManager.ensureUtilityPanelConversation()
-            conversationID = conversation.id
+            conversationID = conversation.persistentModelID
         } catch {
             vxAtelierPro.log.error("Failed to resolve utility conversation: \(error.localizedDescription)")
             errorAlert = ErrorAlert(error: error)

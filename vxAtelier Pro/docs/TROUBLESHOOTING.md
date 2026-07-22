@@ -72,7 +72,6 @@ struct MyView: View {
 ```
 
 **Files Affected:**
-- `ConversationView.swift`: Potentially unnecessary `@Query` for projects and apiConfigurations
 - `ProjectView.swift`: Could use relationship instead of separate query
 
 ### 3. Missing @Transient Properties
@@ -197,7 +196,6 @@ Follow these rules:
 - Use computed properties for values derived from other state
 
 **Files Affected:**
-- `ConversationView.swift`: Mixed usage of state management
 - `StatusBar.swift`: Some `@State` properties could be computed
 
 ### 2. View Performance Issues
@@ -233,7 +231,6 @@ struct MyView: View {
 ```
 
 **Files Affected:**
-- `ConversationView.swift`: Large view body with many subviews
 - `StatusBar.swift`: Complex view hierarchy that could be broken down
 
 **General Rules:**
@@ -294,7 +291,6 @@ var localValue: String {
 ```
 
 **Files Affected:**
-- `ConversationView.swift`: Mixed state management between local state and SwiftData
 - `StatusBar.swift`: Redundant state tracking
 
 ### 3. Initialization Order Dependencies
@@ -324,7 +320,6 @@ var body: some View {
 ```
 
 **Files Affected:**
-- `ConversationView.swift`: Initialization assumptions in `init`
 - `ModelEditorView.swift`: State initialization dependencies
 
 **General Rules:**
@@ -368,7 +363,6 @@ Button("Action") { [weak self] in
 ```
 
 **Files Affected:**
-- `ConversationView.swift`: Multiple closures without capture lists
 - `StatusBar.swift`: Event handlers with potential retain cycles
 
 ### 2. Subscription and Observer Cleanup
@@ -403,7 +397,6 @@ Use proper cleanup in `onDisappear` or return a cleanup closure:
 
 **Files Affected:**
 - `ContentView.swift`: Notification observers without cleanup
-- `ConversationView.swift`: Manual observers that need cleanup
 
 ## Error Handling Patterns
 
@@ -438,7 +431,6 @@ do {
 ```
 
 **Files Affected:**
-- `ConversationView.swift`: Multiple try-catch blocks with minimal error handling
 - Settings pages: destructive and persistence actions should log failures through `vxAtelierPro.log` and surface user-facing errors where recovery is needed
 
 ### 2. Error Propagation in SwiftData
@@ -500,7 +492,6 @@ func performAction() throws {
 
 **Files Affected:**
 - Multiple views assuming environment values are always present
-- `ConversationView.swift`: Direct usage of environment values
 
 ### 2. Environment Propagation
 

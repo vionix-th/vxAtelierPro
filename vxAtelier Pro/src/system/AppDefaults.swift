@@ -66,7 +66,6 @@ struct AppDefaults {
     static let streamingThrottleEnabled = false
     static let streamingThrottleIntervalMs = 50
     static let streamingDebugEnabled = false
-    static let markdownStreamFinalizeOnly = false
     static let showToolCallChips = true
     
     // Permissions
@@ -197,9 +196,6 @@ extension AppDefaults {
             AppDefaults.streamingThrottleIntervalMs,
             forKey: AppSettings.Keys.streamingThrottleIntervalMs)
         defaults.set(AppDefaults.streamingDebugEnabled, forKey: AppSettings.Keys.streamingDebugEnabled)
-        defaults.set(
-            AppDefaults.markdownStreamFinalizeOnly,
-            forKey: AppSettings.Keys.markdownStreamFinalizeOnly)
         defaults.set(AppDefaults.showToolCallChips, forKey: AppSettings.Keys.showToolCallChips)
         // Permissions
         defaults.set(

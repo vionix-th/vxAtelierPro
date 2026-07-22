@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 /// Coordinates a full conversation completion, including provider/tool loops and persistence.
 @MainActor
@@ -38,15 +39,17 @@ final class ConversationResponseUseCase {
     func sendMessage(
         _ message: String,
         in conversation: ConversationItem,
-        draftStore: ConversationDraftStore
+        draftStore: ConversationDraftStore,
+        onTurnStarted: ((PersistentIdentifier) -> Void)? = nil
     ) async throws {
         guard let apiConfig = conversation.options.apiConfiguration else {
             throw LLMProviderError.invalidConfiguration("No API configuration available.")
         }
 
         let turn = try runStore.startTurn(message: message, in: conversation)
+        onTurnStarted?(turn.persistentModelID)
         let draftSink = ConversationDraftStoreSink(draftStore: draftStore)
-        draftSink.start(conversationID: conversation.id)
+        draftSink.start(conversationID: conversation.persistentModelID)
 
         do {
             try await runUntilStable(
@@ -55,11 +58,11 @@ final class ConversationResponseUseCase {
                 apiConfig: apiConfig,
                 draftSink: draftSink
             )
-            draftSink.complete(conversationID: conversation.id)
+            draftSink.complete(conversationID: conversation.persistentModelID)
             try runStore.finishConversation(conversation)
         } catch {
             let normalizedError = ConversationRunError.normalized(error)
-            draftSink.fail(normalizedError, conversationID: conversation.id)
+            draftSink.fail(normalizedError, conversationID: conversation.persistentModelID)
             if turn.events.isEmpty {
                 try runStore.rollbackTurn(turn, from: conversation)
             }
@@ -107,7 +110,7 @@ final class ConversationResponseUseCase {
             ) else {
                 return
             }
-            draftSink.complete(conversationID: conversation.id)
+            draftSink.complete(conversationID: conversation.persistentModelID)
 
             let toolCalls = assistantMessage.toolCallItems.sorted { $0.index < $1.index }
             guard !toolCalls.isEmpty else {
@@ -136,8 +139,8 @@ final class ConversationResponseUseCase {
             }
 
             try runStore.completeRunAfterTools(run, conversation: conversation)
-            draftSink.reset(conversationID: conversation.id)
-            draftSink.start(conversationID: conversation.id)
+            draftSink.reset(conversationID: conversation.persistentModelID)
+            draftSink.start(conversationID: conversation.persistentModelID)
         }
 
         throw LLMProviderError.unsupportedCapability("Max tool recursion depth exceeded.")

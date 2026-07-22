@@ -104,7 +104,7 @@ final class QueryManager {
     }
 
     func turn(with id: PersistentIdentifier, in conversation: ConversationItem) -> ConversationTurn? {
-        conversation.turns.first { $0.id == id }
+        conversation.turns.first { $0.persistentModelID == id }
     }
 
     func turn(with id: PersistentIdentifier, in conversationID: PersistentIdentifier) -> ConversationTurn? {
@@ -113,10 +113,10 @@ final class QueryManager {
     }
 
     func message(with id: PersistentIdentifier, in turn: ConversationTurn) -> MessageItem? {
-        if turn.userMessage.id == id {
+        if turn.userMessage.persistentModelID == id {
             return turn.userMessage
         }
-        return turn.events.first(where: { $0.message.id == id })?.message
+        return turn.events.first(where: { $0.message.persistentModelID == id })?.message
     }
 
     private func fetchConversations(predicate: Predicate<ConversationItem>? = nil) -> [ConversationItem] {
@@ -296,23 +296,23 @@ final class QueryManager {
     // Returns the number of turns removed.
     func deleteTurns(containing messageIDs: Set<PersistentIdentifier>, in conversation: ConversationItem) throws -> Int {
         guard !messageIDs.isEmpty else {
-            vxAtelierPro.log.debug("deleteTurns called with empty messageIDs for conversation \(conversation.id)")
+            vxAtelierPro.log.debug("deleteTurns called with empty messageIDs for conversation \(conversation.persistentModelID)")
             return 0
         }
 
         let initialCount = conversation.turns.count
         conversation.turns.removeAll { turn in
-            if messageIDs.contains(turn.userMessage.id) { return true }
-            return turn.events.contains { messageIDs.contains($0.message.id) }
+            if messageIDs.contains(turn.userMessage.persistentModelID) { return true }
+            return turn.events.contains { messageIDs.contains($0.message.persistentModelID) }
         }
         let removed = initialCount - conversation.turns.count
 
         if removed > 0 {
             conversation.forceUpdateTokenCount(updateContextCount: true, updateTotalCount: false)
             try saveContext()
-            vxAtelierPro.log.notice("Deleted \(removed) turn(s) from conversation \(conversation.id)")
+            vxAtelierPro.log.notice("Deleted \(removed) turn(s) from conversation \(conversation.persistentModelID)")
         } else {
-            vxAtelierPro.log.debug("deleteTurns removed 0 turns for conversation \(conversation.id)")
+            vxAtelierPro.log.debug("deleteTurns removed 0 turns for conversation \(conversation.persistentModelID)")
         }
         return removed
     }
@@ -508,29 +508,11 @@ final class QueryManager {
     // MARK: - Bookmarks
     func bookmark(for turn: ConversationTurn, event: TurnEvent?) -> BookmarkItem? {
         fetchBookmarks().first { bookmark in
-            guard bookmark.turn?.id == turn.id else { return false }
+            guard bookmark.turn?.persistentModelID == turn.persistentModelID else { return false }
             if let event {
-                return bookmark.target?.id == event.id
+                return bookmark.target?.persistentModelID == event.persistentModelID
             }
             return bookmark.target == nil
-        }
-    }
-
-    func insertBookmark(label: String, turn: ConversationTurn) {
-        let bookmark = BookmarkItem(label, turn: turn)
-        do {
-            try insert(bookmark)
-        } catch {
-            vxAtelierPro.log.error("Failed to insert bookmark: \(error.localizedDescription)")
-        }
-    }
-
-    func insertBookmark(label: String, turn: ConversationTurn, event: TurnEvent) {
-        let bookmark = BookmarkItem(label, turn: turn, event: event)
-        do {
-            try insert(bookmark)
-        } catch {
-            vxAtelierPro.log.error("Failed to insert bookmark: \(error.localizedDescription)")
         }
     }
 
@@ -550,24 +532,14 @@ final class QueryManager {
             throw AppError.invalidOperation("Message not available")
         }
 
-        if turn.userMessage.id == message.id {
-            insertBookmark(label: label, turn: turn)
-        } else if let event = turn.events.first(where: { $0.message.id == message.id }) {
-            insertBookmark(label: label, turn: turn, event: event)
+        if turn.userMessage.persistentModelID == message.persistentModelID {
+            try insert(BookmarkItem(label, turn: turn))
+        } else if let event = turn.events.first(where: {
+            $0.message.persistentModelID == message.persistentModelID
+        }) {
+            try insert(BookmarkItem(label, turn: turn, event: event))
         } else {
             throw AppError.invalidOperation("Message not available")
-        }
-    }
-
-    func isUserBookmarked(turnID: PersistentIdentifier) -> Bool {
-        fetchBookmarks().contains { $0.turn?.id == turnID && $0.target == nil }
-    }
-
-    func isAssistantBookmarked(turnID: PersistentIdentifier, messageID: PersistentIdentifier)
-        -> Bool
-    {
-        fetchBookmarks().contains {
-            $0.turn?.id == turnID && $0.targetMessageIDCache == messageID
         }
     }
 

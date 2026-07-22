@@ -70,7 +70,6 @@ enum AppSettings {
         // Markdown & toolchips
         static let isMarkdownEnabled = "IsMarkdownEnabled"
         static let isMarkdownTextSelectable = "IsMarkdownTextSelectable"
-        static let markdownStreamFinalizeOnly = "MarkdownStreamFinalizeOnly"
         static let showToolCallChips = "ShowToolCallChips"
 
         // Developer options

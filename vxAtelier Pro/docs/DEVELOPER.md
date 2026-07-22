@@ -181,7 +181,7 @@ There is no cached read model; invalidation and refresh are handled by SwiftData
 These components manage draft state for in-flight provider responses.
 
 *   **Conversation Draft Store (`ConversationDraftStore.swift`)**: An `@Observable` store keyed by conversation ID. It holds accumulating text, active/run status, tool calls, and error text for the current draft.
-*   **Conversation Completion Use Case (`ConversationCompletionUseCase.swift`)**: Coordinates conversation completion phases while `ConversationRunStore` owns SwiftData mutations and `ProviderRunExecutor` consumes provider events.
+*   **Conversation Response Use Case (`ConversationResponseUseCase.swift`)**: Coordinates conversation response phases while `ConversationRunStore` owns SwiftData mutations and `ProviderRunExecutor` consumes provider events.
 
 ### Utilities
 
@@ -377,7 +377,7 @@ This SwiftData `@Model` is the universal container for any piece of communicatio
 This SwiftData `@Model` represents a single conversation thread and stores the persisted structure for AI interactions.
 
 *   **Hierarchical Structure**: The dialogue is organized into an array of `ConversationTurn` objects. Each turn groups a user's message with all subsequent assistant responses and tool events, creating a structured, chronological record.
-*   **Execution Boundary**: Conversation completion is initiated by `ConversationCompletionUseCase`; the model does not own provider orchestration.
+*   **Execution Boundary**: Conversation completion is initiated by `ConversationResponseUseCase`; the model does not own provider orchestration.
 *   **Relationships**: It holds critical relationships to its child `ConversationTurn` and `ConversationOptions` objects (cascade delete) and an optional parent `ProjectItem` (nullify).
 *   **Features**: Includes a `fork(...)` method to create a deep copy of the conversation at any point.
 
@@ -520,7 +520,7 @@ This is a comprehensive, cross-platform `@ObservableObject` that provides a cent
 The application's in-flight provider response system is built around `ConversationDraftStore` and the execution layer.
 
 *   **Conversation Draft Store (`ConversationDraftStore.swift`)**: SwiftUI views observe draft text, tool calls, run status, and errors per conversation ID.
-*   **Conversation Completion Use Case (`ConversationCompletionUseCase.swift`)**: Orchestrates provider events, draft state, response-run persistence, and sequential tool execution through application-domain helpers.
+*   **Conversation Response Use Case (`ConversationResponseUseCase.swift`)**: Orchestrates provider events, draft state, response-run persistence, and sequential tool execution through application-domain helpers.
 *   **`PermissionManager.swift`**: An `@ObservableObject` that centralizes all logic for checking and requesting user permissions for protected system services (e.g., Photos, Microphone, Camera, Contacts). It provides a unified interface for the UI to query permission status and trigger requests.
 *   **`JsonSerializer.swift`**: A utility class containing static methods to serialize individual SwiftData models to JSON and deserialize them back into the application. It works with the DTOs in `system/export` and is a key part of the single-item import/export functionality.
 *   **`AppDefaults.swift`**: An `Observable` struct that bridges `UserDefaults` with the application's default settings, providing a clean interface for managing user preferences.
@@ -568,7 +568,7 @@ This is the main navigation view, responsible for sidebar structure and detail r
 
 *   **Main UI Structure**: Builds the primary layout using `NavigationSplitView` (macOS) and `NavigationSplitView` + `navigationDestination` (iOS).
 *   **Sidebar Composition**: Uses `ContentSidebarView` with SwiftData queries and routing state to render projects, conversations, and bookmarks based on `NavigationMode` and `ShowSystemDialogs`.
-*   **State-Driven Routing**: Uses `NavigationRouter` plus `SidebarSelection` to route to `ProjectView` or `ConversationView`, and uses project-local routes to focus a specific conversation when navigating into a project.
+*   **State-Driven Routing**: Uses `NavigationRouter` plus `SidebarSelection` to route to `ProjectView` or `ConversationScreen`, uses project-local routes to focus a conversation, and emits ID-based `ConversationScrollRequest` values for bookmark targeting.
 *   **Action Hub**: Exposes toolbar menu actions (new items, import, view options, utilities, settings) and delegates app-level requests back to `AppShellView`.
 
 #### Status Bar (`StatusBar.swift`)
@@ -589,31 +589,31 @@ This submodule holds the sidebar data and navigation plumbing used by `ContentVi
 
 #### Conversation Views (`src/views/dialog/`)
 
-This submodule contains the views responsible for displaying and interacting with a single conversation. All views have been migrated to use ID-based selection patterns to prevent crashes when SwiftData objects are deleted while views are active. Deprecated pass-through wrapper properties using the "dialogs" terminology have been removed throughout the codebase.
+This submodule uses immutable, ID-based presentation values. Persistent models are resolved only while building a snapshot or executing a command; timeline rows never retain deleteable SwiftData models.
 
-##### Chat Interface (`ConversationView.swift` & `MessageInputView.swift`)
+##### Screen Composition (`ConversationScreen.swift`)
 
-These files implement the core chat interface using SwiftUI state plus a focused `@Observable` input controller.
+`ConversationScreen` resolves the conversation by `PersistentIdentifier`, builds its presentation snapshot, and composes timeline, composer, toolbar, sheets, alerts, and selection state. It translates view intents into `ConversationCommands`; it does not render individual messages or own scroll mechanics.
 
-*   **`ConversationView.swift`**: A declarative SwiftUI view responsible for rendering the UI. It resolves the active `ConversationItem` by `conversationID`, owns local selection/bookmark state, and passes `ConversationDraftStore` into the message list and input area.
-*   **`MessageInputView.swift`**: Owns composition state through a private `@Observable` `MessageInputController`, handles prompt-template expansion and auto-naming, and calls `ConversationCompletionUseCase` to initiate the provider run.
+##### Presentation (`ConversationPresentation.swift`)
 
-##### Message Bubble (`MessageView.swift`)
+`ConversationPresentationBuilder` flattens ordered turns and assistant events into immutable `ConversationMessageSnapshot` rows. Snapshots contain explicit persistent IDs, text, bookmark state, tool-call/result values, rendering style, stream status, and a lightweight timeline revision used to detect structural changes.
 
-This is a reusable SwiftUI component that renders a single message bubble in the conversation list. Its primary responsibility is presentation, and it delegates all action logic to its parent view.
+##### Timeline And Scroll (`ConversationTimelineView.swift` & `ConversationScrollSupport.swift`)
 
-*   **Role-Based Layout**: It uses the `message.role` (`user`, `assistant`, `tool`) to determine the layout, alignment, and visual styling of the message.
-*   **Dynamic Content Rendering**: It intelligently renders different content types, including custom views for tool calls, markdown for rich text, and plain text.
-*   **Action Delegation**: It provides a `contextMenu` with a comprehensive set of actions (e.g., bookmark, fork, copy). When an action is triggered, it calls an `onAction` closure so the parent conversation view can handle the intent.
-*   **State-Aware UI**: It adapts its appearance based on selection state, visually indicating whether it is selected or part of an active selection session.
+`ConversationTimelineView` directly renders flat message targets, one transient streaming tail, and a permanent bottom sentinel. It owns `scrollPosition`, sticky-follow state, bookmark navigation, viewport/bottom measurements, and Jump to Latest. Geometry sensors measure only; `ConversationScrollState` decides whether content publication or layout changes may follow the bottom.
 
-##### Message Input (`MessageInputView.swift`)
+##### Persisted And Streaming Rows (`ConversationMessageRow.swift` & `StreamingAssistantRow.swift`)
 
-This view is the dedicated component for composing and sending messages.
+`ConversationMessageRow` is a pure persisted-row renderer backed by immutable snapshots. Persisted content may use Markdown and tool results remain collapsed until opened. `StreamingAssistantRow` alone observes `ConversationDraftStore`; it renders lightweight selectable plain text and transient tool-call values without constructing SwiftData models.
 
-*   **Message Sending Logic**: Its view model orchestrates user-facing send behavior. This includes auto-naming new conversations, expanding variables, and calling `ConversationCompletionUseCase` to initiate the AI request.
-*   **Streaming Integration**: It passes `ConversationDraftStore` to the completion use case and disables itself while a response is actively streaming in, preventing concurrent requests.
-*   **Feature Integration**: It integrates key functionalities like a `PhotosPicker` for image attachments (for vision models) and a button to present a sheet of reusable prompt templates.
+##### Composer (`ConversationComposerView.swift` & `ConversationComposerController.swift`)
+
+`ConversationComposerView` owns only composer UI and focus binding. Its `@Observable` controller handles templates, variable expansion, auto-naming, send lifecycle, and rollback-aware text restoration. Composer text clears when `ConversationResponseUseCase` persists the user turn, not when the assistant run completes.
+
+##### Commands (`ConversationCommands.swift`)
+
+`ConversationCommands` is the ID-only persistence/action boundary for bookmarks, forks, deletion, copy/export, playlists, and utility-panel linking. Each command resolves fresh models at execution time.
 
 ##### Conversation Settings (`ConversationOptionsView.swift`)
 
@@ -624,11 +624,7 @@ This view, typically presented as a sheet, allows the user to configure conversa
 
 ##### BookmarkSheetView (`BookmarkSheetView.swift`)
 
-This is the modal sheet view for creating a new bookmark. It provides a text field for the bookmark label and uses the `QueryManager` to persist the new bookmark, linking it to a specific `MessageItem` within a `ConversationItem`.
-
-##### MessageAction (`MessageAction.swift`)
-
-This enum defines all possible user actions that can be performed on a single `MessageItem` (e.g., copy, bookmark, delete). It provides a type-safe mechanism for views to communicate user intent to the handling logic without being coupled to the implementation details.
+This modal sheet collects a bookmark label. `ConversationScreen` persists the bookmark through `ConversationCommands` using a `ConversationMessageReference`.
 
 #### Settings Views (`src/views/settings/`)
 
@@ -937,9 +933,9 @@ This section documents the views responsible for configuring the application's b
 
 This submodule contains views that provide utility functions, often bridging between different parts of the application or providing global UI elements.
 
-#### Global Utility Panel (`GlobalUtilityPanel.swift`)
+#### Global Utility Panel (`UtilityPanelView.swift`)
 
-A macOS-specific class that manages a floating utility panel (`NSWindow`). This panel can be invoked globally to display a `MessageInputView` for a specific conversation, allowing the user to send a message from anywhere in the system. It has been migrated to use ID-based selection patterns, accepting a `conversationID` and resolving the `ConversationItem` via `QueryManager` at render time. It encapsulates the AppKit logic for creating, showing, and managing the window lifecycle, hosting the SwiftUI view within an `NSHostingController`.
+This macOS utility-window view hosts `ConversationComposerView` for the utility conversation. It stores only the conversation ID, resolves a fresh model through `QueryManager` when sending, then routes to the completed conversation and dismisses the window.
 
 #### Log History Sheet (`LogHistorySheet.swift`)
 
@@ -991,8 +987,13 @@ views/
     ContentSidebarView.swift
     ContentRouting.swift
   dialog/
-    ConversationView.swift
-    MessageView.swift
+    ConversationScreen.swift
+    ConversationPresentation.swift
+    ConversationTimelineView.swift
+    ConversationMessageRow.swift
+    StreamingAssistantRow.swift
+    ConversationComposerView.swift
+    ConversationCommands.swift
   settings/
     SettingsDestination.swift
     IOSApplicationSettingsSheetView.swift

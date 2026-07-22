@@ -27,7 +27,9 @@ struct ConversationRunStore {
     /// Removes an unsent turn after run setup fails before any provider run is recorded.
     @MainActor
     func rollbackTurn(_ turn: ConversationTurn, from conversation: ConversationItem) throws {
-        if let index = conversation.turns.firstIndex(where: { $0.id == turn.id }) {
+        if let index = conversation.turns.firstIndex(where: {
+            $0.persistentModelID == turn.persistentModelID
+        }) {
             conversation.turns.remove(at: index)
         }
         conversation.forceUpdateTokenCount(updateContextCount: true, updateTotalCount: false)

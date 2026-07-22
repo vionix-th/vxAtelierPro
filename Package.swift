@@ -187,12 +187,18 @@ let package = Package(
                 "views/components/HybridNumericInputView.swift",        
                 "views/components/ImagePicker.swift",        
                 // Views - Conversation
-                "views/dialog/MessageView.swift",                
                 "views/dialog/BookmarkSheetView.swift",
-                "views/dialog/MessageInputView.swift",
-                "views/dialog/ConversationView.swift",
+                "views/dialog/ConversationPresentation.swift",
+                "views/dialog/ConversationCommands.swift",
+                "views/dialog/ConversationMessageRow.swift",
+                "views/dialog/StreamingAssistantRow.swift",
+                "views/dialog/ConversationScrollSupport.swift",
+                "views/dialog/ConversationTimelineView.swift",
+                "views/dialog/ConversationComposerController.swift",
+                "views/dialog/ConversationComposerView.swift",
+                "views/dialog/ConversationToolbarMenu.swift",
+                "views/dialog/ConversationScreen.swift",
                 "views/dialog/ConversationOptionsView.swift",                
-                "views/dialog/MessageAction.swift",
                 // Views - Project
                 "views/project/ProjectView.swift",
                 // Views - Status Bar

@@ -1,6 +1,5 @@
 import Foundation
 import SwiftData
-import SwiftUI
 
 /// Represents a bookmark to a specific message in a conversation.
 ///
@@ -16,13 +15,6 @@ final class BookmarkItem {
 
     /// Optional target event. If nil, the bookmark refers to the user message of the turn.
     var target: TurnEvent?
-
-    /// Transient cache of the target message ID for safe render-loop checks.
-    /// This avoids dereferencing `target?.message` during SwiftUI updates when the
-    /// underlying event may have been deleted but the optional relationship has not yet been nulled.
-    /// Not persisted.
-    @Transient
-    var targetMessageIDCache: PersistentIdentifier? = nil
 
     /// Creates a new bookmark for the user message of a turn.
     /// - Parameters:
@@ -43,7 +35,5 @@ final class BookmarkItem {
         self.label = label
         self.turn = turn
         self.target = event
-        // Initialize transient cache for safe lookups
-        self.targetMessageIDCache = event.message.id
     }
 }
