@@ -21,7 +21,8 @@ enum LLMHTTPGenerationPipeline {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    let streamEnabled = request.options.streamMode == .enabled
+                    let streamEnabled = request.isParameterActive(.stream)
+                        && request.options.streamMode == .enabled
                     let body = try makeBody(streamEnabled)
                     let httpConfig = httpClient.makeConfiguration(for: configuration)
                     continuation.yield(.generationStarted(requestID: nil))

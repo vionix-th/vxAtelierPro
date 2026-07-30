@@ -1,47 +1,28 @@
 import SwiftData
 import SwiftUI
 
-private struct MappingOverrideDraft: Identifiable {
-    var id: String { "\(adapterID.rawValue):\(parameterID.rawValue)" }
-    var adapterID: LLMAdapterID
-    var parameterID: LLMParameterID
-    var encodingKind: LLMParameterEncodingKind
-    var wireKey: String
-    var structuredPreset: LLMParameterStructuredPreset?
-
-    init(_ item: ModelParameterMappingOverrideItem) {
-        adapterID = item.adapterID
-        parameterID = item.parameterID
-        encodingKind = item.encodingKind
-        wireKey = item.wireKey
-        structuredPreset = item.structuredPreset
-    }
-
-    var mapping: LLMParameterMapping {
-        LLMParameterMapping(
-            adapterID: adapterID,
-            parameterID: parameterID,
-            encodingKind: encodingKind,
-            wireKey: wireKey,
-            structuredPreset: structuredPreset
-        )
-    }
-}
-
 private struct ParameterOverrideDraft: Identifiable {
     var id: String { "\(adapterID.rawValue):\(parameterID.rawValue)" }
     var adapterID: LLMAdapterID
     var parameterID: LLMParameterID
     var support: LLMSupportState?
+    var encodingKind: LLMParameterEncodingKind?
+    var wireKey: String
+    var structuredPreset: LLMParameterStructuredPreset?
     var required: Bool?
     var enabledByDefault: Bool?
     var defaultValueKind: ModelDefaultValueOverrideKind
     var defaultValueText: String
+    var optionsKind: ModelDefaultValueOverrideKind
+    var optionsText: String
 
     init(_ item: ModelParameterOverrideItem) {
         adapterID = item.adapterID
         parameterID = item.parameterID
         support = item.support
+        encodingKind = item.encodingKind
+        wireKey = item.wireKey ?? ""
+        structuredPreset = item.structuredPreset
         required = item.requiredOverride
         enabledByDefault = item.enabledByDefaultOverride
         defaultValueKind = item.defaultValueOverrideKind
@@ -51,6 +32,8 @@ private struct ParameterOverrideDraft: Identifiable {
         } else {
             defaultValueText = ""
         }
+        optionsKind = item.optionsOverrideKind
+        optionsText = item.options?.joined(separator: ", ") ?? ""
     }
 }
 
@@ -65,7 +48,6 @@ struct ModelEditorView: View {
     @State private var displayNameOverride: String
     @State private var contextSizeOverride: String
     @State private var capabilityOverrides: [LLMModelCapability: LLMSupportState]
-    @State private var mappingOverrides: [MappingOverrideDraft]
     @State private var parameterOverrides: [ParameterOverrideDraft]
     @State private var errorMessage = ""
     @State private var showError = false
@@ -79,7 +61,6 @@ struct ModelEditorView: View {
         _capabilityOverrides = State(initialValue: Dictionary(uniqueKeysWithValues: model.capabilityOverrides.map {
             ($0.capability, $0.support)
         }))
-        _mappingOverrides = State(initialValue: model.parameterMappingOverrides.map(MappingOverrideDraft.init))
         _parameterOverrides = State(initialValue: model.parameterOverrides.map(ParameterOverrideDraft.init))
     }
 
@@ -92,10 +73,7 @@ struct ModelEditorView: View {
     }
 
     private var draftProfile: LLMModelProfile {
-        let mappings = mappingOverrides
-            .filter { $0.adapterID == selectedAdapterID }
-            .reduce(into: [LLMParameterID: LLMParameterMapping]()) { $0[$1.parameterID] = $1.mapping }
-        let parameterSettings = parameterOverrides
+        let settings = parameterOverrides
             .filter { $0.adapterID == selectedAdapterID }
             .reduce(into: [LLMParameterID: LLMParameterOverrides]()) {
                 $0[$1.parameterID] = overrides(from: $1, validateValue: false)
@@ -109,8 +87,7 @@ struct ModelEditorView: View {
                 displayName: displayNameOverride,
                 contextSize: Int(contextSizeOverride),
                 capabilitySupport: capabilityOverrides,
-                parameterMappings: mappings,
-                parameterOverrides: parameterSettings
+                parameterOverrides: settings
             )
         )
     }
@@ -152,70 +129,35 @@ struct ModelEditorView: View {
                 } header: {
                     Text("Capabilities")
                 } footer: {
-                    Text("Support is advisory for remote providers. Overrides affect presentation and defaults, not request admission.")
+                    Text("Capability metadata is advisory for remote providers.")
                 }
 
-                Section("Parameter Profile") {
-                    ForEach(LLMParameterID.allCases.filter(\.isProviderMappable)) { parameterID in
+                Section {
+                    ForEach(LLMParameterID.allCases) { parameterID in
                         let profile = draftProfile.parameters[parameterID]
                         HStack {
                             VStack(alignment: .leading) {
                                 Text(AiParameterPresentationCatalog.displayName(for: parameterID))
-                                Text([
-                                    profile?.support.state.displayName ?? "Unknown",
-                                    profile?.support.source.displayName ?? "Fallback",
-                                    profile?.mapping?.encodingKind == .disabled || profile?.mapping == nil ? "Unencodable" : "Mapped"
-                                ].joined(separator: " · "))
+                                Text(parameterSummary(profile))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Menu("Override") {
-                                Button("Parameter settings") { addParameterOverride(parameterID) }
-                                Button("Wire mapping") { addMappingOverride(parameterID) }
+                            Button("Override") {
+                                addParameterOverride(parameterID)
                             }
                         }
                     }
-                }
-
-                if !mappingOverrides.isEmpty {
-                    Section("Mapping Overrides") {
-                        ForEach($mappingOverrides) { $draft in
-                            VStack(alignment: .leading) {
-                                HStack {
-                                    Text(AiParameterPresentationCatalog.displayName(for: draft.parameterID))
-                                    Spacer()
-                                    Button(role: .destructive) {
-                                        mappingOverrides.removeAll { $0.id == draft.id }
-                                    } label: {
-                                        Image(systemName: "trash")
-                                    }
-                                }
-                                Picker("Encoding", selection: $draft.encodingKind) {
-                                    ForEach(LLMParameterEncodingKind.allCases) { kind in
-                                        Text(kind.displayName).tag(kind)
-                                    }
-                                }
-                                if draft.encodingKind == .scalarKey {
-                                    TextField("Wire key", text: $draft.wireKey)
-                                }
-                                if draft.encodingKind == .structuredPreset {
-                                    Picker("Preset", selection: $draft.structuredPreset) {
-                                        Text("None").tag(LLMParameterStructuredPreset?.none)
-                                        ForEach(LLMParameterStructuredPreset.allCases) { preset in
-                                            Text(preset.displayName).tag(Optional(preset))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                } header: {
+                    Text("Resolved Parameter Profile")
+                } footer: {
+                    Text("Parameters inherit from the adapter API, provider rules, model rules, and provider observations.")
                 }
 
                 if !parameterOverrides.isEmpty {
                     Section("Parameter Overrides") {
                         ForEach($parameterOverrides) { $draft in
-                            VStack(alignment: .leading) {
+                            VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
                                 HStack {
                                     Text(AiParameterPresentationCatalog.displayName(for: draft.parameterID))
                                     Spacer()
@@ -229,6 +171,30 @@ struct ModelEditorView: View {
                                     Text("Inherit").tag(LLMSupportState?.none)
                                     Text("Supported").tag(Optional(LLMSupportState.supported))
                                     Text("Unsupported").tag(Optional(LLMSupportState.unsupported))
+                                }
+                                Picker("Mapping", selection: $draft.encodingKind) {
+                                    Text("Inherit").tag(LLMParameterEncodingKind?.none)
+                                    if draft.adapterID.supportsKeyParameterMappings {
+                                        Text("Key").tag(Optional(LLMParameterEncodingKind.key))
+                                    }
+                                    if LLMParameterStructuredPreset.allCases.contains(where: {
+                                        $0.supports(draft.adapterID)
+                                    }) {
+                                        Text("Preset").tag(Optional(LLMParameterEncodingKind.preset))
+                                    }
+                                }
+                                if draft.encodingKind == .key {
+                                    TextField("Wire key", text: $draft.wireKey)
+                                }
+                                if draft.encodingKind == .preset {
+                                    Picker("Preset", selection: $draft.structuredPreset) {
+                                        Text("Select a preset").tag(LLMParameterStructuredPreset?.none)
+                                        ForEach(LLMParameterStructuredPreset.allCases.filter {
+                                            $0.supports(draft.adapterID)
+                                        }) { preset in
+                                            Text(preset.displayName).tag(Optional(preset))
+                                        }
+                                    }
                                 }
                                 Picker("Required", selection: $draft.required) {
                                     Text("Inherit").tag(Bool?.none)
@@ -247,6 +213,14 @@ struct ModelEditorView: View {
                                 }
                                 if draft.defaultValueKind == .value {
                                     TextField("JSON value", text: $draft.defaultValueText)
+                                }
+                                Picker("Value options", selection: $draft.optionsKind) {
+                                    Text("Inherit").tag(ModelDefaultValueOverrideKind.inherit)
+                                    Text("Override").tag(ModelDefaultValueOverrideKind.value)
+                                    Text("No options").tag(ModelDefaultValueOverrideKind.none)
+                                }
+                                if draft.optionsKind == .value {
+                                    TextField("Comma-separated options", text: $draft.optionsText)
                                 }
                             }
                         }
@@ -271,6 +245,18 @@ struct ModelEditorView: View {
         }
     }
 
+    private func parameterSummary(_ profile: LLMParameterProfile?) -> String {
+        guard let profile else { return "Unsupported · Fallback" }
+        var parts = [profile.support.state.displayName, profile.support.source.displayName]
+        if let mapping = profile.mapping, let source = profile.mappingSource {
+            parts.append("\(mapping.encodingKind.displayName) · \(source.displayName)")
+        }
+        if profile.isRequired {
+            parts.append("Required")
+        }
+        return parts.joined(separator: " · ")
+    }
+
     private func capabilityOverrideBinding(_ capability: LLMModelCapability) -> Binding<LLMSupportState?> {
         Binding(
             get: { capabilityOverrides[capability] },
@@ -278,21 +264,10 @@ struct ModelEditorView: View {
         )
     }
 
-    private func addMappingOverride(_ parameterID: LLMParameterID) {
-        guard !mappingOverrides.contains(where: { $0.adapterID == selectedAdapterID && $0.parameterID == parameterID }) else { return }
-        let resolved = draftProfile.parameters[parameterID]?.mapping
-        mappingOverrides.append(MappingOverrideDraft(ModelParameterMappingOverrideItem(
-            mapping: resolved ?? LLMParameterMapping(
-                adapterID: selectedAdapterID,
-                parameterID: parameterID,
-                encodingKind: .scalarKey,
-                wireKey: parameterID.rawValue
-            )
-        )))
-    }
-
     private func addParameterOverride(_ parameterID: LLMParameterID) {
-        guard !parameterOverrides.contains(where: { $0.adapterID == selectedAdapterID && $0.parameterID == parameterID }) else { return }
+        guard !parameterOverrides.contains(where: {
+            $0.adapterID == selectedAdapterID && $0.parameterID == parameterID
+        }) else { return }
         parameterOverrides.append(ParameterOverrideDraft(ModelParameterOverrideItem(
             adapterID: selectedAdapterID,
             parameterID: parameterID
@@ -300,6 +275,28 @@ struct ModelEditorView: View {
     }
 
     private func overrides(from draft: ParameterOverrideDraft, validateValue: Bool) -> LLMParameterOverrides {
+        let mapping: LLMParameterMapping?
+        switch draft.encodingKind {
+        case .none:
+            mapping = nil
+        case .key:
+            mapping = LLMParameterMapping(
+                adapterID: draft.adapterID,
+                parameterID: draft.parameterID,
+                encodingKind: .key,
+                wireKey: draft.wireKey
+            )
+        case .preset:
+            mapping = LLMParameterMapping(
+                adapterID: draft.adapterID,
+                parameterID: draft.parameterID,
+                encodingKind: .preset,
+                structuredPreset: draft.structuredPreset
+            )
+        case .adapter:
+            mapping = nil
+        }
+
         let defaultValue: LLMDefaultValueOverride
         switch draft.defaultValueKind {
         case .inherit:
@@ -318,21 +315,37 @@ struct ModelEditorView: View {
                 }
             }
         }
+
+        let options: LLMOptionsOverride
+        switch draft.optionsKind {
+        case .inherit:
+            options = .inherit
+        case .none:
+            options = .none
+        case .value:
+            options = .value(draft.optionsText
+                .split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty })
+        }
+
         return LLMParameterOverrides(
             support: draft.support,
+            mapping: mapping,
             isRequired: draft.required,
             isEnabledByDefault: draft.enabledByDefault,
-            defaultValue: defaultValue
+            defaultValue: defaultValue,
+            options: options
         )
     }
 
     private func save() {
         guard let selectedConfiguration else { return }
-        var parameterSettings: [(LLMAdapterID, LLMParameterID, LLMParameterOverrides)] = []
+        var settings: [(LLMAdapterID, LLMParameterID, LLMParameterOverrides)] = []
         for draft in parameterOverrides {
-            let parameterOverrides = overrides(from: draft, validateValue: true)
+            let override = overrides(from: draft, validateValue: true)
             guard !showError else { return }
-            parameterSettings.append((draft.adapterID, draft.parameterID, parameterOverrides))
+            settings.append((draft.adapterID, draft.parameterID, override))
         }
         do {
             try queryManager.updateModelProfile(
@@ -342,8 +355,7 @@ struct ModelEditorView: View {
                 displayNameOverride: displayNameOverride,
                 contextSizeOverride: Int(contextSizeOverride),
                 capabilityOverrides: capabilityOverrides,
-                mappingOverrides: mappingOverrides.map(\.mapping),
-                parameterOverrides: parameterSettings
+                parameterOverrides: settings
             )
             dismiss()
         } catch {

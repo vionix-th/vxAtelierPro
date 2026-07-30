@@ -1,69 +1,64 @@
 import Foundation
 
-struct LLMParameterDefaults: Codable, Equatable, Identifiable {
-    var id: String { "\(adapterID.rawValue):\(parameterID.rawValue)" }
-    var adapterID: LLMAdapterID
-    var parameterID: LLMParameterID
-    var support: LLMSupportState
-    var isRequired: Bool
-    var isEnabledByDefault: Bool
-    var defaultValue: JSONValue?
-    var options: [String]?
-}
-
 struct LLMResolvedGenerationParameters: Equatable {
     var options: LLMGenerationOptions
-    var activeParameterIDs: Set<LLMParameterID>
-    var mappings: [LLMParameterMapping]
+    var activeParameters: [LLMActiveParameter]
 }
 
 enum LLMGenerationOptionsResolver {
     static func isParameterActive(
         _ parameterID: LLMParameterID,
-        value: JSONValue?,
         conversationPreference: Bool?,
         profile: LLMParameterProfile?
     ) -> Bool {
-        guard parameterID.isProviderMappable else { return true }
         if profile?.isRequired == true { return true }
         if let conversationPreference { return conversationPreference }
-        guard let profile else { return value != nil }
+        guard let profile, profile.support.state == .supported else { return false }
         return profile.isEnabledByDefault
-            || value != nil
-            || profile.defaultValue != nil
     }
 
     static func resolve(
         options: LLMGenerationOptions,
         conversationPreferences: [String: Bool],
+        providedParameterIDs: Set<LLMParameterID>? = nil,
         parameterProfiles: [LLMParameterID: LLMParameterProfile]
-    ) -> LLMResolvedGenerationParameters {
+    ) throws -> LLMResolvedGenerationParameters {
         var resolvedOptions = options
-        var activeParameterIDs = Set<LLMParameterID>()
-        var mappings: [LLMParameterMapping] = []
+        var activeParameters: [LLMActiveParameter] = []
 
-        for parameterID in LLMParameterID.allCases where parameterID.isProviderMappable {
+        for (rawID, isEnabled) in conversationPreferences where isEnabled {
+            guard let parameterID = LLMParameterID(rawValue: rawID) else { continue }
+            guard parameterProfiles[parameterID]?.support.state == .supported else {
+                throw LLMProviderError.invalidConfiguration(
+                    "\(parameterID.rawValue) is enabled but unavailable for the selected model and API."
+                )
+            }
+        }
+
+        for parameterID in LLMParameterID.allCases where parameterProfiles[parameterID] != nil {
             let profile = parameterProfiles[parameterID]
             let isActive = isParameterActive(
                 parameterID,
-                value: options.jsonValue(for: parameterID),
                 conversationPreference: conversationPreferences[parameterID.rawValue],
                 profile: profile
             )
             guard isActive else { continue }
-            activeParameterIDs.insert(parameterID)
-            if resolvedOptions.jsonValue(for: parameterID) == nil, let defaultValue = profile?.defaultValue {
+            let hasProvidedValue = providedParameterIDs?.contains(parameterID)
+                ?? (options.jsonValue(for: parameterID) != nil)
+            if !hasProvidedValue, let defaultValue = profile?.defaultValue {
                 resolvedOptions.setSemanticValue(defaultValue, for: parameterID)
             }
-            if let mapping = profile?.mapping {
-                mappings.append(mapping)
+            guard profile?.support.state == .supported, let mapping = profile?.mapping else {
+                throw LLMProviderError.invalidConfiguration(
+                    "\(parameterID.rawValue) has no valid definition for the selected model and API."
+                )
             }
+            activeParameters.append(LLMActiveParameter(parameterID: parameterID, mapping: mapping))
         }
 
         return LLMResolvedGenerationParameters(
             options: resolvedOptions,
-            activeParameterIDs: activeParameterIDs,
-            mappings: mappings
+            activeParameters: activeParameters
         )
     }
 }

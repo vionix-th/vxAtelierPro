@@ -118,7 +118,7 @@ enum LLMModelMetadataDecoder {
             }
         }
 
-        for parameterID in LLMParameterID.allCases where parameterID.isProviderMappable {
+        for parameterID in LLMParameterID.allCases {
             let key = "supports_\(parameterID.rawValue)"
             if let value = object[key]?.boolValue {
                 claims[parameterID] = value ? .supported : .unsupported

@@ -46,7 +46,6 @@ final class ModelItemExportTests: XCTestCase {
         let restoredMaxTokens = restored.modelProfile.parameters[.maxOutputTokens]?.mapping
         XCTAssertEqual(restoredMaxTokens?.wireKey, "max_tokens")
         XCTAssertEqual(restored.modelProfile.parameters[.maxOutputTokens]?.support.state, .supported)
-        XCTAssertTrue(restored.parameterMappingOverrides.isEmpty)
         XCTAssertTrue(restored.parameterOverrides.isEmpty)
     }
 

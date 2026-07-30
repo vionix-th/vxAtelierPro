@@ -101,7 +101,6 @@ let package = Package(
                 "persistence/ResponseRunItem.swift",
                 "persistence/ModelItem.swift",
                 "persistence/ModelCapabilityOverrideItem.swift",
-                "persistence/ModelParameterMappingOverrideItem.swift",
                 "persistence/ModelParameterOverrideItem.swift",
                 "persistence/ProjectItem.swift",
                 "persistence/PromptTemplate.swift",

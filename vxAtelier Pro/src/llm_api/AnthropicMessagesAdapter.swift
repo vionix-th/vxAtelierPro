@@ -47,30 +47,37 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
 
     /// Encodes a provider-neutral request into an Anthropic Messages JSON body.
     func makeBody(for request: LLMGenerationRequest, stream: Bool) throws -> [String: JSONValue] {
+        try request.validateActiveParameterMappings()
         var body: [String: JSONValue] = [
-            "model": .string(request.modelID),
-            "messages": .array(try anthropicMessages(from: request)),
-            "stream": .boolean(stream),
+            "messages": .array(try anthropicMessages(from: request))
         ]
-        if !request.options.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if request.usesAdapterEncoding(.model) {
+            body["model"] = .string(request.modelID)
+        }
+        if request.usesAdapterEncoding(.stream) {
+            body["stream"] = .boolean(stream)
+        }
+        if request.usesAdapterEncoding(.systemPrompt),
+           !request.options.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             body["system"] = .string(request.options.systemPrompt)
         }
-        let mappings = LLMParameterMappingIndex.resolve(
-            adapterID: request.adapterID,
-            mappings: request.parameterMappings
-        )
         try LLMParameterWireEncoder.applyScalarOptions(
             request.options,
             to: &body,
-            mappings: mappings,
-            activeParameterIDs: request.activeParameterIDs
+            parameters: request.activeParameters
         )
-        if request.activeParameterIDs.contains(.reasoningBudgetTokens),
-           let budgetTokens = request.options.reasoningBudgetTokens {
-            body["thinking"] = .object([
-                "type": .string("enabled"),
-                "budget_tokens": .integer(budgetTokens)
-            ])
+        if let reasoning = request.activeParameters.first(where: {
+            $0.parameterID == .reasoningBudgetTokens && $0.mapping.encodingKind == .preset
+        }), let budgetTokens = request.options.reasoningBudgetTokens {
+            guard reasoning.mapping.structuredPreset == .anthropicThinking else {
+                throw LLMProviderError.requestEncoding("Unsupported Anthropic reasoning mapping.")
+            }
+            guard body["thinking"] == nil else {
+                throw LLMProviderError.requestEncoding(
+                    "reasoning_budget_tokens collides with request field thinking."
+                )
+            }
+            body["thinking"] = .object(["type": .string("enabled"), "budget_tokens": .integer(budgetTokens)])
         }
         if !request.tools.isEmpty {
             body["tools"] = .array(

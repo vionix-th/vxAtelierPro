@@ -51,20 +51,20 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
 
     /// Encodes a provider-neutral request into a Chat Completions JSON body.
     func makeBody(for request: LLMGenerationRequest, stream: Bool) throws -> [String: JSONValue] {
+        try request.validateActiveParameterMappings()
         var body: [String: JSONValue] = [
-            "model": .string(request.modelID),
-            "messages": .array(try openAIMessages(from: request)),
-            "stream": .boolean(stream)
+            "messages": .array(try openAIMessages(from: request))
         ]
-        let mappings = LLMParameterMappingIndex.resolve(
-            adapterID: request.adapterID,
-            mappings: request.parameterMappings
-        )
+        if request.usesAdapterEncoding(.model) {
+            body["model"] = .string(request.modelID)
+        }
+        if request.usesAdapterEncoding(.stream) {
+            body["stream"] = .boolean(stream)
+        }
         try OpenAICompatibleEncoding.applyMappedOptions(
             request.options,
             to: &body,
-            mappings: mappings,
-            activeParameterIDs: request.activeParameterIDs,
+            parameters: request.activeParameters,
             reservedProviderExtraKeys: OpenAICompatibleEncoding.chatReservedProviderExtraKeys
         )
         if !request.tools.isEmpty {
@@ -77,7 +77,8 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
     /// Converts provider-neutral messages into Chat Completions message objects.
     private func openAIMessages(from request: LLMGenerationRequest) throws -> [JSONValue] {
         var messages: [JSONValue] = []
-        if !request.options.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if request.usesAdapterEncoding(.systemPrompt),
+           !request.options.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             messages.append(.object(["role": .string("system"), "content": .string(request.options.systemPrompt)]))
         }
         messages.append(contentsOf: try request.messages.map { message in

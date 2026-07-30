@@ -13,16 +13,15 @@ struct ConversationParameterControl: Identifiable, Equatable {
     var step: Double?
     var options: [String]?
     var value: JSONValue?
-    var support: LLMSupport
-    var isMapped: Bool
+    var isSupported: Bool
     var isEnabled: Bool
 
     var canToggleEnabled: Bool {
-        !required && (isMapped || isEnabled)
+        !required && (isSupported || isEnabled)
     }
 
     var isValueEditable: Bool {
-        isMapped && isEnabled
+        isSupported && isEnabled
     }
 }
 
@@ -38,24 +37,17 @@ enum ConversationParameterProjection {
         let model = apiConfiguration.models.first { $0.modelID == modelID }
         let parameterProfiles = model?.modelProfile.parameters ?? [:]
 
-        return LLMParameterID.allCases.map { parameterID in
+        return LLMParameterID.allCases.compactMap { parameterID in
             let profile = parameterProfiles[parameterID]
-            let isProviderMappable = parameterID.isProviderMappable
-            let mapping = profile?.mapping
-            let isDirectlyEncodable = parameterID == .stream && (try? LLMProviderRegistry.shared.resolveAdapter(
-                for: apiConfiguration.defaultAdapterIDEnum,
-                providerID: apiConfiguration.providerIDEnum
-            )) != nil
-            let isMapped = !isProviderMappable
-                || isDirectlyEncodable
-                || (mapping != nil && mapping?.encodingKind != .disabled)
-            let required = !isProviderMappable || profile?.isRequired == true
+            let isSupported = profile?.support.state == .supported
+            let isRetainedSelection = options.parameterInclusionPreference(parameterID) == true
+            guard isSupported || isRetainedSelection else { return nil }
+            let required = profile?.isRequired == true
             let value = options.parameterValue(parameterID)
                 ?? profile?.defaultValue
                 ?? (parameterID == .model ? .string(modelID) : nil)
             let isEnabled = required || LLMGenerationOptionsResolver.isParameterActive(
                 parameterID,
-                value: options.parameterValue(parameterID),
                 conversationPreference: options.parameterInclusionPreference(parameterID),
                 profile: profile
             )
@@ -72,14 +64,13 @@ enum ConversationParameterProjection {
                 step: presentation.step,
                 options: profile?.options ?? parameterID.options,
                 value: value,
-                support: profile?.support ?? LLMSupport(state: .unknown, source: .fallback),
-                isMapped: isMapped,
+                isSupported: isSupported,
                 isEnabled: isEnabled
             )
         }
         .sorted { lhs, rhs in
-            let lhsGroup = lhs.isEnabled ? 0 : (lhs.isMapped ? 1 : 2)
-            let rhsGroup = rhs.isEnabled ? 0 : (rhs.isMapped ? 1 : 2)
+            let lhsGroup = lhs.isEnabled ? 0 : (lhs.isSupported ? 1 : 2)
+            let rhsGroup = rhs.isEnabled ? 0 : (rhs.isSupported ? 1 : 2)
             if lhsGroup != rhsGroup { return lhsGroup < rhsGroup }
             return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
         }

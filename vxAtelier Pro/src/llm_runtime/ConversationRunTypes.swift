@@ -8,8 +8,7 @@ struct ConversationRunContext {
     var providerID: LLMProviderID
     var adapterID: LLMAdapterID
     var modelID: String
-    var parameterMappings: [LLMParameterMapping]
-    var activeParameterIDs: Set<LLMParameterID>
+    var activeParameters: [LLMActiveParameter]
     var messages: [LLMMessage]
     var tools: [LLMToolDefinition]
     var options: LLMGenerationOptions

@@ -12,7 +12,6 @@ struct ModelExportData: Codable {
     let displayNameOverride: String?
     let contextSizeOverride: Int?
     let capabilityOverrides: [ModelCapabilityOverrideExportData]
-    let mappingOverrides: [ModelParameterMappingOverrideExportData]
     let parameterOverrides: [ModelParameterOverrideExportData]
     let apiConfigurationName: String?
     let apiConfigurationProviderID: String?
@@ -30,7 +29,6 @@ struct ModelExportData: Codable {
         displayNameOverride = model.displayNameOverride
         contextSizeOverride = model.contextSizeOverride
         capabilityOverrides = model.capabilityOverrides.map(ModelCapabilityOverrideExportData.init)
-        mappingOverrides = model.parameterMappingOverrides.map(ModelParameterMappingOverrideExportData.init)
         parameterOverrides = model.parameterOverrides.map(ModelParameterOverrideExportData.init)
         apiConfigurationName = model.apiConfiguration?.name
         apiConfigurationProviderID = model.apiConfiguration?.providerID
@@ -54,7 +52,6 @@ struct ModelExportData: Codable {
         model.displayNameOverride = displayNameOverride
         model.contextSizeOverride = contextSizeOverride
         model.capabilityOverrides = capabilityOverrides.map(\.dataItem)
-        model.parameterMappingOverrides = mappingOverrides.map(\.dataItem)
         model.parameterOverrides = parameterOverrides.map(\.dataItem)
         return model
     }
@@ -74,49 +71,33 @@ struct ModelCapabilityOverrideExportData: Codable {
     }
 }
 
-struct ModelParameterMappingOverrideExportData: Codable {
-    let adapterID: LLMAdapterID
-    let parameterID: LLMParameterID
-    let encodingKind: LLMParameterEncodingKind
-    let wireKey: String
-    let structuredPreset: LLMParameterStructuredPreset?
-
-    init(_ item: ModelParameterMappingOverrideItem) {
-        adapterID = item.adapterID
-        parameterID = item.parameterID
-        encodingKind = item.encodingKind
-        wireKey = item.wireKey
-        structuredPreset = item.structuredPreset
-    }
-
-    var dataItem: ModelParameterMappingOverrideItem {
-        ModelParameterMappingOverrideItem(mapping: LLMParameterMapping(
-            adapterID: adapterID,
-            parameterID: parameterID,
-            encodingKind: encodingKind,
-            wireKey: wireKey,
-            structuredPreset: structuredPreset
-        ))
-    }
-}
-
 struct ModelParameterOverrideExportData: Codable {
     let adapterID: LLMAdapterID
     let parameterID: LLMParameterID
     let support: LLMSupportState?
+    let encodingKind: LLMParameterEncodingKind?
+    let wireKey: String?
+    let structuredPreset: LLMParameterStructuredPreset?
     let requiredOverride: Bool?
     let enabledByDefaultOverride: Bool?
     let defaultValueOverrideKind: ModelDefaultValueOverrideKind
     let defaultValue: JSONValue?
+    let optionsOverrideKind: ModelDefaultValueOverrideKind
+    let options: [String]?
 
     init(_ item: ModelParameterOverrideItem) {
         adapterID = item.adapterID
         parameterID = item.parameterID
         support = item.support
+        encodingKind = item.encodingKind
+        wireKey = item.wireKey
+        structuredPreset = item.structuredPreset
         requiredOverride = item.requiredOverride
         enabledByDefaultOverride = item.enabledByDefaultOverride
         defaultValueOverrideKind = item.defaultValueOverrideKind
         defaultValue = item.defaultValue
+        optionsOverrideKind = item.optionsOverrideKind
+        options = item.options
     }
 
     var dataItem: ModelParameterOverrideItem {
@@ -124,10 +105,21 @@ struct ModelParameterOverrideExportData: Codable {
             adapterID: adapterID,
             parameterID: parameterID,
             support: support,
+            mapping: encodingKind.map {
+                LLMParameterMapping(
+                    adapterID: adapterID,
+                    parameterID: parameterID,
+                    encodingKind: $0,
+                    wireKey: wireKey ?? "",
+                    structuredPreset: structuredPreset
+                )
+            },
             requiredOverride: requiredOverride,
             enabledByDefaultOverride: enabledByDefaultOverride,
             defaultValueOverrideKind: defaultValueOverrideKind,
-            defaultValue: defaultValue
+            defaultValue: defaultValue,
+            optionsOverrideKind: optionsOverrideKind,
+            options: options
         )
     }
 }

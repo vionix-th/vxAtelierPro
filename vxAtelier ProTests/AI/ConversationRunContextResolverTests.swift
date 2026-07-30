@@ -28,16 +28,24 @@ final class ConversationRunContextResolverTests: XCTestCase {
         configB.defaultAdapterIDEnum = .openAIChatCompletions
         let modelA = ModelItem(modelID: "gpt-test", apiConfiguration: configA)
         let modelB = ModelItem(modelID: "gpt-test", apiConfiguration: configB)
-        modelA.parameterMappingOverrides = [ModelParameterMappingOverrideItem(mapping: LLMParameterMapping(
+        modelA.parameterOverrides = [ModelParameterOverrideItem(
             adapterID: .openAIChatCompletions,
             parameterID: .maxOutputTokens,
-            wireKey: "max_tokens_a"
-        ))]
-        modelB.parameterMappingOverrides = [ModelParameterMappingOverrideItem(mapping: LLMParameterMapping(
+            mapping: LLMParameterMapping(
+                adapterID: .openAIChatCompletions,
+                parameterID: .maxOutputTokens,
+                wireKey: "max_tokens_a"
+            )
+        )]
+        modelB.parameterOverrides = [ModelParameterOverrideItem(
             adapterID: .openAIChatCompletions,
             parameterID: .maxOutputTokens,
-            wireKey: "max_tokens_b"
-        ))]
+            mapping: LLMParameterMapping(
+                adapterID: .openAIChatCompletions,
+                parameterID: .maxOutputTokens,
+                wireKey: "max_tokens_b"
+            )
+        )]
 
         let options = ConversationOptions(apiConfiguration: configB)
         options.selectedModelID = "gpt-test"
@@ -59,9 +67,9 @@ final class ConversationRunContextResolverTests: XCTestCase {
         )
         let request = LLMGenerationRequestFactory().makeRequest(from: context)
 
-        let maxOutputMapping = request.parameterMappings.first {
-            $0.adapterID == .openAIChatCompletions && $0.parameterID == .maxOutputTokens
-        }
+        let maxOutputMapping = request.activeParameters.first {
+            $0.parameterID == .maxOutputTokens
+        }?.mapping
         XCTAssertEqual(
             maxOutputMapping?.wireKey,
             "max_tokens_b",
@@ -113,12 +121,7 @@ final class ConversationRunContextResolverTests: XCTestCase {
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
             modelID: "gpt-test",
-            parameterMappings: LLMParameterMappingCatalog.defaults(
-                providerID: .openAIPlatform,
-                adapterID: .openAIResponses,
-                modelID: "gpt-test"
-            ),
-            activeParameterIDs: [],
+            activeParameters: [],
             messages: [
                 LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Hello")])
             ],

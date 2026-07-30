@@ -46,29 +46,29 @@ final class LLMCoreTypesTests: XCTestCase {
     func testBundledDefaultsProvideCurrentModelMetadata() {
         let defaults = LLMDefaultsCatalog.bundled
 
-        let openAI = defaults.modelDefaults(providerID: .openAIPlatform, modelID: "gpt-5.4-nano")
+        let openAI = defaults.modelDefaults(providerID: .openAIPlatform, adapterID: .openAIResponses, modelID: "gpt-5.4-nano")
         XCTAssertEqual(openAI?.contextSize, 400000)
         XCTAssertTrue(openAI?.capabilities?.contains(.text) ?? false)
         XCTAssertTrue(openAI?.capabilities?.contains(.image) ?? false)
         XCTAssertTrue(openAI?.capabilities?.contains(.file) ?? false)
         XCTAssertTrue(openAI?.capabilities?.contains(.reasoning) ?? false)
 
-        let anthropic = defaults.modelDefaults(providerID: .anthropic, modelID: "claude-sonnet-4-6")
+        let anthropic = defaults.modelDefaults(providerID: .anthropic, adapterID: .anthropicMessages, modelID: "claude-sonnet-4-6")
         XCTAssertEqual(anthropic?.contextSize, 1000000)
         XCTAssertTrue(anthropic?.capabilities?.contains(.text) ?? false)
         XCTAssertTrue(anthropic?.capabilities?.contains(.image) ?? false)
 
-        let apple = defaults.modelDefaults(providerID: .appleIntelligence, modelID: "apple-intelligence-default")
+        let apple = defaults.modelDefaults(providerID: .appleIntelligence, adapterID: .foundationModels, modelID: "apple-intelligence-default")
         XCTAssertEqual(apple?.contextSize, 4096)
         XCTAssertTrue(apple?.capabilities?.contains(.text) ?? false)
         XCTAssertTrue(apple?.capabilities?.contains(.tools) ?? false)
         XCTAssertTrue(apple?.capabilities?.contains(.streaming) ?? false)
 
-        let xAI = defaults.modelDefaults(providerID: .xAI, modelID: "grok-4.3")
+        let xAI = defaults.modelDefaults(providerID: .xAI, adapterID: .openAICompatibleChatCompletions, modelID: "grok-4.3")
         XCTAssertEqual(xAI?.contextSize, 1000000)
         XCTAssertTrue(xAI?.capabilities?.contains(.jsonSchema) ?? false)
 
-        let deepSeek = defaults.modelDefaults(providerID: .deepSeek, modelID: "deepseek-v4-flash")
+        let deepSeek = defaults.modelDefaults(providerID: .deepSeek, adapterID: .openAICompatibleChatCompletions, modelID: "deepseek-v4-flash")
         XCTAssertEqual(deepSeek?.contextSize, 1000000)
         XCTAssertTrue(deepSeek?.capabilities?.contains(.tools) ?? false)
     }
@@ -102,6 +102,7 @@ final class LLMCoreTypesTests: XCTestCase {
           "providerDefaults": [],
           "rules": [
             {
+              "level": "adapter",
               "modelDefaults": {
                 "capabilities": ["text"]
               }
@@ -133,6 +134,7 @@ final class LLMCoreTypesTests: XCTestCase {
           ],
           "rules": [
             {
+              "level": "model",
               "match": {
                 "providerRegex": "^openAIPlatform$",
                 "modelRegex": "^unit-"
@@ -146,7 +148,7 @@ final class LLMCoreTypesTests: XCTestCase {
         """.utf8))
 
         XCTAssertEqual(catalog.defaultModelID(for: .openAIPlatform), "unit-model")
-        XCTAssertEqual(catalog.modelDefaults(providerID: .openAIPlatform, modelID: "unit-anything")?.capabilities, [.text, .streaming])
+        XCTAssertEqual(catalog.modelDefaults(providerID: .openAIPlatform, adapterID: .openAIResponses, modelID: "unit-anything")?.capabilities, [.text, .streaming])
     }
 
     func testDefaultsCatalogRejectsInvalidEnumValues() {
@@ -169,12 +171,15 @@ final class LLMCoreTypesTests: XCTestCase {
           "providerDefaults": [],
           "rules": [
             {
+              "level": "adapter",
               "match": {
                 "adapterID": "openAIChatCompletions"
               },
-              "parameterMappings": [
+              "parameters": [
                 {
-                  "wireKey": "max_tokens"
+                  "id": "max_output_tokens",
+                  "supported": true,
+                  "mapping": {"kind": "key"}
                 }
               ]
             }
@@ -189,6 +194,7 @@ final class LLMCoreTypesTests: XCTestCase {
           "providerDefaults": [],
           "rules": [
             {
+              "level": "provider",
               "match": {
                 "providerRegex": "["
               },
@@ -213,6 +219,7 @@ final class LLMCoreTypesTests: XCTestCase {
           "providerDefaults": [],
           "rules": [
             {
+              "level": "model",
               "match": {
                 "modelRegex": ""
               },
@@ -236,91 +243,64 @@ final class LLMCoreTypesTests: XCTestCase {
           "providerDefaults": [],
           "rules": [
             {
-              "match": {
-                "providerRegex": "^openAIPlatform$"
-              },
-              "modelDefaults": {
-                  "capabilities": ["text", "streaming"]
-              }
-            },
-            {
-              "match": {
-                "providerRegex": "^openAIPlatform$",
-                "modelRegex": "^vision-"
-              },
-              "modelDefaults": {
-                  "capabilities": ["image", "jsonObject"]
-              }
-            },
-            {
-              "match": {
-                "adapterID": "openAIChatCompletions"
-              },
-              "parameterAvailability": [
+              "level": "adapter",
+              "match": {"adapterID": "openAIChatCompletions"},
+              "parameters": [
                 {
-                  "parameter": "max_output_tokens",
-                  "enabled": true
-                }
-              ],
-              "parameterMappings": [
-                {
-                  "parameter": "max_output_tokens",
-                  "encoding": "scalarKey",
-                  "wireKey": "max_tokens"
+                  "id": "max_output_tokens",
+                  "supported": true,
+                  "mapping": {"kind": "key", "key": "max_tokens"},
+                  "enabledByDefault": true
                 }
               ]
             },
             {
+              "level": "adapter",
+              "match": {"adapterID": "openAICompatibleChatCompletions"},
+              "parameters": [
+                {
+                  "id": "max_output_tokens",
+                  "supported": true,
+                  "mapping": {"kind": "key", "key": "max_tokens"}
+                }
+              ]
+            },
+            {
+              "level": "provider",
+              "match": {"providerRegex": "^openAIPlatform$"},
+              "modelDefaults": {"capabilities": ["text", "streaming"]}
+            },
+            {
+              "level": "model",
+              "match": {"providerRegex": "^openAIPlatform$", "modelRegex": "^vision-"},
+              "modelDefaults": {"capabilities": ["image", "jsonObject"]}
+            },
+            {
+              "level": "model",
               "match": {
                 "modelRegex": "(^|.*/)gpt-5([-.].*)?$",
                 "adapterID": "openAIChatCompletions"
               },
-              "parameterAvailability": [
+              "parameters": [
                 {
-                  "parameter": "max_output_tokens",
+                  "id": "max_output_tokens",
+                  "mapping": {"kind": "key", "key": "max_completion_tokens"},
                   "required": true,
                   "defaultValue": 4096
                 },
-                {
-                  "parameter": "temperature",
-                  "available": false
-                }
-              ],
-              "parameterMappings": [
-                {
-                  "parameter": "max_output_tokens",
-                  "encoding": "scalarKey",
-                  "wireKey": "max_completion_tokens"
-                }
+                {"id": "temperature", "supported": false}
               ]
             },
             {
-              "match": {
-                "adapterID": "openAICompatibleChatCompletions"
-              },
-              "parameterAvailability": [
-                {
-                  "parameter": "max_output_tokens"
-                }
-              ],
-              "parameterMappings": [
-                {
-                  "parameter": "max_output_tokens",
-                  "encoding": "scalarKey",
-                  "wireKey": "max_tokens"
-                }
-              ]
-            },
-            {
+              "level": "model",
               "match": {
                 "modelRegex": "(^|.*/)gpt-5([-.].*)?$",
                 "adapterID": "openAICompatibleChatCompletions"
               },
-              "parameterMappings": [
+              "parameters": [
                 {
-                  "parameter": "max_output_tokens",
-                  "encoding": "scalarKey",
-                  "wireKey": "max_completion_tokens"
+                  "id": "max_output_tokens",
+                  "mapping": {"kind": "key", "key": "max_completion_tokens"}
                 }
               ]
             }
@@ -328,14 +308,14 @@ final class LLMCoreTypesTests: XCTestCase {
         }
         """.utf8))
 
-        let modelDefaults = catalog.modelDefaults(providerID: .openAIPlatform, modelID: "vision-large")
+        let modelDefaults = catalog.modelDefaults(providerID: .openAIPlatform, adapterID: .openAIChatCompletions, modelID: "vision-large")
         XCTAssertEqual(modelDefaults?.capabilities, [.image, .jsonObject])
 
-        let mapping = catalog.parameterMappings(
+        let mapping = catalog.parameterDefaults(
             providerID: .openAIPlatform,
             adapterID: .openAIChatCompletions,
             modelID: "gpt-5.4-nano"
-        ).first { $0.parameterID == .maxOutputTokens }
+        ).first { $0.parameterID == .maxOutputTokens }?.mapping
         XCTAssertEqual(mapping?.wireKey, "max_completion_tokens")
         let mappingJSON = try JSONEncoder().encode(mapping)
         XCTAssertFalse(String(data: mappingJSON, encoding: .utf8)?.contains("required") ?? true)
@@ -349,13 +329,13 @@ final class LLMCoreTypesTests: XCTestCase {
         XCTAssertTrue(maxTokenDefaults?.isRequired ?? false)
         XCTAssertTrue(maxTokenDefaults?.isEnabledByDefault ?? false)
         XCTAssertEqual(maxTokenDefaults?.defaultValue, .integer(4096))
-        XCTAssertEqual(parameterDefaults.first { $0.parameterID == .temperature }?.support, .unsupported)
+        XCTAssertEqual(parameterDefaults.first { $0.parameterID == .temperature }?.isSupported, false)
 
-        let aggregatorMapping = catalog.parameterMappings(
+        let aggregatorMapping = catalog.parameterDefaults(
             providerID: .openRouter,
             adapterID: .openAICompatibleChatCompletions,
             modelID: "openai/gpt-5-mini"
-        ).first { $0.parameterID == .maxOutputTokens }
+        ).first { $0.parameterID == .maxOutputTokens }?.mapping
         XCTAssertEqual(aggregatorMapping?.wireKey, "max_completion_tokens")
     }
 

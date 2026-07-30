@@ -7,34 +7,37 @@
 1. A provider model-list endpoint produces `LLMProviderModelMetadata` values containing only facts returned by the provider.
 2. `ModelItem` persists that metadata and explicit user overrides. Catalog values are never copied into SwiftData.
 3. `LLMModelProfileResolver` creates the effective `LLMModelProfile` used by settings, conversation controls, status UI, and request assembly.
-4. `LLMGenerationOptionsResolver` combines conversation inclusion intent with the resolved required/default policy and returns resolved options, active parameter identifiers, and mappings.
+4. `LLMGenerationOptionsResolver` combines conversation inclusion intent with the resolved required/default policy and returns resolved options plus active parameters carrying their final mappings.
 5. A provider adapter builds the wire body before dispatch. `LLMHTTPGenerationPipeline` sends it and emits provider-neutral `LLMGenerationEvent` values.
 6. `llm_runtime` persists stable `MessageItem`, `ToolCallItem`, and `ResponseRunItem` records. SwiftData is not written per token or tool-argument delta.
 
 ## Model Profiles
 
-`LLMModelProfileResolver` is the sole model-profile resolution path. Precedence is fixed:
+`LLMModelProfileResolver` is the sole model-profile resolution path. Parameter definitions are inherited and mutated in this order:
 
-1. Explicit user override.
-2. Explicit provider metadata.
-3. Last matching catalog rule.
-4. Fallback: model identifier as display name, application default context size, and `unknown` support.
+1. Adapter API baseline.
+2. Provider rules.
+3. Model-family and model rules.
+4. Explicit provider observations.
+5. Explicit user overrides.
 
-Provider capability arrays are positive, non-exhaustive metadata. An omitted field makes no claim. Only an explicit provider `false` produces an `unsupported` claim. The resolved support source is retained as `userOverride`, `provider`, `catalog`, or `fallback` so the UI can show provenance.
+Provider capability arrays remain positive, non-exhaustive metadata and may resolve to `unknown`. Parameter support is binary: omission preserves the inherited definition, explicit provider `false` disables it, and explicit `true` re-enables it only when an inherited mapping exists.
 
-`LLMDefaultsCatalog` evaluates ordered rules from `Resources/LLMDefaults.json`. Rules are evaluated from top to bottom; later matching rules override earlier rules. `providerRegex` and `modelRegex` are regular-expression matches and `adapterID` is exact.
+`LLMDefaultsCatalog` evaluates `adapter`, `provider`, and `model` rules from `Resources/LLMDefaults.json`. Matching rules are applied by level and declaration order. Parameter patches modify only declared fields; missing fields inherit, while explicit `null` clears nullable defaults or options.
 
-The SwiftData schema is changed in place with no migration plan. Development stores created with the former materialized model schema must be removed with the startup recovery **Wipe Store** action. Backup format 3 exports provider metadata and overrides only and intentionally rejects earlier model-profile backup formats.
+The SwiftData schema is changed in place with no migration plan. Development stores created with the former schema must be removed with the startup recovery **Wipe Store** action. Backup format 4 exports provider observations and unified overrides only.
 
 ## Parameters
 
-The subsystem keeps three concepts separate:
+The subsystem keeps three ownership boundaries:
 
 - Semantic value and inclusion intent belong to the conversation.
-- Advisory support, required/default policy, options, and effective mapping belong to `LLMParameterProfile`.
+- Effective support, required/default policy, options, and mapping belong to `LLMParameterProfile`.
 - Wire encoding belongs to the selected adapter.
 
-An explicitly enabled mapped parameter remains active when support is `unsupported` or `unknown`; the provider decides whether to accept it. A missing or disabled mapping is different: the application cannot encode that parameter, so an active unmapped parameter produces `LLMProviderError.requestEncoding` before network dispatch. Streaming is read directly from resolved request options and model streaming support is advisory.
+A parameter becomes active only through required policy, explicit conversation selection, or default-enabled policy. Merely retaining a value does not activate it.
+
+A supported parameter always has one inherited mapping: adapter-owned encoding, a scalar key, or a known structured preset. There is no separate encodability state. An enabled parameter that becomes unsupported remains visible so it can be disabled, but request assembly reports `invalidConfiguration` until the stale selection is removed or an advanced override restores valid support and mapping.
 
 ## Validation Responsibility
 
@@ -44,7 +47,7 @@ Local checks are limited to boundaries owned by the application:
 
 - `LLMProviderRegistry.resolveAdapter` validates provider/adapter composition.
 - `ConversationHistoryValidator` rejects duplicate, missing, dangling, or out-of-order tool-call identifiers as `invalidConversationState`.
-- Provider adapters reject missing/disabled active mappings, required image/file/schema/tool encoding data, reserved option collisions, and unrepresentable wire formats as `requestEncoding`.
+- Provider adapters reject missing required image/file/schema/tool data, reserved option collisions, malformed values, and unrepresentable wire formats as `requestEncoding`.
 - Local backends retain framework availability and platform constraints.
 
 Provider HTTP errors retain normalized metadata, redaction, and retry classification. Remote `4xx` responses are non-retryable. A provider rejection before any assistant event is surfaced transiently and the otherwise empty turn/run is rolled back; failures after persisted assistant or tool events retain the failed run.

@@ -170,7 +170,7 @@ final class ConversationOptions: Equatable {
 
     func normalizeKnownParameters() {
         var enabledStates = parameterEnabledStates
-        for parameterID in [LLMParameterID.model, .systemPrompt]
+        for parameterID in [LLMParameterID.model]
             where enabledStates[parameterID.rawValue] == nil {
             enabledStates[parameterID.rawValue] = true
         }
@@ -254,25 +254,24 @@ final class ConversationOptions: Equatable {
         resolvedModelID: String?
     ) -> LLMGenerationOptions {
         let modelID = selectedModelID ?? resolvedModelID
-        let extras = enabledProviderExtras()
 
         return LLMGenerationOptions(
             systemPrompt: systemPrompt,
             modelID: modelID,
-            temperature: enabledValue(.temperature)?.doubleValue,
-            topP: enabledValue(.topP)?.doubleValue,
-            maxOutputTokens: enabledValue(.maxOutputTokens)?.integerValue,
-            topK: enabledValue(.topK)?.integerValue,
-            stop: Self.stopSequences(from: enabledValue(.stopSequences)),
-            responseFormat: enabledValue(.responseFormat)?.stringValue.map(LLMGenerationOptions.ResponseFormat.fromSemanticRawValue) ?? .text,
-            reasoning: enabledValue(.reasoningEffort)?.stringValue.flatMap { $0.isEmpty ? nil : $0 },
-            reasoningSummary: enabledValue(.reasoningSummary)?.stringValue.flatMap { $0.isEmpty ? nil : $0 },
-            reasoningBudgetTokens: enabledValue(.reasoningBudgetTokens)?.integerValue,
-            serviceTier: enabledValue(.serviceTier)?.stringValue.flatMap { $0.isEmpty ? nil : $0 },
-            textVerbosity: enabledValue(.textVerbosity)?.stringValue.flatMap { $0.isEmpty ? nil : $0 },
-            streamMode: enabledValue(.stream)?.boolValue == true ? .enabled : .disabled,
+            temperature: parameterValue(.temperature)?.doubleValue,
+            topP: parameterValue(.topP)?.doubleValue,
+            maxOutputTokens: parameterValue(.maxOutputTokens)?.integerValue,
+            topK: parameterValue(.topK)?.integerValue,
+            stop: Self.stopSequences(from: parameterValue(.stopSequences)),
+            responseFormat: parameterValue(.responseFormat)?.stringValue.map(LLMGenerationOptions.ResponseFormat.fromSemanticRawValue) ?? .text,
+            reasoning: parameterValue(.reasoningEffort)?.stringValue.flatMap { $0.isEmpty ? nil : $0 },
+            reasoningSummary: parameterValue(.reasoningSummary)?.stringValue.flatMap { $0.isEmpty ? nil : $0 },
+            reasoningBudgetTokens: parameterValue(.reasoningBudgetTokens)?.integerValue,
+            serviceTier: parameterValue(.serviceTier)?.stringValue.flatMap { $0.isEmpty ? nil : $0 },
+            textVerbosity: parameterValue(.textVerbosity)?.stringValue.flatMap { $0.isEmpty ? nil : $0 },
+            streamMode: parameterValue(.stream)?.boolValue == true ? .enabled : .disabled,
             retryPolicy: retryPolicy,
-            providerSpecificOptions: extras
+            providerSpecificOptions: providerExtras()
         )
     }
 
@@ -325,16 +324,13 @@ final class ConversationOptions: Equatable {
         toolConfigurations = updatedConfigs
     }
 
-    private func enabledValue(_ parameter: LLMParameterID) -> JSONValue? {
-        guard isParameterEnabled(parameter) else { return nil }
-        return parameterValue(parameter)
-    }
-
-    private func enabledProviderExtras() -> [String: JSONValue] {
+    private func providerExtras() -> [String: JSONValue] {
         decodedParameterValues.reduce(into: [:]) { result, entry in
-            guard let parameterID = LLMParameterID(rawValue: entry.key),
-                  Self.providerExtraParameters.contains(parameterID),
-                  isParameterEnabled(parameterID) else {
+            guard let parameterID = LLMParameterID(rawValue: entry.key) else {
+                result[entry.key] = entry.value
+                return
+            }
+            guard Self.providerExtraParameters.contains(parameterID) else {
                 return
             }
             result[entry.key] = entry.value
@@ -361,7 +357,7 @@ final class ConversationOptions: Equatable {
 
     private static func defaultEnabledState(for parameter: LLMParameterID) -> Bool {
         switch parameter {
-        case .model, .systemPrompt:
+        case .model:
             return true
         default:
             return false

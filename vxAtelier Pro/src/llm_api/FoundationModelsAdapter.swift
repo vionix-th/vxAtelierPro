@@ -144,6 +144,7 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
         toolExecutor: LLMToolExecutionHandler?,
         continuation: AsyncThrowingStream<LLMGenerationEvent, Error>.Continuation
     ) async throws {
+        try request.validateActiveParameterMappings()
         let availability = availability()
         guard availability.isAvailable else {
             throw LLMProviderError.localModelUnavailable(availability.statusText)
@@ -155,13 +156,13 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
         let transcript = try buildTranscript(from: request)
         let transcriptEntryCount = transcript.count
         let promptText = currentPromptText(for: request)
-        let options = generationOptions(from: request.options)
+        let options = generationOptions(from: request)
         let bridgedTools = try buildTools(
             from: request.tools,
             toolExecutor: toolExecutor
         )
         let session = makeSession(bridgedTools, transcript)
-        if request.options.streamMode == .enabled {
+        if request.usesAdapterEncoding(.stream), request.options.streamMode == .enabled {
             let stream = session.streamResponse(options: options, prompt: Prompt(promptText))
 
             var emittedText = ""
@@ -203,7 +204,9 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
         var toolNamesByID: [String: String] = [:]
         let toolDefinitions = try transcriptToolDefinitions(from: request.tools)
 
-        let systemPrompt = request.options.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let systemPrompt = request.usesAdapterEncoding(.systemPrompt)
+            ? request.options.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            : ""
         if !systemPrompt.isEmpty || !toolDefinitions.isEmpty {
             entries.append(
                 .instructions(
@@ -337,12 +340,16 @@ struct FoundationModelsBackend: LLMLocalModelBackend {
         }
     }
 
-    private func generationOptions(from options: LLMGenerationOptions) -> GenerationOptions {
-        let temperature = options.temperature.map { min(max($0, 0), 1) }
+    private func generationOptions(from request: LLMGenerationRequest) -> GenerationOptions {
+        let temperature = request.usesAdapterEncoding(.temperature)
+            ? request.options.temperature.map { min(max($0, 0), 1) }
+            : nil
         return GenerationOptions(
             sampling: nil,
             temperature: temperature,
-            maximumResponseTokens: options.maxOutputTokens
+            maximumResponseTokens: request.usesAdapterEncoding(.maxOutputTokens)
+                ? request.options.maxOutputTokens
+                : nil
         )
     }
 

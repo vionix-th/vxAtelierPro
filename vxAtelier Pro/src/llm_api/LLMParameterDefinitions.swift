@@ -45,8 +45,6 @@ enum LLMParameterID: String, Codable, CaseIterable, Identifiable {
     var maxValue: Double? { definition.maxValue }
     /// Allowed values for enumerated string parameters.
     var options: [String]? { definition.options }
-    /// Indicates whether provider adapters may map this parameter onto a wire field.
-    var isProviderMappable: Bool { definition.isProviderMappable }
 }
 
 /// Primitive value class used to render and validate parameter controls.
@@ -64,7 +62,6 @@ struct LLMParameterDefinition: Codable, Equatable, Identifiable {
     var minValue: Double?
     var maxValue: Double?
     var options: [String]?
-    var isProviderMappable: Bool
 
     /// Creates semantic parameter metadata used by validation and UI controls.
     init(
@@ -72,15 +69,13 @@ struct LLMParameterDefinition: Codable, Equatable, Identifiable {
         valueType: LLMParameterValueType,
         minValue: Double? = nil,
         maxValue: Double? = nil,
-        options: [String]? = nil,
-        isProviderMappable: Bool = true
+        options: [String]? = nil
     ) {
         self.id = id
         self.valueType = valueType
         self.minValue = minValue
         self.maxValue = maxValue
         self.options = options
-        self.isProviderMappable = isProviderMappable
     }
 }
 
@@ -90,9 +85,9 @@ enum LLMParameterDefinitionCatalog {
     static func definition(for parameterID: LLMParameterID) -> LLMParameterDefinition {
         switch parameterID {
         case .model:
-            return .init(id: parameterID, valueType: .string, isProviderMappable: false)
+            return .init(id: parameterID, valueType: .string)
         case .systemPrompt:
-            return .init(id: parameterID, valueType: .string, isProviderMappable: false)
+            return .init(id: parameterID, valueType: .string)
         case .maxOutputTokens:
             return .init(id: parameterID, valueType: .integer, minValue: 1, maxValue: 200_000)
         case .temperature:

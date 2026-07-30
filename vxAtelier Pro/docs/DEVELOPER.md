@@ -124,15 +124,15 @@ The LLM subsystem is split by reuse boundary. `llm_api` contains the reusable pr
 *   **Concrete Tool Files (`llm_runtime/*Tool.swift`, `llm_runtime/ConversationTools.swift`, `llm_runtime/ShortcutTools.swift`)**: vxAtelier-specific tools for conversations, settings, shortcuts, web search, and website reading.
 *   **Persistence (`persistence/ModelItem.swift`, `persistence/Model*OverrideItem.swift`)**: Stores provider metadata and explicit model overrides only. Effective catalog values are derived and are never materialized into SwiftData.
 
-Model and parameter baseline rules are layered and ordered in `src/llm_api/Resources/LLMDefaults.json`.
+Model and parameter rules form an inherited API profile in `src/llm_api/Resources/LLMDefaults.json`.
 
-* Rules are evaluated in file order.
+* Rules apply in `adapter`, `provider`, then `model` order and in declaration order within each level.
 * `providerRegex` and `modelRegex` are regex matches; `adapterID` is exact.
-* Later matching rules override earlier rules for the same semantic parameter.
-* Broad provider and adapter rules establish the baseline; narrower model-specific rules refine it.
-* `LLMModelMetadataDecoder` produces raw provider metadata without catalog enrichment. `LLMModelProfileResolver` applies user override, explicit provider metadata, catalog, and fallback precedence.
+* Parameter patches mutate only declared fields; omitted fields inherit.
+* Every supported parameter resolves with an adapter-owned, key, or preset mapping.
+* `LLMModelMetadataDecoder` produces raw provider observations without catalog enrichment. `LLMModelProfileResolver` applies observations after catalog rules and user overrides last.
 
-Remote capability and parameter-support states are advisory. Adapters reject only active parameters or content they cannot encode, while `ConversationHistoryValidator` rejects corrupt tool-call replay. The remote provider remains authoritative for semantic request acceptance and normalized remote `4xx` responses are non-retryable.
+Remote capability metadata is advisory. Resolved parameter support defines the selected API surface; adapters consume active parameters with their final mappings and reject only malformed or unrepresentable payloads. `ConversationHistoryValidator` rejects corrupt tool-call replay. Normalized remote `4xx` responses remain non-retryable.
 
 ### Search (`search/`)
 
@@ -341,9 +341,9 @@ This module contains the core SwiftData models and supporting data structures th
 
 This is a non-persistent value type that represents one configurable generation parameter row in the UI.
 
-*   **Dynamic UI Generation**: It combines semantic parameter definitions, presentation metadata, resolved model parameter mappings, and typed values from `ConversationOptions`.
+*   **Dynamic UI Generation**: It combines semantic parameter definitions, presentation metadata, the resolved model API profile, and typed values from `ConversationOptions`.
 *   **No Value Ownership**: It does not persist values. `ConversationOptions` owns generation values and parameter enablement overrides.
-*   **Resolved Profile**: It consumes `ModelItem.modelProfile`, so support provenance and mapping encodability come from the same resolver used by runtime request assembly.
+*   **Resolved Profile**: It consumes `ModelItem.modelProfile`, showing supported parameters plus retained stale selections that can only be disabled.
 
 #### API Configuration (`APIConfigurationItem.swift`)
 
@@ -397,8 +397,8 @@ This SwiftData `@Model` is a comprehensive container for all settings that gover
 This SwiftData `@Model` represents a specific, selectable AI model from a provider.
 
 *   **Provider Metadata**: It stores provider-reported display name, context size, positive/negative capability claims, and raw metadata without catalog enrichment.
-*   **Explicit Overrides**: It stores optional identity/context overrides, tri-state capability overrides, parameter overrides, and atomic mapping overrides. Inherited catalog values do not create rows.
-*   **Resolved Profile**: `modelProfile` applies user override, provider metadata, last matching catalog rule, and fallback precedence on every read.
+*   **Explicit Overrides**: It stores optional identity/context overrides, tri-state capability overrides, and unified parameter patches containing optional support, mapping, policy, default, and options fields. Inherited catalog values do not create rows.
+*   **Resolved Profile**: `modelProfile` applies adapter, provider, and model catalog mutations, then explicit provider observations and user overrides.
 *   **API Configuration Scoping**: `apiConfiguration` links a model to a provider/adapter configuration, so identical model identifiers can resolve different mappings without copying catalog defaults.
 
 #### Project (`ProjectItem.swift`)

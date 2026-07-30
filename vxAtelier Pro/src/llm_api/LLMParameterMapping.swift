@@ -2,9 +2,9 @@ import Foundation
 
 /// Encoding strategy for a semantic parameter in a provider request body.
 enum LLMParameterEncodingKind: String, Codable, CaseIterable, Identifiable {
-    case scalarKey
-    case structuredPreset
-    case disabled
+    case adapter
+    case key
+    case preset
 
     /// Exposes the raw encoding key as the SwiftUI identity.
     var id: String { rawValue }
@@ -12,9 +12,9 @@ enum LLMParameterEncodingKind: String, Codable, CaseIterable, Identifiable {
     /// Human-facing encoding name for model mapping controls.
     var displayName: String {
         switch self {
-        case .scalarKey: return "Scalar Key"
-        case .structuredPreset: return "Structured Preset"
-        case .disabled: return "Disabled"
+        case .adapter: return "Adapter"
+        case .key: return "Key"
+        case .preset: return "Preset"
         }
     }
 }
@@ -44,6 +44,41 @@ enum LLMParameterStructuredPreset: String, Codable, CaseIterable, Identifiable {
         case .anthropicThinking: return "Anthropic Thinking"
         }
     }
+
+    func supports(_ adapterID: LLMAdapterID) -> Bool {
+        switch (self, adapterID) {
+        case (.openAIChatResponseFormat, .openAIChatCompletions),
+             (.openAIChatResponseFormat, .openAICompatibleChatCompletions),
+             (.openAIResponsesTextFormat, .openAIResponses),
+             (.openAIResponsesReasoning, .openAIResponses),
+             (.openAIResponsesTextVerbosity, .openAIResponses),
+             (.openAIResponsesReasoningSummary, .openAIResponses),
+             (.openRouterReasoning, .openAICompatibleChatCompletions),
+             (.anthropicThinking, .anthropicMessages):
+            return true
+        default:
+            return false
+        }
+    }
+}
+
+extension LLMAdapterID {
+    var supportsKeyParameterMappings: Bool {
+        self != .foundationModels
+    }
+
+    func ownsEncoding(of parameterID: LLMParameterID) -> Bool {
+        switch self {
+        case .foundationModels:
+            return [.model, .systemPrompt, .stream, .temperature, .maxOutputTokens]
+                .contains(parameterID)
+        case .openAIResponses,
+             .openAIChatCompletions,
+             .openAICompatibleChatCompletions,
+             .anthropicMessages:
+            return [.model, .systemPrompt, .stream].contains(parameterID)
+        }
+    }
 }
 
 /// Mapping from one semantic parameter to one adapter-specific wire encoding.
@@ -60,7 +95,7 @@ struct LLMParameterMapping: Codable, Equatable, Identifiable {
     init(
         adapterID: LLMAdapterID,
         parameterID: LLMParameterID,
-        encodingKind: LLMParameterEncodingKind = .scalarKey,
+        encodingKind: LLMParameterEncodingKind = .key,
         wireKey: String = "",
         structuredPreset: LLMParameterStructuredPreset? = nil
     ) {
@@ -72,72 +107,35 @@ struct LLMParameterMapping: Codable, Equatable, Identifiable {
     }
 }
 
-/// Default parameter mappings loaded from bundled LLM defaults.
-enum LLMParameterMappingCatalog {
-    /// Returns default mappings for a provider, adapter, and model.
-    static func defaults(
-        providerID: LLMProviderID,
-        adapterID: LLMAdapterID,
-        modelID: String
-    ) -> [LLMParameterMapping] {
-        LLMDefaultsCatalog.bundled.parameterMappings(
-            providerID: providerID,
-            adapterID: adapterID,
-            modelID: modelID
-        )
-    }
-}
-
-/// Resolves persisted model-specific mappings.
-struct LLMParameterMappingIndex {
-    /// Returns active mappings keyed by semantic parameter.
-    static func resolve(
-        adapterID: LLMAdapterID,
-        mappings: [LLMParameterMapping]
-    ) -> [LLMParameterID: LLMParameterMapping] {
-        Dictionary(uniqueKeysWithValues: mappings
-            .filter { $0.adapterID == adapterID }
-            .map { ($0.parameterID, $0) })
-    }
-
-    static func requireEncodableMappings(
-        activeParameterIDs: Set<LLMParameterID>,
-        mappings: [LLMParameterID: LLMParameterMapping],
-        directlyEncodedParameterIDs: Set<LLMParameterID> = [.stream]
-    ) throws -> [LLMParameterID: LLMParameterMapping] {
-        for parameterID in activeParameterIDs.subtracting(directlyEncodedParameterIDs) {
-            guard let mapping = mappings[parameterID], mapping.encodingKind != .disabled else {
-                throw LLMProviderError.requestEncoding(
-                    "No active wire mapping for \(parameterID.rawValue)."
-                )
-            }
-        }
-        return mappings.filter { activeParameterIDs.contains($0.key) }
-    }
+struct LLMActiveParameter: Codable, Equatable, Identifiable {
+    var id: LLMParameterID { parameterID }
+    var parameterID: LLMParameterID
+    var mapping: LLMParameterMapping
 }
 
 /// Encodes scalar semantic parameters into a provider request body.
 enum LLMParameterWireEncoder {
-    /// Applies only scalar-key mappings; structured presets are adapter-specific.
+    /// Applies only key mappings; adapter and preset mappings are adapter-specific.
     static func applyScalarOptions(
         _ options: LLMGenerationOptions,
         to body: inout [String: JSONValue],
-        mappings: [LLMParameterID: LLMParameterMapping],
-        activeParameterIDs: Set<LLMParameterID>
+        parameters: [LLMActiveParameter]
     ) throws {
-        let activeMappings = try LLMParameterMappingIndex.requireEncodableMappings(
-            activeParameterIDs: activeParameterIDs,
-            mappings: mappings
-        )
-        for mapping in activeMappings.values {
+        for parameter in parameters {
+            let mapping = parameter.mapping
+            guard mapping.encodingKind == .key else { continue }
             guard let value = options.jsonValue(for: mapping.parameterID) else {
                 throw LLMProviderError.requestEncoding(
                     "Active parameter \(mapping.parameterID.rawValue) has no value."
                 )
             }
-            guard mapping.encodingKind == .scalarKey else { continue }
             guard !mapping.wireKey.isEmpty else {
                 throw LLMProviderError.requestEncoding("\(mapping.parameterID.rawValue) has no wire key.")
+            }
+            guard body[mapping.wireKey] == nil else {
+                throw LLMProviderError.requestEncoding(
+                    "\(mapping.parameterID.rawValue) maps to reserved or duplicate key \(mapping.wireKey)."
+                )
             }
             body[mapping.wireKey] = value
         }

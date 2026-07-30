@@ -65,7 +65,6 @@ struct AppBootstrap {
             APIConfigurationItem.self,
             ModelItem.self,
             ModelCapabilityOverrideItem.self,
-            ModelParameterMappingOverrideItem.self,
             ModelParameterOverrideItem.self,
             ConversationOptions.self,
             MessageItem.self,

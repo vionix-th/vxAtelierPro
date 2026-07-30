@@ -93,20 +93,17 @@ struct LLMModelOverrides: Equatable {
     var displayName: String?
     var contextSize: Int?
     var capabilitySupport: [LLMModelCapability: LLMSupportState]
-    var parameterMappings: [LLMParameterID: LLMParameterMapping]
     var parameterOverrides: [LLMParameterID: LLMParameterOverrides]
 
     init(
         displayName: String? = nil,
         contextSize: Int? = nil,
         capabilitySupport: [LLMModelCapability: LLMSupportState] = [:],
-        parameterMappings: [LLMParameterID: LLMParameterMapping] = [:],
         parameterOverrides: [LLMParameterID: LLMParameterOverrides] = [:]
     ) {
         self.displayName = displayName
         self.contextSize = contextSize
         self.capabilitySupport = capabilitySupport
-        self.parameterMappings = parameterMappings
         self.parameterOverrides = parameterOverrides
     }
 }
@@ -117,22 +114,34 @@ enum LLMDefaultValueOverride: Equatable {
     case none
 }
 
+enum LLMOptionsOverride: Equatable {
+    case inherit
+    case value([String])
+    case none
+}
+
 struct LLMParameterOverrides: Equatable {
     var support: LLMSupportState?
+    var mapping: LLMParameterMapping?
     var isRequired: Bool?
     var isEnabledByDefault: Bool?
     var defaultValue: LLMDefaultValueOverride
+    var options: LLMOptionsOverride
 
     init(
         support: LLMSupportState? = nil,
+        mapping: LLMParameterMapping? = nil,
         isRequired: Bool? = nil,
         isEnabledByDefault: Bool? = nil,
-        defaultValue: LLMDefaultValueOverride = .inherit
+        defaultValue: LLMDefaultValueOverride = .inherit,
+        options: LLMOptionsOverride = .inherit
     ) {
         self.support = support
+        self.mapping = mapping
         self.isRequired = isRequired
         self.isEnabledByDefault = isEnabledByDefault
         self.defaultValue = defaultValue
+        self.options = options
     }
 }
 
@@ -141,6 +150,7 @@ struct LLMParameterProfile: Equatable, Identifiable {
     var parameterID: LLMParameterID
     var support: LLMSupport
     var mapping: LLMParameterMapping?
+    var mappingSource: LLMMetadataSource?
     var isRequired: Bool
     var isEnabledByDefault: Bool
     var defaultValue: JSONValue?
@@ -188,8 +198,7 @@ struct LLMModelProfileResolver {
         metadata: LLMProviderModelMetadata?,
         overrides: LLMModelOverrides = LLMModelOverrides()
     ) -> LLMModelProfile {
-        let modelDefaults = defaultsCatalog.modelDefaults(providerID: providerID, modelID: modelID)
-        let catalogMappings = defaultsCatalog.parameterMappings(
+        let modelDefaults = defaultsCatalog.modelDefaults(
             providerID: providerID,
             adapterID: adapterID,
             modelID: modelID
@@ -237,29 +246,44 @@ struct LLMModelProfileResolver {
             return (capability, LLMSupport(state: .unknown, source: .fallback))
         })
 
-        let mappings = Dictionary(uniqueKeysWithValues: catalogMappings.map { ($0.parameterID, $0) })
-            .merging(overrides.parameterMappings) { _, override in override }
         let catalogParameterIndex = Dictionary(uniqueKeysWithValues: catalogParameters.map { ($0.parameterID, $0) })
         let providerParameterClaims = (metadata?.parameterSupportClaims ?? []).reduce(into: [LLMParameterID: LLMSupportState]()) {
             $0[$1.parameterID] = $1.state
         }
-        let parameterIDs = Set(LLMParameterID.allCases).union(mappings.keys).union(overrides.parameterOverrides.keys)
+        let parameterIDs = Set(catalogParameterIndex.keys).union(overrides.parameterOverrides.keys)
         let parameters = Dictionary(uniqueKeysWithValues: parameterIDs.map { parameterID in
             let catalog = catalogParameterIndex[parameterID]
             let override = overrides.parameterOverrides[parameterID]
-            let support: LLMSupport
-            if let state = override?.support {
-                support = LLMSupport(state: state, source: .userOverride)
-            } else if let provider = providerParameterClaims[parameterID] {
-                support = LLMSupport(state: provider, source: .provider)
-            } else if let catalog {
-                support = LLMSupport(
-                    state: catalog.support,
-                    source: .catalog
-                )
-            } else {
-                support = LLMSupport(state: .unknown, source: .fallback)
+            let mapping = override?.mapping ?? catalog?.mapping
+            let mappingSource: LLMMetadataSource? = override?.mapping != nil
+                ? .userOverride
+                : (catalog?.mapping != nil ? .catalog : nil)
+
+            var isSupported = catalog?.isSupported ?? false
+            var supportSource: LLMMetadataSource = catalog == nil ? .fallback : .catalog
+            if let provider = providerParameterClaims[parameterID] {
+                switch provider {
+                case .supported where catalog?.mapping != nil:
+                    isSupported = true
+                    supportSource = .provider
+                case .unsupported:
+                    isSupported = false
+                    supportSource = .provider
+                case .supported, .unknown:
+                    break
+                }
             }
+            if let state = override?.support, state != .unknown {
+                isSupported = state == .supported && mapping != nil
+                supportSource = .userOverride
+            }
+            if isSupported && mapping == nil {
+                isSupported = false
+            }
+            let support = LLMSupport(
+                state: isSupported ? .supported : .unsupported,
+                source: supportSource
+            )
 
             let defaultValue: JSONValue?
             switch override?.defaultValue ?? .inherit {
@@ -271,14 +295,25 @@ struct LLMModelProfileResolver {
                 defaultValue = nil
             }
 
+            let options: [String]?
+            switch override?.options ?? .inherit {
+            case .inherit:
+                options = catalog?.options ?? parameterID.options
+            case .value(let value):
+                options = value
+            case .none:
+                options = nil
+            }
+
             return (parameterID, LLMParameterProfile(
                 parameterID: parameterID,
                 support: support,
-                mapping: mappings[parameterID],
-                isRequired: override?.isRequired ?? catalog?.isRequired ?? false,
+                mapping: mapping,
+                mappingSource: mappingSource,
+                isRequired: isSupported && (override?.isRequired ?? catalog?.isRequired ?? false),
                 isEnabledByDefault: override?.isEnabledByDefault ?? catalog?.isEnabledByDefault ?? false,
                 defaultValue: defaultValue,
-                options: catalog?.options ?? parameterID.options
+                options: options
             ))
         })
 

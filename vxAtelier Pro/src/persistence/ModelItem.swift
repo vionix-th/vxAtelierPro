@@ -15,7 +15,6 @@ final class ModelItem {
     var displayNameOverride: String?
     var contextSizeOverride: Int?
     @Relationship(deleteRule: .cascade) var capabilityOverrides: [ModelCapabilityOverrideItem] = []
-    @Relationship(deleteRule: .cascade) var parameterMappingOverrides: [ModelParameterMappingOverrideItem] = []
     @Relationship(deleteRule: .cascade) var parameterOverrides: [ModelParameterOverrideItem] = []
 
     var name: String { modelID }
@@ -60,9 +59,6 @@ final class ModelItem {
         let capabilitySupport = capabilityPairs.reduce(into: [LLMModelCapability: LLMSupportState]()) {
             $0[$1.0] = $1.1
         }
-        let mappings = parameterMappingOverrides
-            .filter { $0.adapterID == adapterID }
-            .reduce(into: [LLMParameterID: LLMParameterMapping]()) { $0[$1.parameterID] = $1.mapping }
         let parameterSettings = parameterOverrides
             .filter { $0.adapterID == adapterID }
             .reduce(into: [LLMParameterID: LLMParameterOverrides]()) { $0[$1.parameterID] = $1.overrides }
@@ -70,7 +66,6 @@ final class ModelItem {
             displayName: displayNameOverride,
             contextSize: contextSizeOverride,
             capabilitySupport: capabilitySupport,
-            parameterMappings: mappings,
             parameterOverrides: parameterSettings
         )
     }
@@ -106,7 +101,6 @@ final class ModelItem {
         displayNameOverride = nil
         contextSizeOverride = contextSize
         capabilityOverrides = []
-        parameterMappingOverrides = []
         parameterOverrides = []
     }
 

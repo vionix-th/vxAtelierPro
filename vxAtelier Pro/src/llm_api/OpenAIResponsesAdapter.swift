@@ -49,23 +49,24 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
 
     /// Encodes a provider-neutral request into a Responses JSON body.
     func makeBody(for request: LLMGenerationRequest, stream: Bool) throws -> [String: JSONValue] {
+        try request.validateActiveParameterMappings()
         var body: [String: JSONValue] = [
-            "model": .string(request.modelID),
-            "input": .array(try responsesInput(from: request)),
-            "stream": .boolean(stream)
+            "input": .array(try responsesInput(from: request))
         ]
-        if !request.options.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if request.usesAdapterEncoding(.model) {
+            body["model"] = .string(request.modelID)
+        }
+        if request.usesAdapterEncoding(.stream) {
+            body["stream"] = .boolean(stream)
+        }
+        if request.usesAdapterEncoding(.systemPrompt),
+           !request.options.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             body["instructions"] = .string(request.options.systemPrompt)
         }
-        let mappings = LLMParameterMappingIndex.resolve(
-            adapterID: request.adapterID,
-            mappings: request.parameterMappings
-        )
         try OpenAICompatibleEncoding.applyMappedOptions(
             request.options,
             to: &body,
-            mappings: mappings,
-            activeParameterIDs: request.activeParameterIDs,
+            parameters: request.activeParameters,
             reservedProviderExtraKeys: OpenAICompatibleEncoding.responsesReservedProviderExtraKeys
         )
         if !request.tools.isEmpty {

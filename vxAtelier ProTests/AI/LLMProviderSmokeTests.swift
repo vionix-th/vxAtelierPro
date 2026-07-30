@@ -72,13 +72,13 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
 
         let primaryModel = try XCTUnwrap(persistedModels.first { $0.modelID == provider.primaryModel })
         XCTContext.runActivity(named: "QueryManager persisted parameter overrides") { activity in
-            let mappings = primaryModel.parameterMappingOverrides
+            let mappings = primaryModel.parameterOverrides
                 .sorted { $0.parameterIDRaw < $1.parameterIDRaw }
-                .map { "\($0.adapterIDRaw):\($0.parameterIDRaw) wireKey=\($0.wireKey)" }
+                .map { "\($0.adapterIDRaw):\($0.parameterIDRaw) wireKey=\($0.wireKey ?? "")" }
                 .joined(separator: "\n")
             activity.add(XCTAttachment(string: mappings))
         }
-        XCTAssertTrue(primaryModel.parameterMappingOverrides.isEmpty)
+        XCTAssertTrue(primaryModel.parameterOverrides.isEmpty)
         XCTAssertFalse(primaryModel.modelProfile.parameters.isEmpty)
     }
 

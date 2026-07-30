@@ -30,7 +30,6 @@ final class TestEnvironment {
             VoiceConfigurationItem.self,
             ModelItem.self,
             ModelCapabilityOverrideItem.self,
-            ModelParameterMappingOverrideItem.self,
             ModelParameterOverrideItem.self,
             WebSearchConfigurationItem.self
         ])
@@ -177,20 +176,38 @@ extension LLMGenerationRequest {
             modelID: modelID,
             metadata: nil
         )
-        let resolved = LLMGenerationOptionsResolver.resolve(
+        let providedParameterIDs = options.testProvidedParameterIDs
+        let resolved = try! LLMGenerationOptionsResolver.resolve(
             options: options,
-            conversationPreferences: [:],
+            conversationPreferences: Dictionary(uniqueKeysWithValues: providedParameterIDs.map {
+                ($0.rawValue, true)
+            }),
+            providedParameterIDs: providedParameterIDs,
             parameterProfiles: profile.parameters
         )
         return LLMGenerationRequest(
             providerID: providerID,
             adapterID: adapterID,
             modelID: modelID,
-            parameterMappings: resolved.mappings,
-            activeParameterIDs: resolved.activeParameterIDs,
+            activeParameters: resolved.activeParameters,
             messages: messages,
             tools: tools,
             options: resolved.options
         )
+    }
+}
+
+extension LLMGenerationOptions {
+    var testProvidedParameterIDs: Set<LLMParameterID> {
+        Set(LLMParameterID.allCases.filter { parameterID in
+            switch parameterID {
+            case .responseFormat:
+                return responseFormat != .text
+            case .stream:
+                return streamMode == .enabled
+            default:
+                return jsonValue(for: parameterID) != nil
+            }
+        })
     }
 }

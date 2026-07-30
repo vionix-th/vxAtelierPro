@@ -223,15 +223,14 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         try OpenAICompatibleEncoding.applyMappedOptions(
             options,
             to: &body,
-            mappings: [
-                .responseFormat: LLMParameterMapping(
+            parameters: [
+                LLMActiveParameter(parameterID: .responseFormat, mapping: LLMParameterMapping(
                     adapterID: .openAIChatCompletions,
                     parameterID: .responseFormat,
-                    encodingKind: .structuredPreset,
+                    encodingKind: .preset,
                     structuredPreset: .openAIChatResponseFormat
-                )
-            ],
-            activeParameterIDs: [.responseFormat]
+                ))
+            ]
         )
 
         let responseFormat = try XCTUnwrap(body["response_format"]?.objectValue)
@@ -241,19 +240,56 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         XCTAssertNil(body["json_schema"])
     }
 
+    func testKeyMappingsReplaceAdapterOwnedFieldEncoding() throws {
+        let adapter = OpenAIChatCompletionsAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
+        let request = LLMGenerationRequest(
+            providerID: .openAIPlatform,
+            adapterID: .openAIChatCompletions,
+            modelID: "semantic-model",
+            activeParameters: [
+                LLMActiveParameter(parameterID: .model, mapping: LLMParameterMapping(
+                    adapterID: .openAIChatCompletions,
+                    parameterID: .model,
+                    encodingKind: .key,
+                    wireKey: "model_name"
+                )),
+                LLMActiveParameter(parameterID: .systemPrompt, mapping: LLMParameterMapping(
+                    adapterID: .openAIChatCompletions,
+                    parameterID: .systemPrompt,
+                    encodingKind: .key,
+                    wireKey: "system_prompt"
+                )),
+                LLMActiveParameter(parameterID: .stream, mapping: LLMParameterMapping(
+                    adapterID: .openAIChatCompletions,
+                    parameterID: .stream,
+                    encodingKind: .key,
+                    wireKey: "use_stream"
+                ))
+            ],
+            messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Answer")])],
+            options: LLMGenerationOptions(
+                systemPrompt: "Be concise.",
+                modelID: "semantic-model",
+                streamMode: .enabled
+            )
+        )
+
+        let body = try adapter.makeBody(for: request, stream: true)
+
+        XCTAssertNil(body["model"])
+        XCTAssertNil(body["stream"])
+        XCTAssertEqual(body["model_name"], .string("semantic-model"))
+        XCTAssertEqual(body["system_prompt"], .string("Be concise."))
+        XCTAssertEqual(body["use_stream"], .boolean(true))
+        XCTAssertEqual(body.array("messages")?.count, 1)
+    }
+
     func testOpenAIResponsesJsonSchemaEncodingUsesTextFormat() throws {
         let adapter = OpenAIResponsesAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
-        let request = LLMGenerationRequest(
+        let resolved = Self.resolvedDefaults(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
             modelID: "gpt-test",
-            parameterMappings: LLMParameterMappingCatalog.defaults(
-                providerID: .openAIPlatform,
-                adapterID: .openAIResponses,
-                modelID: "gpt-test"
-            ),
-            activeParameterIDs: [.responseFormat],
-            messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Answer")])],
             options: LLMGenerationOptions(
                 responseFormat: .jsonSchema,
                 providerSpecificOptions: [
@@ -264,6 +300,14 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
                 ]
             )
         )
+        let request = LLMGenerationRequest(
+            providerID: .openAIPlatform,
+            adapterID: .openAIResponses,
+            modelID: "gpt-test",
+            activeParameters: resolved.activeParameters,
+            messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Answer")])],
+            options: resolved.options
+        )
 
         let body = try adapter.makeBody(for: request, stream: false)
         let text = try XCTUnwrap(body["text"]?.objectValue)
@@ -271,6 +315,42 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         XCTAssertEqual(format.string("type"), "json_schema")
         XCTAssertEqual(format.string("name"), "answer")
         XCTAssertNil(body["json_schema"])
+    }
+
+    func testOpenAIResponsesStructuredMappingsMergeSiblingFields() throws {
+        let adapter = OpenAIResponsesAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
+        let resolved = Self.resolvedDefaults(
+            providerID: .openAIPlatform,
+            adapterID: .openAIResponses,
+            modelID: "gpt-5.5",
+            options: LLMGenerationOptions(
+                responseFormat: .jsonSchema,
+                reasoning: "high",
+                reasoningSummary: "auto",
+                textVerbosity: "high",
+                providerSpecificOptions: [
+                    "json_schema": .object([
+                        "name": .string("answer"),
+                        "schema": .object(["type": .string("object")])
+                    ])
+                ]
+            )
+        )
+        let request = LLMGenerationRequest(
+            providerID: .openAIPlatform,
+            adapterID: .openAIResponses,
+            modelID: "gpt-5.5",
+            activeParameters: resolved.activeParameters,
+            messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Answer")])],
+            options: resolved.options
+        )
+
+        let body = try adapter.makeBody(for: request, stream: false)
+
+        XCTAssertEqual(body.object("text")?.object("format")?.string("type"), "json_schema")
+        XCTAssertEqual(body.object("text")?.string("verbosity"), "high")
+        XCTAssertEqual(body.object("reasoning")?.string("effort"), "high")
+        XCTAssertEqual(body.object("reasoning")?.string("summary"), "auto")
     }
 
     func testOpenAIChatRejectsReservedProviderExtraCollision() {
@@ -310,15 +390,14 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         XCTAssertThrowsError(try OpenAICompatibleEncoding.applyMappedOptions(
             options,
             to: &body,
-            mappings: [
-                .responseFormat: LLMParameterMapping(
+            parameters: [
+                LLMActiveParameter(parameterID: .responseFormat, mapping: LLMParameterMapping(
                     adapterID: .openAIChatCompletions,
                     parameterID: .responseFormat,
-                    encodingKind: .structuredPreset,
+                    encodingKind: .preset,
                     structuredPreset: .openAIChatResponseFormat
-                )
-            ],
-            activeParameterIDs: [.responseFormat]
+                ))
+            ]
         )) { error in
             XCTAssertEqual(error as? LLMProviderError, .requestEncoding("response_format json_schema requires providerSpecificOptions.json_schema object."))
         }
@@ -342,8 +421,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
             providerID: .openAIPlatform,
             adapterID: .openAIChatCompletions,
             modelID: "gpt-5.4-nano",
-            parameterMappings: resolved.mappings,
-            activeParameterIDs: resolved.activeParameterIDs,
+            activeParameters: resolved.activeParameters,
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])],
             options: resolved.options
         )
@@ -359,18 +437,19 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
 
     func testOpenAIChatMapsGPT41MaxOutputTokensToMaxTokens() throws {
         let adapter = OpenAIChatCompletionsAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
+        let resolved = Self.resolvedDefaults(
+            providerID: .openAIPlatform,
+            adapterID: .openAIChatCompletions,
+            modelID: "gpt-4.1-nano",
+            options: LLMGenerationOptions(maxOutputTokens: 16)
+        )
         let request = LLMGenerationRequest(
             providerID: .openAIPlatform,
             adapterID: .openAIChatCompletions,
             modelID: "gpt-4.1-nano",
-            parameterMappings: LLMParameterMappingCatalog.defaults(
-                providerID: .openAIPlatform,
-                adapterID: .openAIChatCompletions,
-                modelID: "gpt-4.1-nano"
-            ),
-            activeParameterIDs: [.maxOutputTokens],
+            activeParameters: resolved.activeParameters,
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])],
-            options: LLMGenerationOptions(maxOutputTokens: 16)
+            options: resolved.options
         )
 
         let body = try adapter.makeBody(for: request, stream: false)
@@ -393,8 +472,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
             providerID: .openAICodexChatGPTSubscription,
             adapterID: .openAIResponses,
             modelID: "gpt-5.4-mini",
-            parameterMappings: resolved.mappings,
-            activeParameterIDs: resolved.activeParameterIDs,
+            activeParameters: resolved.activeParameters,
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])],
             options: resolved.options
         )
@@ -417,8 +495,7 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
             providerID: .anthropic,
             adapterID: .anthropicMessages,
             modelID: "claude-test",
-            parameterMappings: resolved.mappings,
-            activeParameterIDs: resolved.activeParameterIDs,
+            activeParameters: resolved.activeParameters,
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "ok")])],
             options: resolved.options
         )
@@ -476,22 +553,21 @@ final class LLMProviderAdapterEncodingTests: XCTestCase {
         adapterID: LLMAdapterID,
         modelID: String,
         options: LLMGenerationOptions
-    ) -> (
-        mappings: [LLMParameterMapping],
-        activeParameterIDs: Set<LLMParameterID>,
-        options: LLMGenerationOptions
-    ) {
+    ) -> LLMResolvedGenerationParameters {
         let profile = LLMModelProfileResolver(fallbackContextSize: 4096).resolve(
             providerID: providerID,
             adapterID: adapterID,
             modelID: modelID,
             metadata: nil
         )
-        let resolved = LLMGenerationOptionsResolver.resolve(
+        let providedParameterIDs = options.testProvidedParameterIDs
+        return try! LLMGenerationOptionsResolver.resolve(
             options: options,
-            conversationPreferences: [:],
+            conversationPreferences: Dictionary(uniqueKeysWithValues: providedParameterIDs.map {
+                ($0.rawValue, true)
+            }),
+            providedParameterIDs: providedParameterIDs,
             parameterProfiles: profile.parameters
         )
-        return (resolved.mappings, resolved.activeParameterIDs, resolved.options)
     }
 }

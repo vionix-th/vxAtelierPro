@@ -15,19 +15,20 @@ enum OpenAICompatibleEncoding {
     static func applyMappedOptions(
         _ options: LLMGenerationOptions,
         to body: inout [String: JSONValue],
-        mappings: [LLMParameterID: LLMParameterMapping],
-        activeParameterIDs: Set<LLMParameterID>,
+        parameters: [LLMActiveParameter],
         reservedProviderExtraKeys: Set<String> = []
     ) throws {
         var providerSpecificOptions = options.providerSpecificOptions
-        for parameterID in LLMParameterID.allCases where !activeParameterIDs.contains(parameterID) {
+        let activeIDs = Set(parameters.map(\.parameterID))
+        for parameterID in LLMParameterID.allCases where !activeIDs.contains(parameterID) {
             providerSpecificOptions.removeValue(forKey: parameterID.rawValue)
         }
-        let activeMappings = try LLMParameterMappingIndex.requireEncodableMappings(
-            activeParameterIDs: activeParameterIDs,
-            mappings: mappings
-        )
-        for mapping in activeMappings.values {
+        for parameter in parameters {
+            let mapping = parameter.mapping
+            guard mapping.encodingKind != .adapter else {
+                providerSpecificOptions.removeValue(forKey: mapping.parameterID.rawValue)
+                continue
+            }
             guard let value = options.jsonValue(for: mapping.parameterID) else {
                 throw LLMProviderError.requestEncoding(
                     "Active parameter \(mapping.parameterID.rawValue) has no value."
@@ -36,15 +37,20 @@ enum OpenAICompatibleEncoding {
             providerSpecificOptions.removeValue(forKey: mapping.parameterID.rawValue)
 
             switch mapping.encodingKind {
-            case .scalarKey:
+            case .adapter:
+                break
+            case .key:
                 guard !mapping.wireKey.isEmpty else {
                     throw LLMProviderError.requestEncoding("\(mapping.parameterID.rawValue) has no wire key.")
                 }
+                guard body[mapping.wireKey] == nil else {
+                    throw LLMProviderError.requestEncoding(
+                        "\(mapping.parameterID.rawValue) maps to reserved or duplicate key \(mapping.wireKey)."
+                    )
+                }
                 body[mapping.wireKey] = value
-            case .structuredPreset:
+            case .preset:
                 try applyStructuredPreset(mapping.structuredPreset, value: value, providerSpecificOptions: &providerSpecificOptions, to: &body)
-            case .disabled:
-                continue
             }
         }
 
@@ -63,55 +69,104 @@ enum OpenAICompatibleEncoding {
         providerSpecificOptions: inout [String: JSONValue],
         to body: inout [String: JSONValue]
     ) throws {
-        guard let preset else { return }
+        guard let preset else {
+            throw LLMProviderError.requestEncoding("Structured parameter mapping requires a preset.")
+        }
         switch preset {
         case .openAIChatResponseFormat:
             switch value.stringValue {
             case "json_object", "jsonObject":
-                body["response_format"] = .object(["type": .string("json_object")])
+                try setUnique(
+                    .object(["type": .string("json_object")]),
+                    for: "response_format",
+                    in: &body
+                )
             case "json_schema", "jsonSchema":
-                body["response_format"] = .object([
-                    "type": .string("json_schema"),
-                    "json_schema": .object(try jsonSchemaPayload(from: &providerSpecificOptions))
-                ])
+                try setUnique(
+                    .object([
+                        "type": .string("json_schema"),
+                        "json_schema": .object(try jsonSchemaPayload(from: &providerSpecificOptions))
+                    ]),
+                    for: "response_format",
+                    in: &body
+                )
             default:
                 break
             }
         case .openAIResponsesTextFormat:
             switch value.stringValue {
             case "json_object", "jsonObject":
-                body["text"] = .object(["format": .object(["type": .string("json_object")])])
+                try merge(
+                    ["format": .object(["type": .string("json_object")])],
+                    into: "text",
+                    in: &body
+                )
             case "json_schema", "jsonSchema":
                 var format = try jsonSchemaPayload(from: &providerSpecificOptions)
                 format["type"] = .string("json_schema")
-                body["text"] = .object(["format": .object(format)])
+                try merge(["format": .object(format)], into: "text", in: &body)
             default:
                 break
             }
         case .openAIResponsesReasoning:
             if let effort = value.stringValue, !effort.isEmpty {
-                body["reasoning"] = .object(["effort": .string(effort)])
+                try merge(["effort": .string(effort)], into: "reasoning", in: &body)
             }
         case .openAIResponsesTextVerbosity:
             if let verbosity = value.stringValue, !verbosity.isEmpty {
-                body["text"] = .object(["verbosity": .string(verbosity)])
+                try merge(["verbosity": .string(verbosity)], into: "text", in: &body)
             }
         case .openAIResponsesReasoningSummary:
             if let summary = value.stringValue, !summary.isEmpty {
-                body["reasoning"] = .object(["summary": .string(summary)])
+                try merge(["summary": .string(summary)], into: "reasoning", in: &body)
             }
         case .openRouterReasoning:
             if let effort = value.stringValue, !effort.isEmpty {
-                body["reasoning"] = .object(["effort": .string(effort)])
+                try merge(["effort": .string(effort)], into: "reasoning", in: &body)
             }
         case .anthropicThinking:
-            if let budgetTokens = value.integerValue {
-                body["thinking"] = .object([
-                    "type": .string("enabled"),
-                    "budget_tokens": .integer(budgetTokens)
-                ])
-            }
+            throw LLMProviderError.requestEncoding(
+                "Anthropic thinking is not representable by an OpenAI-compatible adapter."
+            )
         }
+    }
+
+    private static func setUnique(
+        _ value: JSONValue,
+        for key: String,
+        in body: inout [String: JSONValue]
+    ) throws {
+        guard body[key] == nil else {
+            throw LLMProviderError.requestEncoding("Structured parameter mapping collides with request field \(key).")
+        }
+        body[key] = value
+    }
+
+    private static func merge(
+        _ values: [String: JSONValue],
+        into key: String,
+        in body: inout [String: JSONValue]
+    ) throws {
+        var object: [String: JSONValue]
+        if let existing = body[key] {
+            guard let existingObject = existing.objectValue else {
+                throw LLMProviderError.requestEncoding(
+                    "Structured parameter mapping collides with request field \(key)."
+                )
+            }
+            object = existingObject
+        } else {
+            object = [:]
+        }
+        for (nestedKey, value) in values {
+            guard object[nestedKey] == nil else {
+                throw LLMProviderError.requestEncoding(
+                    "Structured parameter mapping collides with request field \(key).\(nestedKey)."
+                )
+            }
+            object[nestedKey] = value
+        }
+        body[key] = .object(object)
     }
 
     /// Removes and returns the caller-supplied JSON schema payload required by structured output.

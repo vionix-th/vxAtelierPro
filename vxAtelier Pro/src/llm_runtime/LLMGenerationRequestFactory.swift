@@ -31,9 +31,10 @@ struct ConversationRunContextResolver {
         }
 
         let rawOptions = conversation.options.generationOptions(resolvedModelID: modelID)
-        let resolvedParameters = LLMGenerationOptionsResolver.resolve(
+        let resolvedParameters = try LLMGenerationOptionsResolver.resolve(
             options: rawOptions,
             conversationPreferences: conversation.options.parameterInclusionPreferences,
+            providedParameterIDs: Set(conversation.options.decodedParameterValues.keys.compactMap(LLMParameterID.init(rawValue:))),
             parameterProfiles: model.modelProfile.parameters
         )
         let tools = toolCatalog.allTools()
@@ -48,8 +49,7 @@ struct ConversationRunContextResolver {
             providerID: providerID,
             adapterID: adapterID,
             modelID: modelID,
-            parameterMappings: resolvedParameters.mappings,
-            activeParameterIDs: resolvedParameters.activeParameterIDs,
+            activeParameters: resolvedParameters.activeParameters,
             messages: messages,
             tools: tools,
             options: resolvedParameters.options
@@ -114,8 +114,7 @@ struct LLMGenerationRequestFactory {
             providerID: context.providerID,
             adapterID: context.adapterID,
             modelID: context.modelID,
-            parameterMappings: context.parameterMappings,
-            activeParameterIDs: context.activeParameterIDs,
+            activeParameters: context.activeParameters,
             messages: context.messages,
             tools: context.tools,
             options: context.options

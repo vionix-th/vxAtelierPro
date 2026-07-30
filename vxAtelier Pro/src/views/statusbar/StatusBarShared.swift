@@ -246,12 +246,15 @@ struct StatusBarConversationInfoRow: View {
         conversation?.usedTokenCount ?? 0
     }
 
-    private var canEncodeStreaming: Bool {
+    private var canConfigureStreaming: Bool {
         guard let configuration = conversation?.options.apiConfiguration else { return false }
-        return (try? LLMProviderRegistry.shared.resolveAdapter(
+        guard (try? LLMProviderRegistry.shared.resolveAdapter(
             for: configuration.defaultAdapterIDEnum,
             providerID: configuration.providerIDEnum
-        )) != nil
+        )) != nil else {
+            return false
+        }
+        return selectedModel?.modelProfile.parameters[.stream]?.support.state == .supported
     }
 
     private var streamingSupportHelp: String {
@@ -313,7 +316,7 @@ struct StatusBarConversationInfoRow: View {
                 .padding(.horizontal, AppDefaults.paddingSmall)
 
                 if !dense {
-                    if allowsStreamingToggle && canEncodeStreaming, let onToggleStreaming {
+                    if allowsStreamingToggle && canConfigureStreaming, let onToggleStreaming {
                         HStack(spacing: AppDefaults.paddingSmall) {
                             Image(systemName: isStreamingEnabled ? "sparkles" : "text.alignleft")
                                 .font(.caption)

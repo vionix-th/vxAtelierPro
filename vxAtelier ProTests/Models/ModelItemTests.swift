@@ -78,7 +78,6 @@ final class ModelItemTests: XCTestCase {
 
         XCTAssertTrue(maxTokens?.isRequired ?? false)
         XCTAssertEqual(maxTokens?.defaultValue, .integer(4096))
-        XCTAssertTrue(model.parameterMappingOverrides.isEmpty)
         XCTAssertTrue(model.parameterOverrides.isEmpty)
     }
 

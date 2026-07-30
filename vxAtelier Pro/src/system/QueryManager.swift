@@ -550,6 +550,16 @@ final class QueryManager {
         apiConfigurations: [APIConfigurationItem]
     ) throws -> ModelItem {
         let model = exportData.toDataItem(apiConfigurations: apiConfigurations)
+        guard let apiConfiguration = model.apiConfiguration else {
+            throw LLMProviderError.invalidConfiguration("Imported model has no matching API configuration.")
+        }
+        try validateParameterOverrides(
+            model.parameterOverrides.map { ($0.adapterID, $0.parameterID, $0.overrides) },
+            providerID: apiConfiguration.providerIDEnum,
+            adapterID: apiConfiguration.defaultAdapterIDEnum,
+            modelID: model.modelID,
+            metadata: model.providerMetadata
+        )
         modelContext.insert(model)
         try saveContext()
         return model
@@ -562,22 +572,30 @@ final class QueryManager {
         displayNameOverride: String?,
         contextSizeOverride: Int?,
         capabilityOverrides: [LLMModelCapability: LLMSupportState],
-        mappingOverrides: [LLMParameterMapping],
         parameterOverrides: [(LLMAdapterID, LLMParameterID, LLMParameterOverrides)]
     ) throws {
-        model.modelID = modelID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedModelID = modelID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedModelID.isEmpty else {
+            throw LLMProviderError.invalidConfiguration("Model ID is required.")
+        }
+        try validateParameterOverrides(
+            parameterOverrides,
+            providerID: apiConfiguration.providerIDEnum,
+            adapterID: apiConfiguration.defaultAdapterIDEnum,
+            modelID: normalizedModelID,
+            metadata: model.providerMetadata
+        )
+        model.modelID = normalizedModelID
         model.apiConfiguration = apiConfiguration
         model.displayNameOverride = normalizedOptional(displayNameOverride)
         model.contextSizeOverride = contextSizeOverride
 
         for item in model.capabilityOverrides { modelContext.delete(item) }
-        for item in model.parameterMappingOverrides { modelContext.delete(item) }
         for item in model.parameterOverrides { modelContext.delete(item) }
         model.capabilityOverrides = capabilityOverrides
             .filter { $0.value != .unknown }
             .map { ModelCapabilityOverrideItem(capability: $0.key, support: $0.value) }
-        model.parameterMappingOverrides = mappingOverrides.map(ModelParameterMappingOverrideItem.init)
-        model.parameterOverrides = parameterOverrides.map { adapterID, parameterID, overrides in
+        model.parameterOverrides = parameterOverrides.compactMap { adapterID, parameterID, overrides in
             let kind: ModelDefaultValueOverrideKind
             let value: JSONValue?
             switch overrides.defaultValue {
@@ -591,21 +609,125 @@ final class QueryManager {
                 kind = .none
                 value = nil
             }
-            return ModelParameterOverrideItem(
+            let optionsKind: ModelDefaultValueOverrideKind
+            let options: [String]?
+            switch overrides.options {
+            case .inherit:
+                optionsKind = .inherit
+                options = nil
+            case .value(let value):
+                optionsKind = .value
+                options = value
+            case .none:
+                optionsKind = .none
+                options = nil
+            }
+            let item = ModelParameterOverrideItem(
                 adapterID: adapterID,
                 parameterID: parameterID,
                 support: overrides.support,
+                mapping: overrides.mapping,
                 requiredOverride: overrides.isRequired,
                 enabledByDefaultOverride: overrides.isEnabledByDefault,
                 defaultValueOverrideKind: kind,
-                defaultValue: value
+                defaultValue: value,
+                optionsOverrideKind: optionsKind,
+                options: options
             )
+            return item.isEmpty ? nil : item
         }
 
         if model.modelContext == nil {
             modelContext.insert(model)
         }
         try saveContext()
+    }
+
+    private func validateParameterOverrides(
+        _ overrides: [(LLMAdapterID, LLMParameterID, LLMParameterOverrides)],
+        providerID: LLMProviderID,
+        adapterID: LLMAdapterID,
+        modelID: String,
+        metadata: LLMProviderModelMetadata
+    ) throws {
+        var identities = Set<String>()
+        for (overrideAdapterID, parameterID, override) in overrides {
+            let identity = "\(overrideAdapterID.rawValue):\(parameterID.rawValue)"
+            guard identities.insert(identity).inserted else {
+                throw LLMProviderError.invalidConfiguration(
+                    "Only one override is allowed for \(parameterID.rawValue) on \(overrideAdapterID.displayName)."
+                )
+            }
+            guard override.support != .unknown else {
+                throw LLMProviderError.invalidConfiguration(
+                    "\(parameterID.rawValue) must inherit instead of overriding support to unknown."
+                )
+            }
+            if let mapping = override.mapping {
+                guard overrideAdapterID == mapping.adapterID,
+                      parameterID == mapping.parameterID else {
+                    throw LLMProviderError.invalidConfiguration("Parameter override and mapping identities do not match.")
+                }
+                switch mapping.encodingKind {
+                case .adapter:
+                    throw LLMProviderError.invalidConfiguration(
+                        "Adapter-owned mappings cannot be created as user overrides."
+                    )
+                case .key:
+                    guard overrideAdapterID.supportsKeyParameterMappings else {
+                        throw LLMProviderError.invalidConfiguration(
+                            "\(overrideAdapterID.displayName) does not support key parameter mappings."
+                        )
+                    }
+                    guard !mapping.wireKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                        throw LLMProviderError.invalidConfiguration(
+                            "\(parameterID.rawValue) requires a non-empty wire key."
+                        )
+                    }
+                case .preset:
+                    guard let preset = mapping.structuredPreset, preset.supports(overrideAdapterID) else {
+                        throw LLMProviderError.invalidConfiguration(
+                            "\(parameterID.rawValue) requires a preset supported by \(overrideAdapterID.displayName)."
+                        )
+                    }
+                }
+            }
+        }
+
+        let adapterIDs = Set(overrides.map { $0.0 }).union([adapterID])
+        for resolvedAdapterID in adapterIDs {
+            let selectedOverrides = overrides
+                .filter { $0.0 == resolvedAdapterID }
+                .reduce(into: [LLMParameterID: LLMParameterOverrides]()) { result, entry in
+                    result[entry.1] = entry.2
+                }
+            let profile = LLMModelProfileResolver(
+                fallbackContextSize: AppDefaults.ModelContextSizes.defaultSize
+            ).resolve(
+                providerID: providerID,
+                adapterID: resolvedAdapterID,
+                modelID: modelID,
+                metadata: metadata,
+                overrides: LLMModelOverrides(parameterOverrides: selectedOverrides)
+            )
+            for (overrideAdapterID, parameterID, override) in overrides
+                where overrideAdapterID == resolvedAdapterID && override.support == .supported {
+                guard profile.parameters[parameterID]?.support.state == .supported,
+                      profile.parameters[parameterID]?.mapping != nil else {
+                    throw LLMProviderError.invalidConfiguration(
+                        "\(parameterID.rawValue) cannot be supported without an inherited or overridden mapping."
+                    )
+                }
+            }
+            for (overrideAdapterID, parameterID, override) in overrides
+                where overrideAdapterID == resolvedAdapterID && override.isRequired == true {
+                guard profile.parameters[parameterID]?.support.state == .supported else {
+                    throw LLMProviderError.invalidConfiguration(
+                        "\(parameterID.rawValue) cannot be required while unsupported."
+                    )
+                }
+            }
+        }
     }
 
     private func normalizedOptional(_ value: String?) -> String? {

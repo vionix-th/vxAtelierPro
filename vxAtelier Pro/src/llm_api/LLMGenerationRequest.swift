@@ -5,8 +5,7 @@ struct LLMGenerationRequest: Codable, Equatable {
     var providerID: LLMProviderID
     var adapterID: LLMAdapterID
     var modelID: String
-    var parameterMappings: [LLMParameterMapping]
-    var activeParameterIDs: Set<LLMParameterID>
+    var activeParameters: [LLMActiveParameter]
     var messages: [LLMMessage]
     var tools: [LLMToolDefinition]
     var options: LLMGenerationOptions
@@ -16,8 +15,7 @@ struct LLMGenerationRequest: Codable, Equatable {
         providerID: LLMProviderID,
         adapterID: LLMAdapterID,
         modelID: String,
-        parameterMappings: [LLMParameterMapping] = [],
-        activeParameterIDs: Set<LLMParameterID> = [],
+        activeParameters: [LLMActiveParameter] = [],
         messages: [LLMMessage],
         tools: [LLMToolDefinition] = [],
         options: LLMGenerationOptions = LLMGenerationOptions()
@@ -25,11 +23,60 @@ struct LLMGenerationRequest: Codable, Equatable {
         self.providerID = providerID
         self.adapterID = adapterID
         self.modelID = modelID
-        self.parameterMappings = parameterMappings
-        self.activeParameterIDs = activeParameterIDs
+        self.activeParameters = activeParameters
         self.messages = messages
         self.tools = tools
         self.options = options
+    }
+
+    func isParameterActive(_ parameterID: LLMParameterID) -> Bool {
+        activeParameters.contains { $0.parameterID == parameterID }
+    }
+
+    func usesAdapterEncoding(_ parameterID: LLMParameterID) -> Bool {
+        activeParameters.contains {
+            $0.parameterID == parameterID && $0.mapping.encodingKind == .adapter
+        }
+    }
+
+    func validateActiveParameterMappings() throws {
+        var parameterIDs = Set<LLMParameterID>()
+        for parameter in activeParameters {
+            let mapping = parameter.mapping
+            guard parameterIDs.insert(parameter.parameterID).inserted else {
+                throw LLMProviderError.requestEncoding(
+                    "Active parameter \(parameter.parameterID.rawValue) is duplicated."
+                )
+            }
+            guard mapping.adapterID == adapterID,
+                  mapping.parameterID == parameter.parameterID else {
+                throw LLMProviderError.requestEncoding(
+                    "Active parameter \(parameter.parameterID.rawValue) has a mismatched mapping identity."
+                )
+            }
+            switch mapping.encodingKind {
+            case .adapter:
+                guard adapterID.ownsEncoding(of: parameter.parameterID) else {
+                    throw LLMProviderError.requestEncoding(
+                        "\(adapterID.displayName) has no adapter encoding for \(parameter.parameterID.rawValue)."
+                    )
+                }
+            case .key:
+                guard adapterID.supportsKeyParameterMappings,
+                      !mapping.wireKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    throw LLMProviderError.requestEncoding(
+                        "\(parameter.parameterID.rawValue) has no valid key mapping for \(adapterID.displayName)."
+                    )
+                }
+            case .preset:
+                guard let preset = mapping.structuredPreset,
+                      preset.supports(adapterID) else {
+                    throw LLMProviderError.requestEncoding(
+                        "\(parameter.parameterID.rawValue) has no valid preset mapping for \(adapterID.displayName)."
+                    )
+                }
+            }
+        }
     }
 }
 

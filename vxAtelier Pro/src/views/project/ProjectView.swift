@@ -102,6 +102,10 @@ struct ProjectView: View {
             set: { newValue in
                 guard let project else { return }
                 project.defaultOptions.setParameterValue(.systemPrompt, value: .string(newValue))
+                project.defaultOptions.setParameterEnabled(
+                    .systemPrompt,
+                    enabled: !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                )
                 saveProjectContextAfterSystemPromptChange()
             }
         )

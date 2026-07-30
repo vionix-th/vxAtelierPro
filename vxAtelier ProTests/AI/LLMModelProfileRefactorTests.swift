@@ -60,53 +60,114 @@ final class LLMModelProfileRefactorTests: XCTestCase {
 
         XCTAssertEqual(profile.capabilities[.tools], LLMSupport(state: .supported, source: .catalog))
         XCTAssertEqual(profile.capabilities[.streaming], LLMSupport(state: .supported, source: .catalog))
-        XCTAssertEqual(profile.parameters[.temperature]?.support, LLMSupport(state: .unsupported, source: .catalog))
+        XCTAssertEqual(profile.parameters[.temperature]?.support, LLMSupport(state: .supported, source: .catalog))
     }
 
-    func testUnsupportedSupportStateDoesNotSuppressExplicitMappedParameter() {
+    func testPositiveProviderClaimWithoutInheritedMappingRemainsUnsupported() throws {
+        let catalog = try LLMDefaultsCatalog(data: Data("""
+        {"providerDefaults":[],"rules":[]}
+        """.utf8))
+        let profile = LLMModelProfileResolver(
+            defaultsCatalog: catalog,
+            fallbackContextSize: 4096
+        ).resolve(
+            providerID: .customOpenAICompatible,
+            adapterID: .openAICompatibleChatCompletions,
+            modelID: "future-model",
+            metadata: LLMProviderModelMetadata(
+                id: "future-model",
+                providerID: .customOpenAICompatible,
+                parameterSupportClaims: [
+                    LLMParameterSupportClaim(parameterID: .reasoningEffort, state: .supported)
+                ]
+            )
+        )
+
+        XCTAssertNil(profile.parameters[.reasoningEffort])
+    }
+
+    func testBundledProfilesResolveSupportedParametersWithMappingsAndOptionalSystemPrompt() {
+        let profiles = [
+            resolver.resolve(
+                providerID: .openAIPlatform,
+                adapterID: .openAIResponses,
+                modelID: "gpt-5.4-nano",
+                metadata: nil
+            ),
+            resolver.resolve(
+                providerID: .anthropic,
+                adapterID: .anthropicMessages,
+                modelID: "claude-sonnet-4-6",
+                metadata: nil
+            ),
+            resolver.resolve(
+                providerID: .openRouter,
+                adapterID: .openAICompatibleChatCompletions,
+                modelID: "openai/gpt-5.4-nano",
+                metadata: nil
+            )
+        ]
+
+        for profile in profiles {
+            XCTAssertTrue(profile.parameters.values
+                .filter { $0.support.state == .supported }
+                .allSatisfy { $0.mapping != nil })
+            XCTAssertEqual(profile.parameters[.systemPrompt]?.support.state, .supported)
+            XCTAssertFalse(profile.parameters[.systemPrompt]?.isRequired ?? true)
+            XCTAssertEqual(profile.parameters[.model]?.mapping?.encodingKind, .adapter)
+            XCTAssertEqual(profile.parameters[.stream]?.mapping?.encodingKind, .adapter)
+        }
+    }
+
+    func testRetainedUnsupportedParameterBlocksRequestResolution() {
         let mapping = LLMParameterMapping(
             adapterID: .openAIResponses,
             parameterID: .reasoningEffort,
-            encodingKind: .structuredPreset,
+            encodingKind: .preset,
             structuredPreset: .openAIResponsesReasoning
         )
         let profile = LLMParameterProfile(
             parameterID: .reasoningEffort,
             support: LLMSupport(state: .unsupported, source: .userOverride),
             mapping: mapping,
+            mappingSource: .catalog,
             isRequired: false,
             isEnabledByDefault: false,
             defaultValue: nil,
             options: nil
         )
-        let resolved = LLMGenerationOptionsResolver.resolve(
+        XCTAssertThrowsError(try LLMGenerationOptionsResolver.resolve(
             options: LLMGenerationOptions(reasoning: "low"),
             conversationPreferences: [LLMParameterID.reasoningEffort.rawValue: true],
             parameterProfiles: [.reasoningEffort: profile]
-        )
-
-        XCTAssertTrue(resolved.activeParameterIDs.contains(.reasoningEffort))
-        XCTAssertEqual(resolved.options.reasoning, "low")
-        XCTAssertEqual(resolved.mappings, [mapping])
-    }
-
-    func testEnabledUnmappedParameterFailsDuringEncoding() {
-        let request = LLMGenerationRequest(
-            providerID: .openAIPlatform,
-            adapterID: .openAIResponses,
-            modelID: "gpt-test",
-            activeParameterIDs: [.reasoningEffort],
-            messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Hello")])],
-            options: LLMGenerationOptions(reasoning: "low")
-        )
-        let adapter = OpenAIResponsesAdapter(
-            profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform)
-        )
-
-        XCTAssertThrowsError(try adapter.makeBody(for: request, stream: false)) { error in
+        )) { error in
             XCTAssertEqual(
                 error as? LLMProviderError,
-                .requestEncoding("No active wire mapping for reasoning_effort.")
+                .invalidConfiguration("reasoning_effort is enabled but unavailable for the selected model and API.")
+            )
+        }
+    }
+
+    func testImpossibleSupportedParameterFailsAsInvalidConfiguration() {
+        let profile = LLMParameterProfile(
+            parameterID: .reasoningEffort,
+            support: LLMSupport(state: .supported, source: .userOverride),
+            mapping: nil,
+            mappingSource: nil,
+            isRequired: false,
+            isEnabledByDefault: false,
+            defaultValue: nil,
+            options: nil
+        )
+
+        XCTAssertThrowsError(try LLMGenerationOptionsResolver.resolve(
+            options: LLMGenerationOptions(reasoning: "low"),
+            conversationPreferences: [LLMParameterID.reasoningEffort.rawValue: true],
+            parameterProfiles: [.reasoningEffort: profile]
+        )) { error in
+            XCTAssertEqual(
+                error as? LLMProviderError,
+                .invalidConfiguration("reasoning_effort has no valid definition for the selected model and API.")
             )
         }
     }
@@ -184,21 +245,25 @@ final class LLMModelProfileRefactorTests: XCTestCase {
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
             modelID: "gpt-test",
-            parameterMappings: [
-                LLMParameterMapping(
+            activeParameters: [
+                LLMActiveParameter(parameterID: .responseFormat, mapping: LLMParameterMapping(
                     adapterID: .openAIResponses,
                     parameterID: .responseFormat,
-                    encodingKind: .structuredPreset,
+                    encodingKind: .preset,
                     structuredPreset: .openAIResponsesTextFormat
-                ),
-                LLMParameterMapping(
+                )),
+                LLMActiveParameter(parameterID: .reasoningEffort, mapping: LLMParameterMapping(
                     adapterID: .openAIResponses,
                     parameterID: .reasoningEffort,
-                    encodingKind: .structuredPreset,
+                    encodingKind: .preset,
                     structuredPreset: .openAIResponsesReasoning
-                )
+                )),
+                LLMActiveParameter(parameterID: .stream, mapping: LLMParameterMapping(
+                    adapterID: .openAIResponses,
+                    parameterID: .stream,
+                    encodingKind: .adapter
+                ))
             ],
-            activeParameterIDs: [.responseFormat, .reasoningEffort, .stream],
             messages: [LLMMessage(
                 role: "user",
                 content: [
@@ -257,6 +322,19 @@ final class LLMModelProfileRefactorTests: XCTestCase {
         model.capabilityOverrides = [
             ModelCapabilityOverrideItem(capability: .streaming, support: .unsupported)
         ]
+        model.parameterOverrides = [
+            ModelParameterOverrideItem(
+                adapterID: .openAIResponses,
+                parameterID: .maxOutputTokens,
+                support: .supported,
+                mapping: LLMParameterMapping(
+                    adapterID: .openAIResponses,
+                    parameterID: .maxOutputTokens,
+                    encodingKind: .key,
+                    wireKey: "custom_max_tokens"
+                )
+            )
+        ]
         environment.modelContext.insert(configuration)
         environment.modelContext.insert(model)
 
@@ -271,8 +349,7 @@ final class LLMModelProfileRefactorTests: XCTestCase {
         ], for: configuration)
 
         XCTAssertEqual(model.capabilityOverrides.first?.support, .unsupported)
-        XCTAssertTrue(model.parameterMappingOverrides.isEmpty)
-        XCTAssertTrue(model.parameterOverrides.isEmpty)
+        XCTAssertEqual(model.parameterOverrides.first?.wireKey, "custom_max_tokens")
         XCTAssertEqual(model.modelProfile.capabilities[.streaming]?.source, .userOverride)
     }
 
@@ -325,6 +402,22 @@ final class LLMModelProfileRefactorTests: XCTestCase {
         model.capabilityOverrides = [
             ModelCapabilityOverrideItem(capability: .streaming, support: .supported)
         ]
+        model.parameterOverrides = [
+            ModelParameterOverrideItem(
+                adapterID: .openAIResponses,
+                parameterID: .maxOutputTokens,
+                support: .supported,
+                mapping: LLMParameterMapping(
+                    adapterID: .openAIResponses,
+                    parameterID: .maxOutputTokens,
+                    encodingKind: .key,
+                    wireKey: "custom_max_tokens"
+                ),
+                requiredOverride: true,
+                optionsOverrideKind: .value,
+                options: ["small", "large"]
+            )
+        ]
 
         let originalProfile = model.modelProfile
         let restored = ModelExportData(model).toDataItem(apiConfigurations: [configuration])
@@ -334,7 +427,8 @@ final class LLMModelProfileRefactorTests: XCTestCase {
         XCTAssertEqual(restored.providerUnsupportedParametersRaw, [LLMParameterID.temperature.rawValue])
         XCTAssertEqual(restored.capabilityOverrides.first?.support, .supported)
         XCTAssertEqual(restored.modelProfile, originalProfile)
-        XCTAssertTrue(restored.parameterMappingOverrides.isEmpty)
-        XCTAssertTrue(restored.parameterOverrides.isEmpty)
+        XCTAssertEqual(restored.parameterOverrides.first?.wireKey, "custom_max_tokens")
+        XCTAssertEqual(restored.parameterOverrides.first?.requiredOverride, true)
+        XCTAssertEqual(restored.parameterOverrides.first?.options, ["small", "large"])
     }
 }

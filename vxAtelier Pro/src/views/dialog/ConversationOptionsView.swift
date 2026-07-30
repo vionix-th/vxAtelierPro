@@ -411,17 +411,19 @@ struct ParameterControlView: View {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: AppDefaults.paddingMedium) {
                     parameterValueControl
+                        .disabled(!control.isValueEditable)
+                        .opacity(control.isValueEditable ? 1 : 0.55)
                         .layoutPriority(1)
                     enabledToggle
                 }
 
                 VStack(alignment: .trailing, spacing: AppDefaults.paddingSmall) {
                     parameterValueControl
+                        .disabled(!control.isValueEditable)
+                        .opacity(control.isValueEditable ? 1 : 0.55)
                     enabledToggle
                 }
             }
-            .disabled(!control.isValueEditable)
-            .opacity(control.isValueEditable ? 1 : 0.55)
         } label: {
             VStack(alignment: .leading, spacing: 3) {
                 Text(control.displayName)
@@ -473,12 +475,11 @@ struct ParameterControlView: View {
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
-            Text(control.support.state.displayName)
-                .font(.caption2)
-                .foregroundColor(control.support.state == .supported ? .secondary : .orange)
-            Text(control.isMapped ? "Mapped" : "Unencodable")
-                .font(.caption2)
-                .foregroundColor(control.isMapped ? .secondary : .orange)
+            if !control.isSupported {
+                Text("Unavailable for this model/API")
+                    .font(.caption2)
+                    .foregroundColor(.orange)
+            }
         }
     }
 
@@ -486,13 +487,8 @@ struct ParameterControlView: View {
         if control.required {
             return "Required parameters are always enabled."
         }
-        if !control.isMapped {
-            return control.isEnabled
-                ? "Disable this parameter before sending; the adapter cannot encode it."
-                : "The adapter has no wire mapping for this parameter."
-        }
-        if control.support.state != .supported {
-            return "Support is advisory; the provider will decide whether to accept this parameter."
+        if !control.isSupported {
+            return "Disable this retained parameter before sending with the selected model and API."
         }
         return "Controls whether this parameter is sent with requests."
     }
