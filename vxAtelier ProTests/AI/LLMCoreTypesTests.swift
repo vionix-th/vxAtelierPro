@@ -8,7 +8,7 @@ import XCTest
 
 @MainActor
 final class LLMCoreTypesTests: XCTestCase {
-    func testProviderRegistryProfiles() {
+    func testProviderRegistryProfiles() throws {
         let registry = LLMProviderRegistry.shared
 
         XCTAssertEqual(registry.profile(for: .openAIPlatform).defaultAdapterID, .openAIResponses)
@@ -17,8 +17,7 @@ final class LLMCoreTypesTests: XCTestCase {
         let zen = registry.profile(for: .openCodeZen)
         XCTAssertEqual(zen.defaultBaseURL, "https://opencode.ai/zen/v1")
         XCTAssertEqual(zen.authKind, .bearerToken)
-        XCTAssertEqual(zen.defaultAdapterID, .openAIResponses)
-        XCTAssertEqual(zen.adapterSelectionPolicy, .model)
+        XCTAssertEqual(zen.defaultAdapterID, .openAICompatibleChatCompletions)
         XCTAssertEqual(
             Set(zen.supportedAdapterIDs),
             Set([.openAIResponses, .anthropicMessages, .openAICompatibleChatCompletions])
@@ -31,10 +30,12 @@ final class LLMCoreTypesTests: XCTestCase {
         XCTAssertEqual(LLMProviderRegistry.providerID(fromProviderName: "LM Studio"), .lmStudio)
         XCTAssertEqual(LLMProviderRegistry.providerID(fromProviderName: "OpenRouter"), .openRouter)
         XCTAssertEqual(LLMProviderRegistry.providerID(fromProviderName: "OpenCode Zen"), .openCodeZen)
-        XCTAssertTrue(
-            registry.adapter(for: .openAIResponses, providerID: .openCodeZen)
-                is OpenCodeZenAdapter
+        XCTAssertEqual(LLMProviderRegistry.providerID(fromProviderName: "OpenCode Zen Claude"), .openCodeZen)
+        let zenAdapter = try registry.resolveAdapter(
+            for: .openAICompatibleChatCompletions,
+            providerID: .openCodeZen
         )
+        XCTAssertTrue(zenAdapter is OpenCodeZenAdapter)
     }
 
     func testBundledDefaultsProvideProviderDefaultModels() {
@@ -42,7 +43,7 @@ final class LLMCoreTypesTests: XCTestCase {
 
         XCTAssertEqual(defaults.defaultModelID(for: .openAIPlatform), "gpt-5.4-nano")
         XCTAssertEqual(defaults.defaultModelID(for: .openAICodexChatGPTSubscription), "gpt-5.5")
-        XCTAssertEqual(defaults.defaultModelID(for: .openCodeZen), "gpt-5.6-terra")
+        XCTAssertEqual(defaults.defaultModelID(for: .openCodeZen), "deepseek-v4-flash")
         XCTAssertEqual(defaults.defaultModelID(for: .appleIntelligence), "apple-intelligence-default")
         XCTAssertEqual(defaults.defaultModelID(for: .anthropic), "claude-sonnet-4-6")
         XCTAssertEqual(defaults.defaultModelID(for: .openRouter), "openai/gpt-5.4-nano")
@@ -51,45 +52,29 @@ final class LLMCoreTypesTests: XCTestCase {
         XCTAssertNil(defaults.defaultModelID(for: .customOpenAICompatible))
     }
 
-    func testOpenCodeZenCatalogRoutesAndEnrichesModels() throws {
-        let metadata: [String: JSONValue] = [
-            "name": .string("GPT-5.6 Terra"),
-            "attachment": .boolean(true),
-            "reasoning": .boolean(true),
-            "tool_call": .boolean(true),
-            "structured_output": .boolean(true),
-            "modalities": .object([
-                "input": .array([.string("text"), .string("image"), .string("pdf")])
-            ]),
-            "limit": .object(["context": .integer(1_050_000)]),
-            "provider": .object(["npm": .string("@ai-sdk/openai")])
-        ]
-
-        let candidate = try XCTUnwrap(
-            OpenCodeZenAdapter.candidate(modelID: "gpt-5.6-terra", metadata: metadata)
-        )
-        XCTAssertEqual(candidate.displayName, "GPT-5.6 Terra")
-        XCTAssertEqual(candidate.adapterID, .openAIResponses)
-        XCTAssertEqual(candidate.contextSize, 1_050_000)
-        XCTAssertTrue(candidate.capabilities.contains(.image))
-        XCTAssertTrue(candidate.capabilities.contains(.file))
-        XCTAssertTrue(candidate.capabilities.contains(.tools))
-        XCTAssertTrue(candidate.capabilities.contains(.jsonSchema))
-        XCTAssertTrue(candidate.capabilities.contains(.reasoning))
-
+    func testOpenCodeZenClassifiesOnlySupportedModelFamilies() {
         XCTAssertEqual(
-            OpenCodeZenAdapter.adapterID(modelID: "claude-sonnet-4-6", metadata: nil),
+            OpenCodeZenAdapter.supportedAdapterID(for: "gpt-5.6-terra"),
+            .openAIResponses
+        )
+        XCTAssertEqual(
+            OpenCodeZenAdapter.supportedAdapterID(for: "claude-sonnet-4-6"),
             .anthropicMessages
         )
         XCTAssertEqual(
-            OpenCodeZenAdapter.adapterID(modelID: "minimax-m3", metadata: nil),
+            OpenCodeZenAdapter.supportedAdapterID(for: "qwen3.6-plus"),
+            .anthropicMessages
+        )
+        XCTAssertEqual(
+            OpenCodeZenAdapter.supportedAdapterID(for: "deepseek-v4-flash"),
             .openAICompatibleChatCompletions
         )
-        XCTAssertNil(OpenCodeZenAdapter.adapterID(modelID: "gemini-3.5-flash", metadata: nil))
-        XCTAssertNil(OpenCodeZenAdapter.candidate(
-            modelID: "future-model",
-            metadata: ["provider": .object(["npm": .string("@ai-sdk/future")])]
-        ))
+        XCTAssertEqual(
+            OpenCodeZenAdapter.supportedAdapterID(for: "big-pickle"),
+            .openAICompatibleChatCompletions
+        )
+        XCTAssertNil(OpenCodeZenAdapter.supportedAdapterID(for: "gemini-3.5-flash"))
+        XCTAssertNil(OpenCodeZenAdapter.supportedAdapterID(for: "future-model"))
     }
 
     func testOpenCodeZenUsesAdapterSpecificAuthenticationHeaders() {
@@ -130,6 +115,16 @@ final class LLMCoreTypesTests: XCTestCase {
         XCTAssertEqual(anthropic?.contextSize, 1000000)
         XCTAssertTrue(anthropic?.capabilities?.contains(.text) ?? false)
         XCTAssertTrue(anthropic?.capabilities?.contains(.image) ?? false)
+
+        let zen = defaults.modelDefaults(
+            providerID: .openCodeZen,
+            adapterID: .openAICompatibleChatCompletions,
+            modelID: "deepseek-v4-flash"
+        )
+        XCTAssertEqual(zen?.contextSize, 1000000)
+        XCTAssertTrue(zen?.capabilities?.contains(.text) ?? false)
+        XCTAssertTrue(zen?.capabilities?.contains(.tools) ?? false)
+        XCTAssertTrue(zen?.capabilities?.contains(.jsonObject) ?? false)
 
         let apple = defaults.modelDefaults(providerID: .appleIntelligence, adapterID: .foundationModels, modelID: "apple-intelligence-default")
         XCTAssertEqual(apple?.contextSize, 4096)

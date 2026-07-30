@@ -135,8 +135,7 @@ struct APIConfigurationEditView: View {
                     }
                 }
 
-                if currentProfile.adapterSelectionPolicy == .configuration,
-                   selectableAdapterIDs.count > 1 {
+                if selectableAdapterIDs.count > 1 {
                     SettingsPickerRow("API Mode", selection: $defaultAdapterID) {
                         ForEach(selectableAdapterIDs) { family in
                             Text(family.displayName).tag(family)

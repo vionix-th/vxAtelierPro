@@ -102,7 +102,7 @@ enum LLMParameterDefinitionCatalog {
             return .init(
                 id: parameterID,
                 valueType: .string,
-                options: ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
+                options: ["none", "minimal", "low", "medium", "high", "xhigh"]
             )
         case .reasoningSummary:
             return .init(

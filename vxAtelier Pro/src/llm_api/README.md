@@ -56,6 +56,7 @@ Provider HTTP errors retain normalized metadata, redaction, and retry classifica
 
 - OpenAI Platform: Responses and Chat Completions.
 - Anthropic: Messages.
+- OpenCode Zen: configuration-selected Responses, Messages, or OpenAI-compatible Chat Completions. Model discovery returns only models compatible with selected API mode; unsupported Gemini and unknown protocol families remain hidden. Default is DeepSeek V4 Flash through Chat Completions.
 - OpenRouter, LM Studio, Ollama, xAI, DeepSeek, and custom OpenAI-compatible services: Chat Completions-compatible transport.
 - Codex ChatGPT Subscription: Responses routed through the ChatGPT Codex backend, with app-owned OAuth/device-code credentials and static model metadata when remote listing is unavailable.
 - Apple Intelligence: local Foundation Models backend with local availability enforcement.

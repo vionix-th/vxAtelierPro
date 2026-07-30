@@ -81,7 +81,7 @@
       "baseURL": "https://opencode.ai/zen/v1",
       "apiKey": "replace-with-opencode-zen-api-key",
       "models": [
-        "minimax-m3"
+        "deepseek-v4-flash"
       ],
       "checkModels": true,
       "adapterIDs": [

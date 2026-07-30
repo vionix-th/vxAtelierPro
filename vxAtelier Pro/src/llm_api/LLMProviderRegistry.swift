@@ -35,13 +35,12 @@ struct LLMProviderRegistry {
                 transportKind: .remoteHTTP,
                 defaultBaseURL: "https://opencode.ai/zen/v1",
                 authKind: .bearerToken,
-                defaultAdapterID: .openAIResponses,
+                defaultAdapterID: .openAICompatibleChatCompletions,
                 supportedAdapterIDs: [
                     .openAIResponses,
                     .anthropicMessages,
                     .openAICompatibleChatCompletions
                 ],
-                adapterSelectionPolicy: .model,
                 isEnabled: true
             ),
             LLMProviderProfile(
@@ -222,12 +221,12 @@ struct LLMProviderRegistry {
     /// Infers a provider identifier from user- or import-supplied provider text.
     static func providerID(fromProviderName providerName: String) -> LLMProviderID {
         let probe = providerName.lowercased()
+        if probe.contains("opencode") || probe.contains("open code zen") { return .openCodeZen }
         if probe.contains("anthropic") || probe.contains("claude") { return .anthropic }
         if probe.contains("apple intelligence") || probe.contains("foundation models") {
             return .appleIntelligence
         }
         if probe.contains("openrouter") { return .openRouter }
-        if probe.contains("opencode") || probe.contains("open code zen") { return .openCodeZen }
         if probe.contains("lm studio") { return .lmStudio }
         if probe.contains("ollama") { return .ollama }
         if probe.contains("xai") || probe.contains("x.ai") || probe.contains("grok") { return .xAI }

@@ -10,7 +10,7 @@
     },
     {
       "provider": "openCodeZen",
-      "defaultModel": "gpt-5.6-terra"
+      "defaultModel": "deepseek-v4-flash"
     },
     {
       "provider": "appleIntelligence",
@@ -317,7 +317,7 @@
     {
       "level": "model",
       "match": {
-        "providerRegex": "^openAIPlatform$",
+        "providerRegex": "^(openAIPlatform|openCodeZen)$",
         "modelRegex": "^gpt-5(\\.[0-3])?(-mini|-nano)?$|^gpt-5\\.4-(mini|nano)$"
       },
       "modelDefaults": {
@@ -339,7 +339,7 @@
     {
       "level": "model",
       "match": {
-        "providerRegex": "^openAIPlatform$",
+        "providerRegex": "^(openAIPlatform|openCodeZen)$",
         "modelRegex": "^gpt-5\\.(4|5)(-pro)?$|^gpt-5\\.5$"
       },
       "modelDefaults": {
@@ -405,9 +405,38 @@
       }
     },
     {
+      "level": "model",
       "match": {
         "providerRegex": "^openCodeZen$",
-        "modelRegex": "^gpt-5\\.6-(sol|terra)$"
+        "modelRegex": "^claude-"
+      },
+      "modelDefaults": {
+        "contextSize": 200000,
+        "capabilities": [
+          "text",
+          "image",
+          "tools",
+          "reasoning",
+          "usage",
+          "streaming"
+        ]
+      }
+    },
+    {
+      "level": "model",
+      "match": {
+        "providerRegex": "^openCodeZen$",
+        "modelRegex": "^claude-(opus-4-7|sonnet-4-6)$"
+      },
+      "modelDefaults": {
+        "contextSize": 1000000
+      }
+    },
+    {
+      "level": "model",
+      "match": {
+        "providerRegex": "^openCodeZen$",
+        "modelRegex": "^gpt-5\\.6-(sol|terra|luna)$"
       },
       "modelDefaults": {
         "contextSize": 1050000,
@@ -416,6 +445,7 @@
           "image",
           "file",
           "tools",
+          "strictTools",
           "jsonSchema",
           "jsonObject",
           "reasoning",
@@ -425,6 +455,42 @@
       }
     },
     {
+      "level": "model",
+      "match": {
+        "providerRegex": "^openCodeZen$",
+        "modelRegex": "^deepseek-"
+      },
+      "modelDefaults": {
+        "contextSize": 1000000,
+        "capabilities": [
+          "text",
+          "tools",
+          "jsonObject",
+          "usage",
+          "streaming"
+        ]
+      }
+    },
+    {
+      "level": "model",
+      "match": {
+        "providerRegex": "^openCodeZen$",
+        "modelRegex": "^qwen"
+      },
+      "modelDefaults": {
+        "contextSize": 1000000,
+        "capabilities": [
+          "text",
+          "image",
+          "tools",
+          "reasoning",
+          "usage",
+          "streaming"
+        ]
+      }
+    },
+    {
+      "level": "provider",
       "match": {
         "providerRegex": "^anthropic$"
       },
@@ -883,22 +949,24 @@
       ]
     },
     {
-      "level": "provider",
+      "level": "model",
       "match": {
         "providerRegex": "^openCodeZen$",
         "adapterID": "openAIResponses",
-        "modelRegex": "^gpt-5\\.6-(sol|terra)$"
+        "modelRegex": "^gpt-5\\.6-(sol|terra|luna)$"
       },
-      "parameterAvailability": [
+      "parameters": [
         {
-          "parameter": "reasoning_effort",
-          "enabled": true,
+          "id": "reasoning_effort",
+          "supported": true,
+          "enabledByDefault": true,
           "defaultValue": "medium",
           "options": ["none", "low", "medium", "high", "xhigh", "max"]
         }
       ]
     },
     {
+      "level": "provider",
       "match": {
         "providerRegex": "^openAICodexChatGPTSubscription$",
         "adapterID": "openAIResponses"

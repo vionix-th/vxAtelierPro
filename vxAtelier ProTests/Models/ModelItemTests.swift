@@ -47,36 +47,6 @@ final class ModelItemTests: XCTestCase {
         XCTAssertEqual(Set(fetched?.capabilities ?? []), [.text, .image, .streaming])
     }
 
-    func testOpenCodeZenModelPersistsModelSpecificAdapter() throws {
-        let config = APIConfigurationItem(
-            name: "OpenCode Zen",
-            apiKey: "zen-key",
-            baseURL: "https://opencode.ai/zen/v1",
-            providerID: .openCodeZen
-        )
-        let model = ModelItem(
-            metadata: LLMModelMetadata(
-                id: "claude-sonnet-4-6",
-                providerID: .openCodeZen,
-                adapterID: .anthropicMessages,
-                capabilities: [.text, .tools, .streaming]
-            ),
-            apiConfiguration: config
-        )
-        context.insert(config)
-        context.insert(model)
-        try context.save()
-
-        let fetched = try XCTUnwrap(try context.fetch(FetchDescriptor<ModelItem>()).first)
-        XCTAssertEqual(fetched.adapterIDEnum, .anthropicMessages)
-        XCTAssertEqual(fetched.resolvedAdapterID, .anthropicMessages)
-        XCTAssertTrue(fetched.parameterAvailability.contains {
-            $0.adapterIDEnum == .anthropicMessages
-                && $0.semanticParameterIDEnum == .maxOutputTokens
-                && $0.isRequired
-        })
-    }
-
     func testConfigurationOwnership() throws {
         let config = APIConfigurationItem(
             name: "Scoped OpenAI",
