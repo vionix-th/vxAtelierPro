@@ -1,7 +1,7 @@
 import Foundation
 
-/// Shared request encoders for OpenAI and OpenAI-compatible wire formats.
-enum OpenAICompatibleEncoding {
+/// Shared request encoders for OpenAI-shaped wire formats.
+enum OpenAIEncoding {
     /// Chat body keys that caller-provided provider extras must not override.
     static let chatReservedProviderExtraKeys: Set<String> = [
         "model", "messages", "stream", "tools", "tool_choice", "response_format", "json_schema"
@@ -16,7 +16,8 @@ enum OpenAICompatibleEncoding {
         _ options: LLMGenerationOptions,
         to body: inout [String: JSONValue],
         parameters: [LLMActiveParameter],
-        reservedProviderExtraKeys: Set<String> = []
+        reservedProviderExtraKeys: Set<String> = [],
+        excludedStructuredPresets: Set<LLMParameterStructuredPreset> = []
     ) throws {
         var providerSpecificOptions = options.providerSpecificOptions
         let activeIDs = Set(parameters.map(\.parameterID))
@@ -50,6 +51,10 @@ enum OpenAICompatibleEncoding {
                 }
                 body[mapping.wireKey] = value
             case .preset:
+                if let preset = mapping.structuredPreset,
+                   excludedStructuredPresets.contains(preset) {
+                    continue
+                }
                 try applyStructuredPreset(mapping.structuredPreset, value: value, providerSpecificOptions: &providerSpecificOptions, to: &body)
             }
         }
@@ -121,12 +126,12 @@ enum OpenAICompatibleEncoding {
                 try merge(["summary": .string(summary)], into: "reasoning", in: &body)
             }
         case .openRouterReasoning:
-            if let effort = value.stringValue, !effort.isEmpty {
-                try merge(["effort": .string(effort)], into: "reasoning", in: &body)
-            }
+            throw LLMProviderError.requestEncoding(
+                "OpenRouter reasoning must be encoded by OpenRouterChatCompletionsAdapter."
+            )
         case .anthropicThinking:
             throw LLMProviderError.requestEncoding(
-                "Anthropic thinking is not representable by an OpenAI-compatible adapter."
+                "Anthropic thinking is not representable by an OpenAI wire encoder."
             )
         }
     }

@@ -4,14 +4,15 @@ import SwiftData
 /// Fully resolved runtime inputs needed to build one provider request.
 struct ConversationRunContext {
     var conversationID: PersistentIdentifier
-    var providerConfiguration: LLMProviderConfiguration
-    var providerID: LLMProviderID
-    var adapterID: LLMAdapterID
+    var resolvedRoute: LLMResolvedProviderRoute
     var modelID: String
     var activeParameters: [LLMActiveParameter]
     var messages: [LLMMessage]
     var tools: [LLMToolDefinition]
     var options: LLMGenerationOptions
+
+    var providerID: LLMProviderID { resolvedRoute.providerID }
+    var adapterID: LLMAdapterID { resolvedRoute.adapterID }
 }
 
 /// Accumulates normalized provider output while a run is streaming.

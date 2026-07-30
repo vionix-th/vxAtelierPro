@@ -9,9 +9,10 @@ private struct APIConfigurationEditSnapshot {
     let isDefault: Bool
     let providerID: String
     let authKind: String
-    let defaultAdapterID: String
+    let adapterID: String
     let defaultModel: String?
     let credentialJSON: String
+    let headersJSON: String
 
     init(_ configuration: APIConfigurationItem) {
         name = configuration.name
@@ -20,9 +21,10 @@ private struct APIConfigurationEditSnapshot {
         isDefault = configuration.isDefault
         providerID = configuration.providerID
         authKind = configuration.authKind
-        defaultAdapterID = configuration.defaultAdapterID
+        adapterID = configuration.adapterID
         defaultModel = configuration.defaultModel
         credentialJSON = configuration.credentialJSON
+        headersJSON = configuration.headersJSON
     }
 
     func restore(_ configuration: APIConfigurationItem) {
@@ -32,10 +34,17 @@ private struct APIConfigurationEditSnapshot {
         configuration.isDefault = isDefault
         configuration.providerID = providerID
         configuration.authKind = authKind
-        configuration.defaultAdapterID = defaultAdapterID
+        configuration.adapterID = adapterID
         configuration.defaultModel = defaultModel
         configuration.credentialJSON = credentialJSON
+        configuration.headersJSON = headersJSON
     }
+}
+
+private struct APIHeaderDraft: Identifiable {
+    let id = UUID()
+    var name: String
+    var value: String
 }
 
 /// Editor for API provider configuration records.
@@ -55,7 +64,9 @@ struct APIConfigurationEditView: View {
     @State private var isDefault: Bool
     @State private var defaultModel: String
     @State private var providerID: LLMProviderID
-    @State private var defaultAdapterID: LLMAdapterID
+    @State private var adapterID: LLMAdapterID
+    @State private var authKind: LLMAuthKind
+    @State private var customHeaders: [APIHeaderDraft]
     @State private var isAPIKeyVisible = false
     @State private var showValidationError = false
     @State private var validationErrorMessage = ""
@@ -82,12 +93,26 @@ struct APIConfigurationEditView: View {
         _apiKey = State(initialValue: configuration.apiKey)
         _baseURL = State(initialValue: configuration.baseURL)
         _isDefault = State(initialValue: configuration.isDefault)
-        _providerID = State(initialValue: configuration.providerIDEnum)
-        _defaultAdapterID = State(initialValue: configuration.defaultAdapterIDEnum)
+        let initialProviderID = configuration.parsedProviderID ?? .custom
+        let initialProfile = LLMProviderRegistry.shared.profile(for: initialProviderID)
+        let initialAdapterID = configuration.parsedAdapterID.flatMap {
+            initialProfile.route(for: $0) == nil ? nil : $0
+        } ?? initialProfile.defaultAdapterID
+        let initialRoute = initialProfile.route(for: initialAdapterID)
+        _providerID = State(initialValue: initialProviderID)
+        _adapterID = State(initialValue: initialAdapterID)
+        _authKind = State(initialValue: configuration.parsedAuthKind.flatMap {
+            initialRoute?.allowedAuthKinds.contains($0) == true ? $0 : nil
+        } ?? initialRoute?.defaultAuthKind ?? .none)
+        _customHeaders = State(
+            initialValue: configuration.decodedHeaders
+                .sorted { $0.key.localizedCaseInsensitiveCompare($1.key) == .orderedAscending }
+                .map { APIHeaderDraft(name: $0.key, value: $0.value) }
+        )
         let initialDefaultModel = (configuration.defaultModel?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { !$0.isEmpty ? $0 : nil }
-            ?? APIConfigurationEditView.suggestedDefaultModel(for: configuration.providerIDEnum)
+            ?? APIConfigurationEditView.suggestedDefaultModel(for: initialProviderID)
         _defaultModel = State(initialValue: initialDefaultModel)
-        _selectedPreset = State(initialValue: APIPreset.preset(for: configuration.providerIDEnum))
+        _selectedPreset = State(initialValue: APIPreset.preset(for: initialProviderID))
         _codexCredentialJSON = State(initialValue: configuration.credentialJSON)
     }
 
@@ -97,6 +122,14 @@ struct APIConfigurationEditView: View {
 
     private var selectableAdapterIDs: [LLMAdapterID] {
         currentProfile.supportedAdapterIDs
+    }
+
+    private var currentRoute: LLMProviderRouteProfile {
+        currentProfile.route(for: adapterID) ?? currentProfile.defaultRoute!
+    }
+
+    private var selectableAuthKinds: [LLMAuthKind] {
+        currentRoute.allowedAuthKinds
     }
 
     private var sortedAPIPresets: [APIPreset] {
@@ -127,7 +160,7 @@ struct APIConfigurationEditView: View {
                     applySelectedPreset()
                 }
 
-                if currentProfile.requiresBaseURL {
+                if currentRoute.requiresBaseURL {
                     LabeledContent("API URL") {
                         TextField("", text: $baseURL)
                             .textFieldStyle(.roundedBorder)
@@ -136,12 +169,14 @@ struct APIConfigurationEditView: View {
                 }
 
                 if selectableAdapterIDs.count > 1 {
-                    SettingsPickerRow("API Mode", selection: $defaultAdapterID) {
+                    SettingsPickerRow("API Mode", selection: $adapterID) {
                         ForEach(selectableAdapterIDs) { family in
                             Text(family.displayName).tag(family)
                         }
                     }
-                    .onChange(of: defaultAdapterID) { _, _ in invalidateFetchedModelCandidates() }
+                    .onChange(of: adapterID) { _, _ in
+                        applySelectedRouteDefaults()
+                    }
                 }
             }
 
@@ -153,7 +188,17 @@ struct APIConfigurationEditView: View {
                     }
                 } else if isCodexChatGPTSubscription {
                     codexChatGPTAuthControls
-                } else if currentProfile.requiresCredential {
+                } else {
+                    if providerID == .custom || selectableAuthKinds.count > 1 {
+                        SettingsPickerRow("Authentication", selection: $authKind) {
+                            ForEach(selectableAuthKinds, id: \.self) { kind in
+                                Text(kind.displayName).tag(kind)
+                            }
+                        }
+                        .onChange(of: authKind) { _, _ in invalidateFetchedModelCandidates() }
+                    }
+
+                    if authKind.requiresCredential {
                     LabeledContent("API Key") {
                         HStack(spacing: AppDefaults.paddingSmall) {
                             apiKeyField
@@ -177,6 +222,11 @@ struct APIConfigurationEditView: View {
                                 .help("Copy API key")
                             }
                         }
+                    }
+                    }
+
+                    if providerID == .custom {
+                        customHeaderEditor
                     }
                 }
             }
@@ -233,14 +283,15 @@ struct APIConfigurationEditView: View {
             }
         }
         .onAppear {
-            if !currentProfile.supportedAdapterIDs.contains(defaultAdapterID) {
-                defaultAdapterID = currentProfile.defaultAdapterID
+            if !currentProfile.supportedAdapterIDs.contains(adapterID) {
+                adapterID = currentProfile.defaultAdapterID
             }
         }
         .onChange(of: apiKey) { _, _ in invalidateFetchedModelCandidates() }
         .onChange(of: baseURL) { _, _ in invalidateFetchedModelCandidates() }
         .onChange(of: providerID) { _, _ in invalidateFetchedModelCandidates() }
-        .onChange(of: defaultAdapterID) { _, _ in invalidateFetchedModelCandidates() }
+        .onChange(of: adapterID) { _, _ in invalidateFetchedModelCandidates() }
+        .onChange(of: customHeaderSignature) { _, _ in invalidateFetchedModelCandidates() }
         .sheet(isPresented: $isModelPickerPresented) {
             ModelSelectionView(
                 selectedModel: defaultModel,
@@ -275,6 +326,38 @@ struct APIConfigurationEditView: View {
 
     private var isCodexChatGPTSubscription: Bool {
         providerID == .openAICodexChatGPTSubscription
+    }
+
+    private var customHeaderEditor: some View {
+        Group {
+            ForEach($customHeaders) { $header in
+                LabeledContent("Header") {
+                    HStack(spacing: AppDefaults.paddingSmall) {
+                        TextField("Name", text: $header.name)
+                            .textFieldStyle(.roundedBorder)
+                        TextField("Value", text: $header.value)
+                            .textFieldStyle(.roundedBorder)
+                        Button(role: .destructive) {
+                            customHeaders.removeAll { $0.id == header.id }
+                            invalidateFetchedModelCandidates()
+                        } label: {
+                            Image(systemName: "minus.circle")
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Remove header")
+                    }
+                }
+            }
+
+            LabeledContent("Custom Headers") {
+                Button {
+                    customHeaders.append(APIHeaderDraft(name: "", value: ""))
+                    invalidateFetchedModelCandidates()
+                } label: {
+                    Label("Add Header", systemImage: "plus")
+                }
+            }
+        }
     }
 
     private var codexTokenSet: CodexChatGPTTokenSet? {
@@ -397,11 +480,26 @@ struct APIConfigurationEditView: View {
             return false
         }
 
+        let normalizedNames = customHeaders.map {
+            $0.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if normalizedNames.contains(where: \.isEmpty) {
+            validationErrorMessage = "Custom header names cannot be empty."
+            showValidationError = true
+            return false
+        }
+        let foldedNames = normalizedNames.map { $0.lowercased() }
+        if Set(foldedNames).count != foldedNames.count {
+            validationErrorMessage = "Custom header names must be unique, ignoring letter case."
+            showValidationError = true
+            return false
+        }
+
         return true
     }
 
     private func validateEndpoint() -> Bool {
-        guard currentProfile.requiresBaseURL else { return true }
+        guard currentRoute.requiresBaseURL else { return true }
         if !baseURL.hasPrefix("http://") && !baseURL.hasPrefix("https://") {
             validationErrorMessage = "Base URL must start with http:// or https://"
             showValidationError = true
@@ -466,7 +564,7 @@ struct APIConfigurationEditView: View {
         do {
             fetchedModelMetadata = try await queryManager.fetchModelMetadata(
                 providerID: providerID,
-                adapterID: defaultAdapterID,
+                adapterID: adapterID,
                 configuration: makeProviderConfigurationFromDraft()
             )
             fetchedModelCandidateSignature = draftModelFetchSignature
@@ -483,9 +581,9 @@ struct APIConfigurationEditView: View {
     private func refreshModelsAfterSave() async -> ModelProviderFetchSummary {
         do {
             let candidates = try await queryManager.fetchModelMetadata(
-                providerID: configuration.providerIDEnum,
-                adapterID: configuration.defaultAdapterIDEnum,
-                configuration: configuration.makeLLMProviderConfiguration()
+                providerID: try configuration.requireProviderID(),
+                adapterID: try configuration.requireAdapterID(),
+                configuration: try configuration.makeLLMProviderConfiguration()
             )
             return try queryManager.upsertModelMetadata(candidates, for: configuration)
         } catch {
@@ -498,7 +596,7 @@ struct APIConfigurationEditView: View {
                     var summary = try queryManager.upsertModelMetadata(fetchedModelMetadata, for: configuration)
                     summary.failures.append(ModelProviderFetchFailure(
                         configurationName: configuration.name,
-                        providerID: configuration.providerIDEnum,
+                        providerID: configuration.parsedProviderID,
                         message: message
                     ))
                     return summary
@@ -506,7 +604,7 @@ struct APIConfigurationEditView: View {
                     return ModelProviderFetchSummary(failures: [
                         ModelProviderFetchFailure(
                             configurationName: configuration.name,
-                            providerID: configuration.providerIDEnum,
+                            providerID: configuration.parsedProviderID,
                             message: (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                         )
                     ])
@@ -515,7 +613,7 @@ struct APIConfigurationEditView: View {
             return ModelProviderFetchSummary(failures: [
                 ModelProviderFetchFailure(
                     configurationName: configuration.name,
-                    providerID: configuration.providerIDEnum,
+                    providerID: configuration.parsedProviderID,
                     message: message
                 )
             ])
@@ -525,13 +623,17 @@ struct APIConfigurationEditView: View {
     private var draftModelFetchSignature: String {
         [
             providerID.rawValue,
-            defaultAdapterID.rawValue,
+            adapterID.rawValue,
             baseURL,
             apiKey,
             codexCredentialJSON,
-            configuration.headersJSON,
+            customHeaderSignature,
             configuration.optionsJSON
         ].joined(separator: "\u{1F}")
+    }
+
+    private var customHeaderSignature: String {
+        customHeaders.map { "\($0.name.lowercased())=\($0.value)" }.joined(separator: "\u{1E}")
     }
 
     private func invalidateFetchedModelCandidates() {
@@ -550,6 +652,7 @@ struct APIConfigurationEditView: View {
             headers["originator"] = headers["originator"] ?? "vxatelier_pro"
             return APIConfigurationItem.makeLLMProviderConfiguration(
                 providerID: providerID,
+                adapterID: adapterID,
                 authKind: tokenSet?.authMethod ?? .codexChatGPTOAuth,
                 apiKey: tokenSet?.accessToken ?? "",
                 baseURL: baseURL,
@@ -559,10 +662,11 @@ struct APIConfigurationEditView: View {
         }
         return APIConfigurationItem.makeLLMProviderConfiguration(
             providerID: providerID,
-            authKind: currentProfile.authKind,
+            adapterID: adapterID,
+            authKind: authKind,
             apiKey: apiKey,
             baseURL: baseURL,
-            headers: configuration.decodedHeaders,
+            headers: customHeaderDictionary,
             options: configuration.decodedOptions
         )
     }
@@ -571,16 +675,19 @@ struct APIConfigurationEditView: View {
         configuration.name = name
         configuration.apiKey = apiKey
         configuration.baseURL = baseURL
-        let profile = LLMProviderRegistry.shared.profile(for: providerID)
         configuration.providerID = providerID.rawValue
-        configuration.authKind = profile.authKind.rawValue
-        configuration.defaultAdapterID = defaultAdapterID.rawValue
+        configuration.authKind = authKind.rawValue
+        configuration.adapterID = adapterID.rawValue
+        configuration.decodedHeaders = customHeaderDictionary
         if providerID == .openAICodexChatGPTSubscription {
             configuration.authKind = (codexTokenSet?.authMethod ?? .codexChatGPTOAuth).rawValue
             configuration.apiKey = ""
             configuration.credentialJSON = codexCredentialJSON
-        } else if profile.requiresCredential {
+        } else if currentRoute.requiresBaseURL {
             configuration.credentialJSON = "{}"
+            if !authKind.requiresCredential {
+                configuration.apiKey = ""
+            }
         } else {
             configuration.apiKey = ""
             configuration.baseURL = ""
@@ -619,7 +726,8 @@ struct APIConfigurationEditView: View {
 
         baseURL = preset.baseURL
         providerID = preset.providerID
-        defaultAdapterID = LLMProviderRegistry.shared.profile(for: preset.providerID).defaultAdapterID
+        adapterID = LLMProviderRegistry.shared.profile(for: preset.providerID).defaultAdapterID
+        authKind = LLMProviderRegistry.shared.profile(for: preset.providerID).defaultRoute?.defaultAuthKind ?? .none
         if preset.providerID == .openAICodexChatGPTSubscription {
             apiKey = ""
         } else if !LLMProviderRegistry.shared.profile(for: preset.providerID).requiresCredential {
@@ -638,7 +746,7 @@ struct APIConfigurationEditView: View {
         providerID = .openAICodexChatGPTSubscription
         selectedPreset = .codexChatGPTSubscription
         baseURL = CodexChatGPTOAuthService.codexBackendBaseURL
-        defaultAdapterID = .openAIResponses
+        adapterID = .openAIResponses
         apiKey = ""
         codexCredentialJSON = tokenSet.encoded()
         defaultModel = APIConfigurationEditView.suggestedDefaultModel(for: providerID)
@@ -709,6 +817,22 @@ struct APIConfigurationEditView: View {
     private var localProviderStatusText: String {
         LLMProviderRegistry.shared.localStatusText(for: providerID) ?? "On-device model"
     }
+
+    private var customHeaderDictionary: [String: String] {
+        customHeaders.reduce(into: [String: String]()) { result, header in
+            result[header.name.trimmingCharacters(in: .whitespacesAndNewlines)] = header.value
+        }
+    }
+
+    private func applySelectedRouteDefaults() {
+        guard let route = currentProfile.route(for: adapterID) else { return }
+        authKind = route.defaultAuthKind
+        if baseURL.isEmpty || providerID != .custom {
+            baseURL = route.defaultBaseURL
+        }
+        fetchedModelMetadata = nil
+        fetchedModelCandidateSignature = nil
+    }
 }
 
 /// Preset provider options used to seed API configuration fields.
@@ -723,7 +847,7 @@ enum APIPreset: String, CaseIterable {
     case openRouter = "OpenRouter"
     case lmStudio = "LM Studio"
     case ollama = "Ollama"
-    case customOpenAICompatible = "Custom"
+    case custom = "Custom"
 
     var displayName: String {
         rawValue
@@ -741,7 +865,7 @@ enum APIPreset: String, CaseIterable {
         case .openRouter: return "point.3.connected.trianglepath.dotted"
         case .lmStudio: return "desktopcomputer"
         case .ollama: return "terminal"
-        case .customOpenAICompatible: return "slider.horizontal.3"
+        case .custom: return "slider.horizontal.3"
         }
     }
 
@@ -757,7 +881,7 @@ enum APIPreset: String, CaseIterable {
         case .openRouter: return .openRouter
         case .lmStudio: return .lmStudio
         case .ollama: return .ollama
-        case .customOpenAICompatible: return .customOpenAICompatible
+        case .custom: return .custom
         }
     }
 
@@ -783,8 +907,8 @@ enum APIPreset: String, CaseIterable {
             return .lmStudio
         case .ollama:
             return .ollama
-        case .customOpenAICompatible:
-            return .customOpenAICompatible
+        case .custom:
+            return .custom
         }
     }
 
@@ -800,7 +924,7 @@ enum APIPreset: String, CaseIterable {
         case .openRouter: return "https://openrouter.ai/api/v1"
         case .lmStudio: return "http://localhost:1234/v1"
         case .ollama: return "http://localhost:11434/v1"
-        case .customOpenAICompatible: return AppDefaults.OpenAi.baseURL
+        case .custom: return AppDefaults.OpenAi.baseURL
         }
     }
 }

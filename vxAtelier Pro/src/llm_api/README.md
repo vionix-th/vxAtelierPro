@@ -1,19 +1,53 @@
 # LLM API
 
-`llm_api` is the reusable provider, model-profile, request-encoding, transport, and tool API surface for vxAtelier Pro. SwiftData-aware run orchestration and concrete application tools live in `llm_runtime`.
+`llm_api` contains the provider-neutral generation domain, provider integrations, model catalogs, route validation, generation adapters, HTTP transport, and model-profile resolution. SwiftData-aware orchestration and concrete application tools live in `llm_runtime`.
+
+## Ownership Boundaries
+
+The subsystem separates four responsibilities:
+
+- `LLMProviderIntegration` owns a known service: supported routes, authentication policy, effective transport configuration, model-family validation, and catalog selection.
+- `LLMGenerationAdapter` owns exactly one request, response, and streaming wire contract. It performs generation only.
+- `APIConfigurationItem` represents one provider connection through one persisted adapter. Exposing another protocol requires another configuration.
+- `LLMModelProfile` owns model capabilities, parameter support and policy, defaults, limits, and user overrides. A model derives its adapter from its API configuration.
+
+`LLMProviderRegistry` resolves provider integrations and validates provider routes. `LLMAdapterRegistry` resolves pure generation adapters solely by `LLMAdapterID`. `LLMModelCatalog` performs model discovery independently of adapter construction.
+
+`Custom` is a provider configuration for services unknown to the application. It may select any remote adapter and use no authentication, a bearer token, an `x-api-key`, or entered custom headers. A known provider that diverges from another provider's protocol receives its own adapter; OpenRouter is the current example.
+
+## Route Matrix
+
+| Provider | Default adapter | Other adapters |
+|---|---|---|
+| OpenAI Platform | OpenAI Responses | OpenAI Chat Completions |
+| Codex ChatGPT Subscription | OpenAI Responses | None |
+| OpenCode Zen | OpenAI Chat Completions (Legacy) | OpenAI Responses, Anthropic Messages |
+| Apple Intelligence | Foundation Models | None |
+| Anthropic | Anthropic Messages | None |
+| OpenRouter | OpenRouter Chat Completions | None |
+| LM Studio | OpenAI Chat Completions (Legacy) | None |
+| Ollama | OpenAI Chat Completions (Legacy) | None |
+| xAI | OpenAI Chat Completions (Legacy) | None |
+| DeepSeek | OpenAI Chat Completions (Legacy) | None |
+| Custom | OpenAI Chat Completions (Legacy) | Every remote adapter |
+
+`OpenAI Chat Completions (Legacy)` names the shared `max_tokens` dialect explicitly. Modern OpenAI Chat Completions uses `max_completion_tokens`. OpenRouter composes the shared Chat codec while retaining its dedicated route identity, `top_k`, and nested reasoning representation.
 
 ## Runtime Flow
 
-1. A provider model-list endpoint produces `LLMProviderModelMetadata` values containing only facts returned by the provider.
-2. `ModelItem` persists that metadata and explicit user overrides. Catalog values are never copied into SwiftData.
-3. `LLMModelProfileResolver` creates the effective `LLMModelProfile` used by settings, conversation controls, status UI, and request assembly.
-4. `LLMGenerationOptionsResolver` combines conversation inclusion intent with the resolved required/default policy and returns resolved options plus active parameters carrying their final mappings.
-5. A provider adapter builds the wire body before dispatch. `LLMHTTPGenerationPipeline` sends it and emits provider-neutral `LLMGenerationEvent` values.
-6. `llm_runtime` persists stable `MessageItem`, `ToolCallItem`, and `ResponseRunItem` records. SwiftData is not written per token or tool-argument delta.
+1. Parse persisted provider and adapter raw strings. Unknown identifiers fail with `invalidConfiguration`; there is no routing fallback.
+2. Resolve and refresh credentials, including Codex OAuth credentials.
+3. Ask the provider integration to validate the selected route and produce `LLMResolvedProviderRoute`.
+4. Resolve the selected model profile against the route adapter.
+5. Resolve active generation parameters and build `LLMGenerationRequest`.
+6. Pass the request and resolved route to `ProviderRunExecutor`.
+7. Verify request, route, and transport provider/adapter identity, then resolve the pure generation adapter through `LLMAdapterRegistry`.
 
-## Model Profiles
+Model discovery follows a separate path through provider integrations and `LLMModelCatalog`. Remote listing failures are non-fatal in settings; a configuration can still be saved and models can be entered manually.
 
-`LLMModelProfileResolver` is the sole model-profile resolution path. Parameter definitions are inherited and mutated in this order:
+## Model Profiles and Parameters
+
+`LLMModelProfileResolver` is the sole model-profile resolution path. Definitions are inherited in this order:
 
 1. Adapter API baseline.
 2. Provider rules.
@@ -21,45 +55,41 @@
 4. Explicit provider observations.
 5. Explicit user overrides.
 
-Provider capability arrays remain positive, non-exhaustive metadata and may resolve to `unknown`. Parameter support is binary: omission preserves the inherited definition, explicit provider `false` disables it, and explicit `true` re-enables it only when an inherited mapping exists.
+Adapter rules own every built-in wire mapping. Provider and model rules may change capabilities, support, required/default-enabled policy, values, options, and limits, but `LLMDefaultsCatalog` rejects wire mappings below adapter level.
 
-`LLMDefaultsCatalog` evaluates `adapter`, `provider`, and `model` rules from `Resources/LLMDefaults.json`. Matching rules are applied by level and declaration order. Parameter patches modify only declared fields; missing fields inherit, while explicit `null` clears nullable defaults or options.
+Advanced per-model wire mappings remain available as unsafe user overrides. They bypass guaranteed adapter compatibility and are persisted per adapter.
 
-The SwiftData schema is changed in place with no migration plan. Development stores created with the former schema must be removed with the startup recovery **Wipe Store** action. Backup format 4 exports provider observations and unified overrides only.
+A parameter becomes active only through required policy, explicit conversation selection, or default-enabled policy. Retaining a value alone does not activate it. A supported parameter must resolve a mapping; stale enabled unsupported parameters fail request assembly with `invalidConfiguration`.
 
-## Parameters
+## Model Catalogs
 
-The subsystem keeps three ownership boundaries:
+Catalog implementations cover OpenAI-shaped `/models`, Anthropic `/models`, OpenRouter metadata, OpenCode Zen model-family filtering, the Codex static inventory, and the Apple local inventory. Custom configurations select a catalog from their adapter:
 
-- Semantic value and inclusion intent belong to the conversation.
-- Effective support, required/default policy, options, and mapping belong to `LLMParameterProfile`.
-- Wire encoding belongs to the selected adapter.
+- Responses, modern Chat, and legacy Chat use OpenAI-shaped discovery.
+- OpenRouter Chat uses OpenRouter metadata.
+- Anthropic Messages uses Anthropic discovery.
 
-A parameter becomes active only through required policy, explicit conversation selection, or default-enabled policy. Merely retaining a value does not activate it.
+Concrete local infrastructure may implement both generation and catalog operations, but the operations are exposed through separate interfaces.
 
-A supported parameter always has one inherited mapping: adapter-owned encoding, a scalar key, or a known structured preset. There is no separate encodability state. An enabled parameter that becomes unsupported remains visible so it can be disabled, but request assembly reports `invalidConfiguration` until the stale selection is removed or an advanced override restores valid support and mapping.
+## Persistence and Export
 
-## Validation Responsibility
+SwiftData stores provider, adapter, and authentication identifiers as raw strings. `parsedProviderID`, `parsedAdapterID`, and `parsedAuthKind` expose optional values; runtime and save boundaries use the throwing `require...` accessors.
 
-Remote providers are authoritative for request acceptance. There is no general capability preflight.
+The schema is changed in place with no migration. Development stores made with the old schema must be removed with the startup recovery **Wipe Store** action.
 
-Local checks are limited to boundaries owned by the application:
+Full backups use format version 5. Version 4 is rejected. API configurations and response runs encode typed provider/adapter identifiers, and exported models include the API configuration adapter identity used for reconnection.
 
-- `LLMProviderRegistry.resolveAdapter` validates provider/adapter composition.
-- `ConversationHistoryValidator` rejects duplicate, missing, dangling, or out-of-order tool-call identifiers as `invalidConversationState`.
-- Provider adapters reject missing required image/file/schema/tool data, reserved option collisions, malformed values, and unrepresentable wire formats as `requestEncoding`.
-- Local backends retain framework availability and platform constraints.
+## Validation
 
-Provider HTTP errors retain normalized metadata, redaction, and retry classification. Remote `4xx` responses are non-retryable. A provider rejection before any assistant event is surfaced transiently and the otherwise empty turn/run is rolled back; failures after persisted assistant or tool events retain the failed run.
+Local validation is limited to application-owned boundaries:
 
-## Providers
+- Provider integrations validate provider/adapter/authentication composition and provider-specific model families.
+- The executor rejects request/route/transport identity mismatches.
+- `ConversationHistoryValidator` rejects duplicate, missing, dangling, or out-of-order tool-call identifiers.
+- Generation adapters reject missing required content, reserved-key collisions, malformed values, and unsupported wire representations.
+- Local backends enforce framework availability and platform constraints.
 
-- OpenAI Platform: Responses and Chat Completions.
-- Anthropic: Messages.
-- OpenCode Zen: configuration-selected Responses, Messages, or OpenAI-compatible Chat Completions. Model discovery returns only models compatible with selected API mode; unsupported Gemini and unknown protocol families remain hidden. Default is DeepSeek V4 Flash through Chat Completions.
-- OpenRouter, LM Studio, Ollama, xAI, DeepSeek, and custom OpenAI-compatible services: Chat Completions-compatible transport.
-- Codex ChatGPT Subscription: Responses routed through the ChatGPT Codex backend, with app-owned OAuth/device-code credentials and static model metadata when remote listing is unavailable.
-- Apple Intelligence: local Foundation Models backend with local availability enforcement.
+Remote providers remain authoritative for request acceptance. Provider HTTP errors retain normalized metadata, redaction, and retry classification.
 
 ## Tests
 

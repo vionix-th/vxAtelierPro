@@ -37,13 +37,13 @@ enum CodexChatGPTOAuthService {
 
     @MainActor
     static func resolvedProviderConfiguration(for configuration: APIConfigurationItem) async throws -> LLMProviderConfiguration {
-        guard configuration.providerIDEnum == .openAICodexChatGPTSubscription else {
-            return configuration.makeLLMProviderConfiguration()
+        guard try configuration.requireProviderID() == .openAICodexChatGPTSubscription else {
+            return try configuration.makeLLMProviderConfiguration()
         }
         var tokenSet = try await refreshedTokenIfNeeded(for: configuration)
         tokenSet = tokenSet.withClaimsFromTokens()
         configuration.codexChatGPTTokenSet = tokenSet
-        return configuration.makeLLMProviderConfiguration()
+        return try configuration.makeLLMProviderConfiguration()
     }
 
     @MainActor
@@ -60,10 +60,10 @@ enum CodexChatGPTOAuthService {
 
     @MainActor
     static func save(_ tokenSet: CodexChatGPTTokenSet, to configuration: APIConfigurationItem) throws {
-        configuration.providerIDEnum = .openAICodexChatGPTSubscription
-        configuration.authKindEnum = tokenSet.authMethod
+        configuration.providerID = LLMProviderID.openAICodexChatGPTSubscription.rawValue
+        configuration.authKind = tokenSet.authMethod.rawValue
         configuration.baseURL = codexBackendBaseURL
-        configuration.defaultAdapterIDEnum = .openAIResponses
+        configuration.adapterID = LLMAdapterID.openAIResponses.rawValue
         configuration.apiKey = ""
         configuration.codexChatGPTTokenSet = tokenSet
         try configuration.modelContext?.save()

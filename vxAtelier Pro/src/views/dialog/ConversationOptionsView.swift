@@ -90,10 +90,10 @@ struct ConversationOptionsView: View {
         .onChange(of: options.apiConfiguration) {
             if let config = options.apiConfiguration {
                 vxAtelierPro.log.info("API configuration changed, updating defaults")
-                let provider = config.providerIDEnum
+                let providerName = config.parsedProviderID?.displayName ?? "Unknown Provider"
                 options.applyAPIConfigurationDefaults(replaceSelectedModel: true)
                 let defaultModel = options.selectedModelID ?? ""
-                vxAtelierPro.log.info("Set default model to \(defaultModel) for provider \(provider.displayName)")
+                vxAtelierPro.log.info("Set default model to \(defaultModel) for provider \(providerName)")
             }
         }
         #if os(macOS)

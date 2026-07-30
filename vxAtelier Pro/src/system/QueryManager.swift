@@ -4,7 +4,7 @@ import Foundation
 
 struct ModelProviderFetchFailure: Equatable {
     let configurationName: String
-    let providerID: LLMProviderID
+    let providerID: LLMProviderID?
     let message: String
 }
 
@@ -252,6 +252,15 @@ final class QueryManager {
     }
 
     func upsertAPIConfiguration(_ configuration: APIConfigurationItem, makeDefault: Bool) throws {
+        let providerID = try configuration.requireProviderID()
+        let adapterID = try configuration.requireAdapterID()
+        let providerConfiguration = try configuration.makeLLMProviderConfiguration()
+        _ = try LLMProviderRegistry.shared.resolveRoute(
+            adapterID: adapterID,
+            providerID: providerID,
+            modelID: configuration.defaultModelID,
+            configuration: providerConfiguration
+        )
         if configuration.modelContext == nil {
             modelContext.insert(configuration)
         }
@@ -549,14 +558,16 @@ final class QueryManager {
         _ exportData: ModelExportData,
         apiConfigurations: [APIConfigurationItem]
     ) throws -> ModelItem {
-        let model = exportData.toDataItem(apiConfigurations: apiConfigurations)
+        let model = try exportData.toDataItem(apiConfigurations: apiConfigurations)
         guard let apiConfiguration = model.apiConfiguration else {
             throw LLMProviderError.invalidConfiguration("Imported model has no matching API configuration.")
         }
+        let providerID = try apiConfiguration.requireProviderID()
+        let adapterID = try apiConfiguration.requireAdapterID()
         try validateParameterOverrides(
             model.parameterOverrides.map { ($0.adapterID, $0.parameterID, $0.overrides) },
-            providerID: apiConfiguration.providerIDEnum,
-            adapterID: apiConfiguration.defaultAdapterIDEnum,
+            providerID: providerID,
+            adapterID: adapterID,
             modelID: model.modelID,
             metadata: model.providerMetadata
         )
@@ -578,10 +589,12 @@ final class QueryManager {
         guard !normalizedModelID.isEmpty else {
             throw LLMProviderError.invalidConfiguration("Model ID is required.")
         }
+        let providerID = try apiConfiguration.requireProviderID()
+        let adapterID = try apiConfiguration.requireAdapterID()
         try validateParameterOverrides(
             parameterOverrides,
-            providerID: apiConfiguration.providerIDEnum,
-            adapterID: apiConfiguration.defaultAdapterIDEnum,
+            providerID: providerID,
+            adapterID: adapterID,
             modelID: normalizedModelID,
             metadata: model.providerMetadata
         )
@@ -740,11 +753,11 @@ final class QueryManager {
         adapterID: LLMAdapterID,
         configuration: LLMProviderConfiguration
     ) async throws -> [LLMProviderModelMetadata] {
-        let adapter = try LLMProviderRegistry.shared.resolveAdapter(
-            for: adapterID,
-            providerID: providerID
+        try await LLMProviderRegistry.shared.fetchModelMetadata(
+            adapterID: adapterID,
+            providerID: providerID,
+            configuration: configuration
         )
-        return try await adapter.fetchModelMetadata(configuration: configuration)
     }
 
     @discardableResult
@@ -775,23 +788,22 @@ final class QueryManager {
 
     @discardableResult
     func refreshModels(for apiConfiguration: APIConfigurationItem) async -> ModelProviderFetchSummary {
-        let providerID = apiConfiguration.providerIDEnum
-        let adapterID = apiConfiguration.defaultAdapterIDEnum
-        let providerConfiguration = apiConfiguration.makeLLMProviderConfiguration()
-        let credentialState: String
-        if case .secret = providerConfiguration.credential {
-            credentialState = "present"
-        } else {
-            credentialState = "missing"
-        }
-
-        vxAtelierPro.log.debug(
-            "Refreshing models for provider \(apiConfiguration.name): providerID=\(providerID.rawValue), authKind=\(apiConfiguration.authKind), adapter=\(apiConfiguration.defaultAdapterID), baseURL=\(providerConfiguration.baseURL), apiKeyLength=\(apiConfiguration.apiKey.count), credential=\(credentialState)"
-        )
-
         var summary = ModelProviderFetchSummary()
 
         do {
+            let providerID = try apiConfiguration.requireProviderID()
+            let adapterID = try apiConfiguration.requireAdapterID()
+            let providerConfiguration = try apiConfiguration.makeLLMProviderConfiguration()
+            let credentialState: String
+            if case .secret = providerConfiguration.credential {
+                credentialState = "present"
+            } else {
+                credentialState = "missing"
+            }
+
+            vxAtelierPro.log.debug(
+                "Refreshing models for provider \(apiConfiguration.name): providerID=\(providerID.rawValue), authKind=\(apiConfiguration.authKind), adapter=\(apiConfiguration.adapterID), baseURL=\(providerConfiguration.baseURL), apiKeyLength=\(apiConfiguration.apiKey.count), credential=\(credentialState)"
+            )
             let fetchedModels = try await fetchModelMetadata(
                 providerID: providerID,
                 adapterID: adapterID,
@@ -808,7 +820,7 @@ final class QueryManager {
             )
             summary.failures.append(ModelProviderFetchFailure(
                 configurationName: apiConfiguration.name,
-                providerID: providerID,
+                providerID: apiConfiguration.parsedProviderID,
                 message: message
             ))
         }

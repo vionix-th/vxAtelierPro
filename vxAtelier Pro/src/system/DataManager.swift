@@ -22,6 +22,26 @@ class DataManager {
         models: [ModelItem],
         webSearchConfigurations: [WebSearchConfigurationItem]
     ) async throws -> Data {
+        for configuration in apiConfigurations {
+            let providerID = try configuration.requireProviderID()
+            let adapterID = try configuration.requireAdapterID()
+            _ = try LLMProviderRegistry.shared.resolveRoute(
+                adapterID: adapterID,
+                providerID: providerID,
+                modelID: configuration.defaultModelID,
+                configuration: try configuration.makeLLMProviderConfiguration()
+            )
+        }
+        for model in models {
+            try ModelExportData(model).validateRouteIdentity()
+        }
+        for conversation in conversations {
+            try ConversationExportData(conversation).validateRouteIdentity()
+        }
+        for project in projects {
+            try ProjectExportData(project).validateRouteIdentity()
+        }
+
         let projectExports = projects.map { ProjectExportData($0) }
         let conversationExports = conversations.map { ConversationExportData($0) }
         let bookmarkExports = bookmarks.map { BookmarkExportData($0) }
@@ -114,6 +134,17 @@ class DataManager {
             )
         }
         
+        let validatedAPIConfigurations = try backup.apiConfigurations.map { try $0.toDataItem() }
+        for model in backup.models {
+            try model.validateRouteIdentity()
+        }
+        for conversation in backup.conversations {
+            try conversation.validateRouteIdentity()
+        }
+        for project in backup.projects {
+            try project.validateRouteIdentity()
+        }
+
         // Backup format is valid, proceed with restore
         do {
             // Delete existing data
@@ -129,8 +160,7 @@ class DataManager {
             try context.delete(model: WebSearchConfigurationItem.self)
             
             // Insert API configurations first as they're referenced by other items
-            for configData in backup.apiConfigurations {
-                let config = configData.toDataItem()
+            for config in validatedAPIConfigurations {
                 context.insert(config)
             }
             
@@ -539,7 +569,7 @@ class DataManager {
             var duplicates: [(original: APIConfigurationItem, duplicate: APIConfigurationItem)] = []
             
             for config in configurations {
-                let key = "\(config.name)|\(config.providerID)|\(config.baseURL)|\(config.defaultAdapterID)"
+                let key = "\(config.name)|\(config.providerID)|\(config.baseURL)|\(config.adapterID)"
                 
                 if let existing = uniqueConfigs[key] {
                     duplicates.append((original: existing, duplicate: config))

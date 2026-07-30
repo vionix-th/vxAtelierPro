@@ -15,6 +15,7 @@ class JsonSerializer {
         encoder.dateEncodingStrategy = .iso8601
         
         let exportData = ProjectExportData(project)
+        try exportData.validateRouteIdentity()
         return try encoder.encode(exportData)
     }
     
@@ -31,6 +32,7 @@ class JsonSerializer {
         encoder.dateEncodingStrategy = .iso8601
         
         let exportData = ConversationExportData(conversation)
+        try exportData.validateRouteIdentity()
         return try encoder.encode(exportData)
     }
     
@@ -106,6 +108,7 @@ class JsonSerializer {
         encoder.outputFormatting = .prettyPrinted
         
         let exportData = ModelExportData(model)
+        try exportData.validateRouteIdentity()
         return try encoder.encode(exportData)
     }
     
@@ -118,7 +121,7 @@ class JsonSerializer {
         } else {
             apiConfigurations = []
         }
-        return importData.toDataItem(apiConfigurations: apiConfigurations)
+        return try importData.toDataItem(apiConfigurations: apiConfigurations)
     }
     
     static func importData(from data: Data, context: ModelContext) async throws -> Any {

@@ -44,14 +44,14 @@ struct ModelsSettingsView: View {
                     modelID: model.modelID,
                     displayName: model.modelProfile.displayName,
                     providerName: model.apiConfiguration?.name ?? "No API Configuration",
-                    providerDisplayName: model.apiConfiguration?.providerIDEnum.displayName ?? "Unknown",
+                    providerDisplayName: model.apiConfiguration?.parsedProviderID?.displayName ?? "Unknown",
                     contextSize: model.contextSize,
                     capabilitySystemImages: model.metadataIconSystemNames,
                     searchCorpus: [
                         model.modelID,
                         model.displayName,
                         model.apiConfiguration?.name ?? "",
-                        model.apiConfiguration?.providerIDEnum.displayName ?? "",
+                        model.apiConfiguration?.parsedProviderID?.displayName ?? "",
                         String(model.contextSize),
                         model.capabilities.map(\.rawValue).joined(separator: " ")
                     ]

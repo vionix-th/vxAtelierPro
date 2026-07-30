@@ -67,6 +67,20 @@
           "required": false,
           "enabledByDefault": false,
           "defaultValue": false
+        },
+        {
+          "id": "temperature",
+          "supported": false,
+          "mapping": {
+            "kind": "adapter"
+          }
+        },
+        {
+          "id": "max_output_tokens",
+          "supported": false,
+          "mapping": {
+            "kind": "adapter"
+          }
         }
       ]
     },
@@ -103,6 +117,86 @@
           "required": false,
           "enabledByDefault": false,
           "defaultValue": false
+        },
+        {
+          "id": "max_output_tokens",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "max_output_tokens"
+          }
+        },
+        {
+          "id": "temperature",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "temperature"
+          }
+        },
+        {
+          "id": "top_p",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "top_p"
+          }
+        },
+        {
+          "id": "response_format",
+          "supported": true,
+          "mapping": {
+            "kind": "preset",
+            "preset": "openAIResponsesTextFormat"
+          }
+        },
+        {
+          "id": "reasoning_effort",
+          "supported": true,
+          "mapping": {
+            "kind": "preset",
+            "preset": "openAIResponsesReasoning"
+          }
+        },
+        {
+          "id": "reasoning_summary",
+          "supported": true,
+          "mapping": {
+            "kind": "preset",
+            "preset": "openAIResponsesReasoningSummary"
+          }
+        },
+        {
+          "id": "service_tier",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "service_tier"
+          }
+        },
+        {
+          "id": "store",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "store"
+          }
+        },
+        {
+          "id": "parallel_tool_calls",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "parallel_tool_calls"
+          }
+        },
+        {
+          "id": "text_verbosity",
+          "supported": true,
+          "mapping": {
+            "kind": "preset",
+            "preset": "openAIResponsesTextVerbosity"
+          }
         }
       ]
     },
@@ -139,13 +233,95 @@
           "required": false,
           "enabledByDefault": false,
           "defaultValue": false
+        },
+        {
+          "id": "max_output_tokens",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "max_completion_tokens"
+          }
+        },
+        {
+          "id": "temperature",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "temperature"
+          },
+          "defaultValue": 1,
+          "enabledByDefault": true
+        },
+        {
+          "id": "top_p",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "top_p"
+          },
+          "defaultValue": 1,
+          "enabledByDefault": true
+        },
+        {
+          "id": "stop_sequences",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "stop"
+          }
+        },
+        {
+          "id": "response_format",
+          "supported": true,
+          "mapping": {
+            "kind": "preset",
+            "preset": "openAIChatResponseFormat"
+          }
+        },
+        {
+          "id": "parallel_tool_calls",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "parallel_tool_calls"
+          },
+          "defaultValue": true,
+          "enabledByDefault": true
+        },
+        {
+          "id": "service_tier",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "service_tier"
+          },
+          "defaultValue": "auto",
+          "enabledByDefault": true
+        },
+        {
+          "id": "store",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "store"
+          },
+          "defaultValue": false,
+          "enabledByDefault": true
+        },
+        {
+          "id": "reasoning_effort",
+          "supported": false,
+          "mapping": {
+            "kind": "key",
+            "key": "reasoning_effort"
+          }
         }
       ]
     },
     {
       "level": "adapter",
       "match": {
-        "adapterID": "openAICompatibleChatCompletions"
+        "adapterID": "openAIChatCompletionsLegacy"
       },
       "parameters": [
         {
@@ -175,6 +351,208 @@
           "required": false,
           "enabledByDefault": false,
           "defaultValue": false
+        },
+        {
+          "id": "max_output_tokens",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "max_tokens"
+          }
+        },
+        {
+          "id": "temperature",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "temperature"
+          },
+          "defaultValue": 1,
+          "enabledByDefault": true
+        },
+        {
+          "id": "top_p",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "top_p"
+          },
+          "defaultValue": 1,
+          "enabledByDefault": true
+        },
+        {
+          "id": "stop_sequences",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "stop"
+          }
+        },
+        {
+          "id": "response_format",
+          "supported": true,
+          "mapping": {
+            "kind": "preset",
+            "preset": "openAIChatResponseFormat"
+          }
+        },
+        {
+          "id": "parallel_tool_calls",
+          "supported": false,
+          "mapping": {
+            "kind": "key",
+            "key": "parallel_tool_calls"
+          }
+        },
+        {
+          "id": "service_tier",
+          "supported": false,
+          "mapping": {
+            "kind": "key",
+            "key": "service_tier"
+          }
+        },
+        {
+          "id": "store",
+          "supported": false,
+          "mapping": {
+            "kind": "key",
+            "key": "store"
+          }
+        },
+        {
+          "id": "reasoning_effort",
+          "supported": false,
+          "mapping": {
+            "kind": "key",
+            "key": "reasoning_effort"
+          }
+        }
+      ]
+    },
+    {
+      "level": "adapter",
+      "match": {
+        "adapterID": "openRouterChatCompletions"
+      },
+      "parameters": [
+        {
+          "id": "model",
+          "supported": true,
+          "mapping": {
+            "kind": "adapter"
+          },
+          "required": true,
+          "enabledByDefault": true
+        },
+        {
+          "id": "system_prompt",
+          "supported": true,
+          "mapping": {
+            "kind": "adapter"
+          },
+          "required": false,
+          "enabledByDefault": false
+        },
+        {
+          "id": "stream",
+          "supported": true,
+          "mapping": {
+            "kind": "adapter"
+          },
+          "required": false,
+          "enabledByDefault": false,
+          "defaultValue": false
+        },
+        {
+          "id": "max_output_tokens",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "max_completion_tokens"
+          }
+        },
+        {
+          "id": "temperature",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "temperature"
+          },
+          "defaultValue": 1,
+          "enabledByDefault": true
+        },
+        {
+          "id": "top_p",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "top_p"
+          },
+          "defaultValue": 1,
+          "enabledByDefault": true
+        },
+        {
+          "id": "stop_sequences",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "stop"
+          }
+        },
+        {
+          "id": "response_format",
+          "supported": true,
+          "mapping": {
+            "kind": "preset",
+            "preset": "openAIChatResponseFormat"
+          }
+        },
+        {
+          "id": "top_k",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "top_k"
+          },
+          "defaultValue": 0,
+          "enabledByDefault": true
+        },
+        {
+          "id": "service_tier",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "service_tier"
+          },
+          "defaultValue": "auto",
+          "enabledByDefault": true
+        },
+        {
+          "id": "store",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "store"
+          }
+        },
+        {
+          "id": "parallel_tool_calls",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "parallel_tool_calls"
+          },
+          "defaultValue": true,
+          "enabledByDefault": true
+        },
+        {
+          "id": "reasoning_effort",
+          "supported": true,
+          "mapping": {
+            "kind": "preset",
+            "preset": "openRouterReasoning"
+          }
         }
       ]
     },
@@ -211,6 +589,54 @@
           "required": false,
           "enabledByDefault": false,
           "defaultValue": false
+        },
+        {
+          "id": "max_output_tokens",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "max_tokens"
+          }
+        },
+        {
+          "id": "temperature",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "temperature"
+          }
+        },
+        {
+          "id": "top_p",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "top_p"
+          }
+        },
+        {
+          "id": "top_k",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "top_k"
+          }
+        },
+        {
+          "id": "reasoning_budget_tokens",
+          "supported": true,
+          "mapping": {
+            "kind": "preset",
+            "preset": "anthropicThinking"
+          }
+        },
+        {
+          "id": "stop_sequences",
+          "supported": true,
+          "mapping": {
+            "kind": "key",
+            "key": "stop_sequences"
+          }
         }
       ]
     },
@@ -233,19 +659,13 @@
           "id": "temperature",
           "supported": true,
           "enabledByDefault": true,
-          "defaultValue": 1,
-          "mapping": {
-            "kind": "adapter"
-          }
+          "defaultValue": 1
         },
         {
           "id": "max_output_tokens",
           "supported": true,
           "enabledByDefault": true,
-          "defaultValue": 1024,
-          "mapping": {
-            "kind": "adapter"
-          }
+          "defaultValue": 1024
         },
         {
           "id": "stream",
@@ -688,7 +1108,7 @@
       "match": {
         "providerRegex": "^openRouter$",
         "modelRegex": "^deepseek/deepseek-(reasoner|v4-pro)$",
-        "adapterID": "openAICompatibleChatCompletions"
+        "adapterID": "openRouterChatCompletions"
       },
       "parameters": [
         {
@@ -703,7 +1123,7 @@
     {
       "level": "provider",
       "match": {
-        "providerRegex": "^(lmStudio|ollama|customOpenAICompatible)$"
+        "providerRegex": "^(lmStudio|ollama|custom)$"
       },
       "modelDefaults": {
         "contextSize": 4096,
@@ -801,97 +1221,57 @@
       "parameters": [
         {
           "id": "max_output_tokens",
-          "supported": true,
-          "mapping": {
-            "kind": "key",
-            "key": "max_output_tokens"
-          }
+          "supported": true
         },
         {
           "id": "temperature",
           "supported": true,
           "defaultValue": 1,
-          "mapping": {
-            "kind": "key",
-            "key": "temperature"
-          },
           "enabledByDefault": true
         },
         {
           "id": "top_p",
           "supported": true,
           "defaultValue": 1,
-          "mapping": {
-            "kind": "key",
-            "key": "top_p"
-          },
           "enabledByDefault": true
         },
         {
           "id": "response_format",
-          "supported": true,
-          "mapping": {
-            "kind": "preset",
-            "preset": "openAIResponsesTextFormat"
-          }
+          "supported": true
         },
         {
           "id": "reasoning_effort",
           "supported": true,
-          "enabledByDefault": true,
-          "mapping": {
-            "kind": "preset",
-            "preset": "openAIResponsesReasoning"
-          }
+          "enabledByDefault": true
         },
         {
           "id": "reasoning_summary",
           "supported": true,
-          "enabledByDefault": true,
-          "mapping": {
-            "kind": "preset",
-            "preset": "openAIResponsesReasoningSummary"
-          }
+          "enabledByDefault": true
         },
         {
           "id": "service_tier",
           "supported": true,
           "enabledByDefault": true,
-          "defaultValue": "auto",
-          "mapping": {
-            "kind": "key",
-            "key": "service_tier"
-          }
+          "defaultValue": "auto"
         },
         {
           "id": "store",
           "supported": true,
           "enabledByDefault": true,
-          "defaultValue": true,
-          "mapping": {
-            "kind": "key",
-            "key": "store"
-          }
+          "defaultValue": true
         },
         {
           "id": "parallel_tool_calls",
           "supported": true,
           "enabledByDefault": true,
-          "defaultValue": true,
-          "mapping": {
-            "kind": "key",
-            "key": "parallel_tool_calls"
-          }
+          "defaultValue": true
         },
         {
           "id": "text_verbosity",
           "supported": true,
           "enabledByDefault": true,
-          "defaultValue": "medium",
-          "mapping": {
-            "kind": "preset",
-            "preset": "openAIResponsesTextVerbosity"
-          }
+          "defaultValue": "medium"
         },
         {
           "id": "stream",
@@ -961,7 +1341,14 @@
           "supported": true,
           "enabledByDefault": true,
           "defaultValue": "medium",
-          "options": ["none", "low", "medium", "high", "xhigh", "max"]
+          "options": [
+            "none",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
         }
       ]
     },
@@ -984,104 +1371,11 @@
           "supported": true,
           "required": true,
           "enabledByDefault": true,
-          "defaultValue": false,
-          "mapping": {
-            "kind": "key",
-            "key": "store"
-          }
+          "defaultValue": false
         },
         {
           "id": "max_output_tokens",
           "supported": false
-        }
-      ]
-    },
-    {
-      "level": "adapter",
-      "match": {
-        "adapterID": "openAIChatCompletions"
-      },
-      "parameters": [
-        {
-          "id": "max_output_tokens",
-          "supported": true,
-          "mapping": {
-            "kind": "key",
-            "key": "max_completion_tokens"
-          }
-        },
-        {
-          "id": "temperature",
-          "supported": true,
-          "defaultValue": 1,
-          "mapping": {
-            "kind": "key",
-            "key": "temperature"
-          },
-          "enabledByDefault": true
-        },
-        {
-          "id": "top_p",
-          "supported": true,
-          "defaultValue": 1,
-          "mapping": {
-            "kind": "key",
-            "key": "top_p"
-          },
-          "enabledByDefault": true
-        },
-        {
-          "id": "stop_sequences",
-          "supported": true,
-          "mapping": {
-            "kind": "key",
-            "key": "stop"
-          }
-        },
-        {
-          "id": "response_format",
-          "supported": true,
-          "mapping": {
-            "kind": "preset",
-            "preset": "openAIChatResponseFormat"
-          }
-        },
-        {
-          "id": "parallel_tool_calls",
-          "supported": true,
-          "enabledByDefault": true,
-          "defaultValue": true,
-          "mapping": {
-            "kind": "key",
-            "key": "parallel_tool_calls"
-          }
-        },
-        {
-          "id": "service_tier",
-          "supported": true,
-          "enabledByDefault": true,
-          "defaultValue": "auto",
-          "mapping": {
-            "kind": "key",
-            "key": "service_tier"
-          }
-        },
-        {
-          "id": "store",
-          "supported": true,
-          "enabledByDefault": true,
-          "defaultValue": false,
-          "mapping": {
-            "kind": "key",
-            "key": "store"
-          }
-        },
-        {
-          "id": "stream",
-          "supported": true,
-          "enabledByDefault": false,
-          "defaultValue": false,
-          "required": false
         }
       ]
     },
@@ -1118,11 +1412,7 @@
             "medium",
             "high",
             "xhigh"
-          ],
-          "mapping": {
-            "kind": "key",
-            "key": "reasoning_effort"
-          }
+          ]
         }
       ]
     },
@@ -1145,11 +1435,7 @@
             "medium",
             "high",
             "xhigh"
-          ],
-          "mapping": {
-            "kind": "key",
-            "key": "reasoning_effort"
-          }
+          ]
         }
       ]
     },
@@ -1169,11 +1455,7 @@
             "medium",
             "high",
             "xhigh"
-          ],
-          "mapping": {
-            "kind": "key",
-            "key": "reasoning_effort"
-          }
+          ]
         }
       ]
     },
@@ -1196,11 +1478,7 @@
             "medium",
             "high",
             "xhigh"
-          ],
-          "mapping": {
-            "kind": "key",
-            "key": "reasoning_effort"
-          }
+          ]
         }
       ]
     },
@@ -1220,70 +1498,7 @@
             "medium",
             "high",
             "xhigh"
-          ],
-          "mapping": {
-            "kind": "key",
-            "key": "reasoning_effort"
-          }
-        }
-      ]
-    },
-    {
-      "level": "adapter",
-      "match": {
-        "adapterID": "openAICompatibleChatCompletions"
-      },
-      "parameters": [
-        {
-          "id": "max_output_tokens",
-          "supported": true,
-          "mapping": {
-            "kind": "key",
-            "key": "max_tokens"
-          }
-        },
-        {
-          "id": "temperature",
-          "supported": true,
-          "defaultValue": 1,
-          "mapping": {
-            "kind": "key",
-            "key": "temperature"
-          },
-          "enabledByDefault": true
-        },
-        {
-          "id": "top_p",
-          "supported": true,
-          "defaultValue": 1,
-          "mapping": {
-            "kind": "key",
-            "key": "top_p"
-          },
-          "enabledByDefault": true
-        },
-        {
-          "id": "stop_sequences",
-          "supported": true,
-          "mapping": {
-            "kind": "key",
-            "key": "stop"
-          }
-        },
-        {
-          "id": "response_format",
-          "supported": true,
-          "mapping": {
-            "kind": "preset",
-            "preset": "openAIChatResponseFormat"
-          }
-        },
-        {
-          "id": "stream",
-          "supported": true,
-          "enabledByDefault": false,
-          "defaultValue": false,
-          "required": false
+          ]
         }
       ]
     },
@@ -1291,62 +1506,38 @@
       "level": "provider",
       "match": {
         "providerRegex": "^openRouter$",
-        "adapterID": "openAICompatibleChatCompletions"
+        "adapterID": "openRouterChatCompletions"
       },
       "parameters": [
         {
           "id": "max_output_tokens",
-          "supported": true,
-          "mapping": {
-            "kind": "key",
-            "key": "max_completion_tokens"
-          }
+          "supported": true
         },
         {
           "id": "top_k",
           "supported": true,
           "defaultValue": 0,
-          "mapping": {
-            "kind": "key",
-            "key": "top_k"
-          },
           "enabledByDefault": true
         },
         {
           "id": "service_tier",
           "supported": true,
           "defaultValue": "auto",
-          "mapping": {
-            "kind": "key",
-            "key": "service_tier"
-          },
           "enabledByDefault": true
         },
         {
           "id": "store",
-          "supported": true,
-          "mapping": {
-            "kind": "key",
-            "key": "store"
-          }
+          "supported": true
         },
         {
           "id": "parallel_tool_calls",
           "supported": true,
           "enabledByDefault": true,
-          "defaultValue": true,
-          "mapping": {
-            "kind": "key",
-            "key": "parallel_tool_calls"
-          }
+          "defaultValue": true
         },
         {
           "id": "reasoning_effort",
-          "supported": true,
-          "mapping": {
-            "kind": "preset",
-            "preset": "openRouterReasoning"
-          }
+          "supported": true
         }
       ]
     },
@@ -1354,7 +1545,7 @@
       "level": "provider",
       "match": {
         "providerRegex": "^xAI$",
-        "adapterID": "openAICompatibleChatCompletions"
+        "adapterID": "openAIChatCompletionsLegacy"
       },
       "parameters": [
         {
@@ -1364,31 +1555,19 @@
           "defaultValue": "default",
           "options": [
             "default"
-          ],
-          "mapping": {
-            "kind": "key",
-            "key": "service_tier"
-          }
+          ]
         },
         {
           "id": "store",
           "supported": true,
           "enabledByDefault": true,
-          "defaultValue": true,
-          "mapping": {
-            "kind": "key",
-            "key": "store"
-          }
+          "defaultValue": true
         },
         {
           "id": "parallel_tool_calls",
           "supported": true,
           "enabledByDefault": true,
-          "defaultValue": true,
-          "mapping": {
-            "kind": "key",
-            "key": "parallel_tool_calls"
-          }
+          "defaultValue": true
         }
       ]
     },
@@ -1397,7 +1576,7 @@
       "match": {
         "providerRegex": "^xAI$",
         "modelRegex": "^grok-4\\.3$",
-        "adapterID": "openAICompatibleChatCompletions"
+        "adapterID": "openAIChatCompletionsLegacy"
       },
       "parameters": [
         {
@@ -1410,11 +1589,7 @@
             "low",
             "medium",
             "high"
-          ],
-          "mapping": {
-            "kind": "key",
-            "key": "reasoning_effort"
-          }
+          ]
         }
       ]
     },
@@ -1423,7 +1598,7 @@
       "match": {
         "providerRegex": "^xAI$",
         "modelRegex": "^grok-4\\.20-multi-agent.*$",
-        "adapterID": "openAICompatibleChatCompletions"
+        "adapterID": "openAIChatCompletionsLegacy"
       },
       "parameters": [
         {
@@ -1436,11 +1611,7 @@
             "medium",
             "high",
             "xhigh"
-          ],
-          "mapping": {
-            "kind": "key",
-            "key": "reasoning_effort"
-          }
+          ]
         }
       ]
     },
@@ -1449,7 +1620,7 @@
       "match": {
         "providerRegex": "^xAI$",
         "modelRegex": "^grok-4($|-0709$)|^grok-4\\.20-.*non-reasoning.*$",
-        "adapterID": "openAICompatibleChatCompletions"
+        "adapterID": "openAIChatCompletionsLegacy"
       },
       "parameters": [
         {
@@ -1462,62 +1633,38 @@
       "level": "provider",
       "match": {
         "providerRegex": "^deepSeek$",
-        "adapterID": "openAICompatibleChatCompletions"
+        "adapterID": "openAIChatCompletionsLegacy"
       },
       "parameters": [
         {
           "id": "reasoning_effort",
           "supported": true,
           "enabledByDefault": true,
-          "defaultValue": "high",
-          "mapping": {
-            "kind": "key",
-            "key": "reasoning_effort"
-          }
+          "defaultValue": "high"
         },
         {
           "id": "max_output_tokens",
-          "supported": true,
-          "mapping": {
-            "kind": "key",
-            "key": "max_tokens"
-          }
+          "supported": true
         },
         {
           "id": "temperature",
           "supported": true,
           "defaultValue": 1,
-          "mapping": {
-            "kind": "key",
-            "key": "temperature"
-          },
           "enabledByDefault": true
         },
         {
           "id": "top_p",
           "supported": true,
           "defaultValue": 1,
-          "mapping": {
-            "kind": "key",
-            "key": "top_p"
-          },
           "enabledByDefault": true
         },
         {
           "id": "stop_sequences",
-          "supported": true,
-          "mapping": {
-            "kind": "key",
-            "key": "stop"
-          }
+          "supported": true
         },
         {
           "id": "response_format",
-          "supported": true,
-          "mapping": {
-            "kind": "preset",
-            "preset": "openAIChatResponseFormat"
-          }
+          "supported": true
         }
       ]
     },
@@ -1526,7 +1673,7 @@
       "match": {
         "providerRegex": "^deepSeek$",
         "modelRegex": "^deepseek-(reasoner|v4-pro)$",
-        "adapterID": "openAICompatibleChatCompletions"
+        "adapterID": "openAIChatCompletionsLegacy"
       },
       "parameters": [
         {
@@ -1541,11 +1688,7 @@
           "id": "reasoning_effort",
           "supported": true,
           "enabledByDefault": true,
-          "defaultValue": "high",
-          "mapping": {
-            "kind": "key",
-            "key": "reasoning_effort"
-          }
+          "defaultValue": "high"
         }
       ]
     },
@@ -1559,53 +1702,29 @@
         {
           "id": "max_output_tokens",
           "supported": true,
-          "required": true,
-          "mapping": {
-            "kind": "key",
-            "key": "max_tokens"
-          }
+          "required": true
         },
         {
           "id": "temperature",
           "supported": true,
           "defaultValue": 1,
-          "mapping": {
-            "kind": "key",
-            "key": "temperature"
-          },
           "enabledByDefault": true
         },
         {
           "id": "top_p",
-          "supported": true,
-          "mapping": {
-            "kind": "key",
-            "key": "top_p"
-          }
+          "supported": true
         },
         {
           "id": "top_k",
-          "supported": true,
-          "mapping": {
-            "kind": "key",
-            "key": "top_k"
-          }
+          "supported": true
         },
         {
           "id": "reasoning_budget_tokens",
-          "supported": true,
-          "mapping": {
-            "kind": "preset",
-            "preset": "anthropicThinking"
-          }
+          "supported": true
         },
         {
           "id": "stop_sequences",
-          "supported": true,
-          "mapping": {
-            "kind": "key",
-            "key": "stop_sequences"
-          }
+          "supported": true
         },
         {
           "id": "stream",

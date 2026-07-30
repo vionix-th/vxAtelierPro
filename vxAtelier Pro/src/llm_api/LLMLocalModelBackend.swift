@@ -26,7 +26,6 @@ protocol LLMLocalModelBackend {
 
     func availability() -> LLMLocalModelAvailability
     func statusText() -> String
-    func modelMetadata(configuration: LLMProviderConfiguration) -> [LLMProviderModelMetadata]
     func generateEvents(
         request: LLMGenerationRequest,
         configuration: LLMProviderConfiguration,

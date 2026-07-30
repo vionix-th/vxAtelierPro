@@ -1,16 +1,11 @@
 import Foundation
 
 /// Adapter for OpenAI Responses requests and events.
-struct OpenAIResponsesAdapter: LLMProviderAdapter {
+struct OpenAIResponsesAdapter: LLMGenerationAdapter {
     private static let generationPath = "/responses"
 
-    let profile: LLMProviderProfile
+    let id: LLMAdapterID = .openAIResponses
     private let httpClient = LLMHTTPClient()
-
-    /// Creates an adapter for a provider profile that supports Responses.
-    init(profile: LLMProviderProfile) {
-        self.profile = profile
-    }
 
     /// Executes a Responses request through the shared adapter run loop.
     func generateEvents(
@@ -38,15 +33,6 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
         )
     }
 
-    /// Reuses Chat Completions model listing for Responses-capable configurations.
-    func fetchModelMetadata(configuration: LLMProviderConfiguration) async throws -> [LLMProviderModelMetadata] {
-        if profile.id == .openAICodexChatGPTSubscription {
-            return CodexChatGPTModels.metadata()
-        }
-        let chatFallback = OpenAIChatCompletionsAdapter(profile: profile)
-        return try await chatFallback.fetchModelMetadata(configuration: configuration)
-    }
-
     /// Encodes a provider-neutral request into a Responses JSON body.
     func makeBody(for request: LLMGenerationRequest, stream: Bool) throws -> [String: JSONValue] {
         try request.validateActiveParameterMappings()
@@ -63,14 +49,14 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
            !request.options.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             body["instructions"] = .string(request.options.systemPrompt)
         }
-        try OpenAICompatibleEncoding.applyMappedOptions(
+        try OpenAIEncoding.applyMappedOptions(
             request.options,
             to: &body,
             parameters: request.activeParameters,
-            reservedProviderExtraKeys: OpenAICompatibleEncoding.responsesReservedProviderExtraKeys
+            reservedProviderExtraKeys: OpenAIEncoding.responsesReservedProviderExtraKeys
         )
         if !request.tools.isEmpty {
-            body["tools"] = .array(OpenAICompatibleEncoding.responsesTools(from: request.tools))
+            body["tools"] = .array(OpenAIEncoding.responsesTools(from: request.tools))
         }
         return body
     }
@@ -90,7 +76,7 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
             if hasProviderContent(message) {
                 items.append(.object([
                     "role": .string(message.role),
-                    "content": try OpenAICompatibleEncoding.responsesContent(from: message)
+                    "content": try OpenAIEncoding.responsesContent(from: message)
                 ]))
             }
             if message.role == "assistant" {
@@ -162,7 +148,7 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
         case "response.completed":
             let response = event.object("response")
             if let usage = response?.object("usage") {
-                continuation.yield(.usage(OpenAICompatibleEncoding.usage(from: usage, inputKey: "input_tokens", outputKey: "output_tokens")))
+                continuation.yield(.usage(OpenAIEncoding.usage(from: usage, inputKey: "input_tokens", outputKey: "output_tokens")))
             }
             continuation.yield(.generationCompleted(responseID: response?.string("id"), modelID: response?.string("model")))
         default:
@@ -204,7 +190,7 @@ struct OpenAIResponsesAdapter: LLMProviderAdapter {
             }
         }
         if let usage = object.object("usage") {
-            continuation.yield(.usage(OpenAICompatibleEncoding.usage(from: usage, inputKey: "input_tokens", outputKey: "output_tokens")))
+            continuation.yield(.usage(OpenAIEncoding.usage(from: usage, inputKey: "input_tokens", outputKey: "output_tokens")))
         }
         continuation.yield(.generationCompleted(responseID: object.string("id"), modelID: object.string("model")))
     }

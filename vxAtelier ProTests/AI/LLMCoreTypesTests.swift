@@ -17,10 +17,10 @@ final class LLMCoreTypesTests: XCTestCase {
         let zen = registry.profile(for: .openCodeZen)
         XCTAssertEqual(zen.defaultBaseURL, "https://opencode.ai/zen/v1")
         XCTAssertEqual(zen.authKind, .bearerToken)
-        XCTAssertEqual(zen.defaultAdapterID, .openAICompatibleChatCompletions)
+        XCTAssertEqual(zen.defaultAdapterID, .openAIChatCompletionsLegacy)
         XCTAssertEqual(
             Set(zen.supportedAdapterIDs),
-            Set([.openAIResponses, .anthropicMessages, .openAICompatibleChatCompletions])
+            Set([.openAIResponses, .anthropicMessages, .openAIChatCompletionsLegacy])
         )
         XCTAssertEqual(registry.profile(for: .appleIntelligence).transportKind, .localSystem)
         XCTAssertFalse(registry.profile(for: .appleIntelligence).requiresCredential)
@@ -31,11 +31,83 @@ final class LLMCoreTypesTests: XCTestCase {
         XCTAssertEqual(LLMProviderRegistry.providerID(fromProviderName: "OpenRouter"), .openRouter)
         XCTAssertEqual(LLMProviderRegistry.providerID(fromProviderName: "OpenCode Zen"), .openCodeZen)
         XCTAssertEqual(LLMProviderRegistry.providerID(fromProviderName: "OpenCode Zen Claude"), .openCodeZen)
-        let zenAdapter = try registry.resolveAdapter(
-            for: .openAICompatibleChatCompletions,
-            providerID: .openCodeZen
+        let zenRoute = try registry.resolveRoute(
+            adapterID: .openAIChatCompletionsLegacy,
+            providerID: .openCodeZen,
+            modelID: "deepseek-v4-flash",
+            configuration: LLMProviderConfiguration(
+                providerID: .openCodeZen,
+                baseURL: "https://opencode.ai/zen/v1",
+                credential: .secret("secret")
+            )
         )
-        XCTAssertTrue(zenAdapter is OpenCodeZenAdapter)
+        XCTAssertEqual(zenRoute.adapterID, .openAIChatCompletionsLegacy)
+        XCTAssertTrue(try LLMAdapterRegistry.shared.resolve(zenRoute.adapterID) is OpenAIChatCompletionsLegacyAdapter)
+    }
+
+    func testKnownProviderRouteMatrixIsExact() {
+        let registry = LLMProviderRegistry.shared
+        let expected: [LLMProviderID: Set<LLMAdapterID>] = [
+            .openAIPlatform: [.openAIResponses, .openAIChatCompletions],
+            .openAICodexChatGPTSubscription: [.openAIResponses],
+            .openCodeZen: [.openAIChatCompletionsLegacy, .openAIResponses, .anthropicMessages],
+            .appleIntelligence: [.foundationModels],
+            .anthropic: [.anthropicMessages],
+            .openRouter: [.openRouterChatCompletions],
+            .lmStudio: [.openAIChatCompletionsLegacy],
+            .ollama: [.openAIChatCompletionsLegacy],
+            .xAI: [.openAIChatCompletionsLegacy],
+            .deepSeek: [.openAIChatCompletionsLegacy]
+        ]
+
+        for (providerID, adapterIDs) in expected {
+            XCTAssertEqual(Set(registry.profile(for: providerID).supportedAdapterIDs), adapterIDs)
+        }
+    }
+
+    func testCustomSupportsEveryRemoteAdapterAndAuthKind() {
+        let profile = LLMProviderRegistry.shared.profile(for: .custom)
+        XCTAssertEqual(Set(profile.supportedAdapterIDs), Set(LLMAdapterID.allCases.filter(\.isRemote)))
+        for route in profile.routes {
+            XCTAssertEqual(
+                Set(route.allowedAuthKinds),
+                Set([.none, .bearerToken, .xAPIKey, .customHeaders])
+            )
+        }
+    }
+
+    func testUnknownPersistedProviderAndAdapterIDsFailClosed() {
+        let configuration = APIConfigurationItem()
+        configuration.providerID = "future-provider"
+        configuration.adapterID = "future-adapter"
+
+        XCTAssertNil(configuration.parsedProviderID)
+        XCTAssertNil(configuration.parsedAdapterID)
+        XCTAssertThrowsError(try configuration.requireProviderID())
+        XCTAssertThrowsError(try configuration.requireAdapterID())
+        XCTAssertThrowsError(try configuration.makeLLMProviderConfiguration())
+    }
+
+    func testCustomAuthenticationOwnsTypedHeaderAndValidatesHeaderNames() throws {
+        let configuration = APIConfigurationItem(
+            name: "Custom",
+            apiKey: "secret",
+            baseURL: "https://unit.test/v1",
+            providerID: .custom
+        )
+        configuration.authKind = LLMAuthKind.bearerToken.rawValue
+        configuration.decodedHeaders = [
+            "Authorization": "entered-value",
+            "X-Trace": "trace"
+        ]
+
+        let runtime = try configuration.makeLLMProviderConfiguration()
+        let headers = LLMProviderHeaderResolver.headers(for: runtime)
+        XCTAssertEqual(headers["Authorization"], "Bearer secret")
+        XCTAssertEqual(headers["X-Trace"], "trace")
+
+        configuration.decodedHeaders = ["X-Test": "one", "x-test": "two"]
+        XCTAssertThrowsError(try configuration.makeLLMProviderConfiguration())
     }
 
     func testBundledDefaultsProvideProviderDefaultModels() {
@@ -49,46 +121,46 @@ final class LLMCoreTypesTests: XCTestCase {
         XCTAssertEqual(defaults.defaultModelID(for: .openRouter), "openai/gpt-5.4-nano")
         XCTAssertEqual(defaults.defaultModelID(for: .xAI), "grok-4.3")
         XCTAssertEqual(defaults.defaultModelID(for: .deepSeek), "deepseek-v4-flash")
-        XCTAssertNil(defaults.defaultModelID(for: .customOpenAICompatible))
+        XCTAssertNil(defaults.defaultModelID(for: .custom))
     }
 
     func testOpenCodeZenClassifiesOnlySupportedModelFamilies() {
         XCTAssertEqual(
-            OpenCodeZenAdapter.supportedAdapterID(for: "gpt-5.6-terra"),
+            OpenCodeZenProviderIntegration.supportedAdapterID(for: "gpt-5.6-terra"),
             .openAIResponses
         )
         XCTAssertEqual(
-            OpenCodeZenAdapter.supportedAdapterID(for: "claude-sonnet-4-6"),
+            OpenCodeZenProviderIntegration.supportedAdapterID(for: "claude-sonnet-4-6"),
             .anthropicMessages
         )
         XCTAssertEqual(
-            OpenCodeZenAdapter.supportedAdapterID(for: "qwen3.6-plus"),
+            OpenCodeZenProviderIntegration.supportedAdapterID(for: "qwen3.6-plus"),
             .anthropicMessages
         )
         XCTAssertEqual(
-            OpenCodeZenAdapter.supportedAdapterID(for: "deepseek-v4-flash"),
-            .openAICompatibleChatCompletions
+            OpenCodeZenProviderIntegration.supportedAdapterID(for: "deepseek-v4-flash"),
+            .openAIChatCompletionsLegacy
         )
         XCTAssertEqual(
-            OpenCodeZenAdapter.supportedAdapterID(for: "big-pickle"),
-            .openAICompatibleChatCompletions
+            OpenCodeZenProviderIntegration.supportedAdapterID(for: "big-pickle"),
+            .openAIChatCompletionsLegacy
         )
-        XCTAssertNil(OpenCodeZenAdapter.supportedAdapterID(for: "gemini-3.5-flash"))
-        XCTAssertNil(OpenCodeZenAdapter.supportedAdapterID(for: "future-model"))
+        XCTAssertNil(OpenCodeZenProviderIntegration.supportedAdapterID(for: "gemini-3.5-flash"))
+        XCTAssertNil(OpenCodeZenProviderIntegration.supportedAdapterID(for: "future-model"))
     }
 
     func testOpenCodeZenUsesAdapterSpecificAuthenticationHeaders() {
         func headers(for adapterID: LLMAdapterID) -> [String: String] {
             LLMProviderHeaderResolver.headers(for: LLMProviderConfiguration(
                 providerID: .openCodeZen,
-                authKind: OpenCodeZenAdapter.authKind(for: adapterID),
+                authKind: OpenCodeZenProviderIntegration.authKind(for: adapterID),
                 baseURL: "https://opencode.ai/zen/v1",
                 credential: .secret("zen-secret")
             ))
         }
 
         XCTAssertEqual(headers(for: .openAIResponses)["Authorization"], "Bearer zen-secret")
-        XCTAssertEqual(headers(for: .openAICompatibleChatCompletions)["Authorization"], "Bearer zen-secret")
+        XCTAssertEqual(headers(for: .openAIChatCompletionsLegacy)["Authorization"], "Bearer zen-secret")
         XCTAssertEqual(headers(for: .anthropicMessages)["x-api-key"], "zen-secret")
         XCTAssertEqual(headers(for: .anthropicMessages)["anthropic-version"], "2023-06-01")
         XCTAssertNil(headers(for: .anthropicMessages)["Authorization"])
@@ -118,7 +190,7 @@ final class LLMCoreTypesTests: XCTestCase {
 
         let zen = defaults.modelDefaults(
             providerID: .openCodeZen,
-            adapterID: .openAICompatibleChatCompletions,
+            adapterID: .openAIChatCompletionsLegacy,
             modelID: "deepseek-v4-flash"
         )
         XCTAssertEqual(zen?.contextSize, 1000000)
@@ -132,11 +204,11 @@ final class LLMCoreTypesTests: XCTestCase {
         XCTAssertTrue(apple?.capabilities?.contains(.tools) ?? false)
         XCTAssertTrue(apple?.capabilities?.contains(.streaming) ?? false)
 
-        let xAI = defaults.modelDefaults(providerID: .xAI, adapterID: .openAICompatibleChatCompletions, modelID: "grok-4.3")
+        let xAI = defaults.modelDefaults(providerID: .xAI, adapterID: .openAIChatCompletionsLegacy, modelID: "grok-4.3")
         XCTAssertEqual(xAI?.contextSize, 1000000)
         XCTAssertTrue(xAI?.capabilities?.contains(.jsonSchema) ?? false)
 
-        let deepSeek = defaults.modelDefaults(providerID: .deepSeek, adapterID: .openAICompatibleChatCompletions, modelID: "deepseek-v4-flash")
+        let deepSeek = defaults.modelDefaults(providerID: .deepSeek, adapterID: .openAIChatCompletionsLegacy, modelID: "deepseek-v4-flash")
         XCTAssertEqual(deepSeek?.contextSize, 1000000)
         XCTAssertTrue(deepSeek?.capabilities?.contains(.tools) ?? false)
     }
@@ -152,8 +224,8 @@ final class LLMCoreTypesTests: XCTestCase {
             defaultsCatalog: catalog,
             fallbackContextSize: 4096
         ).resolve(
-            providerID: .customOpenAICompatible,
-            adapterID: .openAICompatibleChatCompletions,
+            providerID: .custom,
+            adapterID: .openAIChatCompletionsLegacy,
             modelID: "unknown-model",
             metadata: nil
         )
@@ -317,19 +389,30 @@ final class LLMCoreTypesTests: XCTestCase {
                 {
                   "id": "max_output_tokens",
                   "supported": true,
-                  "mapping": {"kind": "key", "key": "max_tokens"},
+                  "mapping": {"kind": "key", "key": "max_completion_tokens"},
                   "enabledByDefault": true
                 }
               ]
             },
             {
               "level": "adapter",
-              "match": {"adapterID": "openAICompatibleChatCompletions"},
+              "match": {"adapterID": "openAIChatCompletionsLegacy"},
               "parameters": [
                 {
                   "id": "max_output_tokens",
                   "supported": true,
                   "mapping": {"kind": "key", "key": "max_tokens"}
+                }
+              ]
+            },
+            {
+              "level": "adapter",
+              "match": {"adapterID": "openRouterChatCompletions"},
+              "parameters": [
+                {
+                  "id": "max_output_tokens",
+                  "supported": true,
+                  "mapping": {"kind": "key", "key": "max_completion_tokens"}
                 }
               ]
             },
@@ -352,7 +435,6 @@ final class LLMCoreTypesTests: XCTestCase {
               "parameters": [
                 {
                   "id": "max_output_tokens",
-                  "mapping": {"kind": "key", "key": "max_completion_tokens"},
                   "required": true,
                   "defaultValue": 4096
                 },
@@ -363,14 +445,9 @@ final class LLMCoreTypesTests: XCTestCase {
               "level": "model",
               "match": {
                 "modelRegex": "(^|.*/)gpt-5([-.].*)?$",
-                "adapterID": "openAICompatibleChatCompletions"
+                "adapterID": "openAIChatCompletionsLegacy"
               },
-              "parameters": [
-                {
-                  "id": "max_output_tokens",
-                  "mapping": {"kind": "key", "key": "max_completion_tokens"}
-                }
-              ]
+              "parameters": [{"id": "max_output_tokens", "required": false}]
             }
           ]
         }
@@ -401,15 +478,37 @@ final class LLMCoreTypesTests: XCTestCase {
 
         let aggregatorMapping = catalog.parameterDefaults(
             providerID: .openRouter,
-            adapterID: .openAICompatibleChatCompletions,
+            adapterID: .openRouterChatCompletions,
             modelID: "openai/gpt-5-mini"
         ).first { $0.parameterID == .maxOutputTokens }?.mapping
         XCTAssertEqual(aggregatorMapping?.wireKey, "max_completion_tokens")
     }
 
+    func testDefaultsCatalogRejectsWireMappingsBelowAdapterLevel() {
+        XCTAssertThrowsError(try LLMDefaultsCatalog(data: Data("""
+        {
+          "providerDefaults": [],
+          "rules": [{
+            "level": "provider",
+            "match": {"providerRegex": "^openAIPlatform$", "adapterID": "openAIResponses"},
+            "parameters": [{
+              "id": "max_output_tokens",
+              "mapping": {"kind": "key", "key": "provider_owned_key"}
+            }]
+          }]
+        }
+        """.utf8))) { error in
+            guard case LLMDefaultsCatalogError.invalidRule(let level, let reason) = error else {
+                return XCTFail("Expected invalidRule, got \(error)")
+            }
+            XCTAssertEqual(level, "provider")
+            XCTAssertTrue(reason.contains("adapter"))
+        }
+    }
+
     func testModelMetadataDecoderUsesProviderMetadataOverDefaults() {
         let profile = LLMProviderRegistry.shared.profile(for: .openRouter)
-        let models = LLMModelMetadataDecoder.openAICompatibleMetadata(
+        let models = LLMModelMetadataDecoder.openAIShapedMetadata(
             from: [
                 .object([
                     "id": .string("vision-model"),
@@ -441,7 +540,7 @@ final class LLMCoreTypesTests: XCTestCase {
 
     func testModelMetadataDecoderLeavesMissingFieldsUnclaimed() {
         let profile = LLMProviderRegistry.shared.profile(for: .openRouter)
-        let models = LLMModelMetadataDecoder.openAICompatibleMetadata(
+        let models = LLMModelMetadataDecoder.openAIShapedMetadata(
             from: [.object(["id": .string("fallback-model")])],
             profile: profile
         )
@@ -471,9 +570,9 @@ final class LLMCoreTypesTests: XCTestCase {
             providerID: .openRouter
         )
 
-        XCTAssertEqual(config.providerIDEnum, .openRouter)
-        XCTAssertEqual(config.defaultAdapterIDEnum, .openAICompatibleChatCompletions)
-        XCTAssertEqual(config.makeLLMProviderConfiguration().baseURL, "https://openrouter.ai/api/v1")
+        XCTAssertEqual(config.parsedProviderID, .openRouter)
+        XCTAssertEqual(config.parsedAdapterID, .openRouterChatCompletions)
+        XCTAssertEqual(try config.makeLLMProviderConfiguration().baseURL, "https://openrouter.ai/api/v1")
     }
 
     func testMessageContentPartsAndDisplayTextOrdering() {

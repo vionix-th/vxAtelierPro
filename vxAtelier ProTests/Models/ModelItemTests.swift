@@ -61,7 +61,7 @@ final class ModelItemTests: XCTestCase {
 
         let fetched = try XCTUnwrap(try context.fetch(FetchDescriptor<ModelItem>()).first)
         XCTAssertEqual(fetched.apiConfiguration?.name, "Scoped OpenAI")
-        XCTAssertEqual(fetched.apiConfiguration?.providerIDEnum, .openAIPlatform)
+        XCTAssertEqual(fetched.apiConfiguration?.parsedProviderID, .openAIPlatform)
     }
 
     func testManualModelCreationDerivesDefaultsWithoutPersistingRows() throws {
@@ -71,7 +71,7 @@ final class ModelItemTests: XCTestCase {
             baseURL: "https://api.test.com/v1",
             providerID: .anthropic
         )
-        config.defaultAdapterIDEnum = .anthropicMessages
+        config.adapterID = LLMAdapterID.anthropicMessages.rawValue
         let model = ModelItem(modelID: "claude-sonnet-4-5", contextSize: 8192, apiConfiguration: config)
 
         let maxTokens = model.modelProfile.parameters[.maxOutputTokens]
@@ -88,7 +88,7 @@ final class ModelItemTests: XCTestCase {
             baseURL: "https://api.test.com/v1",
             providerID: .openAIPlatform
         )
-        config.defaultAdapterIDEnum = .openAIChatCompletions
+        config.adapterID = LLMAdapterID.openAIChatCompletions.rawValue
         let model = ModelItem(modelID: "gpt-5.4-nano", apiConfiguration: config)
         let temperature = model.modelProfile.parameters[.temperature]
 
@@ -103,7 +103,7 @@ final class ModelItemTests: XCTestCase {
             baseURL: "https://api.test.com/v1",
             providerID: .openAIPlatform
         )
-        config.defaultAdapterIDEnum = .openAIChatCompletions
+        config.adapterID = LLMAdapterID.openAIChatCompletions.rawValue
         let model = ModelItem(modelID: "gpt-4.1-nano", contextSize: 8192, apiConfiguration: config)
         context.insert(config)
         context.insert(model)

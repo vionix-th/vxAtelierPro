@@ -248,10 +248,12 @@ struct StatusBarConversationInfoRow: View {
 
     private var canConfigureStreaming: Bool {
         guard let configuration = conversation?.options.apiConfiguration else { return false }
-        guard (try? LLMProviderRegistry.shared.resolveAdapter(
-            for: configuration.defaultAdapterIDEnum,
-            providerID: configuration.providerIDEnum
-        )) != nil else {
+        guard let providerID = configuration.parsedProviderID,
+              let adapterID = configuration.parsedAdapterID,
+              (try? LLMProviderRegistry.shared.validateRoute(
+                adapterID: adapterID,
+                providerID: providerID
+              )) != nil else {
             return false
         }
         return selectedModel?.modelProfile.parameters[.stream]?.support.state == .supported

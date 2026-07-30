@@ -21,18 +21,17 @@ struct LLMSSECompletionPolicy {
     }
 }
 
-/// Provider adapters translate provider wire formats into the stable LLM domain.
+/// Generation adapters translate one exact wire contract into the stable LLM domain.
 ///
 /// Responsibilities:
 /// - Emit provider-neutral `LLMGenerationEvent` values for streamed and non-streamed requests.
 /// - Emit `.responseMetadata` when HTTP response metadata is available.
 /// - Emit `.generationCompleted` exactly once for complete provider responses, or throw if the provider stream ends before a required completion event.
 /// - Emit tool-call deltas and completed calls using provider order indexes so `LLMToolCallAssembler` can merge fragments deterministically.
-/// - Return raw provider model metadata without catalog enrichment; throw when model listing is unavailable unless the provider owns an explicit static inventory.
 typealias LLMToolExecutionHandler = @MainActor @Sendable (_ toolName: String, _ argumentsJSON: String) async throws -> String
 
-protocol LLMProviderAdapter {
-    var profile: LLMProviderProfile { get }
+protocol LLMGenerationAdapter {
+    var id: LLMAdapterID { get }
 
     /// Sends a request and emits normalized events regardless of provider wire format.
     func generateEvents(
@@ -41,6 +40,4 @@ protocol LLMProviderAdapter {
         toolExecutor: LLMToolExecutionHandler?
     ) -> AsyncThrowingStream<LLMGenerationEvent, Error>
 
-    /// Fetches raw provider model metadata.
-    func fetchModelMetadata(configuration: LLMProviderConfiguration) async throws -> [LLMProviderModelMetadata]
 }

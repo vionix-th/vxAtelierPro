@@ -69,7 +69,7 @@ struct ModelEditorView: View {
     }
 
     private var selectedAdapterID: LLMAdapterID {
-        selectedConfiguration?.defaultAdapterIDEnum ?? model.adapterID
+        selectedConfiguration?.parsedAdapterID ?? model.adapterID
     }
 
     private var draftProfile: LLMModelProfile {
@@ -79,7 +79,7 @@ struct ModelEditorView: View {
                 $0[$1.parameterID] = overrides(from: $1, validateValue: false)
             }
         return LLMModelProfileResolver(fallbackContextSize: AppDefaults.ModelContextSizes.defaultSize).resolve(
-            providerID: selectedConfiguration?.providerIDEnum ?? model.providerID,
+            providerID: selectedConfiguration?.parsedProviderID ?? model.providerID,
             adapterID: selectedAdapterID,
             modelID: modelID,
             metadata: model.providerMetadata,
@@ -155,7 +155,7 @@ struct ModelEditorView: View {
                 }
 
                 if !parameterOverrides.isEmpty {
-                    Section("Parameter Overrides") {
+                    Section {
                         ForEach($parameterOverrides) { $draft in
                             VStack(alignment: .leading, spacing: AppDefaults.paddingSmall) {
                                 HStack {
@@ -224,6 +224,10 @@ struct ModelEditorView: View {
                                 }
                             }
                         }
+                    } header: {
+                        Text("Unsafe Wire Overrides")
+                    } footer: {
+                        Text("Custom wire keys and presets bypass the adapter contract and are not guaranteed to remain compatible.")
                     }
                 }
             }

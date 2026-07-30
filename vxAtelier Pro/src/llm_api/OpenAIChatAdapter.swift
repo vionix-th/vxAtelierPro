@@ -1,18 +1,16 @@
 import Foundation
 
-/// Adapter for OpenAI Platform Chat Completions requests and events.
-struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
+/// Shared Chat Completions request and event codec.
+struct OpenAIChatCompletionsCodec {
     private static let generationPath = "/chat/completions"
-    private static let modelsPath = "/models"
 
-    let profile: LLMProviderProfile
     private let httpClient = LLMHTTPClient()
+    private let openRouterEncoding: OpenRouterChatCompletionsEncoding?
 
-    init(profile: LLMProviderProfile) {
-        self.profile = profile
+    init(openRouterEncoding: OpenRouterChatCompletionsEncoding? = nil) {
+        self.openRouterEncoding = openRouterEncoding
     }
 
-    /// Executes a Chat Completions request through the shared adapter run loop.
     func generateEvents(
         _ request: LLMGenerationRequest,
         configuration: LLMProviderConfiguration,
@@ -38,17 +36,6 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
         )
     }
 
-    /// Fetches OpenAI-compatible model metadata and maps it into candidates.
-    func fetchModelMetadata(configuration: LLMProviderConfiguration) async throws -> [LLMProviderModelMetadata] {
-        let httpConfig = httpClient.makeConfiguration(for: configuration)
-        let response: JSONValue = try await httpClient.getJSON(path: Self.modelsPath, configuration: httpConfig, responseType: JSONValue.self)
-        guard let data = response.objectValue?.array("data") else { return [] }
-        return LLMModelMetadataDecoder.openAICompatibleMetadata(
-            from: data,
-            profile: profile
-        )
-    }
-
     /// Encodes a provider-neutral request into a Chat Completions JSON body.
     func makeBody(for request: LLMGenerationRequest, stream: Bool) throws -> [String: JSONValue] {
         try request.validateActiveParameterMappings()
@@ -61,14 +48,16 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
         if request.usesAdapterEncoding(.stream) {
             body["stream"] = .boolean(stream)
         }
-        try OpenAICompatibleEncoding.applyMappedOptions(
+        try OpenAIEncoding.applyMappedOptions(
             request.options,
             to: &body,
             parameters: request.activeParameters,
-            reservedProviderExtraKeys: OpenAICompatibleEncoding.chatReservedProviderExtraKeys
+            reservedProviderExtraKeys: OpenAIEncoding.chatReservedProviderExtraKeys,
+            excludedStructuredPresets: openRouterEncoding == nil ? [] : [.openRouterReasoning]
         )
+        try openRouterEncoding?.apply(request: request, to: &body)
         if !request.tools.isEmpty {
-            body["tools"] = .array(OpenAICompatibleEncoding.chatTools(from: request.tools))
+            body["tools"] = .array(OpenAIEncoding.chatTools(from: request.tools))
             body["tool_choice"] = .string("auto")
         }
         return body
@@ -84,7 +73,7 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
         messages.append(contentsOf: try request.messages.map { message in
             var body: [String: JSONValue] = [
                 "role": .string(message.role),
-                "content": try OpenAICompatibleEncoding.chatContent(from: message)
+                "content": try OpenAIEncoding.chatContent(from: message)
             ]
             if let toolCallID = message.toolCallID {
                 body["tool_call_id"] = .string(toolCallID)
@@ -112,7 +101,7 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
               let choice = choices.first?.objectValue,
               let delta = choice.object("delta") else {
             if let usage = event.object("usage") {
-                return [.usage(OpenAICompatibleEncoding.usage(from: usage, inputKey: "prompt_tokens", outputKey: "completion_tokens"))]
+                return [.usage(OpenAIEncoding.usage(from: usage, inputKey: "prompt_tokens", outputKey: "completion_tokens"))]
             }
             return []
         }
@@ -136,7 +125,7 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
             }
         }
         if let usage = event.object("usage") {
-            events.append(.usage(OpenAICompatibleEncoding.usage(from: usage, inputKey: "prompt_tokens", outputKey: "completion_tokens")))
+            events.append(.usage(OpenAIEncoding.usage(from: usage, inputKey: "prompt_tokens", outputKey: "completion_tokens")))
         }
         return events
     }
@@ -171,34 +160,104 @@ struct OpenAIChatCompletionsAdapter: LLMProviderAdapter {
             }
         }
         if let usage = object.object("usage") {
-            continuation.yield(.usage(OpenAICompatibleEncoding.usage(from: usage, inputKey: "prompt_tokens", outputKey: "completion_tokens")))
+            continuation.yield(.usage(OpenAIEncoding.usage(from: usage, inputKey: "prompt_tokens", outputKey: "completion_tokens")))
         }
         continuation.yield(.generationCompleted(responseID: object.string("id"), modelID: object.string("model")))
     }
 }
 
-/// Adapter for providers that implement the OpenAI-compatible Chat Completions shape.
-struct OpenAICompatibleChatCompletionsAdapter: LLMProviderAdapter {
-    let profile: LLMProviderProfile
-    private let chatAdapter: OpenAIChatCompletionsAdapter
+struct OpenRouterChatCompletionsEncoding {
+    func apply(
+        request: LLMGenerationRequest,
+        to body: inout [String: JSONValue]
+    ) throws {
+        guard request.activeParameters.contains(where: {
+            $0.mapping.structuredPreset == .openRouterReasoning
+        }), let effort = request.options.reasoning, !effort.isEmpty else {
+            return
+        }
 
-    /// Creates an OpenAI-compatible Chat Completions adapter for a provider profile.
-    init(profile: LLMProviderProfile) {
-        self.profile = profile
-        self.chatAdapter = OpenAIChatCompletionsAdapter(profile: profile)
+        var reasoning = body["reasoning"]?.objectValue ?? [:]
+        guard reasoning["effort"] == nil else {
+            throw LLMProviderError.requestEncoding(
+                "OpenRouter reasoning collides with request field reasoning.effort."
+            )
+        }
+        reasoning["effort"] = .string(effort)
+        body["reasoning"] = .object(reasoning)
     }
+}
 
-    /// Executes a compatible Chat Completions request through the shared chat implementation.
+struct OpenAIChatCompletionsAdapter: LLMGenerationAdapter {
+    let id: LLMAdapterID = .openAIChatCompletions
+    private let codec = OpenAIChatCompletionsCodec()
+
     func generateEvents(
         _ request: LLMGenerationRequest,
         configuration: LLMProviderConfiguration,
         toolExecutor: LLMToolExecutionHandler?
     ) -> AsyncThrowingStream<LLMGenerationEvent, Error> {
-        chatAdapter.generateEvents(request, configuration: configuration, toolExecutor: toolExecutor)
+        codec.generateEvents(
+            request,
+            configuration: configuration,
+            toolExecutor: toolExecutor
+        )
     }
 
-    /// Fetches OpenAI-compatible model metadata and maps it into candidates.
-    func fetchModelMetadata(configuration: LLMProviderConfiguration) async throws -> [LLMProviderModelMetadata] {
-        try await chatAdapter.fetchModelMetadata(configuration: configuration)
+    func makeBody(
+        for request: LLMGenerationRequest,
+        stream: Bool
+    ) throws -> [String: JSONValue] {
+        try codec.makeBody(for: request, stream: stream)
+    }
+}
+
+struct OpenAIChatCompletionsLegacyAdapter: LLMGenerationAdapter {
+    let id: LLMAdapterID = .openAIChatCompletionsLegacy
+    private let codec = OpenAIChatCompletionsCodec()
+
+    func generateEvents(
+        _ request: LLMGenerationRequest,
+        configuration: LLMProviderConfiguration,
+        toolExecutor: LLMToolExecutionHandler?
+    ) -> AsyncThrowingStream<LLMGenerationEvent, Error> {
+        codec.generateEvents(
+            request,
+            configuration: configuration,
+            toolExecutor: toolExecutor
+        )
+    }
+
+    func makeBody(
+        for request: LLMGenerationRequest,
+        stream: Bool
+    ) throws -> [String: JSONValue] {
+        try codec.makeBody(for: request, stream: stream)
+    }
+}
+
+struct OpenRouterChatCompletionsAdapter: LLMGenerationAdapter {
+    let id: LLMAdapterID = .openRouterChatCompletions
+    private let codec = OpenAIChatCompletionsCodec(
+        openRouterEncoding: OpenRouterChatCompletionsEncoding()
+    )
+
+    func generateEvents(
+        _ request: LLMGenerationRequest,
+        configuration: LLMProviderConfiguration,
+        toolExecutor: LLMToolExecutionHandler?
+    ) -> AsyncThrowingStream<LLMGenerationEvent, Error> {
+        codec.generateEvents(
+            request,
+            configuration: configuration,
+            toolExecutor: toolExecutor
+        )
+    }
+
+    func makeBody(
+        for request: LLMGenerationRequest,
+        stream: Bool
+    ) throws -> [String: JSONValue] {
+        try codec.makeBody(for: request, stream: stream)
     }
 }

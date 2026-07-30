@@ -38,10 +38,10 @@ final class LLMLocalProviderTests: XCTestCase {
                 continuation.finish()
             }
         )
-        let adapter = FoundationModelsAdapter(profile: LLMProviderRegistry.shared.profile(for: .appleIntelligence), backend: backend)
+        let adapter = FoundationModelsAdapter(backend: backend)
         let configuration = LLMProviderConfiguration(providerID: .appleIntelligence, baseURL: "", credential: .none)
 
-        let fetchedModels = try await adapter.fetchModelMetadata(configuration: configuration)
+        let fetchedModels = backend.modelMetadata(configuration: configuration)
         XCTAssertEqual(fetchedModels, [candidate])
 
         let request = LLMGenerationRequest(
@@ -86,7 +86,7 @@ final class LLMLocalProviderTests: XCTestCase {
             statusTextResult: "Apple Intelligence unavailable.",
             candidatesResult: []
         )
-        let adapter = FoundationModelsAdapter(profile: LLMProviderRegistry.shared.profile(for: .appleIntelligence), backend: backend)
+        let adapter = FoundationModelsAdapter(backend: backend)
         let configuration = LLMProviderConfiguration(providerID: .appleIntelligence, baseURL: "", credential: .none)
 
         let request = LLMGenerationRequest(

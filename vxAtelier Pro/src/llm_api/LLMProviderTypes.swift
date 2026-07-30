@@ -19,7 +19,7 @@ enum LLMProviderID: String, Codable, CaseIterable, Identifiable {
     case xAI
     case deepSeek
     case anthropic
-    case customOpenAICompatible
+    case custom
 
     /// Exposes the raw provider key as the SwiftUI identity.
     var id: String { rawValue }
@@ -37,7 +37,7 @@ enum LLMProviderID: String, Codable, CaseIterable, Identifiable {
         case .xAI: return "xAI"
         case .deepSeek: return "DeepSeek"
         case .anthropic: return "Anthropic"
-        case .customOpenAICompatible: return "Custom OpenAI Compatible"
+        case .custom: return "Custom"
         }
     }
 }
@@ -46,7 +46,8 @@ enum LLMProviderID: String, Codable, CaseIterable, Identifiable {
 enum LLMAdapterID: String, Codable, CaseIterable, Identifiable {
     case openAIResponses
     case openAIChatCompletions
-    case openAICompatibleChatCompletions
+    case openAIChatCompletionsLegacy
+    case openRouterChatCompletions
     case anthropicMessages
     case foundationModels
 
@@ -58,10 +59,15 @@ enum LLMAdapterID: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .openAIResponses: return "OpenAI Responses"
         case .openAIChatCompletions: return "OpenAI Chat Completions"
-        case .openAICompatibleChatCompletions: return "OpenAI-Compatible Chat Completions"
+        case .openAIChatCompletionsLegacy: return "OpenAI Chat Completions (Legacy)"
+        case .openRouterChatCompletions: return "OpenRouter Chat Completions"
         case .anthropicMessages: return "Anthropic Messages"
         case .foundationModels: return "Foundation Models"
         }
+    }
+
+    var isRemote: Bool {
+        self != .foundationModels
     }
 }
 
@@ -75,15 +81,36 @@ enum LLMAuthKind: String, Codable, CaseIterable {
     case codexChatGPTDeviceCode
 }
 
-/// Static provider transport metadata used for configuration and adapter selection.
-struct LLMProviderProfile: Codable, Identifiable, Equatable {
-    var id: LLMProviderID
-    var name: String
+extension LLMAuthKind {
+    var requiresCredential: Bool {
+        switch self {
+        case .bearerToken, .xAPIKey, .codexChatGPTOAuth, .codexChatGPTDeviceCode:
+            return true
+        case .none, .customHeaders:
+            return false
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .none: return "None"
+        case .bearerToken: return "Bearer Token"
+        case .xAPIKey: return "x-api-key"
+        case .customHeaders: return "Custom Headers"
+        case .codexChatGPTOAuth: return "Codex OAuth"
+        case .codexChatGPTDeviceCode: return "Codex Device Code"
+        }
+    }
+}
+
+/// One generation route exposed by a provider integration.
+struct LLMProviderRouteProfile: Codable, Identifiable, Equatable {
+    var id: LLMAdapterID { adapterID }
+    var adapterID: LLMAdapterID
     var transportKind: LLMProviderTransportKind
     var defaultBaseURL: String
-    var authKind: LLMAuthKind
-    var defaultAdapterID: LLMAdapterID
-    var supportedAdapterIDs: [LLMAdapterID]
+    var defaultAuthKind: LLMAuthKind
+    var allowedAuthKinds: [LLMAuthKind]
     var isEnabled: Bool
 
     var requiresBaseURL: Bool {
@@ -91,29 +118,54 @@ struct LLMProviderProfile: Codable, Identifiable, Equatable {
     }
 
     var requiresCredential: Bool {
-        switch transportKind {
-        case .remoteHTTP:
-            return authKind != .none
-        case .localSystem, .localFile:
-            return false
-        }
+        transportKind == .remoteHTTP && defaultAuthKind.requiresCredential
+    }
+}
+
+/// Static provider metadata and its supported generation routes.
+struct LLMProviderProfile: Codable, Identifiable, Equatable {
+    var id: LLMProviderID
+    var name: String
+    var defaultAdapterID: LLMAdapterID
+    var routes: [LLMProviderRouteProfile]
+    var isEnabled: Bool
+
+    var supportedAdapterIDs: [LLMAdapterID] {
+        routes.filter(\.isEnabled).map(\.adapterID)
     }
 
-    var supportsRemoteModelListing: Bool {
-        switch transportKind {
-        case .remoteHTTP:
-            return true
-        case .localSystem, .localFile:
-            return false
-        }
+    var defaultRoute: LLMProviderRouteProfile? {
+        route(for: defaultAdapterID)
     }
 
-    var supportsSessionState: Bool {
-        switch transportKind {
-        case .remoteHTTP:
-            return false
-        case .localSystem, .localFile:
-            return true
-        }
+    var transportKind: LLMProviderTransportKind {
+        defaultRoute?.transportKind ?? .remoteHTTP
     }
+
+    var defaultBaseURL: String {
+        defaultRoute?.defaultBaseURL ?? ""
+    }
+
+    var authKind: LLMAuthKind {
+        defaultRoute?.defaultAuthKind ?? .none
+    }
+
+    var requiresBaseURL: Bool {
+        defaultRoute?.requiresBaseURL ?? false
+    }
+
+    var requiresCredential: Bool {
+        defaultRoute?.requiresCredential ?? false
+    }
+
+    func route(for adapterID: LLMAdapterID) -> LLMProviderRouteProfile? {
+        routes.first { $0.adapterID == adapterID && $0.isEnabled }
+    }
+}
+
+/// Effective provider route passed into generation execution.
+struct LLMResolvedProviderRoute: Equatable {
+    var providerID: LLMProviderID
+    var adapterID: LLMAdapterID
+    var configuration: LLMProviderConfiguration
 }

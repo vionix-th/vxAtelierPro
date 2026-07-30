@@ -44,11 +44,11 @@ final class ModelItem {
     }
 
     var providerID: LLMProviderID {
-        apiConfiguration?.providerIDEnum ?? .customOpenAICompatible
+        apiConfiguration?.parsedProviderID ?? .custom
     }
 
     var adapterID: LLMAdapterID {
-        apiConfiguration?.defaultAdapterIDEnum ?? .openAICompatibleChatCompletions
+        apiConfiguration?.parsedAdapterID ?? .openAIChatCompletionsLegacy
     }
 
     var modelOverrides: LLMModelOverrides {
@@ -71,6 +71,13 @@ final class ModelItem {
     }
 
     var modelProfile: LLMModelProfile {
+        modelProfile(providerID: providerID, adapterID: adapterID)
+    }
+
+    func modelProfile(
+        providerID: LLMProviderID,
+        adapterID: LLMAdapterID
+    ) -> LLMModelProfile {
         LLMModelProfileResolver(fallbackContextSize: AppDefaults.ModelContextSizes.defaultSize).resolve(
             providerID: providerID,
             adapterID: adapterID,

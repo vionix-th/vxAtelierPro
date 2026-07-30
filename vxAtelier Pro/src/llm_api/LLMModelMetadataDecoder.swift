@@ -2,8 +2,8 @@ import Foundation
 
 /// Decodes model-list payloads into provider metadata without catalog enrichment.
 enum LLMModelMetadataDecoder {
-    /// Maps OpenAI-compatible model objects into provider metadata.
-    static func openAICompatibleMetadata(
+    /// Maps OpenAI-shaped model objects into provider metadata.
+    static func openAIShapedMetadata(
         from data: [JSONValue],
         profile: LLMProviderProfile
     ) -> [LLMProviderModelMetadata] {
@@ -38,6 +38,13 @@ enum LLMModelMetadataDecoder {
                 rawMetadataJSON: rawJSONString(from: item)
             )
         }
+    }
+
+    static func openRouterMetadata(
+        from data: [JSONValue],
+        profile: LLMProviderProfile
+    ) -> [LLMProviderModelMetadata] {
+        openAIShapedMetadata(from: data, profile: profile)
     }
 
     /// Re-encodes raw provider metadata for diagnostics and persistence.

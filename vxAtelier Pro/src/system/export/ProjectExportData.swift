@@ -30,7 +30,12 @@ struct ProjectExportData: Codable {
     }
     
     func toDataItem(context: ModelContext) throws -> ProjectItem {
-        let project = ProjectItem(name, defaultOptions: defaultOptions.toDataItem(context: context), status: ItemStatus(rawValue: status) ?? ItemStatus.active, timestamp: timestamp)
+        let project = ProjectItem(
+            name,
+            defaultOptions: try defaultOptions.toDataItem(context: context),
+            status: ItemStatus(rawValue: status) ?? ItemStatus.active,
+            timestamp: timestamp
+        )
         
         if let conversations = conversations {
             for conversationData in conversations {
@@ -49,4 +54,11 @@ struct ProjectExportData: Codable {
         
         return project
     }
-} 
+
+    func validateRouteIdentity() throws {
+        _ = try defaultOptions.apiConfiguration?.toDataItem()
+        for conversation in conversations ?? [] {
+            try conversation.validateRouteIdentity()
+        }
+    }
+}

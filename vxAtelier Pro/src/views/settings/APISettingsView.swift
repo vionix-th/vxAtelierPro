@@ -111,11 +111,14 @@ struct APISettingsView: View {
     }
 
     private func metadata(for config: APIConfigurationItem) -> String? {
-        let profile = LLMProviderRegistry.shared.profile(for: config.providerIDEnum)
-        if profile.transportKind == .localSystem {
-            return LLMProviderRegistry.shared.localStatusText(for: config.providerIDEnum) ?? "On-device model"
+        guard let providerID = config.parsedProviderID else {
+            return "Invalid provider: \(config.providerID)"
         }
-        if config.providerIDEnum == .openAICodexChatGPTSubscription {
+        let profile = LLMProviderRegistry.shared.profile(for: providerID)
+        if profile.transportKind == .localSystem {
+            return LLMProviderRegistry.shared.localStatusText(for: providerID) ?? "On-device model"
+        }
+        if providerID == .openAICodexChatGPTSubscription {
             guard let tokenSet = config.codexChatGPTTokenSet else {
                 return "Codex ChatGPT Subscription: not signed in"
             }

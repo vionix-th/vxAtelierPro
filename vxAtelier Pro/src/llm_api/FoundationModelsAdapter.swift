@@ -6,12 +6,11 @@ import FoundationModels
 
 /// Adapter for Apple Foundation Models / Apple Intelligence local generation.
 @available(macOS 26.0, iOS 26.0, *)
-struct FoundationModelsAdapter: LLMProviderAdapter {
-    let profile: LLMProviderProfile
+struct FoundationModelsAdapter: LLMGenerationAdapter {
+    let id: LLMAdapterID = .foundationModels
     private let backend: any LLMLocalModelBackend
 
-    init(profile: LLMProviderProfile, backend: any LLMLocalModelBackend = FoundationModelsBackend()) {
-        self.profile = profile
+    init(backend: any LLMLocalModelBackend = FoundationModelsBackend()) {
         self.backend = backend
     }
 
@@ -27,9 +26,6 @@ struct FoundationModelsAdapter: LLMProviderAdapter {
         )
     }
 
-    func fetchModelMetadata(configuration: LLMProviderConfiguration) async throws -> [LLMProviderModelMetadata] {
-        backend.modelMetadata(configuration: configuration)
-    }
 }
 
 /// Foundation Models-backed local provider implementation.

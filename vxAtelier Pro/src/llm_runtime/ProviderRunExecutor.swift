@@ -3,18 +3,18 @@ import SwiftData
 
 /// Executes provider adapters and accumulates normalized run output.
 struct ProviderRunExecutor {
-    let registry: LLMProviderRegistry
+    let adapterRegistry: LLMAdapterRegistry
 
-    /// Creates an executor with an injectable provider registry.
-    init(registry: LLMProviderRegistry = .shared) {
-        self.registry = registry
+    /// Creates an executor with an injectable generation-adapter registry.
+    init(adapterRegistry: LLMAdapterRegistry = .shared) {
+        self.adapterRegistry = adapterRegistry
     }
 
     /// Performs one provider run, retrying once for retryable failures when requested.
     @MainActor
     func performRun(
         request: LLMGenerationRequest,
-        providerConfiguration: LLMProviderConfiguration,
+        resolvedRoute: LLMResolvedProviderRoute,
         draftSink: any ConversationDraftSink,
         conversationID: PersistentIdentifier,
         toolExecutor: LLMToolExecutionHandler? = nil,
@@ -23,7 +23,7 @@ struct ProviderRunExecutor {
         do {
             return try await collectRun(
                 request: request,
-                providerConfiguration: providerConfiguration,
+                resolvedRoute: resolvedRoute,
                 draftSink: draftSink,
                 conversationID: conversationID,
                 toolExecutor: toolExecutor
@@ -35,7 +35,7 @@ struct ProviderRunExecutor {
             draftSink.start(conversationID: conversationID)
             return try await collectRun(
                 request: request,
-                providerConfiguration: providerConfiguration,
+                resolvedRoute: resolvedRoute,
                 draftSink: draftSink,
                 conversationID: conversationID,
                 toolExecutor: toolExecutor
@@ -55,20 +55,34 @@ struct ProviderRunExecutor {
     @MainActor
     private func collectRun(
         request: LLMGenerationRequest,
-        providerConfiguration: LLMProviderConfiguration,
+        resolvedRoute: LLMResolvedProviderRoute,
         draftSink: any ConversationDraftSink,
         conversationID: PersistentIdentifier,
         toolExecutor: LLMToolExecutionHandler?
     ) async throws -> ProviderRunResult {
-        guard providerConfiguration.providerID == request.providerID else {
+        guard resolvedRoute.providerID == request.providerID else {
             throw LLMProviderError.invalidConfiguration(
-                "Provider configuration \(providerConfiguration.providerID.rawValue) does not match request provider \(request.providerID.rawValue)."
+                "Resolved route provider \(resolvedRoute.providerID.rawValue) does not match request provider \(request.providerID.rawValue)."
             )
         }
-        let adapter = try registry.resolveAdapter(for: request.adapterID, providerID: request.providerID)
+        guard resolvedRoute.adapterID == request.adapterID else {
+            throw LLMProviderError.invalidConfiguration(
+                "Resolved route adapter \(resolvedRoute.adapterID.rawValue) does not match request adapter \(request.adapterID.rawValue)."
+            )
+        }
+        guard resolvedRoute.configuration.providerID == resolvedRoute.providerID else {
+            throw LLMProviderError.invalidConfiguration(
+                "Resolved transport provider \(resolvedRoute.configuration.providerID.rawValue) does not match route provider \(resolvedRoute.providerID.rawValue)."
+            )
+        }
+        let adapter = try adapterRegistry.resolve(resolvedRoute.adapterID)
         var result = ProviderRunResult()
 
-        for try await event in adapter.generateEvents(request, configuration: providerConfiguration, toolExecutor: toolExecutor) {
+        for try await event in adapter.generateEvents(
+            request,
+            configuration: resolvedRoute.configuration,
+            toolExecutor: toolExecutor
+        ) {
             switch event {
             case .generationStarted(let requestID):
                 result.requestID = result.requestID ?? requestID

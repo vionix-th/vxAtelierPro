@@ -71,12 +71,12 @@ final class LLMModelProfileRefactorTests: XCTestCase {
             defaultsCatalog: catalog,
             fallbackContextSize: 4096
         ).resolve(
-            providerID: .customOpenAICompatible,
-            adapterID: .openAICompatibleChatCompletions,
+            providerID: .custom,
+            adapterID: .openAIChatCompletionsLegacy,
             modelID: "future-model",
             metadata: LLMProviderModelMetadata(
                 id: "future-model",
-                providerID: .customOpenAICompatible,
+                providerID: .custom,
                 parameterSupportClaims: [
                     LLMParameterSupportClaim(parameterID: .reasoningEffort, state: .supported)
                 ]
@@ -102,7 +102,7 @@ final class LLMModelProfileRefactorTests: XCTestCase {
             ),
             resolver.resolve(
                 providerID: .openRouter,
-                adapterID: .openAICompatibleChatCompletions,
+                adapterID: .openRouterChatCompletions,
                 modelID: "openai/gpt-5.4-nano",
                 metadata: nil
             )
@@ -293,9 +293,7 @@ final class LLMModelProfileRefactorTests: XCTestCase {
             baseURL: "https://unit.test/v1",
             credential: .secret("key")
         )
-        let adapter = OpenAIResponsesAdapter(
-            profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform)
-        )
+        let adapter = OpenAIResponsesAdapter()
 
         var events: [LLMGenerationEvent] = []
         for try await event in adapter.generateEvents(
@@ -420,7 +418,7 @@ final class LLMModelProfileRefactorTests: XCTestCase {
         ]
 
         let originalProfile = model.modelProfile
-        let restored = ModelExportData(model).toDataItem(apiConfigurations: [configuration])
+        let restored = try ModelExportData(model).toDataItem(apiConfigurations: [configuration])
 
         XCTAssertEqual(restored.providerContextSize, 12_000)
         XCTAssertEqual(restored.contextSizeOverride, 24_000)

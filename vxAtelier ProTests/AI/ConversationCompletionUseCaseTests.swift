@@ -449,7 +449,7 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
             name: "Custom",
             apiKey: "",
             baseURL: "https://unit.test/v1",
-            providerID: .customOpenAICompatible
+            providerID: .custom
         )
         let options = ConversationOptions(apiConfiguration: config)
         let conversation = ConversationItem("Preflight", options: options)

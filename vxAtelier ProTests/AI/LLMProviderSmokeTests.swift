@@ -46,7 +46,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
     func testOpenAIQueryManagerLiveFetchModelsPersistsCompletedDefaults() async throws {
         let (suite, provider) = try loadEnabledProvider(providerID: .openAIPlatform, adapterID: .openAIResponses)
         let config = makeAPIConfigurationItem(for: provider, suite: suite, adapterID: .openAIResponses)
-        let configuration = config.makeLLMProviderConfiguration()
+        let configuration = try config.makeLLMProviderConfiguration()
         recordConfigurationActivity(provider: provider, adapterID: .openAIResponses, configuration: configuration)
         assertRequiredCredentialPresent(provider: provider, configuration: configuration)
 
@@ -95,31 +95,31 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
     }
 
     func testOpenCodeZenChatCompletionsLiveSmoke() async throws {
-        try await runLiveSmoke(providerID: .openCodeZen, adapterID: .openAICompatibleChatCompletions)
+        try await runLiveSmoke(providerID: .openCodeZen, adapterID: .openAIChatCompletionsLegacy)
     }
 
     func testOpenRouterChatCompletionsLiveSmoke() async throws {
-        try await runLiveSmoke(providerID: .openRouter, adapterID: .openAICompatibleChatCompletions)
+        try await runLiveSmoke(providerID: .openRouter, adapterID: .openRouterChatCompletions)
     }
 
     func testLMStudioChatCompletionsLiveSmoke() async throws {
-        try await runLiveSmoke(providerID: .lmStudio, adapterID: .openAICompatibleChatCompletions)
+        try await runLiveSmoke(providerID: .lmStudio, adapterID: .openAIChatCompletionsLegacy)
     }
 
     func testOllamaChatCompletionsLiveSmoke() async throws {
-        try await runLiveSmoke(providerID: .ollama, adapterID: .openAICompatibleChatCompletions)
+        try await runLiveSmoke(providerID: .ollama, adapterID: .openAIChatCompletionsLegacy)
     }
 
     func testXAIChatCompletionsLiveSmoke() async throws {
-        try await runLiveSmoke(providerID: .xAI, adapterID: .openAICompatibleChatCompletions)
+        try await runLiveSmoke(providerID: .xAI, adapterID: .openAIChatCompletionsLegacy)
     }
 
     func testDeepSeekChatCompletionsLiveSmoke() async throws {
-        try await runLiveSmoke(providerID: .deepSeek, adapterID: .openAICompatibleChatCompletions)
+        try await runLiveSmoke(providerID: .deepSeek, adapterID: .openAIChatCompletionsLegacy)
     }
 
-    func testCustomOpenAICompatibleChatCompletionsLiveSmoke() async throws {
-        try await runLiveSmoke(providerID: .customOpenAICompatible, adapterID: .openAICompatibleChatCompletions)
+    func testCustomLegacyChatCompletionsLiveSmoke() async throws {
+        try await runLiveSmoke(providerID: .custom, adapterID: .openAIChatCompletionsLegacy)
     }
 
     private func runLiveSmoke(providerID: LLMProviderID, adapterID: LLMAdapterID) async throws {
@@ -133,13 +133,17 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         adapterID: LLMAdapterID
     ) async throws {
         let providerID = provider.id
-        let adapter = try LLMProviderRegistry.shared.resolveAdapter(for: adapterID, providerID: providerID)
+        let adapter = try LLMAdapterRegistry.shared.resolve(adapterID)
         let models = try provider.resolvedModels()
         let configuration = try await makeConfiguration(for: provider, suite: suite, adapterID: adapterID)
 
         if provider.checkModels ?? true {
             _ = try await runProviderOperation(provider: provider, adapterID: adapterID, operation: "models") {
-                _ = try await adapter.fetchModelMetadata(configuration: configuration)
+                _ = try await LLMProviderRegistry.shared.fetchModelMetadata(
+                    adapterID: adapterID,
+                    providerID: providerID,
+                    configuration: configuration
+                )
                 return true
             }
         }
@@ -150,10 +154,16 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
                 let activity = activityName(provider: provider, adapterID: adapterID, model: model, scenario: scenario)
                 recordActivity(named: activity)
                 let passed = try await runProviderOperation(provider: provider, adapterID: adapterID, model: model, operation: scenario.name) {
+                    let route = try LLMProviderRegistry.shared.resolveRoute(
+                        adapterID: adapterID,
+                        providerID: providerID,
+                        modelID: model,
+                        configuration: configuration
+                    )
                     let events = try await collectEvents(
                         adapter.generateEvents(
                             makeRequest(providerID: providerID, adapterID: adapterID, model: model, scenario: scenario),
-                            configuration: configuration,
+                            configuration: route.configuration,
                             toolExecutor: nil
                         )
                     )
@@ -168,7 +178,6 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
 
     private func runLiveModelFetch(providerID: LLMProviderID, adapterID: LLMAdapterID) async throws {
         let (suite, provider) = try loadEnabledProvider(providerID: providerID, adapterID: adapterID)
-        let adapter = try LLMProviderRegistry.shared.resolveAdapter(for: adapterID, providerID: providerID)
         let configuration = try await makeConfiguration(for: provider, suite: suite, adapterID: adapterID)
         recordConfigurationActivity(provider: provider, adapterID: adapterID, configuration: configuration)
         assertRequiredCredentialPresent(provider: provider, configuration: configuration)
@@ -176,7 +185,6 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         let fetchedModels = try await runProviderModelFetch(
             provider: provider,
             adapterID: adapterID,
-            adapter: adapter,
             configuration: configuration
         )
         try assertFetchedModelMetadata(fetchedModels, provider: provider, adapterID: adapterID)
@@ -185,12 +193,15 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
     private func runProviderModelFetch(
         provider: LiveSmokeProvider,
         adapterID: LLMAdapterID,
-        adapter: LLMProviderAdapter,
         configuration: LLMProviderConfiguration
     ) async throws -> [LLMProviderModelMetadata] {
         var fetchedModels: [LLMProviderModelMetadata] = []
         _ = try await runProviderOperation(provider: provider, adapterID: adapterID, operation: "live model fetch") {
-            fetchedModels = try await adapter.fetchModelMetadata(configuration: configuration)
+            fetchedModels = try await LLMProviderRegistry.shared.fetchModelMetadata(
+                adapterID: adapterID,
+                providerID: provider.id,
+                configuration: configuration
+            )
             return true
         }
         XCTContext.runActivity(named: "Adapter live /models response") { activity in
@@ -218,17 +229,17 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         let configuration = APIConfigurationItem(
             name: provider.name ?? "\(profile.name) Live Smoke",
             apiKey: provider.apiKey ?? "",
-            baseURL: provider.baseURL ?? profile.defaultBaseURL,
+            baseURL: provider.baseURL ?? profile.route(for: adapterID)?.defaultBaseURL ?? "",
             defaultModel: provider.primaryModel,
             providerID: provider.id
         )
         if let authKind = provider.authKind {
-            configuration.authKindEnum = authKind
+            configuration.authKind = authKind.rawValue
         }
         if let credentialJSON = provider.credentialJSON {
             configuration.credentialJSON = credentialJSON
         }
-        configuration.defaultAdapterIDEnum = adapterID
+        configuration.adapterID = adapterID.rawValue
         configuration.decodedHeaders = provider.headers ?? [:]
         configuration.decodedOptions = mergedOptions(provider: provider, suite: suite)
         return configuration
@@ -530,7 +541,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
 
     private func adapterSupportsTools(_ adapterID: LLMAdapterID) -> Bool {
         switch adapterID {
-        case .openAIResponses, .openAIChatCompletions, .openAICompatibleChatCompletions, .anthropicMessages:
+        case .openAIResponses, .openAIChatCompletions, .openAIChatCompletionsLegacy, .anthropicMessages:
             return true
         }
     }

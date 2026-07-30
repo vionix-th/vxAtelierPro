@@ -18,9 +18,8 @@ struct ConversationRunContextResolver {
         conversation: ConversationItem,
         apiConfig: APIConfigurationItem
     ) async throws -> ConversationRunContext {
-        let providerID = apiConfig.providerIDEnum
-        let adapterID = apiConfig.defaultAdapterIDEnum
-        try registry.validateRoute(adapterID: adapterID, providerID: providerID)
+        let providerID = try apiConfig.requireProviderID()
+        let adapterID = try apiConfig.requireAdapterID()
 
         let modelID = conversation.options.selectedModelID ?? apiConfig.defaultModelID
         guard let modelID, !modelID.isEmpty else {
@@ -29,13 +28,23 @@ struct ConversationRunContextResolver {
         guard let model = apiConfig.models.first(where: { $0.modelID == modelID }) else {
             throw LLMProviderError.invalidConfiguration("Model \(modelID) is not available for \(apiConfig.name).")
         }
+        let providerConfiguration = try await CodexChatGPTOAuthService.resolvedProviderConfiguration(for: apiConfig)
+        let resolvedRoute = try registry.resolveRoute(
+            adapterID: adapterID,
+            providerID: providerID,
+            modelID: modelID,
+            configuration: providerConfiguration
+        )
 
         let rawOptions = conversation.options.generationOptions(resolvedModelID: modelID)
         let resolvedParameters = try LLMGenerationOptionsResolver.resolve(
             options: rawOptions,
             conversationPreferences: conversation.options.parameterInclusionPreferences,
             providedParameterIDs: Set(conversation.options.decodedParameterValues.keys.compactMap(LLMParameterID.init(rawValue:))),
-            parameterProfiles: model.modelProfile.parameters
+            parameterProfiles: model.modelProfile(
+                providerID: resolvedRoute.providerID,
+                adapterID: resolvedRoute.adapterID
+            ).parameters
         )
         let tools = toolCatalog.allTools()
             .filter { conversation.options.isToolEnabled($0.name) }
@@ -45,9 +54,7 @@ struct ConversationRunContextResolver {
 
         return ConversationRunContext(
             conversationID: conversation.persistentModelID,
-            providerConfiguration: try await CodexChatGPTOAuthService.resolvedProviderConfiguration(for: apiConfig),
-            providerID: providerID,
-            adapterID: adapterID,
+            resolvedRoute: resolvedRoute,
             modelID: modelID,
             activeParameters: resolvedParameters.activeParameters,
             messages: messages,

@@ -112,7 +112,7 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
             defaultModel: "gpt-4.1-nano",
             providerID: .openAIPlatform
         )
-        config.defaultAdapterIDEnum = .openAIChatCompletions
+        config.adapterID = LLMAdapterID.openAIChatCompletions.rawValue
         config.models = [ModelItem(modelID: "gpt-4.1-nano", apiConfiguration: config)]
         let options = ConversationOptions(apiConfiguration: config)
         options.temperature = 0.7

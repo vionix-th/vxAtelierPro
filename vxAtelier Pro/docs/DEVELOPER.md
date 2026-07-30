@@ -1015,7 +1015,8 @@ views/
 ### LLM API Layer
 | Protocol | Purpose | Key Conformers |
 |----------|---------|----------------|
-| `LLMProviderAdapter` | Top-level provider adapter interface for streaming and model fetches. | `OpenAIResponsesAdapter`, `OpenAIChatCompletionsAdapter`, `OpenAICompatibleChatCompletionsAdapter`, `AnthropicMessagesAdapter` |
+| `LLMGenerationAdapter` | Pure provider-neutral generation interface for one exact wire contract. | `OpenAIResponsesAdapter`, `OpenAIChatCompletionsAdapter`, `OpenAIChatCompletionsLegacyAdapter`, `OpenRouterChatCompletionsAdapter`, `AnthropicMessagesAdapter` |
+| `LLMProviderIntegration` / `LLMModelCatalog` | Provider route, authentication, validation, and model-discovery boundaries. | Standard, OpenCode Zen, and Apple integrations plus protocol-specific catalogs |
 | `LLMGenerationRequest` / `LLMMessage` / `LLMGenerationEvent` | Provider-neutral request, message, and generation event types. | LLM protocol structs under `src/llm_api` |
 | `LLMModelProfileResolver` | Sole resolution path for provider metadata, catalog rules, fallbacks, and explicit overrides. | Runtime, settings, and model-selection projections |
 | `LLMProviderProfile` | Provider capabilities, auth kind, supported adapters, defaults, and feature flags. | Profiles in `LLMProviderRegistry` |
@@ -1116,8 +1117,8 @@ All logging routes through `vxAtelierPro.log` (`LoggingService.shared`), which w
 ## Extending the App
 1. **Add a new AI Provider**
    * Add an `LLMProviderProfile` entry in `LLMProviderRegistry` with provider ID, auth kind, API-root base URL, supported adapter IDs, default adapter ID, and enabled state.
-   * Add model capability and parameter-mapping defaults to `LLMDefaults.json`.
-   * If the provider uses a non-OpenAI-compatible API, implement `LLMProviderAdapter` (`stream` + `fetchModels`) and wire it in `LLMProviderRegistry.adapter(for:)`.
+   * Add model capability and parameter-policy defaults to `LLMDefaults.json`; wire mappings belong only to adapter rules.
+   * Add an `LLMProviderIntegration` and catalog behavior. Implement an `LLMGenerationAdapter` only when the provider exposes a distinct generation wire contract, then register it in `LLMAdapterRegistry`.
    * Add model decoding and fixture tests under `vxAtelier ProTests/AI`.
 2. **Add a New Feature Tab**
    * Add SwiftUI view under `views/` and wire to sidebar.

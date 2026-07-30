@@ -1,224 +1,104 @@
 import Foundation
 
-/// Registry of built-in provider profiles and their adapter implementations.
 struct LLMProviderRegistry {
     static let shared = LLMProviderRegistry()
 
     let profiles: [LLMProviderID: LLMProviderProfile]
+    private let integrations: [LLMProviderID: any LLMProviderIntegration]
 
-    /// Builds the built-in provider profiles used by configuration and adapter selection.
     init() {
-        let allProfiles = [
-            LLMProviderProfile(
-                id: .openAIPlatform,
-                name: "OpenAI",
-                transportKind: .remoteHTTP,
-                defaultBaseURL: AppDefaults.OpenAi.baseURL,
-                authKind: .bearerToken,
-                defaultAdapterID: .openAIResponses,
-                supportedAdapterIDs: [.openAIResponses, .openAIChatCompletions],
-                isEnabled: true
-            ),
-            LLMProviderProfile(
-                id: .openAICodexChatGPTSubscription,
-                name: "Codex ChatGPT Subscription",
-                transportKind: .remoteHTTP,
-                defaultBaseURL: "https://chatgpt.com/backend-api/codex",
-                authKind: .codexChatGPTOAuth,
-                defaultAdapterID: .openAIResponses,
-                supportedAdapterIDs: [.openAIResponses],
-                isEnabled: true
-            ),
-            LLMProviderProfile(
-                id: .openCodeZen,
-                name: "OpenCode Zen",
-                transportKind: .remoteHTTP,
-                defaultBaseURL: "https://opencode.ai/zen/v1",
-                authKind: .bearerToken,
-                defaultAdapterID: .openAICompatibleChatCompletions,
-                supportedAdapterIDs: [
-                    .openAIResponses,
-                    .anthropicMessages,
-                    .openAICompatibleChatCompletions
-                ],
-                isEnabled: true
-            ),
-            LLMProviderProfile(
-                id: .appleIntelligence,
-                name: "Apple Intelligence",
-                transportKind: .localSystem,
-                defaultBaseURL: "",
-                authKind: .none,
-                defaultAdapterID: .foundationModels,
-                supportedAdapterIDs: [.foundationModels],
-                isEnabled: true
-            ),
-            LLMProviderProfile(
-                id: .anthropic,
-                name: "Anthropic",
-                transportKind: .remoteHTTP,
-                defaultBaseURL: AppDefaults.Anthropic.baseURL,
-                authKind: .xAPIKey,
-                defaultAdapterID: .anthropicMessages,
-                supportedAdapterIDs: [.anthropicMessages],
-                isEnabled: true
-            ),
-            LLMProviderProfile(
-                id: .openRouter,
-                name: "OpenRouter",
-                transportKind: .remoteHTTP,
-                defaultBaseURL: "https://openrouter.ai/api/v1",
-                authKind: .bearerToken,
-                defaultAdapterID: .openAICompatibleChatCompletions,
-                supportedAdapterIDs: [.openAICompatibleChatCompletions],
-                isEnabled: true
-            ),
-            LLMProviderProfile(
-                id: .lmStudio,
-                name: "LM Studio",
-                transportKind: .remoteHTTP,
-                defaultBaseURL: "http://localhost:1234/v1",
-                authKind: .none,
-                defaultAdapterID: .openAICompatibleChatCompletions,
-                supportedAdapterIDs: [.openAICompatibleChatCompletions],
-                isEnabled: true
-            ),
-            LLMProviderProfile(
-                id: .ollama,
-                name: "Ollama",
-                transportKind: .remoteHTTP,
-                defaultBaseURL: "http://localhost:11434/v1",
-                authKind: .none,
-                defaultAdapterID: .openAICompatibleChatCompletions,
-                supportedAdapterIDs: [.openAICompatibleChatCompletions],
-                isEnabled: true
-            ),
-            LLMProviderProfile(
-                id: .xAI,
-                name: "xAI",
-                transportKind: .remoteHTTP,
-                defaultBaseURL: AppDefaults.XAI.baseURL,
-                authKind: .bearerToken,
-                defaultAdapterID: .openAICompatibleChatCompletions,
-                supportedAdapterIDs: [.openAICompatibleChatCompletions],
-                isEnabled: true
-            ),
-            LLMProviderProfile(
-                id: .deepSeek,
-                name: "DeepSeek",
-                transportKind: .remoteHTTP,
-                defaultBaseURL: AppDefaults.DeepSeek.baseURL,
-                authKind: .bearerToken,
-                defaultAdapterID: .openAICompatibleChatCompletions,
-                supportedAdapterIDs: [.openAICompatibleChatCompletions],
-                isEnabled: true
-            ),
-            LLMProviderProfile(
-                id: .customOpenAICompatible,
-                name: "Custom OpenAI Compatible",
-                transportKind: .remoteHTTP,
-                defaultBaseURL: AppDefaults.OpenAi.baseURL,
-                authKind: .bearerToken,
-                defaultAdapterID: .openAICompatibleChatCompletions,
-                supportedAdapterIDs: [.openAICompatibleChatCompletions],
-                isEnabled: true
-            )
-        ]
-        self.profiles = Dictionary(uniqueKeysWithValues: allProfiles.map { ($0.id, $0) })
+        let profiles = Self.makeProfiles()
+        self.profiles = profiles
+
+        var integrations: [LLMProviderID: any LLMProviderIntegration] = [:]
+        for providerID in LLMProviderID.allCases {
+            guard let profile = profiles[providerID] else { continue }
+            switch providerID {
+            case .openCodeZen:
+                integrations[providerID] = OpenCodeZenProviderIntegration(profile: profile)
+            case .appleIntelligence:
+                #if canImport(FoundationModels)
+                if #available(macOS 26.0, iOS 26.0, *) {
+                    integrations[providerID] = AppleIntelligenceProviderIntegration(profile: profile)
+                }
+                #endif
+            default:
+                integrations[providerID] = StandardLLMProviderIntegration(
+                    profile: profile,
+                    catalogs: Self.catalogs(for: profile)
+                )
+            }
+        }
+        self.integrations = integrations
     }
 
-    /// Returns the profile for a provider, falling back to the custom compatible profile.
     func profile(for id: LLMProviderID) -> LLMProviderProfile {
-        profiles[id] ?? profiles[.customOpenAICompatible]!
-    }
-
-    /// Creates the default adapter appropriate for the provider profile.
-    func defaultAdapter(for providerID: LLMProviderID) throws -> LLMProviderAdapter {
-        let profile = profile(for: providerID)
-        return try resolveAdapter(for: profile.defaultAdapterID, providerID: providerID)
+        guard let profile = profiles[id] else {
+            preconditionFailure("Missing provider profile for \(id.rawValue).")
+        }
+        return profile
     }
 
     func validateRoute(adapterID: LLMAdapterID, providerID: LLMProviderID) throws {
-        let profile = profile(for: providerID)
-        guard profile.isEnabled else {
-            throw LLMProviderError.authUnavailable("\(profile.name) is disabled.")
-        }
-        guard profile.supportedAdapterIDs.contains(adapterID) else {
-            throw LLMProviderError.invalidConfiguration(
-                "\(profile.name) cannot use \(adapterID.rawValue)."
-            )
-        }
+        let configuration = LLMProviderConfiguration(
+            providerID: providerID,
+            baseURL: profile(for: providerID).route(for: adapterID)?.defaultBaseURL ?? ""
+        )
+        _ = try resolveRoute(
+            adapterID: adapterID,
+            providerID: providerID,
+            modelID: nil,
+            configuration: configuration
+        )
     }
 
-    /// Creates the adapter for a validated provider and wire contract.
-    func resolveAdapter(for adapterID: LLMAdapterID, providerID: LLMProviderID) throws -> LLMProviderAdapter {
-        try validateRoute(adapterID: adapterID, providerID: providerID)
-        let profile = profile(for: providerID)
-
-        if providerID == .openCodeZen {
-            return OpenCodeZenAdapter(profile: profile, adapterID: adapterID)
-        }
-
-        switch adapterID {
-        case .openAIResponses:
-            return OpenAIResponsesAdapter(profile: profile)
-        case .openAIChatCompletions:
-            return OpenAIChatCompletionsAdapter(profile: profile)
-        case .openAICompatibleChatCompletions:
-            return OpenAICompatibleChatCompletionsAdapter(profile: profile)
-        case .anthropicMessages:
-            return AnthropicMessagesAdapter(profile: profile)
-        case .foundationModels:
-            #if canImport(FoundationModels)
-            if #available(macOS 26.0, iOS 26.0, *) {
-                return FoundationModelsAdapter(profile: profile)
+    func resolveRoute(
+        adapterID: LLMAdapterID,
+        providerID: LLMProviderID,
+        modelID: String?,
+        configuration: LLMProviderConfiguration
+    ) throws -> LLMResolvedProviderRoute {
+        guard let integration = integrations[providerID] else {
+            if providerID == .appleIntelligence {
+                throw LLMProviderError.localModelUnavailable(
+                    "Apple Intelligence requires macOS 26.0 or iOS 26.0 or newer."
+                )
             }
-            #endif
-            throw LLMProviderError.localModelUnavailable(
-                "\(profile.name) requires macOS 26.0 or iOS 26.0 or newer."
+            throw LLMProviderError.invalidConfiguration(
+                "No provider integration is registered for \(providerID.rawValue)."
             )
         }
+        return try integration.resolveRoute(
+            adapterID: adapterID,
+            modelID: modelID,
+            configuration: configuration
+        )
     }
 
-    /// Returns a user-facing availability summary for local-model providers, if available.
+    func fetchModelMetadata(
+        adapterID: LLMAdapterID,
+        providerID: LLMProviderID,
+        configuration: LLMProviderConfiguration
+    ) async throws -> [LLMProviderModelMetadata] {
+        guard let integration = integrations[providerID] else {
+            throw LLMProviderError.localModelUnavailable(
+                "\(profile(for: providerID).name) is unavailable on this platform."
+            )
+        }
+        return try await integration.fetchModelMetadata(
+            adapterID: adapterID,
+            configuration: configuration
+        )
+    }
+
     func localStatusText(for providerID: LLMProviderID) -> String? {
         guard profile(for: providerID).transportKind != .remoteHTTP else { return nil }
-        #if canImport(FoundationModels)
-        if providerID == .appleIntelligence {
-            if #available(macOS 26.0, iOS 26.0, *) {
-                return localBackend(for: providerID)?.statusText()
-            } else {
-                return "Foundation Models requires macOS 26.0 or iOS 26.0 or newer."
-            }
+        if let integration = integrations[providerID] {
+            return integration.localStatusText()
         }
-        #endif
-        return localBackend(for: providerID)?.statusText()
+        return "Foundation Models requires macOS 26.0 or iOS 26.0 or newer."
     }
 
-    /// Returns the model metadata exposed by a local-model backend.
-    func localModelMetadata(
-        for providerID: LLMProviderID,
-        configuration: LLMProviderConfiguration
-    ) -> [LLMProviderModelMetadata] {
-        localBackend(for: providerID)?.modelMetadata(configuration: configuration) ?? []
-    }
-
-    /// Returns the local backend associated with one provider profile.
-    func localBackend(for providerID: LLMProviderID) -> (any LLMLocalModelBackend)? {
-        switch providerID {
-        case .appleIntelligence:
-            #if canImport(FoundationModels)
-            if #available(macOS 26.0, iOS 26.0, *) {
-                return FoundationModelsBackend()
-            }
-            #endif
-            return nil
-        default:
-            return nil
-        }
-    }
-
-    /// Infers a provider identifier from user- or import-supplied provider text.
     static func providerID(fromProviderName providerName: String) -> LLMProviderID {
         let probe = providerName.lowercased()
         if probe.contains("opencode") || probe.contains("open code zen") { return .openCodeZen }
@@ -233,8 +113,189 @@ struct LLMProviderRegistry {
         if probe.contains("deepseek") { return .deepSeek }
         if probe.contains("codex") && probe.contains("chatgpt") { return .openAICodexChatGPTSubscription }
         if probe.contains("chatgpt") { return .openAICodexChatGPTSubscription }
-        if probe.contains("custom") { return .customOpenAICompatible }
+        if probe.contains("custom") { return .custom }
         if probe.contains("openai") { return .openAIPlatform }
-        return .customOpenAICompatible
+        return .custom
+    }
+
+    private static func makeProfiles() -> [LLMProviderID: LLMProviderProfile] {
+        let remoteAdapters: [LLMAdapterID] = [
+            .openAIResponses,
+            .openAIChatCompletions,
+            .openAIChatCompletionsLegacy,
+            .openRouterChatCompletions,
+            .anthropicMessages
+        ]
+        let allProfiles = [
+            profile(
+                id: .openAIPlatform,
+                name: "OpenAI",
+                defaultAdapterID: .openAIResponses,
+                routes: [
+                    remoteRoute(.openAIResponses, AppDefaults.OpenAi.baseURL, .bearerToken),
+                    remoteRoute(.openAIChatCompletions, AppDefaults.OpenAi.baseURL, .bearerToken)
+                ]
+            ),
+            profile(
+                id: .openAICodexChatGPTSubscription,
+                name: "Codex ChatGPT Subscription",
+                defaultAdapterID: .openAIResponses,
+                routes: [
+                    remoteRoute(
+                        .openAIResponses,
+                        "https://chatgpt.com/backend-api/codex",
+                        .codexChatGPTOAuth,
+                        allowedAuthKinds: [.codexChatGPTOAuth, .codexChatGPTDeviceCode]
+                    )
+                ]
+            ),
+            profile(
+                id: .openCodeZen,
+                name: "OpenCode Zen",
+                defaultAdapterID: .openAIChatCompletionsLegacy,
+                routes: [
+                    remoteRoute(.openAIResponses, "https://opencode.ai/zen/v1", .bearerToken),
+                    remoteRoute(.anthropicMessages, "https://opencode.ai/zen/v1", .xAPIKey),
+                    remoteRoute(.openAIChatCompletionsLegacy, "https://opencode.ai/zen/v1", .bearerToken)
+                ]
+            ),
+            profile(
+                id: .appleIntelligence,
+                name: "Apple Intelligence",
+                defaultAdapterID: .foundationModels,
+                routes: [
+                    LLMProviderRouteProfile(
+                        adapterID: .foundationModels,
+                        transportKind: .localSystem,
+                        defaultBaseURL: "",
+                        defaultAuthKind: .none,
+                        allowedAuthKinds: [.none],
+                        isEnabled: true
+                    )
+                ]
+            ),
+            profile(
+                id: .anthropic,
+                name: "Anthropic",
+                defaultAdapterID: .anthropicMessages,
+                routes: [
+                    remoteRoute(.anthropicMessages, AppDefaults.Anthropic.baseURL, .xAPIKey)
+                ]
+            ),
+            profile(
+                id: .openRouter,
+                name: "OpenRouter",
+                defaultAdapterID: .openRouterChatCompletions,
+                routes: [
+                    remoteRoute(.openRouterChatCompletions, "https://openrouter.ai/api/v1", .bearerToken)
+                ]
+            ),
+            profile(
+                id: .lmStudio,
+                name: "LM Studio",
+                defaultAdapterID: .openAIChatCompletionsLegacy,
+                routes: [
+                    remoteRoute(.openAIChatCompletionsLegacy, "http://localhost:1234/v1", .none)
+                ]
+            ),
+            profile(
+                id: .ollama,
+                name: "Ollama",
+                defaultAdapterID: .openAIChatCompletionsLegacy,
+                routes: [
+                    remoteRoute(.openAIChatCompletionsLegacy, "http://localhost:11434/v1", .none)
+                ]
+            ),
+            profile(
+                id: .xAI,
+                name: "xAI",
+                defaultAdapterID: .openAIChatCompletionsLegacy,
+                routes: [
+                    remoteRoute(.openAIChatCompletionsLegacy, AppDefaults.XAI.baseURL, .bearerToken)
+                ]
+            ),
+            profile(
+                id: .deepSeek,
+                name: "DeepSeek",
+                defaultAdapterID: .openAIChatCompletionsLegacy,
+                routes: [
+                    remoteRoute(.openAIChatCompletionsLegacy, AppDefaults.DeepSeek.baseURL, .bearerToken)
+                ]
+            ),
+            profile(
+                id: .custom,
+                name: "Custom",
+                defaultAdapterID: .openAIChatCompletionsLegacy,
+                routes: remoteAdapters.map {
+                    remoteRoute(
+                        $0,
+                        AppDefaults.OpenAi.baseURL,
+                        .bearerToken,
+                        allowedAuthKinds: [.none, .bearerToken, .xAPIKey, .customHeaders]
+                    )
+                }
+            )
+        ]
+        return Dictionary(uniqueKeysWithValues: allProfiles.map { ($0.id, $0) })
+    }
+
+    private static func profile(
+        id: LLMProviderID,
+        name: String,
+        defaultAdapterID: LLMAdapterID,
+        routes: [LLMProviderRouteProfile]
+    ) -> LLMProviderProfile {
+        LLMProviderProfile(
+            id: id,
+            name: name,
+            defaultAdapterID: defaultAdapterID,
+            routes: routes,
+            isEnabled: true
+        )
+    }
+
+    private static func remoteRoute(
+        _ adapterID: LLMAdapterID,
+        _ baseURL: String,
+        _ defaultAuthKind: LLMAuthKind,
+        allowedAuthKinds: [LLMAuthKind]? = nil
+    ) -> LLMProviderRouteProfile {
+        LLMProviderRouteProfile(
+            adapterID: adapterID,
+            transportKind: .remoteHTTP,
+            defaultBaseURL: baseURL,
+            defaultAuthKind: defaultAuthKind,
+            allowedAuthKinds: allowedAuthKinds ?? [defaultAuthKind],
+            isEnabled: true
+        )
+    }
+
+    private static func catalogs(
+        for profile: LLMProviderProfile
+    ) -> [LLMAdapterID: any LLMModelCatalog] {
+        switch profile.id {
+        case .openAICodexChatGPTSubscription:
+            return [.openAIResponses: StaticModelCatalog(metadata: CodexChatGPTModels.metadata())]
+        case .anthropic:
+            return [.anthropicMessages: AnthropicModelCatalog(profile: profile)]
+        case .openRouter:
+            return [.openRouterChatCompletions: OpenRouterModelCatalog(profile: profile)]
+        case .custom:
+            return [
+                .openAIResponses: OpenAIModelCatalog(profile: profile),
+                .openAIChatCompletions: OpenAIModelCatalog(profile: profile),
+                .openAIChatCompletionsLegacy: OpenAIModelCatalog(profile: profile),
+                .openRouterChatCompletions: OpenRouterModelCatalog(profile: profile),
+                .anthropicMessages: AnthropicModelCatalog(profile: profile)
+            ]
+        case .appleIntelligence, .openCodeZen:
+            return [:]
+        default:
+            return Dictionary(
+                uniqueKeysWithValues: profile.supportedAdapterIDs.map {
+                    ($0, OpenAIModelCatalog(profile: profile) as any LLMModelCatalog)
+                }
+            )
+        }
     }
 }

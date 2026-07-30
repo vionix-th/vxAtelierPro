@@ -85,7 +85,7 @@
       ],
       "checkModels": true,
       "adapterIDs": [
-        "openAICompatibleChatCompletions"
+        "openAIChatCompletionsLegacy"
       ]
     },
     {
@@ -99,7 +99,7 @@
       ],
       "checkModels": true,
       "adapterIDs": [
-        "openAICompatibleChatCompletions"
+        "openRouterChatCompletions"
       ]
     },
     {
@@ -113,7 +113,7 @@
       ],
       "checkModels": true,
       "adapterIDs": [
-        "openAICompatibleChatCompletions"
+        "openAIChatCompletionsLegacy"
       ]
     },
     {
@@ -127,7 +127,7 @@
       ],
       "checkModels": true,
       "adapterIDs": [
-        "openAICompatibleChatCompletions"
+        "openAIChatCompletionsLegacy"
       ]
     },
     {
@@ -141,7 +141,7 @@
       ],
       "checkModels": true,
       "adapterIDs": [
-        "openAICompatibleChatCompletions"
+        "openAIChatCompletionsLegacy"
       ]
     },
     {
@@ -155,12 +155,12 @@
       ],
       "checkModels": true,
       "adapterIDs": [
-        "openAICompatibleChatCompletions"
+        "openAIChatCompletionsLegacy"
       ]
     },
     {
-      "id": "customOpenAICompatible",
-      "name": "Custom OpenAI Compatible",
+      "id": "custom",
+      "name": "Custom Provider",
       "enabled": false,
       "baseURL": "https://example.test/v1",
       "apiKey": "replace-with-api-key-or-empty-string",
@@ -172,7 +172,7 @@
       "headers": {},
       "options": {},
       "adapterIDs": [
-        "openAICompatibleChatCompletions"
+        "openAIChatCompletionsLegacy"
       ]
     }
   ]

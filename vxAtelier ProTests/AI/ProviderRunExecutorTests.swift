@@ -17,7 +17,6 @@ final class ProviderRunExecutorTests: LLMTestCase {
 
         let env = TestEnvironment()
         let conversation = env.createConversation()
-        let profile = LLMProviderRegistry.shared.profile(for: .openAIPlatform)
         var options = LLMGenerationOptions(streamMode: .enabled)
         options.modelID = "gpt-4.1-mini"
         let request = LLMGenerationRequest.runtimeEquivalent(
@@ -39,7 +38,11 @@ final class ProviderRunExecutorTests: LLMTestCase {
 
         let result = try await ProviderRunExecutor().performRun(
             request: request,
-            providerConfiguration: providerConfiguration,
+            resolvedRoute: LLMResolvedProviderRoute(
+                providerID: .openAIPlatform,
+                adapterID: .openAIResponses,
+                configuration: providerConfiguration
+            ),
             draftSink: sink,
             conversationID: conversation.id,
             retryPolicy: .disabled
@@ -50,6 +53,76 @@ final class ProviderRunExecutorTests: LLMTestCase {
         XCTAssertEqual(sink.toolCalls.first?.name, "lookup")
         XCTAssertEqual(result.toolCalls.first?.argumentsJSON, "{\"q\":\"test\"}")
         XCTAssertEqual(result.usage.totalTokens, 12)
+    }
+
+    func testProviderRunExecutorRejectsRouteAdapterMismatch() async throws {
+        let environment = TestEnvironment()
+        let conversation = environment.createConversation()
+        let request = LLMGenerationRequest(
+            providerID: .openAIPlatform,
+            adapterID: .openAIResponses,
+            modelID: "gpt-test",
+            messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Hello")])]
+        )
+        let route = LLMResolvedProviderRoute(
+            providerID: .openAIPlatform,
+            adapterID: .openAIChatCompletions,
+            configuration: LLMProviderConfiguration(
+                providerID: .openAIPlatform,
+                baseURL: "https://unit.test/v1"
+            )
+        )
+
+        do {
+            _ = try await ProviderRunExecutor().performRun(
+                request: request,
+                resolvedRoute: route,
+                draftSink: RecordingDraftSink(),
+                conversationID: conversation.id,
+                retryPolicy: .disabled
+            )
+            XCTFail("Expected the executor to reject a route/adapter mismatch.")
+        } catch let error as LLMProviderError {
+            guard case .invalidConfiguration(let message) = error else {
+                return XCTFail("Expected invalidConfiguration, got \(error).")
+            }
+            XCTAssertTrue(message.contains("does not match request adapter"))
+        }
+    }
+
+    func testProviderRunExecutorRejectsRouteTransportProviderMismatch() async throws {
+        let environment = TestEnvironment()
+        let conversation = environment.createConversation()
+        let request = LLMGenerationRequest(
+            providerID: .openAIPlatform,
+            adapterID: .openAIResponses,
+            modelID: "gpt-test",
+            messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Hello")])]
+        )
+        let route = LLMResolvedProviderRoute(
+            providerID: .openAIPlatform,
+            adapterID: .openAIResponses,
+            configuration: LLMProviderConfiguration(
+                providerID: .custom,
+                baseURL: "https://unit.test/v1"
+            )
+        )
+
+        do {
+            _ = try await ProviderRunExecutor().performRun(
+                request: request,
+                resolvedRoute: route,
+                draftSink: RecordingDraftSink(),
+                conversationID: conversation.id,
+                retryPolicy: .disabled
+            )
+            XCTFail("Expected the executor to reject a route/transport provider mismatch.")
+        } catch let error as LLMProviderError {
+            guard case .invalidConfiguration(let message) = error else {
+                return XCTFail("Expected invalidConfiguration, got \(error).")
+            }
+            XCTAssertTrue(message.contains("does not match route provider"))
+        }
     }
 }
 

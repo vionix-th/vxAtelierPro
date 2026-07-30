@@ -278,6 +278,14 @@ private struct LLMDefaultsRule {
             }
         }
 
+        if level != .adapter,
+           parameters.contains(where: { $0.mapping != nil }) {
+            throw LLMDefaultsCatalogError.invalidRule(
+                level: level.rawValue,
+                reason: "wire mappings may only be declared by adapter rules"
+            )
+        }
+
         for parameter in parameters {
             try parameter.mapping?.validate(parameterID: parameter.parameterID)
             guard let mapping = parameter.mapping else { continue }

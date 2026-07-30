@@ -121,14 +121,14 @@ final class LLMHTTPClientTests: LLMTestCase {
             name: "Custom",
             apiKey: "",
             baseURL: "https://unit.test",
-            providerID: .customOpenAICompatible
+            providerID: .custom
         )
         configItem.decodedOptions = [
             "request_timeout_seconds": "7",
             "max_response_body_bytes": "4"
         ]
         let config = LLMHTTPClient().makeConfiguration(
-            for: configItem.makeLLMProviderConfiguration()
+            for: try configItem.makeLLMProviderConfiguration()
         )
 
         await assertThrowsAsyncError(try await LLMHTTPClient().getJSONWithMetadata(

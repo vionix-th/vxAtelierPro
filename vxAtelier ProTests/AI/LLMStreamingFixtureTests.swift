@@ -15,7 +15,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
             MockLLMURLProtocol.requestHandler = nil
         }
 
-        let adapter = OpenAIChatCompletionsAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
+        let adapter = OpenAIChatCompletionsAdapter()
         let request = LLMGenerationRequest.runtimeEquivalent(
             providerID: .openAIPlatform,
             adapterID: .openAIChatCompletions,
@@ -33,7 +33,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
 
         let events = try await collectEvents(adapter.generateEvents(
             request,
-            configuration: config.makeLLMProviderConfiguration(),
+            configuration: try config.makeLLMProviderConfiguration(),
             toolExecutor: nil
         ))
         XCTAssertTrue(events.contains(.textDelta("Hello")))
@@ -53,7 +53,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
             MockLLMURLProtocol.requestHandler = nil
         }
 
-        let adapter = OpenAIResponsesAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
+        let adapter = OpenAIResponsesAdapter()
         let request = LLMGenerationRequest.runtimeEquivalent(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
@@ -71,7 +71,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
 
         let events = try await collectEvents(adapter.generateEvents(
             request,
-            configuration: config.makeLLMProviderConfiguration(),
+            configuration: try config.makeLLMProviderConfiguration(),
             toolExecutor: nil
         ))
         XCTAssertTrue(events.contains(.generationStarted(requestID: "resp_fixture")))
@@ -93,7 +93,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
             MockLLMURLProtocol.requestHandler = nil
         }
 
-        let adapter = OpenAIResponsesAdapter(profile: LLMProviderRegistry.shared.profile(for: .openAIPlatform))
+        let adapter = OpenAIResponsesAdapter()
         let request = LLMGenerationRequest.runtimeEquivalent(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
@@ -111,7 +111,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
 
         await assertThrowsAsyncError(try await collectEvents(adapter.generateEvents(
             request,
-            configuration: config.makeLLMProviderConfiguration(),
+            configuration: try config.makeLLMProviderConfiguration(),
             toolExecutor: nil
         ))) { error in
             XCTAssertEqual(error as? LLMProviderError, .decoding("Provider stream ended before completion event."))
@@ -125,7 +125,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
             MockLLMURLProtocol.requestHandler = nil
         }
 
-        let adapter = AnthropicMessagesAdapter(profile: LLMProviderRegistry.shared.profile(for: .anthropic))
+        let adapter = AnthropicMessagesAdapter()
         let request = LLMGenerationRequest.runtimeEquivalent(
             providerID: .anthropic,
             adapterID: .anthropicMessages,
@@ -143,7 +143,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
 
         let events = try await collectEvents(adapter.generateEvents(
             request,
-            configuration: config.makeLLMProviderConfiguration(),
+            configuration: try config.makeLLMProviderConfiguration(),
             toolExecutor: nil
         ))
         XCTAssertTrue(events.contains(.generationStarted(requestID: "msg_fixture")))
@@ -157,10 +157,10 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         }))
     }
 
-    func testOpenAICompatibleModelMetadataFixtures() throws {
+    func testOpenAIShapedModelMetadataFixtures() throws {
         let openRouterData = try fixtureJSON(name: "openrouter_models").objectValue?.array("data") ?? []
         let openRouterProfile = LLMProviderRegistry.shared.profile(for: .openRouter)
-        let openRouterModels = LLMModelMetadataDecoder.openAICompatibleMetadata(
+        let openRouterModels = LLMModelMetadataDecoder.openAIShapedMetadata(
             from: openRouterData,
             profile: openRouterProfile
         )
@@ -170,7 +170,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         XCTAssertEqual(openRouterModels.first?.capabilityClaims, [])
 
         let lmStudioData = try fixtureJSON(name: "lmstudio_models").objectValue?.array("data") ?? []
-        let lmStudioModels = LLMModelMetadataDecoder.openAICompatibleMetadata(
+        let lmStudioModels = LLMModelMetadataDecoder.openAIShapedMetadata(
             from: lmStudioData,
             profile: LLMProviderRegistry.shared.profile(for: .lmStudio)
         )
@@ -178,7 +178,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         XCTAssertEqual(lmStudioModels.first?.capabilityClaims, [])
 
         let ollamaData = try fixtureJSON(name: "ollama_models").objectValue?.array("data") ?? []
-        let ollamaModels = LLMModelMetadataDecoder.openAICompatibleMetadata(
+        let ollamaModels = LLMModelMetadataDecoder.openAIShapedMetadata(
             from: ollamaData,
             profile: LLMProviderRegistry.shared.profile(for: .ollama)
         )

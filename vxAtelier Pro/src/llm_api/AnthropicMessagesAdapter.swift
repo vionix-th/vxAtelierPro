@@ -1,11 +1,9 @@
 import Foundation
 
 /// Adapter for Anthropic Messages requests and events.
-struct AnthropicMessagesAdapter: LLMProviderAdapter {
+struct AnthropicMessagesAdapter: LLMGenerationAdapter {
     private static let generationPath = "/messages"
-    private static let modelsPath = "/models"
-
-    let profile: LLMProviderProfile
+    let id: LLMAdapterID = .anthropicMessages
     private let httpClient = LLMHTTPClient()
 
     /// Executes a Messages request through the shared adapter run loop.
@@ -32,17 +30,6 @@ struct AnthropicMessagesAdapter: LLMProviderAdapter {
                 handleStreamEvent(event, assembler: &assembler, continuation: continuation)
             }
         )
-    }
-
-    /// Fetches Anthropic model metadata and maps it into candidates.
-    func fetchModelMetadata(configuration: LLMProviderConfiguration) async throws -> [LLMProviderModelMetadata] {
-        let response: JSONValue = try await httpClient.getJSON(
-            path: Self.modelsPath,
-            configuration: httpClient.makeConfiguration(for: configuration),
-            responseType: JSONValue.self
-        )
-        guard let data = response.objectValue?.array("data") else { return [] }
-        return LLMModelMetadataDecoder.anthropicMetadata(from: data, profile: profile)
     }
 
     /// Encodes a provider-neutral request into an Anthropic Messages JSON body.

@@ -15,6 +15,7 @@ struct ModelExportData: Codable {
     let parameterOverrides: [ModelParameterOverrideExportData]
     let apiConfigurationName: String?
     let apiConfigurationProviderID: String?
+    let apiConfigurationAdapterID: String?
     let apiConfigurationBaseURL: String?
 
     init(_ model: ModelItem) {
@@ -32,13 +33,16 @@ struct ModelExportData: Codable {
         parameterOverrides = model.parameterOverrides.map(ModelParameterOverrideExportData.init)
         apiConfigurationName = model.apiConfiguration?.name
         apiConfigurationProviderID = model.apiConfiguration?.providerID
+        apiConfigurationAdapterID = model.apiConfiguration?.adapterID
         apiConfigurationBaseURL = model.apiConfiguration?.baseURL
     }
 
-    func toDataItem(apiConfigurations: [APIConfigurationItem] = []) -> ModelItem {
+    func toDataItem(apiConfigurations: [APIConfigurationItem] = []) throws -> ModelItem {
+        try validateRouteIdentity()
         let apiConfiguration = apiConfigurations.first {
             $0.name == apiConfigurationName
                 && $0.providerID == apiConfigurationProviderID
+                && $0.adapterID == apiConfigurationAdapterID
                 && $0.baseURL == apiConfigurationBaseURL
         }
         let model = ModelItem(modelID: modelID, apiConfiguration: apiConfiguration)
@@ -54,6 +58,21 @@ struct ModelExportData: Codable {
         model.capabilityOverrides = capabilityOverrides.map(\.dataItem)
         model.parameterOverrides = parameterOverrides.map(\.dataItem)
         return model
+    }
+
+    func validateRouteIdentity() throws {
+        if let apiConfigurationProviderID,
+           LLMProviderID(rawValue: apiConfigurationProviderID) == nil {
+            throw LLMProviderError.invalidConfiguration(
+                "Imported model references unknown provider id \(apiConfigurationProviderID)."
+            )
+        }
+        if let apiConfigurationAdapterID,
+           LLMAdapterID(rawValue: apiConfigurationAdapterID) == nil {
+            throw LLMProviderError.invalidConfiguration(
+                "Imported model references unknown generation adapter id \(apiConfigurationAdapterID)."
+            )
+        }
     }
 }
 

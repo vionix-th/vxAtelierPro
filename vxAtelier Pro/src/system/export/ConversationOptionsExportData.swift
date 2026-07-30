@@ -47,10 +47,10 @@ struct ConversationOptionsExportData: Codable {
         self.providerSpecificOptionsJSON = options.providerSpecificOptionsJSON
     }
     
-    func toDataItem(context: ModelContext) -> ConversationOptions {
+    func toDataItem(context: ModelContext) throws -> ConversationOptions {
         let options = ConversationOptions(
             avatarImageData: avatarImageData,
-            apiConfiguration: apiConfiguration?.toDataItem()
+            apiConfiguration: try apiConfiguration?.toDataItem()
         )
 
         options.enabledToolsDict = enabledToolsDict

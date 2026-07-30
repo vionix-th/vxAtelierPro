@@ -43,7 +43,7 @@ struct ConversationExportData: Codable {
     func toDataItem(context: ModelContext) throws -> ConversationItem {
         let conversation = ConversationItem(title)
         conversation.timestamp = timestamp
-        conversation.options = options.toDataItem(context: context)
+        conversation.options = try options.toDataItem(context: context)
         conversation.status = ItemStatus(rawValue: status) ?? ItemStatus.active
         conversation.purpose = ConversationItem.ConversationPurpose(rawValue: purpose) ?? .user
         conversation.tokenCount = tokenCount
@@ -53,6 +53,13 @@ struct ConversationExportData: Codable {
             conversation.turns.append(turn)
         }
         return conversation
+    }
+
+    func validateRouteIdentity() throws {
+        _ = try options.apiConfiguration?.toDataItem()
+        for responseRun in turns.flatMap(\.responseRuns) {
+            try responseRun.validateRouteIdentity()
+        }
     }
 }
 
@@ -93,7 +100,7 @@ struct TurnExportData: Codable {
             conversation: conversation
         )
         turn.events = events.map { $0.toDataItem(turn: turn) }
-        turn.responseRuns = responseRuns.map { $0.toDataItem(turn: turn) }
+        turn.responseRuns = try responseRuns.map { try $0.toDataItem(turn: turn) }
         return turn
     }
 }
@@ -151,10 +158,12 @@ struct ResponseRunExportData: Codable {
         self.completedAt = item.completedAt
     }
 
-    func toDataItem(turn: ConversationTurn) -> ResponseRunItem {
+    func toDataItem(turn: ConversationTurn) throws -> ResponseRunItem {
+        let (providerID, adapterID) = try validatedRouteIdentity()
+        try LLMProviderRegistry.shared.validateRoute(adapterID: adapterID, providerID: providerID)
         let item = ResponseRunItem(
-            providerID: LLMProviderID(rawValue: providerID) ?? .customOpenAICompatible,
-            adapterID: LLMAdapterID(rawValue: adapterID) ?? .openAIChatCompletions,
+            providerID: providerID,
+            adapterID: adapterID,
             requestedModelID: requestedModelID,
             actualModelID: actualModelID,
             requestID: requestID,
@@ -169,5 +178,20 @@ struct ResponseRunExportData: Codable {
         item.startedAt = startedAt
         item.completedAt = completedAt
         return item
+    }
+
+    func validateRouteIdentity() throws {
+        let (providerID, adapterID) = try validatedRouteIdentity()
+        try LLMProviderRegistry.shared.validateRoute(adapterID: adapterID, providerID: providerID)
+    }
+
+    private func validatedRouteIdentity() throws -> (LLMProviderID, LLMAdapterID) {
+        guard let providerID = LLMProviderID(rawValue: providerID) else {
+            throw LLMProviderError.invalidConfiguration("Unknown response-run provider id \(providerID).")
+        }
+        guard let adapterID = LLMAdapterID(rawValue: adapterID) else {
+            throw LLMProviderError.invalidConfiguration("Unknown response-run adapter id \(adapterID).")
+        }
+        return (providerID, adapterID)
     }
 }

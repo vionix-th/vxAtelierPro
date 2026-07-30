@@ -7,7 +7,7 @@ import SwiftUI
 
 // Add version constant at the top level
 private enum BackupVersion {
-    static let current = 4
+    static let current = 5
 }
 
 struct FullBackup: Codable {

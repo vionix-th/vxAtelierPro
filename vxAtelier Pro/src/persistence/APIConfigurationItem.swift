@@ -29,24 +29,42 @@ final class APIConfigurationItem {
     var defaultModel: String?
     @Relationship(deleteRule: .cascade, inverse: \ModelItem.apiConfiguration) var models: [ModelItem] = []
 
-    var defaultAdapterID: String
+    var adapterID: String
     var headersJSON: String
     var optionsJSON: String
     var credentialJSON: String
 
-    var providerIDEnum: LLMProviderID {
-        get { LLMProviderID(rawValue: providerID) ?? .customOpenAICompatible }
-        set { providerID = newValue.rawValue }
+    var parsedProviderID: LLMProviderID? {
+        LLMProviderID(rawValue: providerID)
     }
 
-    var authKindEnum: LLMAuthKind {
-        get { LLMAuthKind(rawValue: authKind) ?? LLMProviderRegistry.shared.profile(for: providerIDEnum).authKind }
-        set { authKind = newValue.rawValue }
+    var parsedAuthKind: LLMAuthKind? {
+        LLMAuthKind(rawValue: authKind)
     }
 
-    var defaultAdapterIDEnum: LLMAdapterID {
-        get { LLMAdapterID(rawValue: defaultAdapterID) ?? LLMProviderRegistry.shared.profile(for: providerIDEnum).defaultAdapterID }
-        set { defaultAdapterID = newValue.rawValue }
+    var parsedAdapterID: LLMAdapterID? {
+        LLMAdapterID(rawValue: adapterID)
+    }
+
+    func requireProviderID() throws -> LLMProviderID {
+        guard let parsedProviderID else {
+            throw LLMProviderError.invalidConfiguration("Unknown provider id \(providerID).")
+        }
+        return parsedProviderID
+    }
+
+    func requireAdapterID() throws -> LLMAdapterID {
+        guard let parsedAdapterID else {
+            throw LLMProviderError.invalidConfiguration("Unknown generation adapter id \(adapterID).")
+        }
+        return parsedAdapterID
+    }
+
+    func requireAuthKind() throws -> LLMAuthKind {
+        guard let parsedAuthKind else {
+            throw LLMProviderError.invalidConfiguration("Unknown authentication kind \(authKind).")
+        }
+        return parsedAuthKind
     }
 
     var defaultModelID: String? {
@@ -81,23 +99,27 @@ final class APIConfigurationItem {
         providerID: LLMProviderID = .openAIPlatform
     ) {
         let profile = LLMProviderRegistry.shared.profile(for: providerID)
+        let route = profile.defaultRoute
         self.name = name
         self.providerID = providerID.rawValue
-        self.authKind = profile.authKind.rawValue
-        self.apiKey = profile.requiresCredential ? apiKey : ""
-        self.baseURL = profile.requiresBaseURL ? baseURL : ""
+        self.authKind = route?.defaultAuthKind.rawValue ?? LLMAuthKind.none.rawValue
+        self.apiKey = route?.requiresCredential == true ? apiKey : ""
+        self.baseURL = route?.requiresBaseURL == true ? baseURL : ""
         self.isDefault = isDefault
         self.defaultModel = defaultModel
-        self.defaultAdapterID = profile.defaultAdapterID.rawValue
+        self.adapterID = profile.defaultAdapterID.rawValue
         self.headersJSON = "{}"
         self.optionsJSON = "{}"
         self.credentialJSON = "{}"
     }
 
-    func makeLLMProviderConfiguration() -> LLMProviderConfiguration {
-        var headers = decodedHeaders
+    func makeLLMProviderConfiguration() throws -> LLMProviderConfiguration {
+        let providerID = try requireProviderID()
+        let adapterID = try requireAdapterID()
+        let authKind = try requireAuthKind()
+        var headers = try Self.validatedHeaders(decodedHeaders)
         var credential = apiKey
-        if providerIDEnum == .openAICodexChatGPTSubscription,
+        if providerID == .openAICodexChatGPTSubscription,
            let tokenSet = codexChatGPTTokenSet {
             credential = tokenSet.accessToken
             if let accountID = tokenSet.accountID, !accountID.isEmpty {
@@ -105,12 +127,18 @@ final class APIConfigurationItem {
             }
             headers["originator"] = headers["originator"] ?? "vxatelier_pro"
         }
-        let profile = LLMProviderRegistry.shared.profile(for: providerIDEnum)
+        let profile = LLMProviderRegistry.shared.profile(for: providerID)
+        guard let route = profile.route(for: adapterID) else {
+            throw LLMProviderError.invalidConfiguration(
+                "\(profile.name) cannot use \(adapterID.displayName)."
+            )
+        }
         return Self.makeLLMProviderConfiguration(
-            providerID: providerIDEnum,
-            authKind: authKindEnum,
-            apiKey: profile.requiresCredential ? credential : "",
-            baseURL: profile.requiresBaseURL ? baseURL : "",
+            providerID: providerID,
+            adapterID: adapterID,
+            authKind: authKind,
+            apiKey: authKind.requiresCredential ? credential : "",
+            baseURL: route.requiresBaseURL ? baseURL : "",
             headers: headers,
             options: decodedOptions
         )
@@ -123,6 +151,7 @@ final class APIConfigurationItem {
 
     static func makeLLMProviderConfiguration(
         providerID: LLMProviderID,
+        adapterID: LLMAdapterID,
         authKind: LLMAuthKind,
         apiKey: String,
         baseURL: String,
@@ -130,17 +159,55 @@ final class APIConfigurationItem {
         options: [String: String] = [:]
     ) -> LLMProviderConfiguration {
         let profile = LLMProviderRegistry.shared.profile(for: providerID)
+        let route = profile.route(for: adapterID)
         return LLMProviderConfiguration(
             providerID: providerID,
             authKind: authKind,
-            baseURL: profile.requiresBaseURL ? (baseURL.isEmpty ? profile.defaultBaseURL : baseURL) : "",
-            credential: apiKey.isEmpty ? .none : .secret(apiKey),
-            customHeaders: headers,
+            baseURL: route?.requiresBaseURL == true
+                ? (baseURL.isEmpty ? route?.defaultBaseURL ?? "" : baseURL)
+                : "",
+            credential: authKind.requiresCredential && !apiKey.isEmpty ? .secret(apiKey) : .none,
+            customHeaders: sanitizedHeaders(headers, authKind: authKind),
             requestTimeout: Self.secondsOption("request_timeout_seconds", in: options, defaultValue: 60),
             streamIdleTimeout: Self.secondsOption("sse_idle_timeout_seconds", in: options, defaultValue: 120),
             maxResponseBodyBytes: Self.intOption("max_response_body_bytes", in: options, defaultValue: 10 * 1024 * 1024),
             maxSSEEventBytes: Self.intOption("max_sse_event_bytes", in: options, defaultValue: 1024 * 1024)
         )
+    }
+
+    private static func sanitizedHeaders(
+        _ headers: [String: String],
+        authKind: LLMAuthKind
+    ) -> [String: String] {
+        let ownedHeader: String?
+        switch authKind {
+        case .bearerToken, .codexChatGPTOAuth, .codexChatGPTDeviceCode:
+            ownedHeader = "authorization"
+        case .xAPIKey:
+            ownedHeader = "x-api-key"
+        case .none, .customHeaders:
+            ownedHeader = nil
+        }
+        guard let ownedHeader else { return headers }
+        return headers.filter { $0.key.lowercased() != ownedHeader }
+    }
+
+    private static func validatedHeaders(
+        _ headers: [String: String]
+    ) throws -> [String: String] {
+        var normalizedNames = Set<String>()
+        for name in headers.keys {
+            let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedName.isEmpty else {
+                throw LLMProviderError.invalidConfiguration("Custom header names cannot be empty.")
+            }
+            guard normalizedNames.insert(trimmedName.lowercased()).inserted else {
+                throw LLMProviderError.invalidConfiguration(
+                    "Custom header names must be unique, ignoring letter case."
+                )
+            }
+        }
+        return headers
     }
 
     private static func secondsOption(

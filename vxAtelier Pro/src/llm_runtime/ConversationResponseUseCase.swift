@@ -86,7 +86,7 @@ final class ConversationResponseUseCase {
             do {
                 result = try await providerRunExecutor.performRun(
                     request: request,
-                    providerConfiguration: context.providerConfiguration,
+                    resolvedRoute: context.resolvedRoute,
                     draftSink: draftSink,
                     conversationID: context.conversationID,
                     toolExecutor: makeToolExecutor(conversation: conversation, turn: turn),

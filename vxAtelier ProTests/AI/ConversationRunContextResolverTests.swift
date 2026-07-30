@@ -24,8 +24,8 @@ final class ConversationRunContextResolverTests: XCTestCase {
             defaultModel: "gpt-test",
             providerID: .openAIPlatform
         )
-        configA.defaultAdapterIDEnum = .openAIChatCompletions
-        configB.defaultAdapterIDEnum = .openAIChatCompletions
+        configA.adapterID = LLMAdapterID.openAIChatCompletions.rawValue
+        configB.adapterID = LLMAdapterID.openAIChatCompletions.rawValue
         let modelA = ModelItem(modelID: "gpt-test", apiConfiguration: configA)
         let modelB = ModelItem(modelID: "gpt-test", apiConfiguration: configB)
         modelA.parameterOverrides = [ModelParameterOverrideItem(
@@ -86,7 +86,7 @@ final class ConversationRunContextResolverTests: XCTestCase {
             defaultModel: "gpt-missing",
             providerID: .openAIPlatform
         )
-        config.defaultAdapterIDEnum = .openAIResponses
+        config.adapterID = LLMAdapterID.openAIResponses.rawValue
         let options = ConversationOptions(apiConfiguration: config)
         let conversation = ConversationItem("No descriptor", options: options)
         env.modelContext.insert(config)
@@ -106,20 +106,21 @@ final class ConversationRunContextResolverTests: XCTestCase {
     }
 
     func testRequestFactoryProducesStableRequestFromFixedContext() throws {
-        let profile = LLMProviderRegistry.shared.profile(for: .openAIPlatform)
         let options = LLMGenerationOptions(
             modelID: "gpt-test",
             streamMode: .disabled
         )
         let context = ConversationRunContext(
             conversationID: TestEnvironment().createConversation().id,
-            providerConfiguration: LLMProviderConfiguration(
+            resolvedRoute: LLMResolvedProviderRoute(
                 providerID: .openAIPlatform,
-                baseURL: "https://unit.test/v1",
-                credential: .secret("key")
+                adapterID: .openAIResponses,
+                configuration: LLMProviderConfiguration(
+                    providerID: .openAIPlatform,
+                    baseURL: "https://unit.test/v1",
+                    credential: .secret("key")
+                )
             ),
-            providerID: .openAIPlatform,
-            adapterID: .openAIResponses,
             modelID: "gpt-test",
             activeParameters: [],
             messages: [

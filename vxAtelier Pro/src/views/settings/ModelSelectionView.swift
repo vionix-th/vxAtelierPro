@@ -25,7 +25,7 @@ struct ModelSelectionView: View {
             models = draftModelMetadata.map { metadata in
                 ModelSelectionOption(
                     metadata: metadata,
-                    adapterID: apiConfiguration?.defaultAdapterIDEnum
+                    adapterID: apiConfiguration?.parsedAdapterID
                         ?? LLMProviderRegistry.shared.profile(for: metadata.providerID).defaultAdapterID,
                     groupName: apiConfiguration?.name ?? metadata.providerID.displayName
                 )
@@ -219,7 +219,7 @@ private struct ModelSelectionOption: Identifiable {
         self.id = String(describing: model.persistentModelID)
         self.name = model.modelID
         self.displayName = model.modelProfile.displayName
-        self.provider = model.apiConfiguration?.providerIDEnum.displayName ?? "Unknown Provider"
+        self.provider = model.apiConfiguration?.parsedProviderID?.displayName ?? "Unknown Provider"
         self.contextSize = model.contextSize
         self.capabilities = model.capabilities
         self.metadataSearchTerms = model.metadataSearchTerms

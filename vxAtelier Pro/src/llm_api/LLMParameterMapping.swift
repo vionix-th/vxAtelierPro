@@ -48,12 +48,13 @@ enum LLMParameterStructuredPreset: String, Codable, CaseIterable, Identifiable {
     func supports(_ adapterID: LLMAdapterID) -> Bool {
         switch (self, adapterID) {
         case (.openAIChatResponseFormat, .openAIChatCompletions),
-             (.openAIChatResponseFormat, .openAICompatibleChatCompletions),
+             (.openAIChatResponseFormat, .openAIChatCompletionsLegacy),
+             (.openAIChatResponseFormat, .openRouterChatCompletions),
              (.openAIResponsesTextFormat, .openAIResponses),
              (.openAIResponsesReasoning, .openAIResponses),
              (.openAIResponsesTextVerbosity, .openAIResponses),
              (.openAIResponsesReasoningSummary, .openAIResponses),
-             (.openRouterReasoning, .openAICompatibleChatCompletions),
+             (.openRouterReasoning, .openRouterChatCompletions),
              (.anthropicThinking, .anthropicMessages):
             return true
         default:
@@ -74,7 +75,8 @@ extension LLMAdapterID {
                 .contains(parameterID)
         case .openAIResponses,
              .openAIChatCompletions,
-             .openAICompatibleChatCompletions,
+             .openAIChatCompletionsLegacy,
+             .openRouterChatCompletions,
              .anthropicMessages:
             return [.model, .systemPrompt, .stream].contains(parameterID)
         }
