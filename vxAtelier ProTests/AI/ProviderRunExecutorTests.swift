@@ -162,8 +162,15 @@ final class ConversationDraftStoreTests: LLMTestCase {
 }
 
 @MainActor
-final class ConversationDisplayPolicyTests: LLMTestCase {
-    func testToolResultResolverMatchesProviderCallID() {
+final class ConversationPresentationTests: LLMTestCase {
+    func testPresentationMatchesToolResultByProviderCallID() {
+        let environment = TestEnvironment()
+        let conversation = environment.createConversation()
+        let turn = ConversationTurn(
+            sequenceNumber: 0,
+            userMessage: MessageItem(role: "user", text: "Look this up"),
+            conversation: conversation
+        )
         let call = ToolCallItem(
             callID: "fc_1",
             providerCallID: "call_1",
@@ -171,48 +178,38 @@ final class ConversationDisplayPolicyTests: LLMTestCase {
             name: "lookup",
             argumentsJSON: "{\"q\":\"test\"}"
         )
+        let assistantMessage = MessageItem(
+            role: "assistant",
+            text: "",
+            toolCalls: [call]
+        )
+        let assistantEvent = TurnEvent(
+            type: .assistant,
+            message: assistantMessage,
+            turn: turn
+        )
         let resultMessage = MessageItem(
             role: "tool",
             contentParts: [MessageContentPartItem(index: 0, kind: .toolResult, text: "result")],
             toolCallId: "call_1"
         )
-        let event = TurnEvent(type: .toolResult, message: resultMessage, turn: nil)
+        let resultEvent = TurnEvent(
+            type: .toolResult,
+            message: resultMessage,
+            turn: turn
+        )
+        turn.events = [assistantEvent, resultEvent]
+        conversation.turns = [turn]
 
-        let state = ToolResultDisplayResolver.resolve(calls: [call], events: [event])
+        let assistantRow = ConversationPresentationBuilder.build(conversation: conversation)
+            .rows
+            .first { $0.role == .assistant }
 
-        XCTAssertEqual(state.totalResults, 1)
-        XCTAssertEqual(state.pendingCount, 0)
-        XCTAssertEqual(state.results.first?.toolCall.name, "lookup")
-        XCTAssertEqual(state.results.first?.event.message.displayText, "result")
-    }
-
-    func testActiveFollowUpDraftRendersAfterAssistantEventExists() {
-        let draft = ConversationDraft(isActive: true, runStatus: .running)
-
-        XCTAssertTrue(ConversationDraftRenderPolicy.shouldRender(
-            isLastTurn: true,
-            draft: draft,
-            latestRunStatus: .running
-        ))
-    }
-
-    func testCompletedDraftDoesNotRenderAfterPersistence() {
-        let draft = ConversationDraft(isActive: false, runStatus: .completed)
-
-        XCTAssertFalse(ConversationDraftRenderPolicy.shouldRender(
-            isLastTurn: true,
-            draft: draft,
-            latestRunStatus: .completed
-        ))
-    }
-
-    func testFailedDraftRendersErrorState() {
-        let draft = ConversationDraft(isActive: false, runStatus: .failed, errorMessage: "boom")
-
-        XCTAssertTrue(ConversationDraftRenderPolicy.shouldRender(
-            isLastTurn: true,
-            draft: draft,
-            latestRunStatus: .failed
-        ))
+        XCTAssertEqual(assistantRow?.toolCalls.count, 1)
+        XCTAssertEqual(assistantRow?.toolCalls.first?.name, "lookup")
+        XCTAssertEqual(assistantRow?.toolResults.count, 1)
+        XCTAssertEqual(assistantRow?.toolResults.first?.toolName, "lookup")
+        XCTAssertEqual(assistantRow?.toolResults.first?.text, "result")
+        XCTAssertEqual(assistantRow?.pendingToolResultCount, 0)
     }
 }

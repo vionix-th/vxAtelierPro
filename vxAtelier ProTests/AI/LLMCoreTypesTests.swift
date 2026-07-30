@@ -575,7 +575,7 @@ final class LLMCoreTypesTests: XCTestCase {
         XCTAssertEqual(try config.makeLLMProviderConfiguration().baseURL, "https://openrouter.ai/api/v1")
     }
 
-    func testMessageContentPartsAndDisplayTextOrdering() {
+    func testMessageContentPartsAndTextContentOrdering() {
         let message = MessageItem(
             role: "assistant",
             contentParts: [
@@ -584,8 +584,8 @@ final class LLMCoreTypesTests: XCTestCase {
             ]
         )
 
-        XCTAssertEqual(message.displayText, "Hello world")
-        XCTAssertEqual(message.asDomainMessage().displayText, "Hello world")
+        XCTAssertEqual(message.textContent, "Hello world")
+        XCTAssertEqual(message.asDomainMessage().textContent, "Hello world")
         XCTAssertEqual(message.orderedContentParts.compactMap(\.text).joined(), "Hello world")
     }
 

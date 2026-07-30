@@ -47,10 +47,10 @@ final class ConversationItemForkingTests: XCTestCase {
         let sortedForkedOneTurns = forkedOne.turns.sorted { $0.sequenceNumber < $1.sequenceNumber }
         let sortedOrigTurns = conversation.turns.sorted { $0.sequenceNumber < $1.sequenceNumber }
         XCTAssertEqual(sortedForkedOneTurns.count, 1)
-        XCTAssertEqual(sortedForkedOneTurns[0].userMessage.displayText, "First")
+        XCTAssertEqual(sortedForkedOneTurns[0].userMessage.textContent, "First")
         XCTAssertEqual(forkedOne.project, project)
         sortedForkedOneTurns[0].userMessage.setContentParts([MessageContentPartItem(index: 0, kind: .text, text: "Changed in Fork")])
-        XCTAssertNotEqual(sortedForkedOneTurns[0].userMessage.displayText, sortedOrigTurns[0].userMessage.displayText)
+        XCTAssertNotEqual(sortedForkedOneTurns[0].userMessage.textContent, sortedOrigTurns[0].userMessage.textContent)
         sortedForkedOneTurns[0].events.append(TurnEvent(type: .assistant, timestamp: Date(), message: MessageItem(role: "assistant", text: "Reply", timestamp: Date(), toolCallId: nil), turn: sortedForkedOneTurns[0]))
         XCTAssertNotEqual(sortedForkedOneTurns[0].events.count, sortedOrigTurns[0].events.count)
 
@@ -58,10 +58,10 @@ final class ConversationItemForkingTests: XCTestCase {
         let forkedAll = conversation.fork(upToTurnIndex: 1)
         let sortedForkedAllTurns = forkedAll.turns.sorted { $0.sequenceNumber < $1.sequenceNumber }
         XCTAssertEqual(sortedForkedAllTurns.count, 2)
-        XCTAssertEqual(sortedForkedAllTurns[0].userMessage.displayText, "First")
-        XCTAssertEqual(sortedForkedAllTurns[1].userMessage.displayText, "Second")
+        XCTAssertEqual(sortedForkedAllTurns[0].userMessage.textContent, "First")
+        XCTAssertEqual(sortedForkedAllTurns[1].userMessage.textContent, "Second")
         XCTAssertEqual(forkedAll.project, project)
         sortedForkedAllTurns[1].userMessage.setContentParts([MessageContentPartItem(index: 0, kind: .text, text: "Changed in Fork All")])
-        XCTAssertNotEqual(sortedForkedAllTurns[1].userMessage.displayText, sortedOrigTurns[1].userMessage.displayText)
+        XCTAssertNotEqual(sortedForkedAllTurns[1].userMessage.textContent, sortedOrigTurns[1].userMessage.textContent)
     }
 }

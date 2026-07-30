@@ -200,7 +200,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         let exported = MessageExportData(message)
         let restored = exported.toDataItem()
 
-        XCTAssertEqual(restored.displayText, "Use tool")
+        XCTAssertEqual(restored.textContent, "Use tool")
         XCTAssertEqual(restored.toolCallItems.count, 1)
         XCTAssertEqual(restored.toolCallItems.first?.argumentsJSON, "{\"q\":\"test\"}")
     }

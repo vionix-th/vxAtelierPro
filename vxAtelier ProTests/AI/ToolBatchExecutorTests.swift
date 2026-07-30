@@ -38,7 +38,7 @@ final class ToolBatchExecutorTests: LLMTestCase {
         )
 
         XCTAssertEqual(toolCall.status, .completed)
-        XCTAssertEqual(toolCall.resultMessage?.displayText, "id=call_1 name=unit_echo_tool args={\"value\":\"ok\"} config=0 title=Tool Test turn=0")
+        XCTAssertEqual(toolCall.resultMessage?.textContent, "id=call_1 name=unit_echo_tool args={\"value\":\"ok\"} config=0 title=Tool Test turn=0")
         XCTAssertEqual(turn.events.first?.type, .toolResult)
     }
 

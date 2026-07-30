@@ -74,12 +74,12 @@ final class ConversationItemBackupRestoreTests: XCTestCase {
         let sortedRestoredTurns = restored.turns.sorted { $0.sequenceNumber < $1.sequenceNumber }
         let sortedOriginalTurns = conversation.turns.sorted { $0.sequenceNumber < $1.sequenceNumber }
         XCTAssertEqual(sortedRestoredTurns.count, sortedOriginalTurns.count)
-        XCTAssertEqual(sortedRestoredTurns[0].userMessage.displayText, sortedOriginalTurns[0].userMessage.displayText)
+        XCTAssertEqual(sortedRestoredTurns[0].userMessage.textContent, sortedOriginalTurns[0].userMessage.textContent)
         // Sort events by timestamp to mirror app logic
         let sortedRestoredEvents = sortedRestoredTurns[0].events.sorted { $0.timestamp < $1.timestamp }
         let sortedOriginalEvents = sortedOriginalTurns[0].events.sorted { $0.timestamp < $1.timestamp }
         XCTAssertEqual(sortedRestoredEvents.count, sortedOriginalEvents.count)
-        XCTAssertEqual(sortedRestoredEvents[0].message.displayText, sortedOriginalEvents[0].message.displayText)
+        XCTAssertEqual(sortedRestoredEvents[0].message.textContent, sortedOriginalEvents[0].message.textContent)
         XCTAssertEqual(restored.options.systemPrompt, conversation.options.systemPrompt)
         XCTAssertEqual(restored.options.temperature, conversation.options.temperature)
         XCTAssertEqual(restored.options.maxOutputTokens, conversation.options.maxOutputTokens)

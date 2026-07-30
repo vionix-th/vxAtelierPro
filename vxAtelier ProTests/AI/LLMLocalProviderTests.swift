@@ -9,6 +9,7 @@ import FoundationModels
 #endif
 
 @MainActor
+@available(macOS 26.0, iOS 26.0, *)
 final class LLMLocalProviderTests: XCTestCase {
     func testFoundationModelsAdapterDelegatesLocalBackend() async throws {
         let candidate = LLMProviderModelMetadata(
@@ -333,6 +334,7 @@ final class FoundationModelsBackendTests: XCTestCase {
     }
 }
 
+@available(macOS 26.0, iOS 26.0, *)
 private final class MockFoundationModelsSession: @unchecked Sendable, FoundationModelsSessioning {
     var transcript: Transcript
     let responseText: String

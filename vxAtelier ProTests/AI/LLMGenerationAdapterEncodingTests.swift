@@ -403,7 +403,7 @@ final class LLMGenerationAdapterEncodingTests: XCTestCase {
         }
     }
 
-    func testOpenAIChatMapsGPT5MaxOutputTokensToMaxCompletionTokens() throws {
+    func testModernOpenAIChatMapsMaxOutputTokensToMaxCompletionTokens() throws {
         let adapter = OpenAIChatCompletionsAdapter()
         let resolved = Self.resolvedDefaults(
             providerID: .openAIPlatform,

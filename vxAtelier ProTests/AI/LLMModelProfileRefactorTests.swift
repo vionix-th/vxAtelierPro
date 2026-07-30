@@ -204,7 +204,7 @@ final class LLMModelProfileRefactorTests: XCTestCase {
         var requestCount = 0
         MockLLMURLProtocol.requestHandler = { request in
             requestCount += 1
-            let data = request.httpBodyStream.flatMap { stream -> Data? in
+            let requestData = request.httpBodyStream.flatMap { stream -> Data? in
                 stream.open()
                 defer { stream.close() }
                 var data = Data()
@@ -217,7 +217,7 @@ final class LLMModelProfileRefactorTests: XCTestCase {
                 }
                 return data
             } ?? request.httpBody ?? Data()
-            let body = try JSONDecoder().decode(JSONValue.self, from: data)
+            let body = try JSONDecoder().decode(JSONValue.self, from: requestData)
             XCTAssertEqual(body.objectValue?.bool("stream"), true)
             XCTAssertNotNil(body.objectValue?.array("tools"))
             XCTAssertNotNil(body.objectValue?.object("reasoning"))
@@ -232,13 +232,13 @@ final class LLMModelProfileRefactorTests: XCTestCase {
                 httpVersion: nil,
                 headerFields: ["content-type": "text/event-stream"]
             )!
-            let data = Data("""
+            let responseData = Data("""
             data: {"type":"response.created","response":{"id":"resp_contract","model":"gpt-test"}}
 
             data: {"type":"response.completed","response":{"id":"resp_contract","model":"gpt-test"}}
 
             """.utf8)
-            return (response, data)
+            return (response, responseData)
         }
 
         let request = LLMGenerationRequest(
@@ -385,7 +385,7 @@ final class LLMModelProfileRefactorTests: XCTestCase {
         XCTAssertEqual(catalogOnly.capabilities[.streaming], LLMSupport(state: .supported, source: .catalog))
     }
 
-    func testExportImportRoundTripsMetadataAndOverrides() {
+    func testExportImportRoundTripsMetadataAndOverrides() throws {
         let configuration = APIConfigurationItem(
             name: "OpenAI",
             apiKey: "key",

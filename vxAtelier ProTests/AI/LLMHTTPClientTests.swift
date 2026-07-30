@@ -100,7 +100,7 @@ final class LLMHTTPClientTests: LLMTestCase {
         }
     }
 
-    func testHTTPClientAppliesTimeoutAndResponseSizeOptions() async {
+    func testHTTPClientAppliesTimeoutAndResponseSizeOptions() async throws {
         URLProtocol.registerClass(MockLLMURLProtocol.self)
         defer {
             URLProtocol.unregisterClass(MockLLMURLProtocol.self)

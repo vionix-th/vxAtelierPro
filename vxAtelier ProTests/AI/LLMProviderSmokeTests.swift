@@ -541,7 +541,12 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
 
     private func adapterSupportsTools(_ adapterID: LLMAdapterID) -> Bool {
         switch adapterID {
-        case .openAIResponses, .openAIChatCompletions, .openAIChatCompletionsLegacy, .anthropicMessages:
+        case .openAIResponses,
+             .openAIChatCompletions,
+             .openAIChatCompletionsLegacy,
+             .openRouterChatCompletions,
+             .anthropicMessages,
+             .foundationModels:
             return true
         }
     }

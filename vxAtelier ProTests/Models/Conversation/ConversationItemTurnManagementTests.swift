@@ -38,7 +38,7 @@ final class ConversationItemTurnManagementTests: XCTestCase {
         XCTAssertEqual(conversation.turns.count, 1)
         // Sort turns by sequenceNumber to mirror app logic (SwiftData relationships are unordered)
         let sortedTurns = conversation.turns.sorted { $0.sequenceNumber < $1.sequenceNumber }
-        XCTAssertEqual(sortedTurns.first?.userMessage.displayText, "Hello, world!")
+        XCTAssertEqual(sortedTurns.first?.userMessage.textContent, "Hello, world!")
     }
     
     func testAddMultipleTurns() throws {
@@ -55,8 +55,8 @@ final class ConversationItemTurnManagementTests: XCTestCase {
         XCTAssertEqual(conversation.turns.count, 2)
         // Sort turns by sequenceNumber to mirror app logic (SwiftData relationships are unordered)
         let sortedTurns = conversation.turns.sorted { $0.sequenceNumber < $1.sequenceNumber }
-        XCTAssertEqual(sortedTurns[0].userMessage.displayText, "First")
-        XCTAssertEqual(sortedTurns[1].userMessage.displayText, "Second")
+        XCTAssertEqual(sortedTurns[0].userMessage.textContent, "First")
+        XCTAssertEqual(sortedTurns[1].userMessage.textContent, "Second")
         XCTAssert(sortedTurns[0].sequenceNumber < sortedTurns[1].sequenceNumber)
     }
     
@@ -73,7 +73,7 @@ final class ConversationItemTurnManagementTests: XCTestCase {
         let fetchTurns = try context.fetch(FetchDescriptor<ConversationTurn>())
         let fetched = fetchTurns.first { $0.id == turn.id }
         XCTAssertNotNil(fetched)
-        XCTAssertEqual(fetched?.userMessage.displayText, "Edited")
+        XCTAssertEqual(fetched?.userMessage.textContent, "Edited")
     }
     
     func testDeleteSpecificTurn() throws {
@@ -87,7 +87,7 @@ final class ConversationItemTurnManagementTests: XCTestCase {
         conversation.turns.append(turn2)
         context.insert(conversation)
         try context.save()
-        if let idx = conversation.turns.firstIndex(where: { $0.userMessage.displayText == "Delete Me" }) {
+        if let idx = conversation.turns.firstIndex(where: { $0.userMessage.textContent == "Delete Me" }) {
             let toDelete = conversation.turns.remove(at: idx)
             context.delete(toDelete)
         }
@@ -96,6 +96,6 @@ final class ConversationItemTurnManagementTests: XCTestCase {
         XCTAssertEqual(fetchTurns.count, 1)
         // Sort fetchTurns by sequenceNumber to mirror app logic (SwiftData relationships are unordered)
         let sortedFetchTurns = fetchTurns.sorted { $0.sequenceNumber < $1.sequenceNumber }
-        XCTAssertEqual(sortedFetchTurns.first?.userMessage.displayText, "Keep")
+        XCTAssertEqual(sortedFetchTurns.first?.userMessage.textContent, "Keep")
     }
 }

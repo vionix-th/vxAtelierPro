@@ -7,7 +7,7 @@ import XCTest
 #endif
 
 @MainActor
-final class ConversationCompletionUseCaseTests: LLMTestCase {
+final class ConversationResponseUseCaseTests: LLMTestCase {
     func testStreamModeDisabledUsesNonStreamingWhenModelDoesNotSupportStreaming() async throws {
         URLProtocol.registerClass(MockLLMURLProtocol.self)
         defer {
@@ -58,9 +58,9 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         env.modelContext.insert(model)
         env.modelContext.insert(conversation)
 
-        try await ConversationCompletionUseCase.shared.complete(
-            conversation: conversation,
-            message: "Hello",
+        try await ConversationResponseUseCase.shared.sendMessage(
+            "Hello",
+            in: conversation,
             draftStore: ConversationDraftStore()
         )
 
@@ -129,9 +129,9 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         env.modelContext.insert(model)
         env.modelContext.insert(conversation)
 
-        try await ConversationCompletionUseCase.shared.complete(
-            conversation: conversation,
-            message: "Hello",
+        try await ConversationResponseUseCase.shared.sendMessage(
+            "Hello",
+            in: conversation,
             draftStore: ConversationDraftStore()
         )
 
@@ -174,9 +174,9 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         insertOpenAIModel(config: config, env: env)
         env.modelContext.insert(conversation)
 
-        await assertThrowsAsyncError(try await ConversationCompletionUseCase.shared.complete(
-            conversation: conversation,
-            message: "Hello",
+        await assertThrowsAsyncError(try await ConversationResponseUseCase.shared.sendMessage(
+            "Hello",
+            in: conversation,
             draftStore: ConversationDraftStore()
         ))
 
@@ -231,9 +231,9 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         insertOpenAIModel(config: config, env: env)
         env.modelContext.insert(conversation)
 
-        try await ConversationCompletionUseCase.shared.complete(
-            conversation: conversation,
-            message: "Hello",
+        try await ConversationResponseUseCase.shared.sendMessage(
+            "Hello",
+            in: conversation,
             draftStore: ConversationDraftStore()
         )
 
@@ -280,9 +280,9 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         env.modelContext.insert(conversation)
 
         let draftStore = ConversationDraftStore()
-        await assertThrowsAsyncError(try await ConversationCompletionUseCase.shared.complete(
-            conversation: conversation,
-            message: "Hello",
+        await assertThrowsAsyncError(try await ConversationResponseUseCase.shared.sendMessage(
+            "Hello",
+            in: conversation,
             draftStore: draftStore
         )) { error in
             guard case .provider(let statusCode, let message, let metadata) = error as? LLMProviderError else {
@@ -335,9 +335,9 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         insertOpenAIModel(config: config, env: env)
         env.modelContext.insert(conversation)
 
-        await assertThrowsAsyncError(try await ConversationCompletionUseCase.shared.complete(
-            conversation: conversation,
-            message: "Hello",
+        await assertThrowsAsyncError(try await ConversationResponseUseCase.shared.sendMessage(
+            "Hello",
+            in: conversation,
             draftStore: ConversationDraftStore()
         ))
 
@@ -388,9 +388,9 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         insertOpenAIModel(config: config, env: env)
         env.modelContext.insert(conversation)
 
-        try await ConversationCompletionUseCase.shared.complete(
-            conversation: conversation,
-            message: "Hello",
+        try await ConversationResponseUseCase.shared.sendMessage(
+            "Hello",
+            in: conversation,
             draftStore: ConversationDraftStore()
         )
 
@@ -432,9 +432,9 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         insertOpenAIModel(config: config, env: env)
         env.modelContext.insert(conversation)
 
-        await assertThrowsAsyncError(try await ConversationCompletionUseCase.shared.complete(
-            conversation: conversation,
-            message: "Hello",
+        await assertThrowsAsyncError(try await ConversationResponseUseCase.shared.sendMessage(
+            "Hello",
+            in: conversation,
             draftStore: ConversationDraftStore()
         )) { error in
             XCTAssertEqual(error as? LLMProviderError, .cancelled)
@@ -456,9 +456,9 @@ final class ConversationCompletionUseCaseTests: LLMTestCase {
         env.modelContext.insert(config)
         env.modelContext.insert(conversation)
 
-        await assertThrowsAsyncError(try await ConversationCompletionUseCase.shared.complete(
-            conversation: conversation,
-            message: "Hello",
+        await assertThrowsAsyncError(try await ConversationResponseUseCase.shared.sendMessage(
+            "Hello",
+            in: conversation,
             draftStore: ConversationDraftStore()
         ))
 

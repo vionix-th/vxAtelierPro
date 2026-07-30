@@ -48,7 +48,7 @@ final class ConversationRunStoreTests: XCTestCase {
         XCTAssertEqual(run.status, .completed)
         XCTAssertEqual(run.requestID, "req_store")
         XCTAssertEqual(run.totalTokens, 3)
-        XCTAssertEqual(message?.displayText, "Done")
+        XCTAssertEqual(message?.textContent, "Done")
         XCTAssertEqual(turn.events.first?.type, .assistant)
     }
 }

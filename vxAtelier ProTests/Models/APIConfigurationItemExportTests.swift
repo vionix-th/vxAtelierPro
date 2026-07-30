@@ -12,7 +12,7 @@ final class APIConfigurationItemExportTests: XCTestCase {
         let exportData = APIConfigurationExportData(original)
         let encoded = try JSONEncoder().encode(exportData)
         let decoded = try JSONDecoder().decode(APIConfigurationExportData.self, from: encoded)
-        let restored = decoded.toDataItem()
+        let restored = try decoded.toDataItem()
         XCTAssertEqual(restored.name, original.name)
         XCTAssertEqual(restored.apiKey, original.apiKey)
         XCTAssertEqual(restored.baseURL, original.baseURL)
