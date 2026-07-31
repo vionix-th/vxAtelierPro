@@ -48,6 +48,6 @@ final class ConversationItemPropertyParameterTests: XCTestCase {
         XCTAssertNil(conversation.options.temperature)
         XCTAssertNil(conversation.options.maxOutputTokens)
         XCTAssertNil(conversation.options.parameterValue(.reasoningEffort))
-        XCTAssertEqual(conversation.options.parameterValue(.systemPrompt), .string(""))
+        XCTAssertNil(conversation.options.parameterValue(.systemPrompt))
     }
 }

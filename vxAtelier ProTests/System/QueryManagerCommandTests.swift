@@ -208,7 +208,7 @@ final class QueryManagerCommandTests: XCTestCase {
         XCTAssertEqual(try testEnv.conversations().filter { $0.purpose == .system }.count, 1)
     }
 
-    func testWipePersistentStorePreservesRootDirectoryAndRemovesContents() throws {
+    func testWipePersistentStoreRemovesKnownStoreFilesAndPreservesUnrelatedContents() throws {
         let fileManager = FileManager.default
         let root = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let nestedDirectory = root.appendingPathComponent("nested", isDirectory: true)
@@ -232,7 +232,8 @@ final class QueryManagerCommandTests: XCTestCase {
         var isDirectory = ObjCBool(false)
         XCTAssertTrue(fileManager.fileExists(atPath: root.path, isDirectory: &isDirectory))
         XCTAssertTrue(isDirectory.boolValue)
-        XCTAssertTrue(try fileManager.contentsOfDirectory(at: root, includingPropertiesForKeys: nil).isEmpty)
+        XCTAssertTrue(fileManager.fileExists(atPath: nestedDirectory.path, isDirectory: &isDirectory))
+        XCTAssertTrue(isDirectory.boolValue)
         XCTAssertFalse(fileManager.fileExists(atPath: storeFile.path))
         XCTAssertFalse(fileManager.fileExists(atPath: walFile.path))
         XCTAssertFalse(fileManager.fileExists(atPath: shmFile.path))

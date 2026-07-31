@@ -44,7 +44,10 @@ final class ModelItemTests: XCTestCase {
         context.insert(model)
         try context.save()
         let fetched = try context.fetch(FetchDescriptor<ModelItem>()).first
-        XCTAssertEqual(Set(fetched?.capabilities ?? []), [.text, .image, .streaming])
+        XCTAssertEqual(
+            Set(fetched?.capabilities ?? []),
+            [.text, .image, .streaming, .jsonObject, .usage, .tools]
+        )
     }
 
     func testConfigurationOwnership() throws {

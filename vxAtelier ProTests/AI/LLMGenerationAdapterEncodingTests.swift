@@ -292,6 +292,8 @@ final class LLMGenerationAdapterEncodingTests: XCTestCase {
             modelID: "gpt-test",
             options: LLMGenerationOptions(
                 responseFormat: .jsonSchema,
+                reasoning: "medium",
+                reasoningSummary: "auto",
                 providerSpecificOptions: [
                     "json_schema": .object([
                         "name": .string("answer"),
@@ -517,7 +519,7 @@ final class LLMGenerationAdapterEncodingTests: XCTestCase {
             providerID: .anthropic,
             adapterID: .anthropicMessages,
             modelID: "claude-test",
-            options: LLMGenerationOptions()
+            options: LLMGenerationOptions(maxOutputTokens: AppDefaults.Anthropic.max_tokens)
         )
         let request = LLMGenerationRequest(
             providerID: .anthropic,

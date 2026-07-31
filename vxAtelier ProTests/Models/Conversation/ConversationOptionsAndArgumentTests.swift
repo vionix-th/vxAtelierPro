@@ -198,7 +198,7 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
         case .topP:
             return .number(0.9)
         case .stopSequences:
-            return .string("END\nSTOP")
+            return .array([.string("END"), .string("STOP")])
         case .responseFormat:
             return .string("json_schema")
         case .reasoningEffort:
@@ -255,7 +255,7 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
         case .topP:
             return .number(0.9)
         case .stopSequences:
-            return .string("END\nSTOP")
+            return .array([.string("END"), .string("STOP")])
         case .responseFormat:
             return .string("json_schema")
         case .reasoningEffort:
@@ -281,7 +281,7 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
         case .previousResponseID:
             return .string("resp_previous")
         case .include:
-            return .array([.string("reasoning.encrypted_content")])
+            return .string("[\"reasoning.encrypted_content\"]")
         case .textVerbosity:
             return .string("medium")
         case .frequencyPenalty:
@@ -289,7 +289,7 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
         case .presencePenalty:
             return .number(0.2)
         case .logitBias:
-            return .object(["42": .integer(1)])
+            return .string("[\"42\": 1]")
         case .seed:
             return .integer(123)
         case .user:
@@ -338,7 +338,7 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
         case .previousResponseID:
             return .string("resp_previous")
         case .include:
-            return .array([.string("reasoning.encrypted_content")])
+            return .string("[\"reasoning.encrypted_content\"]")
         case .textVerbosity:
             return .string("medium")
         case .frequencyPenalty:
@@ -346,7 +346,7 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
         case .presencePenalty:
             return .number(0.2)
         case .logitBias:
-            return .object(["42": .integer(1)])
+            return .string("[\"42\": 1]")
         case .seed:
             return .integer(123)
         case .user:
