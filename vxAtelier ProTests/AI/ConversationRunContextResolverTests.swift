@@ -75,6 +75,11 @@ final class ConversationRunContextResolverTests: XCTestCase {
             "max_tokens_b",
             "Resolved wire key: \(maxOutputMapping?.wireKey ?? "nil")"
         )
+
+        let body = try OpenAIChatCompletionsAdapter().makeBody(for: request, stream: false)
+        XCTAssertEqual(body["max_tokens_b"], .integer(256))
+        XCTAssertNil(body["max_completion_tokens"])
+        XCTAssertNil(body["max_tokens_a"])
     }
 
     func testResolverFailsWhenNoPersistedModelExists() async throws {

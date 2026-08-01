@@ -159,6 +159,19 @@ extension XCTestCase {
             errorHandler(error)
         }
     }
+
+    func assertJSONEqual(
+        _ actual: String?,
+        _ expected: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let actual = try XCTUnwrap(actual, file: file, line: line)
+        let decoder = JSONDecoder()
+        let actualValue = try decoder.decode(JSONValue.self, from: Data(actual.utf8))
+        let expectedValue = try decoder.decode(JSONValue.self, from: Data(expected.utf8))
+        XCTAssertEqual(actualValue, expectedValue, file: file, line: line)
+    }
 }
 
 extension LLMGenerationRequest {
@@ -169,7 +182,7 @@ extension LLMGenerationRequest {
         messages: [LLMMessage],
         tools: [LLMToolDefinition] = [],
         options: LLMGenerationOptions = LLMGenerationOptions()
-    ) -> LLMGenerationRequest {
+    ) throws -> LLMGenerationRequest {
         let profile = LLMModelProfileResolver(fallbackContextSize: 4096).resolve(
             providerID: providerID,
             adapterID: adapterID,
@@ -177,7 +190,7 @@ extension LLMGenerationRequest {
             metadata: nil
         )
         let providedParameterIDs = options.testProvidedParameterIDs
-        let resolved = try! LLMGenerationOptionsResolver.resolve(
+        let resolved = try LLMGenerationOptionsResolver.resolve(
             options: options,
             conversationPreferences: Dictionary(uniqueKeysWithValues: providedParameterIDs.map {
                 ($0.rawValue, true)

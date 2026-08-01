@@ -162,7 +162,7 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
                     )
                     let events = try await collectEvents(
                         adapter.generateEvents(
-                            makeRequest(providerID: providerID, adapterID: adapterID, model: model, scenario: scenario),
+                            try makeRequest(providerID: providerID, adapterID: adapterID, model: model, scenario: scenario),
                             configuration: route.configuration,
                             toolExecutor: nil
                         )
@@ -391,8 +391,8 @@ final class LLMProviderLiveSmokeTests: XCTestCase {
         adapterID: LLMAdapterID,
         model: String,
         scenario: LiveSmokeScenario
-    ) -> LLMGenerationRequest {
-        LLMGenerationRequest.runtimeEquivalent(
+    ) throws -> LLMGenerationRequest {
+        try LLMGenerationRequest.runtimeEquivalent(
             providerID: providerID,
             adapterID: adapterID,
             modelID: model,

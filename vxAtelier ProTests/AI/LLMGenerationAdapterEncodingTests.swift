@@ -216,7 +216,7 @@ final class LLMGenerationAdapterEncodingTests: XCTestCase {
                         "properties": .object([:])
                     ])
                 ]),
-                "seed": .integer(7)
+                "custom_flag": .integer(7)
             ]
         )
 
@@ -236,7 +236,7 @@ final class LLMGenerationAdapterEncodingTests: XCTestCase {
         let responseFormat = try XCTUnwrap(body["response_format"]?.objectValue)
         XCTAssertEqual(responseFormat.string("type"), "json_schema")
         XCTAssertEqual(responseFormat.object("json_schema")?.string("name"), "answer")
-        XCTAssertEqual(body["seed"], .integer(7))
+        XCTAssertEqual(body["custom_flag"], .integer(7))
         XCTAssertNil(body["json_schema"])
     }
 
@@ -286,7 +286,7 @@ final class LLMGenerationAdapterEncodingTests: XCTestCase {
 
     func testOpenAIResponsesJsonSchemaEncodingUsesTextFormat() throws {
         let adapter = OpenAIResponsesAdapter()
-        let resolved = Self.resolvedDefaults(
+        let resolved = try Self.resolvedDefaults(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
             modelID: "gpt-test",
@@ -321,7 +321,7 @@ final class LLMGenerationAdapterEncodingTests: XCTestCase {
 
     func testOpenAIResponsesStructuredMappingsMergeSiblingFields() throws {
         let adapter = OpenAIResponsesAdapter()
-        let resolved = Self.resolvedDefaults(
+        let resolved = try Self.resolvedDefaults(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
             modelID: "gpt-5.5",
@@ -362,11 +362,11 @@ final class LLMGenerationAdapterEncodingTests: XCTestCase {
             adapterID: .openAIChatCompletions,
             modelID: "gpt-test",
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Answer")])],
-            options: LLMGenerationOptions(providerSpecificOptions: ["stream": .boolean(false)])
+            options: LLMGenerationOptions(providerSpecificOptions: ["messages": .array([])])
         )
 
         XCTAssertThrowsError(try adapter.makeBody(for: request, stream: true)) { error in
-            XCTAssertEqual(error as? LLMProviderError, .requestEncoding("providerSpecificOptions.stream cannot override a reserved request field."))
+            XCTAssertEqual(error as? LLMProviderError, .requestEncoding("providerSpecificOptions.messages cannot override a reserved request field."))
         }
     }
 
@@ -407,7 +407,7 @@ final class LLMGenerationAdapterEncodingTests: XCTestCase {
 
     func testModernOpenAIChatMapsMaxOutputTokensToMaxCompletionTokens() throws {
         let adapter = OpenAIChatCompletionsAdapter()
-        let resolved = Self.resolvedDefaults(
+        let resolved = try Self.resolvedDefaults(
             providerID: .openAIPlatform,
             adapterID: .openAIChatCompletions,
             modelID: "gpt-5.4-nano",
@@ -432,14 +432,14 @@ final class LLMGenerationAdapterEncodingTests: XCTestCase {
         XCTAssertEqual(body["max_completion_tokens"], .integer(16))
         XCTAssertEqual(body["reasoning_effort"], .string("low"))
         XCTAssertNil(body["max_tokens"])
-        XCTAssertNil(body["temperature"])
-        XCTAssertNil(body["top_p"])
-        XCTAssertNil(body["stop"])
+        XCTAssertEqual(body["temperature"], .number(0.7))
+        XCTAssertEqual(body["top_p"], .number(0.9))
+        XCTAssertEqual(body["stop"], .array([.string("END")]))
     }
 
     func testLegacyOpenAIChatMapsMaxOutputTokensToMaxTokens() throws {
         let adapter = OpenAIChatCompletionsLegacyAdapter()
-        let resolved = Self.resolvedDefaults(
+        let resolved = try Self.resolvedDefaults(
             providerID: .custom,
             adapterID: .openAIChatCompletionsLegacy,
             modelID: "gpt-4.1-nano",
@@ -461,7 +461,7 @@ final class LLMGenerationAdapterEncodingTests: XCTestCase {
 
     func testOpenRouterEncodesNestedReasoningAndTopK() throws {
         let adapter = OpenRouterChatCompletionsAdapter()
-        let resolved = Self.resolvedDefaults(
+        let resolved = try Self.resolvedDefaults(
             providerID: .openRouter,
             adapterID: .openRouterChatCompletions,
             modelID: "openai/gpt-5.4-nano",
@@ -489,14 +489,11 @@ final class LLMGenerationAdapterEncodingTests: XCTestCase {
 
     func testCodexResponsesUsesMappedRouteParametersFromDefaults() throws {
         let adapter = OpenAIResponsesAdapter()
-        let resolved = Self.resolvedDefaults(
+        let resolved = try Self.resolvedDefaults(
             providerID: .openAICodexChatGPTSubscription,
             adapterID: .openAIResponses,
             modelID: "gpt-5.4-mini",
-            options: LLMGenerationOptions(
-                maxOutputTokens: 16,
-                streamMode: .enabled
-            )
+            options: LLMGenerationOptions(streamMode: .enabled)
         )
         let request = LLMGenerationRequest(
             providerID: .openAICodexChatGPTSubscription,
@@ -515,7 +512,7 @@ final class LLMGenerationAdapterEncodingTests: XCTestCase {
 
     func testAnthropicMessagesUsesRequiredDefaultMaxTokens() throws {
         let adapter = AnthropicMessagesAdapter()
-        let resolved = Self.resolvedDefaults(
+        let resolved = try Self.resolvedDefaults(
             providerID: .anthropic,
             adapterID: .anthropicMessages,
             modelID: "claude-test",
@@ -578,12 +575,115 @@ final class LLMGenerationAdapterEncodingTests: XCTestCase {
         }
     }
 
+    func testOpenRouterReasoningPresetIsLegalOnlyForOpenRouter() throws {
+        let valid = LLMGenerationRequest(
+            providerID: .openRouter,
+            adapterID: .openRouterChatCompletions,
+            modelID: "openai/gpt-test",
+            activeParameters: [
+                LLMActiveParameter(parameterID: .reasoningEffort, mapping: LLMParameterMapping(
+                    adapterID: .openRouterChatCompletions,
+                    parameterID: .reasoningEffort,
+                    encodingKind: .preset,
+                    structuredPreset: .openRouterReasoning
+                ))
+            ],
+            messages: [],
+            options: LLMGenerationOptions(reasoning: "high")
+        )
+        XCTAssertNoThrow(try valid.validateActiveParameterMappings())
+
+        for adapterID in LLMAdapterID.allCases where adapterID != .openRouterChatCompletions {
+            let invalid = LLMGenerationRequest(
+                providerID: adapterID == .foundationModels ? .appleIntelligence : .custom,
+                adapterID: adapterID,
+                modelID: "test-model",
+                activeParameters: [
+                    LLMActiveParameter(parameterID: .reasoningEffort, mapping: LLMParameterMapping(
+                        adapterID: adapterID,
+                        parameterID: .reasoningEffort,
+                        encodingKind: .preset,
+                        structuredPreset: .openRouterReasoning
+                    ))
+                ],
+                messages: [],
+                options: LLMGenerationOptions(reasoning: "high")
+            )
+            XCTAssertThrowsError(try invalid.validateActiveParameterMappings(), adapterID.rawValue)
+        }
+    }
+
+    func testActiveParameterMappingValidationRejectsInvalidDefinitions() {
+        func request(
+            adapterID: LLMAdapterID = .openAIChatCompletions,
+            parameters: [LLMActiveParameter]
+        ) -> LLMGenerationRequest {
+            LLMGenerationRequest(
+                providerID: .custom,
+                adapterID: adapterID,
+                modelID: "test-model",
+                activeParameters: parameters,
+                messages: [],
+                options: LLMGenerationOptions(topP: 0.9, maxOutputTokens: 16)
+            )
+        }
+
+        let maxTokens = LLMActiveParameter(parameterID: .maxOutputTokens, mapping: LLMParameterMapping(
+            adapterID: .openAIChatCompletions,
+            parameterID: .maxOutputTokens,
+            wireKey: "max_completion_tokens"
+        ))
+        XCTAssertThrowsError(try request(parameters: [maxTokens, maxTokens]).validateActiveParameterMappings())
+
+        XCTAssertThrowsError(try request(parameters: [
+            LLMActiveParameter(parameterID: .maxOutputTokens, mapping: LLMParameterMapping(
+                adapterID: .openAIResponses,
+                parameterID: .maxOutputTokens,
+                wireKey: "max_output_tokens"
+            ))
+        ]).validateActiveParameterMappings())
+
+        XCTAssertThrowsError(try request(parameters: [
+            LLMActiveParameter(parameterID: .maxOutputTokens, mapping: LLMParameterMapping(
+                adapterID: .openAIChatCompletions,
+                parameterID: .topP,
+                wireKey: "top_p"
+            ))
+        ]).validateActiveParameterMappings())
+
+        XCTAssertThrowsError(try request(parameters: [
+            LLMActiveParameter(parameterID: .maxOutputTokens, mapping: LLMParameterMapping(
+                adapterID: .openAIChatCompletions,
+                parameterID: .maxOutputTokens,
+                encodingKind: .key,
+                wireKey: ""
+            ))
+        ]).validateActiveParameterMappings())
+
+        XCTAssertThrowsError(try request(parameters: [
+            LLMActiveParameter(parameterID: .reasoningEffort, mapping: LLMParameterMapping(
+                adapterID: .openAIChatCompletions,
+                parameterID: .reasoningEffort,
+                encodingKind: .preset,
+                structuredPreset: .anthropicThinking
+            ))
+        ]).validateActiveParameterMappings())
+
+        XCTAssertThrowsError(try request(adapterID: .foundationModels, parameters: [
+            LLMActiveParameter(parameterID: .topP, mapping: LLMParameterMapping(
+                adapterID: .foundationModels,
+                parameterID: .topP,
+                encodingKind: .adapter
+            ))
+        ]).validateActiveParameterMappings())
+    }
+
     private static func resolvedDefaults(
         providerID: LLMProviderID,
         adapterID: LLMAdapterID,
         modelID: String,
         options: LLMGenerationOptions
-    ) -> LLMResolvedGenerationParameters {
+    ) throws -> LLMResolvedGenerationParameters {
         let profile = LLMModelProfileResolver(fallbackContextSize: 4096).resolve(
             providerID: providerID,
             adapterID: adapterID,
@@ -591,7 +691,7 @@ final class LLMGenerationAdapterEncodingTests: XCTestCase {
             metadata: nil
         )
         let providedParameterIDs = options.testProvidedParameterIDs
-        return try! LLMGenerationOptionsResolver.resolve(
+        return try LLMGenerationOptionsResolver.resolve(
             options: options,
             conversationPreferences: Dictionary(uniqueKeysWithValues: providedParameterIDs.map {
                 ($0.rawValue, true)

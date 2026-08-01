@@ -62,18 +62,19 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
         XCTAssertEqual(options.temperature, 0.9)
     }
 
-    func testGenerationOptionsOmitDisabledOptionalParameters() {
+    func testGenerationOptionsOmitDisabledOptionalParameters() throws {
         let options = ConversationOptions()
         options.temperature = 0.9
         options.maxOutputTokens = 1000
         options.setParameterEnabled(.temperature, enabled: false)
         options.setParameterEnabled(.maxOutputTokens, enabled: true)
         let parameterProfiles: [LLMParameterID: LLMParameterProfile] = [
+            .model: Self.parameterProfile(.model),
             .temperature: Self.parameterProfile(.temperature, defaultValue: .number(0.4)),
             .maxOutputTokens: Self.parameterProfile(.maxOutputTokens)
         ]
 
-        let resolved = try! LLMGenerationOptionsResolver.resolve(
+        let resolved = try LLMGenerationOptionsResolver.resolve(
             options: options.generationOptions(resolvedModelID: "model"),
             conversationPreferences: options.parameterInclusionPreferences,
             parameterProfiles: parameterProfiles
@@ -86,15 +87,16 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
         XCTAssertEqual(options.temperature, 0.9)
     }
 
-    func testMandatoryParameterCannotBeDisabledByConversationPreference() {
+    func testMandatoryParameterCannotBeDisabledByConversationPreference() throws {
         let options = ConversationOptions()
         options.maxOutputTokens = 1000
         options.setParameterEnabled(.maxOutputTokens, enabled: false)
         let parameterProfiles: [LLMParameterID: LLMParameterProfile] = [
+            .model: Self.parameterProfile(.model),
             .maxOutputTokens: Self.parameterProfile(.maxOutputTokens, isRequired: true)
         ]
 
-        let resolved = try! LLMGenerationOptionsResolver.resolve(
+        let resolved = try LLMGenerationOptionsResolver.resolve(
             options: options.generationOptions(resolvedModelID: "model"),
             conversationPreferences: options.parameterInclusionPreferences,
             parameterProfiles: parameterProfiles
@@ -131,7 +133,7 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
         XCTAssertTrue(temperature?.isEnabled ?? false)
     }
 
-    func testAllSemanticParametersHaveConversationConversionCoverage() {
+    func testAllSemanticParametersHaveConversationConversionCoverage() throws {
         let options = ConversationOptions()
 
         for parameterID in LLMParameterID.allCases {
@@ -145,7 +147,7 @@ final class ConversationOptionsAndArgumentTests: XCTestCase {
 
         let parameterProfiles = Dictionary(uniqueKeysWithValues: LLMParameterID.allCases
             .map { ($0, Self.parameterProfile($0)) })
-        let resolved = try! LLMGenerationOptionsResolver.resolve(
+        let resolved = try LLMGenerationOptionsResolver.resolve(
             options: options.generationOptions(resolvedModelID: "fallback-model"),
             conversationPreferences: options.parameterInclusionPreferences,
             parameterProfiles: parameterProfiles

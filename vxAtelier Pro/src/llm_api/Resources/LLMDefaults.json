@@ -1241,13 +1241,11 @@
         },
         {
           "id": "reasoning_effort",
-          "supported": true,
-          "enabledByDefault": true
+          "supported": true
         },
         {
           "id": "reasoning_summary",
-          "supported": true,
-          "enabledByDefault": true
+          "supported": true
         },
         {
           "id": "service_tier",
@@ -1702,7 +1700,8 @@
         {
           "id": "max_output_tokens",
           "supported": true,
-          "required": true
+          "required": true,
+          "defaultValue": 4096
         },
         {
           "id": "temperature",

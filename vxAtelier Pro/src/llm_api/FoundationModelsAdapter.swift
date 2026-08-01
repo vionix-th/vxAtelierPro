@@ -31,16 +31,18 @@ struct FoundationModelsAdapter: LLMGenerationAdapter {
 /// Foundation Models-backed local provider implementation.
 @available(macOS 26.0, iOS 26.0, *)
 struct FoundationModelsBackend: LLMLocalModelBackend {
-    let profile: LLMProviderProfile = LLMProviderRegistry.shared.profile(for: .appleIntelligence)
+    let profile: LLMProviderProfile
     private let makeSession: FoundationModelsSessionFactory
 
     init(
+        profile: LLMProviderProfile = LLMProviderRegistry.shared.profile(for: .appleIntelligence),
         makeSession: @escaping FoundationModelsSessionFactory = { tools, transcript in
             FoundationModelsLiveSession(
                 session: LanguageModelSession(model: .default, tools: tools, transcript: transcript)
             )
         }
     ) {
+        self.profile = profile
         self.makeSession = makeSession
     }
 

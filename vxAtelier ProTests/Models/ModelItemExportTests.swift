@@ -72,6 +72,30 @@ final class ModelItemExportTests: XCTestCase {
         XCTAssertEqual(restored.apiConfiguration?.parsedProviderID, .openAIPlatform)
     }
 
+    func testImportRejectsUnknownConfigurationRouteReferences() throws {
+        let configuration = APIConfigurationItem(
+            name: "OpenAI",
+            apiKey: "key",
+            baseURL: "https://api.test.com/v1",
+            providerID: .openAIPlatform
+        )
+        let export = ModelExportData(ModelItem(
+            modelID: "gpt-4.1",
+            apiConfiguration: configuration
+        ))
+
+        try assertInvalidModelImport(
+            export,
+            replacing: ["apiConfigurationProviderID": "future-provider"],
+            contains: "future-provider"
+        )
+        try assertInvalidModelImport(
+            export,
+            replacing: ["apiConfigurationAdapterID": "future-adapter"],
+            contains: "future-adapter"
+        )
+    }
+
     func testBackupVersionFiveRoundTripsConfigurationAndModelRouteIdentity() throws {
         let configuration = APIConfigurationItem(
             name: "OpenRouter",
@@ -112,5 +136,32 @@ final class ModelItemExportTests: XCTestCase {
         versionFour["version"] = 4
         let versionFourData = try JSONSerialization.data(withJSONObject: versionFour)
         XCTAssertThrowsError(try JSONDecoder().decode(FullBackup.self, from: versionFourData))
+    }
+
+    private func assertInvalidModelImport(
+        _ export: ModelExportData,
+        replacing values: [String: Any],
+        contains expectedText: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let data = try JSONEncoder().encode(export)
+        var json = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any],
+            file: file,
+            line: line
+        )
+        for (key, value) in values {
+            json[key] = value
+        }
+        let mutatedData = try JSONSerialization.data(withJSONObject: json)
+        let decoded = try JSONDecoder().decode(ModelExportData.self, from: mutatedData)
+
+        XCTAssertThrowsError(try decoded.toDataItem(), file: file, line: line) { error in
+            guard case .invalidConfiguration(let message) = error as? LLMProviderError else {
+                return XCTFail("Expected invalidConfiguration, got \(error)", file: file, line: line)
+            }
+            XCTAssertTrue(message.contains(expectedText), "Unexpected message: \(message)", file: file, line: line)
+        }
     }
 }

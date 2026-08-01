@@ -96,7 +96,11 @@ struct StaticModelCatalog: LLMModelCatalog {
 
 @available(macOS 26.0, iOS 26.0, *)
 struct FoundationModelsCatalog: LLMModelCatalog {
-    private let backend = FoundationModelsBackend()
+    private let backend: FoundationModelsBackend
+
+    init(backend: FoundationModelsBackend) {
+        self.backend = backend
+    }
 
     func fetchModelMetadata(
         configuration: LLMProviderConfiguration
@@ -157,9 +161,12 @@ struct OpenCodeZenProviderIntegration: LLMProviderIntegration {
     let profile: LLMProviderProfile
     private let catalog: any LLMModelCatalog
 
-    init(profile: LLMProviderProfile) {
+    init(
+        profile: LLMProviderProfile,
+        catalog: (any LLMModelCatalog)? = nil
+    ) {
         self.profile = profile
-        catalog = OpenAIModelCatalog(profile: profile)
+        self.catalog = catalog ?? OpenAIModelCatalog(profile: profile)
     }
 
     func resolveRoute(
@@ -221,8 +228,15 @@ struct OpenCodeZenProviderIntegration: LLMProviderIntegration {
 @available(macOS 26.0, iOS 26.0, *)
 struct AppleIntelligenceProviderIntegration: LLMProviderIntegration {
     let profile: LLMProviderProfile
-    private let backend = FoundationModelsBackend()
-    private let catalog = FoundationModelsCatalog()
+    private let backend: FoundationModelsBackend
+    private let catalog: FoundationModelsCatalog
+
+    init(profile: LLMProviderProfile) {
+        self.profile = profile
+        let backend = FoundationModelsBackend(profile: profile)
+        self.backend = backend
+        self.catalog = FoundationModelsCatalog(backend: backend)
+    }
 
     func resolveRoute(
         adapterID: LLMAdapterID,

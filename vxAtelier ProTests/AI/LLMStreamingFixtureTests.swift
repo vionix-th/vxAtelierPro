@@ -16,7 +16,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         }
 
         let adapter = OpenAIChatCompletionsAdapter()
-        let request = LLMGenerationRequest.runtimeEquivalent(
+        let request = try LLMGenerationRequest.runtimeEquivalent(
             providerID: .openAIPlatform,
             adapterID: .openAIChatCompletions,
             modelID: "gpt-test",
@@ -37,12 +37,13 @@ final class LLMStreamingFixtureTests: LLMTestCase {
             toolExecutor: nil
         ))
         XCTAssertTrue(events.contains(.textDelta("Hello")))
-        XCTAssertTrue(events.contains(where: { event in
-            if case .toolCallCompleted(let call) = event {
-                return call.callID == "call_1" && call.name == "lookup" && call.argumentsJSON == "{\"q\":\"test\"}"
-            }
-            return false
-        }))
+        let chatCall = try XCTUnwrap(events.compactMap { event -> LLMToolCall? in
+            guard case .toolCallCompleted(let call) = event else { return nil }
+            return call
+        }.first)
+        XCTAssertEqual(chatCall.callID, "call_1")
+        XCTAssertEqual(chatCall.name, "lookup")
+        try assertJSONEqual(chatCall.argumentsJSON, "{\"q\":\"test\"}")
         XCTAssertTrue(events.contains(.generationCompleted(responseID: nil, modelID: nil)))
     }
 
@@ -54,7 +55,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         }
 
         let adapter = OpenAIResponsesAdapter()
-        let request = LLMGenerationRequest.runtimeEquivalent(
+        let request = try LLMGenerationRequest.runtimeEquivalent(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
             modelID: "gpt-test",
@@ -78,12 +79,13 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         XCTAssertTrue(events.contains(.textDelta("Hello")))
         XCTAssertTrue(events.contains(.usage(LLMUsage(inputTokens: 5, outputTokens: 7, totalTokens: 12))))
         XCTAssertTrue(events.contains(.generationCompleted(responseID: "resp_fixture", modelID: "gpt-4.1-mini")))
-        XCTAssertTrue(events.contains(where: { event in
-            if case .toolCallCompleted(let call) = event {
-                return call.id == "fc_1" && call.callID == "call_1" && call.argumentsJSON == "{\"q\":\"test\"}"
-            }
-            return false
-        }))
+        let responsesCall = try XCTUnwrap(events.compactMap { event -> LLMToolCall? in
+            guard case .toolCallCompleted(let call) = event else { return nil }
+            return call
+        }.first)
+        XCTAssertEqual(responsesCall.id, "fc_1")
+        XCTAssertEqual(responsesCall.callID, "call_1")
+        try assertJSONEqual(responsesCall.argumentsJSON, "{\"q\":\"test\"}")
     }
 
     func testResponsesStreamWithoutCompletionEventFails() async throws {
@@ -94,7 +96,7 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         }
 
         let adapter = OpenAIResponsesAdapter()
-        let request = LLMGenerationRequest.runtimeEquivalent(
+        let request = try LLMGenerationRequest.runtimeEquivalent(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
             modelID: "gpt-test",
@@ -126,12 +128,15 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         }
 
         let adapter = AnthropicMessagesAdapter()
-        let request = LLMGenerationRequest.runtimeEquivalent(
+        let request = try LLMGenerationRequest.runtimeEquivalent(
             providerID: .anthropic,
             adapterID: .anthropicMessages,
             modelID: "claude-test",
             messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Hello")])],
-            options: LLMGenerationOptions(streamMode: .enabled)
+            options: LLMGenerationOptions(
+                maxOutputTokens: AppDefaults.Anthropic.max_tokens,
+                streamMode: .enabled
+            )
         )
         let config = APIConfigurationItem(
             name: "Anthropic",
@@ -149,12 +154,13 @@ final class LLMStreamingFixtureTests: LLMTestCase {
         XCTAssertTrue(events.contains(.generationStarted(requestID: "msg_fixture")))
         XCTAssertTrue(events.contains(.textDelta("Hello")))
         XCTAssertTrue(events.contains(.generationCompleted(responseID: nil, modelID: nil)))
-        XCTAssertTrue(events.contains(where: { event in
-            if case .toolCallCompleted(let call) = event {
-                return call.callID == "toolu_1" && call.name == "lookup" && call.argumentsJSON == "{\"q\":\"test\"}"
-            }
-            return false
-        }))
+        let anthropicCall = try XCTUnwrap(events.compactMap { event -> LLMToolCall? in
+            guard case .toolCallCompleted(let call) = event else { return nil }
+            return call
+        }.first)
+        XCTAssertEqual(anthropicCall.callID, "toolu_1")
+        XCTAssertEqual(anthropicCall.name, "lookup")
+        try assertJSONEqual(anthropicCall.argumentsJSON, "{\"q\":\"test\"}")
     }
 
     func testOpenAIShapedModelMetadataFixtures() throws {

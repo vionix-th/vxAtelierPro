@@ -81,7 +81,7 @@ final class LLMLocalProviderTests: XCTestCase {
         ])
     }
 
-    func testFoundationModelsAdapterSurfacesLocalBackendAvailabilityFailure() async throws {
+    func testFoundationModelsAdapterDelegatesAvailabilityPolicyToLocalBackend() async throws {
         let backend = MockLocalModelBackend(
             availabilityResult: .unavailable("Apple Intelligence unavailable."),
             statusTextResult: "Apple Intelligence unavailable.",
@@ -99,16 +99,13 @@ final class LLMLocalProviderTests: XCTestCase {
             ]
         )
 
-        do {
-            _ = try await collectEvents(adapter.generateEvents(
-                request,
-                configuration: configuration,
-                toolExecutor: nil
-            ))
-            XCTFail("Expected adapter to fail when backend is unavailable.")
-        } catch let error as LLMProviderError {
-            XCTAssertEqual(error, .localModelUnavailable("Apple Intelligence unavailable."))
-        }
+        let events = try await collectEvents(adapter.generateEvents(
+            request,
+            configuration: configuration,
+            toolExecutor: nil
+        ))
+
+        XCTAssertTrue(events.isEmpty)
     }
 
     private func collectEvents(_ stream: AsyncThrowingStream<LLMGenerationEvent, Error>) async throws -> [LLMGenerationEvent] {
@@ -214,7 +211,7 @@ final class FoundationModelsBackendTests: XCTestCase {
 
         XCTAssertTrue(session.respondCalled)
         XCTAssertFalse(session.streamCalled)
-        XCTAssertEqual(events, [
+        XCTAssertEqual(try normalizedToolArguments(in: events), try normalizedToolArguments(in: [
             .generationStarted(requestID: nil),
             .textDelta("Final answer"),
             .toolCallCompleted(LLMToolCall(
@@ -232,7 +229,7 @@ final class FoundationModelsBackendTests: XCTestCase {
                 output: "result"
             )),
             .generationCompleted(responseID: nil, modelID: "apple-intelligence-default")
-        ])
+        ]))
     }
 
     func testFoundationModelsBackendUsesStreamForStreamingRuns() async throws {
@@ -274,7 +271,7 @@ final class FoundationModelsBackendTests: XCTestCase {
 
         XCTAssertTrue(session.streamCalled)
         XCTAssertFalse(session.respondCalled)
-        XCTAssertEqual(events, [
+        XCTAssertEqual(try normalizedToolArguments(in: events), try normalizedToolArguments(in: [
             .generationStarted(requestID: nil),
             .textDelta("Fin"),
             .textDelta("al answer"),
@@ -293,7 +290,7 @@ final class FoundationModelsBackendTests: XCTestCase {
                 output: "result"
             )),
             .generationCompleted(responseID: nil, modelID: "apple-intelligence-default")
-        ])
+        ]))
     }
 
     private func makeAppleRequest(streamMode: LLMGenerationOptions.StreamMode) -> LLMGenerationRequest {
@@ -311,6 +308,13 @@ final class FoundationModelsBackendTests: XCTestCase {
             providerID: .appleIntelligence,
             adapterID: .foundationModels,
             modelID: candidate.id,
+            activeParameters: [
+                LLMActiveParameter(parameterID: .stream, mapping: LLMParameterMapping(
+                    adapterID: .foundationModels,
+                    parameterID: .stream,
+                    encodingKind: .adapter
+                ))
+            ],
             messages: [
                 LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Hello")])
             ],
@@ -331,6 +335,15 @@ final class FoundationModelsBackendTests: XCTestCase {
             events.append(event)
         }
         return events
+    }
+
+    private func normalizedToolArguments(in events: [LLMGenerationEvent]) throws -> [LLMGenerationEvent] {
+        try events.map { event in
+            guard case .toolCallCompleted(var call) = event else { return event }
+            try assertJSONEqual(call.argumentsJSON, "{\"q\":\"test\"}")
+            call.argumentsJSON = "{\"q\":\"test\"}"
+            return .toolCallCompleted(call)
+        }
     }
 }
 

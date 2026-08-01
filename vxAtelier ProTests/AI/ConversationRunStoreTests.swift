@@ -28,7 +28,7 @@ final class ConversationRunStoreTests: XCTestCase {
         let conversation = env.createConversation()
         let store = ConversationRunStore()
         let turn = try store.startTurn(message: "Hello", in: conversation)
-        let request = LLMGenerationRequest.runtimeEquivalent(
+        let request = try LLMGenerationRequest.runtimeEquivalent(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
             modelID: "gpt-test",

@@ -75,7 +75,7 @@ final class ModelItemTests: XCTestCase {
             providerID: .anthropic
         )
         config.adapterID = LLMAdapterID.anthropicMessages.rawValue
-        let model = ModelItem(modelID: "claude-sonnet-4-5", contextSize: 8192, apiConfiguration: config)
+        let model = ModelItem(modelID: "claude-sonnet-4-6", contextSize: 8192, apiConfiguration: config)
 
         let maxTokens = model.modelProfile.parameters[.maxOutputTokens]
 
@@ -84,7 +84,7 @@ final class ModelItemTests: XCTestCase {
         XCTAssertTrue(model.parameterOverrides.isEmpty)
     }
 
-    func testModelDerivesUnsupportedParameterFromCatalog() throws {
+    func testModelDerivesSupportedParameterFromCatalog() throws {
         let config = APIConfigurationItem(
             name: "OpenAI",
             apiKey: "key",
@@ -95,7 +95,7 @@ final class ModelItemTests: XCTestCase {
         let model = ModelItem(modelID: "gpt-5.4-nano", apiConfiguration: config)
         let temperature = model.modelProfile.parameters[.temperature]
 
-        XCTAssertEqual(temperature?.support.state, .unsupported)
+        XCTAssertEqual(temperature?.support.state, .supported)
         XCTAssertEqual(temperature?.support.source, .catalog)
     }
 

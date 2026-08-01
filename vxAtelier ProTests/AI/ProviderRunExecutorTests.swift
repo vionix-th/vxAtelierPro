@@ -19,7 +19,7 @@ final class ProviderRunExecutorTests: LLMTestCase {
         let conversation = env.createConversation()
         var options = LLMGenerationOptions(streamMode: .enabled)
         options.modelID = "gpt-4.1-mini"
-        let request = LLMGenerationRequest.runtimeEquivalent(
+        let request = try LLMGenerationRequest.runtimeEquivalent(
             providerID: .openAIPlatform,
             adapterID: .openAIResponses,
             modelID: "gpt-4.1-mini",
@@ -51,7 +51,7 @@ final class ProviderRunExecutorTests: LLMTestCase {
         XCTAssertEqual(result.text, "Hello")
         XCTAssertEqual(sink.text, "Hello")
         XCTAssertEqual(sink.toolCalls.first?.name, "lookup")
-        XCTAssertEqual(result.toolCalls.first?.argumentsJSON, "{\"q\":\"test\"}")
+        try assertJSONEqual(result.toolCalls.first?.argumentsJSON, "{\"q\":\"test\"}")
         XCTAssertEqual(result.usage.totalTokens, 12)
     }
 
@@ -87,6 +87,41 @@ final class ProviderRunExecutorTests: LLMTestCase {
                 return XCTFail("Expected invalidConfiguration, got \(error).")
             }
             XCTAssertTrue(message.contains("does not match request adapter"))
+        }
+    }
+
+    func testProviderRunExecutorRejectsRequestProviderMismatch() async throws {
+        let environment = TestEnvironment()
+        let conversation = environment.createConversation()
+        let request = LLMGenerationRequest(
+            providerID: .custom,
+            adapterID: .openAIResponses,
+            modelID: "gpt-test",
+            messages: [LLMMessage(role: "user", content: [LLMContentPart(kind: .text, text: "Hello")])]
+        )
+        let route = LLMResolvedProviderRoute(
+            providerID: .openAIPlatform,
+            adapterID: .openAIResponses,
+            configuration: LLMProviderConfiguration(
+                providerID: .openAIPlatform,
+                baseURL: "https://unit.test/v1"
+            )
+        )
+
+        do {
+            _ = try await ProviderRunExecutor().performRun(
+                request: request,
+                resolvedRoute: route,
+                draftSink: RecordingDraftSink(),
+                conversationID: conversation.id,
+                retryPolicy: .disabled
+            )
+            XCTFail("Expected the executor to reject a request/route provider mismatch.")
+        } catch let error as LLMProviderError {
+            guard case .invalidConfiguration(let message) = error else {
+                return XCTFail("Expected invalidConfiguration, got \(error).")
+            }
+            XCTAssertTrue(message.contains("does not match request provider"))
         }
     }
 

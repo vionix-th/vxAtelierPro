@@ -65,6 +65,69 @@ final class LLMCoreTypesTests: XCTestCase {
         }
     }
 
+    func testRouteResolverEnforcesDeclaredRoutesDefaultsAndAuthentication() throws {
+        let registry = LLMProviderRegistry.shared
+
+        for providerID in LLMProviderID.allCases {
+            let profile = registry.profile(for: providerID)
+            for adapterID in LLMAdapterID.allCases {
+                let configuration = LLMProviderConfiguration(
+                    providerID: providerID,
+                    baseURL: ""
+                )
+
+                guard let route = profile.route(for: adapterID) else {
+                    XCTAssertThrowsError(try LLMProviderRouteResolver.resolve(
+                        profile: profile,
+                        adapterID: adapterID,
+                        configuration: configuration
+                    )) { error in
+                        guard case .invalidConfiguration = error as? LLMProviderError else {
+                            return XCTFail("Expected invalidConfiguration for \(providerID.rawValue)/\(adapterID.rawValue), got \(error)")
+                        }
+                    }
+                    continue
+                }
+
+                let resolved = try LLMProviderRouteResolver.resolve(
+                    profile: profile,
+                    adapterID: adapterID,
+                    configuration: configuration
+                )
+                XCTAssertEqual(resolved.providerID, providerID)
+                XCTAssertEqual(resolved.adapterID, adapterID)
+                XCTAssertEqual(resolved.configuration.providerID, providerID)
+                XCTAssertEqual(resolved.configuration.authKind, route.defaultAuthKind)
+                XCTAssertEqual(
+                    resolved.configuration.baseURL,
+                    route.requiresBaseURL ? route.defaultBaseURL : ""
+                )
+
+                if let rejectedAuthKind = LLMAuthKind.allCases.first(where: {
+                    !route.allowedAuthKinds.contains($0)
+                }) {
+                    var rejectedConfiguration = configuration
+                    rejectedConfiguration.authKind = rejectedAuthKind
+                    XCTAssertThrowsError(try LLMProviderRouteResolver.resolve(
+                        profile: profile,
+                        adapterID: adapterID,
+                        configuration: rejectedConfiguration
+                    ))
+                }
+            }
+        }
+
+        let openAIProfile = registry.profile(for: .openAIPlatform)
+        XCTAssertThrowsError(try LLMProviderRouteResolver.resolve(
+            profile: openAIProfile,
+            adapterID: .openAIResponses,
+            configuration: LLMProviderConfiguration(
+                providerID: .custom,
+                baseURL: "https://unit.test/v1"
+            )
+        ))
+    }
+
     func testCustomSupportsEveryRemoteAdapterAndAuthKind() {
         let profile = LLMProviderRegistry.shared.profile(for: .custom)
         XCTAssertEqual(Set(profile.supportedAdapterIDs), Set(LLMAdapterID.allCases.filter(\.isRemote)))
@@ -106,7 +169,34 @@ final class LLMCoreTypesTests: XCTestCase {
         XCTAssertEqual(headers["Authorization"], "Bearer secret")
         XCTAssertEqual(headers["X-Trace"], "trace")
 
+        configuration.authKind = LLMAuthKind.xAPIKey.rawValue
+        configuration.decodedHeaders = ["X-API-Key": "entered-value", "X-Trace": "trace"]
+        let xAPIKeyHeaders = LLMProviderHeaderResolver.headers(
+            for: try configuration.makeLLMProviderConfiguration()
+        )
+        XCTAssertEqual(xAPIKeyHeaders["x-api-key"], "secret")
+        XCTAssertNil(xAPIKeyHeaders["X-API-Key"])
+        XCTAssertEqual(xAPIKeyHeaders["X-Trace"], "trace")
+
+        configuration.authKind = LLMAuthKind.none.rawValue
+        configuration.decodedHeaders = ["Authorization": "entered-value"]
+        let unauthenticatedHeaders = LLMProviderHeaderResolver.headers(
+            for: try configuration.makeLLMProviderConfiguration()
+        )
+        XCTAssertEqual(unauthenticatedHeaders["Authorization"], "entered-value")
+
+        configuration.authKind = LLMAuthKind.customHeaders.rawValue
+        configuration.decodedHeaders = ["Authorization": "custom-value", "X-Trace": "trace"]
+        let customHeaders = LLMProviderHeaderResolver.headers(
+            for: try configuration.makeLLMProviderConfiguration()
+        )
+        XCTAssertEqual(customHeaders["Authorization"], "custom-value")
+        XCTAssertEqual(customHeaders["X-Trace"], "trace")
+
         configuration.decodedHeaders = ["X-Test": "one", "x-test": "two"]
+        XCTAssertThrowsError(try configuration.makeLLMProviderConfiguration())
+
+        configuration.decodedHeaders = ["   ": "value"]
         XCTAssertThrowsError(try configuration.makeLLMProviderConfiguration())
     }
 
@@ -213,8 +303,8 @@ final class LLMCoreTypesTests: XCTestCase {
         XCTAssertTrue(deepSeek?.capabilities?.contains(.tools) ?? false)
     }
 
-    func testResolverProvidesUnknownFallbackProfile() {
-        let catalog = try! LLMDefaultsCatalog(data: Data("""
+    func testResolverProvidesUnknownFallbackProfile() throws {
+        let catalog = try LLMDefaultsCatalog(data: Data("""
         {
           "providerDefaults": [],
           "rules": []
